@@ -1,0 +1,14 @@
+<odoo>
+    <record id="etat_a_facturer" model="souscription.etat">
+        <field name="name">À facturer</field>
+        <field name="sequence">1</field>
+    </record>
+    <record id="etat_facture" model="souscription.etat">
+        <field name="name">Facturé</field>
+        <field name="sequence">2</field>
+    </record>
+    <record id="etat_annule" model="souscription.etat">
+        <field name="name">Annulé</field>
+        <field name="sequence">3</field>
+    </record>
+</odoo>

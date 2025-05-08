@@ -1,0 +1,51 @@
+<odoo>
+    <record id="view_souscription_form" model="ir.ui.view">
+        <field name="name">souscription.form</field>
+        <field name="model">souscription</field>
+        <field name="type">form</field>
+        <field name="arch" type="xml">
+            <form string="Souscription">
+                <sheet>
+                    <group>
+                        <field name="name" />
+                        <field name="client_id" />
+                        <field name="date_debut" />
+                        <field name="date_fin" />
+                        <field name="active" />
+                        <field name="etat_facturation_id"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="view_souscription_kanban" model="ir.ui.view">
+        <field name="name">souscription.kanban</field>
+        <field name="model">souscription</field>
+        <field name="type">kanban</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="etat_facturation_id">
+                <field name="etat_facturation_id"/>
+                <templates>
+                    <t t-name="kanban-box">
+                        <div class="oe_kanban_global_click">
+                            <strong><field name="name"/></strong><br/>
+                            <span><field name="etat_facturation_id"/></span>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="action_souscription" model="ir.actions.act_window">
+        <field name="name">Souscriptions</field>
+        <field name="res_model">souscription</field>
+        <field name="view_mode">kanban,form</field>
+    </record>
+
+    <menuitem
+        id="menu_souscription_root"
+        name="Souscriptions"
+        action="action_souscription"
+        sequence="10" />
+</odoo>

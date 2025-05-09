@@ -11,7 +11,7 @@
                 <sheet>
                     <group>
                         <field name="name" />
-                        <field name="client_id" />
+                        <field name="partner_id" />
                         <field name="date_debut" />
                         <field name="date_fin" />
                         <field name="active" />
@@ -20,7 +20,8 @@
                 </sheet>
                 <notebook>
                     <page string="Factures">
-                        <field name="facture_ids" context="{'default_move_type': 'out_invoice'}">
+                        <field name="facture_ids" 
+                            context="{'default_move_type': 'out_invoice', 'default_partner_id': partner_id}">
                           <list>
                             <field name="name"/>
                             <field name="invoice_date"/>
@@ -40,7 +41,7 @@
         <field name="arch" type="xml">
           <list string="Souscriptions">
             <field name="name"/>
-            <field name="client_id"/>
+            <field name="partner_id"/>
             <field name="date_debut"/>
             <field name="date_fin"/>
             <field name="active"/>

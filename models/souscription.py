@@ -1,4 +1,4 @@
-from odoo import models, fields
+from odoo import models, fields, api
 
 class SouscriptionEtat(models.Model):
     _name = 'souscription.etat'
@@ -14,8 +14,8 @@ class Souscription(models.Model):
     _description = 'Souscription Électricité'
     _inherit = ['mail.thread']
 
-    name = fields.Char(string='Nom', required=True, tracking=True)
-    client_id = fields.Many2one('res.partner', string='Client')
+    name = fields.Char(string='Référence', required=True, copy=False, readonly=True, default='Nouveau')
+    partner_id = fields.Many2one('res.partner', string='Souscripteur·trice')
     date_debut = fields.Date(string='Date de début')
     date_fin = fields.Date(string='Date de fin')
     active = fields.Boolean(string='Active', default=True)
@@ -26,11 +26,18 @@ class Souscription(models.Model):
     )
     facture_ids = fields.One2many('account.move', 'souscription_id', string='Factures')
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('name', 'Nouveau') == 'Nouveau':
+                vals['name'] = self.env['ir.sequence'].next_by_code('souscription.sequence') or 'Nouveau'
+        return super().create(vals_list)
+    
     def action_creer_facture(self):
         self.ensure_one()
         facture = self.env['account.move'].create({
             'move_type': 'out_invoice',
-            'partner_id': self.client_id.id,
+            'partner_id': self.partner_id.id,
             'invoice_date': fields.Date.today(),
             'souscription_id': self.id,
             'invoice_line_ids': [(0, 0, {

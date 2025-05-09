@@ -1,7 +1,7 @@
 {
     "name": "Souscriptions",
     "version": "0.1.0",
-    "depends": ["base", "contacts"],
+    "depends": ["base", "mail", "contacts"],
     "author": "Virgile Daugé",
     "category": "Category",
     "license": "AGPL-3",

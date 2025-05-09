@@ -57,14 +57,20 @@ class Souscription(models.Model):
         return super().create(vals_list)
     
     def creer_factures(self):
-        product_template = self.env.ref('souscriptions.souscriptions_product_template_abonnement')
-        factures = self.env['account.move']
+        
+        #factures = self.env['account.move']
 
         _logger.info(f"Créer factures appelé pour {len(self)} souscriptions")
 
         for souscription in self:
             if not souscription.partner_id or not souscription.puissance_souscrite:
                 continue
+
+            product_template = self.env.ref(
+                'souscriptions.souscriptions_product_template_abonnement_solidaire'
+                if souscription.tarif_solidaire
+                else 'souscriptions.souscriptions_product_template_abonnement'
+            )
 
             variant = product_template.product_variant_ids.filtered(
                 lambda p: p.product_template_attribute_value_ids.filtered(
@@ -86,17 +92,6 @@ class Souscription(models.Model):
                     # 'price_unit': variant.list_price,
                 })],
             })
-
-        def action_creer_factures(self):
-            self.creer_factures()
-            return {
-                'type': 'ir.actions.act_window',
-                'name': 'Factures créées',
-                'res_model': 'account.move',
-                'view_mode': 'tree,form',
-                'domain': [('souscription_id', 'in', self.ids)],
-                'target': 'current',
-            }
     
-    def button_creer_factures(self):
-        self.creer_factures()
+    # def button_creer_factures(self):
+    #     self.creer_factures()

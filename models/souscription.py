@@ -1,5 +1,6 @@
 from odoo import models, fields, api
 from odoo.exceptions import UserError
+from datetime import date, timedelta
 
 import logging
 _logger = logging.getLogger(__name__)
@@ -26,8 +27,15 @@ class Souscription(models.Model):
         string="État de facturation",
         required=True
     )
-    facture_ids = fields.One2many('account.move', 'souscription_id', string='Factures')
-
+    facture_ids = fields.One2many(
+        'account.move',
+        'souscription_id',
+        string='Factures')
+    periode_ids = fields.One2many(
+        'souscription.periode', 
+        'souscription_id', 
+        string='Périodes de facturation'
+    )
     # Données métier 
 
     ## Utiles facturation
@@ -91,6 +99,28 @@ class Souscription(models.Model):
                     'quantity': 30.5,
                     # 'price_unit': variant.list_price,
                 })],
+            })
+    @api.model
+    def ajouter_periodes_mensuelles(self):
+        """
+        Crée une période de facturation (du 1er au dernier jour du mois précédent)
+        pour chaque souscription active.
+        """
+        # Calcul du 1er jour du mois en cours
+        premier_mois_courant = date.today().replace(day=1)
+
+        # 1er jour du mois précédent
+        premier_mois_precedent = (premier_mois_courant - timedelta(days=1)).replace(day=1)
+
+        souscriptions = self.search([('active', '=', True)])
+        for souscription in souscriptions:
+            self.env['souscription.periode'].create({
+                'souscription_id': souscription.id,
+                'date_debut': premier_mois_precedent,
+                'date_fin': premier_mois_courant,
+                'energie_kwh': 0,
+                'turpe_fixe': 0,
+                'turpe_variable': 0,
             })
     
     # def button_creer_factures(self):

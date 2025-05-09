@@ -80,8 +80,8 @@ class Souscription(models.Model):
                 'invoice_line_ids': [(0, 0, {
                     'product_id': variant.id,
                     'name': variant.name,
-                    'quantity': 1,
-                    'price_unit': variant.list_price,
+                    'quantity': 30.5,
+                    # 'price_unit': variant.list_price,
                 })],
             })
 

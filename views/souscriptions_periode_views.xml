@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_souscription_periode_list" model="ir.ui.view">
+        <field name="name">souscription.periode.list</field>
+        <field name="model">souscription.periode</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="souscription_id"/>
+                <field name="date_debut"/>
+                <field name="date_fin"/>
+                <field name="jours"/>
+                <field name="energie_kwh"/>
+                <field name="turpe_fixe"/>
+                <field name="turpe_variable"/>
+                <field name="facture_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_souscription_periode" model="ir.actions.act_window">
+        <field name="name">Périodes de facturation</field>
+        <field name="res_model">souscription.periode</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_souscription_periode_list"/>
+    </record>
+
+    <menuitem
+        id="menu_souscription_periode"
+        name="Périodes de facturation"
+        parent="menu_souscription_root"
+        action="action_souscription_periode"
+        sequence="20"/>
+</odoo>

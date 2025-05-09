@@ -5,6 +5,9 @@
         <field name="type">form</field>
         <field name="arch" type="xml">
             <form string="Souscription">
+                <header>
+                    <button name="action_creer_facture" type="object" string="Créer une facture" class="btn-primary"/>
+                </header>
                 <sheet>
                     <group>
                         <field name="name" />
@@ -15,6 +18,18 @@
                         <field name="etat_facturation_id"/>
                     </group>
                 </sheet>
+                <notebook>
+                    <page string="Factures">
+                        <field name="facture_ids" context="{'default_move_type': 'out_invoice'}">
+                          <list>
+                            <field name="name"/>
+                            <field name="invoice_date"/>
+                            <field name="amount_total"/>
+                            <field name="state"/>
+                          </list>
+                        </field>
+                      </page>
+                </notebook>
                 <chatter open_attachments="True"/>
             </form>
         </field>

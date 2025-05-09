@@ -24,3 +24,26 @@ class Souscription(models.Model):
         string="État de facturation",
         required=True
     )
+    facture_ids = fields.One2many('account.move', 'souscription_id', string='Factures')
+
+    def action_creer_facture(self):
+        self.ensure_one()
+        facture = self.env['account.move'].create({
+            'move_type': 'out_invoice',
+            'partner_id': self.client_id.id,
+            'invoice_date': fields.Date.today(),
+            'souscription_id': self.id,
+            'invoice_line_ids': [(0, 0, {
+                'name': f'Facture liée à la souscription {self.name}',
+                'quantity': 1,
+                'price_unit': 100.0,  # ou dynamique
+            })],
+        })
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Facture',
+            'res_model': 'account.move',
+            'res_id': facture.id,
+            'view_mode': 'form',
+            'target': 'current',
+        }

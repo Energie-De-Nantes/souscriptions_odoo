@@ -1,7 +1,7 @@
 {
     "name": "Souscriptions",
     "version": "0.1.0",
-    "depends": ["base", "mail", "contacts"],
+    "depends": ["base", "mail", "contacts", "account"],
     "author": "Virgile Daugé",
     "category": "Category",
     "license": "AGPL-3",
@@ -12,9 +12,9 @@
     "application": True,
     "auto_install": False, 
 
-    'data': [
-        'security/ir.model.access.csv',
-        'views/souscription_views.xml',
-        'data/souscription_etat_data.xml',
+    "data": [
+        "security/ir.model.access.csv",
+        "views/souscription_views.xml",
+        "data/souscription_etat_data.xml",
     ],
 }

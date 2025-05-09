@@ -37,4 +37,20 @@
             ref('souscriptions_val_puissance_9')
         ])]"/>
     </record>
+
+    <!-- Produit Abonnement Solidaire (copie d'Abonnement sans TVA) -->
+    <record id="souscriptions_product_template_abonnement_solidaire" model="product.template">
+        <field name="name">Abonnement Solidaire</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="taxes_id" eval="[(6, 0, [])]"/>
+    </record>
+
+    <!-- Lignes d'attribut pour Abonnement Solidaire (réutilise l’attribut existant) -->
+    <record id="souscriptions_product_abonnement_solidaire_attribute_line" model="product.template.attribute.line">
+        <field name="product_tmpl_id" ref="souscriptions_product_template_abonnement_solidaire"/>
+        <field name="attribute_id" ref="souscriptions_attr_puissance"/>
+        <field name="value_ids" eval="[(6, 0, [ref('souscriptions_val_puissance_3'), ref('souscriptions_val_puissance_6'), ref('souscriptions_val_puissance_9')])]"/>
+    </record>
 </odoo>

@@ -1,4 +1,5 @@
 from odoo import models, fields, api
+from babel.dates import format_date
 
 class SouscriptionPeriode(models.Model):
     _name = 'souscription.periode'
@@ -9,6 +10,7 @@ class SouscriptionPeriode(models.Model):
     
     date_debut = fields.Date(required=True)
     date_fin = fields.Date(required=True)
+    mois_annee = fields.Char(string='Mois', compute='_compute_mois_annee', store=True, readonly=True)
 
     lisse = fields.Boolean(related='souscription_id.lisse', string='Lissé', store=True)
 
@@ -50,3 +52,12 @@ class SouscriptionPeriode(models.Model):
         for p in self:
             if not p._fix_provision:
                 p.provision_kwh = p.energie_kwh
+                
+
+    @api.depends('date_debut')
+    def _compute_mois_annee(self):
+        for rec in self:
+            if rec.date_debut:
+                rec.mois_annee = format_date(rec.date_debut, format='MMMM yyyy', locale='fr_FR').capitalize()
+            else:
+                rec.mois_annee = ''

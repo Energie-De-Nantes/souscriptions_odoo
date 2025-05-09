@@ -40,6 +40,7 @@
                       <page string="Périodes de facturation">
                         <field name="periode_ids">
                             <list editable="bottom">
+                                <field name="mois_annee"/>
                                 <field name="date_debut"/>
                                 <field name="date_fin"/>
                                 <field name="energie_kwh"/>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+    <!-- Attribut "Puissance" -->
+    <record id="souscriptions_attr_puissance" model="product.attribute">
+        <field name="name">Puissance</field>
+    </record>
+
+    <!-- Valeurs d'attribut -->
+    <record id="souscriptions_val_puissance_3" model="product.attribute.value">
+        <field name="name">3 kVA</field>
+        <field name="attribute_id" ref="souscriptions_attr_puissance"/>
+    </record>
+    <record id="souscriptions_val_puissance_6" model="product.attribute.value">
+        <field name="name">6 kVA</field>
+        <field name="attribute_id" ref="souscriptions_attr_puissance"/>
+    </record>
+    <record id="souscriptions_val_puissance_9" model="product.attribute.value">
+        <field name="name">9 kVA</field>
+        <field name="attribute_id" ref="souscriptions_attr_puissance"/>
+    </record>
+
+    <!-- Template produit Abonnement -->
+    <record id="souscriptions_product_template_abonnement" model="product.template">
+        <field name="name">Abonnement</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+    </record>
+
+    <!-- Lignes d'attribut pour le produit -->
+    <record id="souscriptions_product_abonnement_attribute_line" model="product.template.attribute.line">
+        <field name="product_tmpl_id" ref="souscriptions_product_template_abonnement"/>
+        <field name="attribute_id" ref="souscriptions_attr_puissance"/>
+        <field name="value_ids" eval="[(6, 0, [
+            ref('souscriptions_val_puissance_3'),
+            ref('souscriptions_val_puissance_6'),
+            ref('souscriptions_val_puissance_9')
+        ])]"/>
+    </record>
+</odoo>

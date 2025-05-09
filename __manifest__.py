@@ -17,5 +17,6 @@
         "data/souscription_sequence.xml",
         "views/souscription_views.xml",
         "data/souscription_etat_data.xml",
+        "data/produits_abonnement.xml",
     ],
 }

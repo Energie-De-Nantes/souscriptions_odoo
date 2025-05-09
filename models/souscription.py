@@ -16,8 +16,6 @@ class Souscription(models.Model):
 
     name = fields.Char(string='Référence', required=True, copy=False, readonly=True, default='Nouveau')
     partner_id = fields.Many2one('res.partner', string='Souscripteur·trice')
-    date_debut = fields.Date(string='Date de début')
-    date_fin = fields.Date(string='Date de fin')
     active = fields.Boolean(string='Active', default=True)
     etat_facturation_id = fields.Many2one(
         'souscription.etat',

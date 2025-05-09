@@ -12,8 +12,6 @@
                     <group>
                         <field name="name" />
                         <field name="partner_id" />
-                        <field name="date_debut" />
-                        <field name="date_fin" />
                         <field name="active" />
                         <field name="etat_facturation_id"/>
                     </group>
@@ -51,8 +49,6 @@
           <list string="Souscriptions">
             <field name="name"/>
             <field name="partner_id"/>
-            <field name="date_debut"/>
-            <field name="date_fin"/>
             <field name="active"/>
           </list>
         </field>

@@ -39,10 +39,22 @@ class Souscription(models.Model):
     # Données métier 
 
     ## Utiles facturation
-    puissance_souscrite = fields.Integer(
-        string='Puissance souscrite (kVA)', 
-        required=True,
-        tracking=True)
+    puissance_souscrite = fields.Selection(
+    selection=[
+        ('3', '3 kVA'),
+        ('6', '6 kVA'),
+        ('9', '9 kVA'),
+        ('12', '12 kVA'),
+        ('15', '15 kVA'),
+        ('18', '18 kVA'),
+        ('24', '24 kVA'),
+        ('30', '30 kVA'),
+        ('36', '36 kVA'),
+    ],
+    string='Puissance souscrite (kVA)',
+    required=True,
+    tracking=True
+    )
     type_tarif = fields.Selection(
         [('base', 'Base'), ('hphc', 'Heures Pleines / Heures Creuses')],
         default='base',

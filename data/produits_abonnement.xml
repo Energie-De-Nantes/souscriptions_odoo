@@ -18,6 +18,30 @@
         <field name="name">9 kVA</field>
         <field name="attribute_id" ref="souscriptions_attr_puissance"/>
     </record>
+    <record id="souscriptions_val_puissance_12" model="product.attribute.value">
+        <field name="name">12 kVA</field>
+        <field name="attribute_id" ref="souscriptions_attr_puissance"/>
+    </record>
+    <record id="souscriptions_val_puissance_15" model="product.attribute.value">
+        <field name="name">15 kVA</field>
+        <field name="attribute_id" ref="souscriptions_attr_puissance"/>
+    </record>
+    <record id="souscriptions_val_puissance_18" model="product.attribute.value">
+        <field name="name">18 kVA</field>
+        <field name="attribute_id" ref="souscriptions_attr_puissance"/>
+    </record>
+    <record id="souscriptions_val_puissance_24" model="product.attribute.value">
+        <field name="name">24 kVA</field>
+        <field name="attribute_id" ref="souscriptions_attr_puissance"/>
+    </record>
+    <record id="souscriptions_val_puissance_30" model="product.attribute.value">
+        <field name="name">30 kVA</field>
+        <field name="attribute_id" ref="souscriptions_attr_puissance"/>
+    </record>
+    <record id="souscriptions_val_puissance_36" model="product.attribute.value">
+        <field name="name">36 kVA</field>
+        <field name="attribute_id" ref="souscriptions_attr_puissance"/>
+    </record>
 
     <!-- Template produit Abonnement -->
     <record id="souscriptions_product_template_abonnement" model="product.template">
@@ -34,7 +58,13 @@
         <field name="value_ids" eval="[(6, 0, [
             ref('souscriptions_val_puissance_3'),
             ref('souscriptions_val_puissance_6'),
-            ref('souscriptions_val_puissance_9')
+            ref('souscriptions_val_puissance_9'),
+            ref('souscriptions_val_puissance_12'),
+            ref('souscriptions_val_puissance_15'),
+            ref('souscriptions_val_puissance_18'),
+            ref('souscriptions_val_puissance_24'),
+            ref('souscriptions_val_puissance_30'),
+            ref('souscriptions_val_puissance_36')
         ])]"/>
     </record>
 

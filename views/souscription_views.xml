@@ -5,9 +5,6 @@
         <field name="type">form</field>
         <field name="arch" type="xml">
             <form string="Souscription">
-                <header>
-                    <button name="action_creer_facture" type="object" string="Créer une facture" class="btn-primary"/>
-                </header>
                 <sheet>
                     <group>
                         <field name="name" />
@@ -51,6 +48,17 @@
             <field name="partner_id"/>
             <field name="active"/>
           </list>
+        </field>
+    </record>
+    <!-- Action serveur (pour déclencher la méthode Python) -->
+    <record id="action_creer_factures" model="ir.actions.server">
+        <field name="name">Créer factures</field>
+        <field name="model_id" ref="model_souscription"/>
+        <field name="binding_model_id" ref="model_souscription"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">
+            records.creer_factures()
         </field>
     </record>
     <record id="view_souscription_kanban" model="ir.ui.view">

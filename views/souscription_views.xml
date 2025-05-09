@@ -17,6 +17,15 @@
                         <field name="active" />
                         <field name="etat_facturation_id"/>
                     </group>
+                    <group string="Caractéristiques facturantes">
+                        <field name="puissance_souscrite"/>
+                        <field name="type_tarif"/>
+                    </group>
+                    <group string="Infos">
+                        <field name="ref_compteur"/>
+                        <field name="numero_depannage" widget="phone"/>
+                    </group>
+                    
                 </sheet>
                 <notebook>
                     <page string="Factures">

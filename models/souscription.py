@@ -26,6 +26,25 @@ class Souscription(models.Model):
     )
     facture_ids = fields.One2many('account.move', 'souscription_id', string='Factures')
 
+    # Données métier 
+
+    ## Utiles facturation
+    puissance_souscrite = fields.Integer(
+        string='Puissance souscrite (kVA)', 
+        required=True,
+        tracking=True)
+    type_tarif = fields.Selection(
+        [('base', 'Base'), ('hphc', 'Heures Pleines / Heures Creuses')],
+        default='base',
+        string='Type de tarif',
+        required=True,
+        tracking=True
+    )
+
+    ## Informations
+    ref_compteur = fields.Char(string="Référence compteur")
+    numero_depannage = fields.Char(string="Numéro de dépannage")
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:

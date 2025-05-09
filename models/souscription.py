@@ -42,6 +42,8 @@ class Souscription(models.Model):
         required=True,
         tracking=True
     )
+    tarif_solidaire = fields.Boolean(string="Tarif solidaire", default=False, tracking=True)
+
 
     ## Informations
     ref_compteur = fields.Char(string="Référence compteur")

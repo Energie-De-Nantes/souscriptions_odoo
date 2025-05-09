@@ -15,6 +15,7 @@
                     <group string="Caractéristiques facturantes">
                         <field name="puissance_souscrite"/>
                         <field name="type_tarif"/>
+                        <field name="tarif_solidaire"/>
                     </group>
                     <group string="Infos">
                         <field name="ref_compteur"/>

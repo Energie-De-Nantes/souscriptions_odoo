@@ -10,14 +10,33 @@ class SouscriptionPeriode(models.Model):
     date_debut = fields.Date(required=True)
     date_fin = fields.Date(required=True)
 
+    lisse = fields.Boolean(related='souscription_id.lisse', string='Lissé', store=True)
+
     jours = fields.Integer(compute='_compute_jours', store=True)
     energie_kwh = fields.Float(string='Énergie consommée (kWh)')
+    provision_kwh = fields.Float(
+        string='Énergie provisionnée (kWh)',
+        compute='_compute_provision_kwh',
+        store=True,
+    )
+    _fix_provision = fields.Boolean(default=False)
     
     turpe_fixe = fields.Float(string='TURPE Fixe (€)')
     turpe_variable = fields.Float(string='TURPE Variable (€)')
 
     facture_id = fields.Many2one('account.move', string='Facture associée')
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            sous = self.env['souscription'].browse(vals['souscription_id'])
+
+            if sous.lisse and sous.provision_mensuelle_kwh:
+                vals['provision_kwh'] = sous.provision_mensuelle_kwh
+                vals['_fix_provision'] = True
+
+        return super().create(vals_list)
+    
     @api.depends('date_debut', 'date_fin')
     def _compute_jours(self):
         for p in self:
@@ -25,3 +44,9 @@ class SouscriptionPeriode(models.Model):
                 p.jours = (p.date_fin - p.date_debut).days
             else:
                 p.jours = 0
+
+    @api.depends('energie_kwh')
+    def _compute_provision_kwh(self):
+        for p in self:
+            if not p._fix_provision:
+                p.provision_kwh = p.energie_kwh

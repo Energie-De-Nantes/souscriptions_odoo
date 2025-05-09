@@ -39,6 +39,7 @@ class Souscription(models.Model):
     # Données métier 
 
     ## Utiles facturation
+    lisse = fields.Boolean(string='Lissé', default=False)
     puissance_souscrite = fields.Selection(
     selection=[
         ('3', '3 kVA'),
@@ -54,6 +55,11 @@ class Souscription(models.Model):
     string='Puissance souscrite (kVA)',
     required=True,
     tracking=True
+    )
+    provision_mensuelle_kwh = fields.Float(
+        string="Provision mensuelle (kWh)",
+        help="Énergie estimée mensuelle à facturer si lissage activé.",
+        tracking=True
     )
     type_tarif = fields.Selection(
         [('base', 'Base'), ('hphc', 'Heures Pleines / Heures Creuses')],

@@ -8,8 +8,10 @@
                 <field name="souscription_id"/>
                 <field name="date_debut"/>
                 <field name="date_fin"/>
+                <field name="lisse"/>
                 <field name="jours"/>
                 <field name="energie_kwh"/>
+                <field name="provision_kwh"/>
                 <field name="turpe_fixe"/>
                 <field name="turpe_variable"/>
                 <field name="facture_id"/>

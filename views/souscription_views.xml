@@ -14,6 +14,8 @@
                     </group>
                     <group string="Caractéristiques facturantes">
                         <field name="puissance_souscrite"/>
+                        <field name="lisse"/>
+                        <field name="provision_mensuelle_kwh" invisible="not lisse"/>
                         <field name="type_tarif"/>
                         <field name="tarif_solidaire"/>
                     </group>
@@ -64,28 +66,7 @@
           </list>
         </field>
     </record>
-    <!-- <record id="view_souscription_form_inherit_periodes" model="ir.ui.view">
-        <field name="name">souscription.form.periodes</field>
-        <field name="model">souscription</field>
-        <field name="inherit_id" ref="souscriptions.view_souscription_form"/>
-        <field name="arch" type="xml">
-            <xpath expr="//notebook" position="inside">
-                <page string="Périodes de facturation">
-                    <field name="periode_ids">
-                        <tree editable="bottom">
-                            <field name="date_debut"/>
-                            <field name="date_fin"/>
-                            <field name="energie_kwh"/>
-                            <field name="jours"/>
-                            <field name="turpe_fixe"/>
-                            <field name="turpe_variable"/>
-                            <field name="facture_id"/>
-                        </tree>
-                    </field>
-                </page>
-            </xpath>
-        </field>
-    </record> -->
+
     <!-- Action serveur (pour déclencher la méthode Python) -->
     <record id="action_creer_factures" model="ir.actions.server">
         <field name="name">Créer factures</field>

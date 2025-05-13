@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<odoo noupdate="1">
+<!-- noupdate="0" -->
+<odoo noupdate="1"> 
     <!-- Attribut "Puissance" -->
     <record id="souscriptions_attr_puissance" model="product.attribute">
         <field name="name">Puissance</field>
@@ -81,6 +82,16 @@
     <record id="souscriptions_product_abonnement_solidaire_attribute_line" model="product.template.attribute.line">
         <field name="product_tmpl_id" ref="souscriptions_product_template_abonnement_solidaire"/>
         <field name="attribute_id" ref="souscriptions_attr_puissance"/>
-        <field name="value_ids" eval="[(6, 0, [ref('souscriptions_val_puissance_3'), ref('souscriptions_val_puissance_6'), ref('souscriptions_val_puissance_9')])]"/>
+        <field name="value_ids" eval="[(6, 0, [
+            ref('souscriptions_val_puissance_3'),
+            ref('souscriptions_val_puissance_6'),
+            ref('souscriptions_val_puissance_9'),
+            ref('souscriptions_val_puissance_12'),
+            ref('souscriptions_val_puissance_15'),
+            ref('souscriptions_val_puissance_18'),
+            ref('souscriptions_val_puissance_24'),
+            ref('souscriptions_val_puissance_30'),
+            ref('souscriptions_val_puissance_36')
+        ])]"/>
     </record>
 </odoo>

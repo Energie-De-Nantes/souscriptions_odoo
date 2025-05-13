@@ -20,6 +20,10 @@
                         <field name="type_tarif"/>
                         <field name="tarif_solidaire"/>
                     </group>
+                    <group string="Paiement">
+                        <field name="mode_paiement"/>
+                    </group>
+                    
                     <group string="Infos">
                         <field name="ref_compteur"/>
                         <field name="numero_depannage" widget="phone"/>
@@ -42,12 +46,9 @@
                         <field name="periode_ids">
                             <list editable="bottom">
                                 <field name="mois_annee"/>
-                                <field name="date_debut"/>
-                                <field name="date_fin"/>
                                 <field name="energie_kwh"/>
                                 <field name="jours"/>
                                 <field name="turpe_fixe"/>
-                                <field name="turpe_variable"/>
                                 <field name="facture_id"/>
                             </list>
                         </field>
@@ -90,6 +91,14 @@
         <field name="code">
             records.ajouter_periodes_mensuelles()
         </field>
+    </record>
+    <record id="action_generer_lot_prelevement" model="ir.actions.server">
+        <field name="name">Générer lot prélèvement</field>
+        <field name="model_id" ref="souscriptions.model_souscription"/>
+        <field name="binding_model_id" ref="souscriptions.model_souscription"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">env['souscription'].generer_lot_prelevement_mensuel()</field>
     </record>
     <record id="view_souscription_kanban" model="ir.ui.view">
         <field name="name">souscription.kanban</field>

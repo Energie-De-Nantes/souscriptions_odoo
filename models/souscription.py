@@ -77,7 +77,16 @@ class Souscription(models.Model):
     )
     tarif_solidaire = fields.Boolean(string="Tarif solidaire", default=False, tracking=True)
     
+    ## Utiles paiement 
 
+    mode_paiement = fields.Selection([
+        ('prelevement', 'Prélèvement'),
+        ('cheque_energie', 'Chèque énergie'),
+        ('monnaie_locale', 'Monnaie locale'),
+        ('especes', 'Espèces'),
+        ('virement', 'Virement'),
+        ('cheque', 'Chèque'),
+    ], string="Mode de paiement", tracking=True)
     ## Informations
     ref_compteur = fields.Char(string="Référence compteur")
     numero_depannage = fields.Char(string="Numéro de dépannage")
@@ -135,6 +144,7 @@ class Souscription(models.Model):
                 })
 
             periode.facture_id = facture
+    
     @api.model
     def ajouter_periodes_mensuelles(self):
         """
@@ -159,6 +169,3 @@ class Souscription(models.Model):
                 'pdl': souscription.pdl,
                 'lisse': souscription.lisse,
             })
-    
-    # def button_creer_factures(self):
-    #     self.creer_factures()

@@ -95,9 +95,6 @@ class Souscription(models.Model):
             sous.facture_ids = sous.periode_ids.mapped('facture_id')
 
     def creer_factures(self):
-        
-        #factures = self.env['account.move']
-
         _logger.info(f"Créer factures appelé pour {len(self)} souscriptions")
 
         for souscription in self:
@@ -109,27 +106,35 @@ class Souscription(models.Model):
                 if souscription.tarif_solidaire
                 else 'souscriptions.souscriptions_product_template_abonnement'
             )
-
+            _logger.info(f"Produit {product_template}")
+            if not product_template:
+                raise UserError(f"Aucun produit trouvé")
+            
             variant = product_template.product_variant_ids.filtered(
-                lambda p: p.product_template_attribute_value_ids.filtered(
-                    lambda v: v.attribute_id.name == 'Puissance' and v.name == f"{souscription.puissance_souscrite} kVA"
+                lambda p: any(
+                    v.attribute_id.name == 'Puissance' and v.name.strip() == f"{int(souscription.puissance_souscrite)} kVA"
+                    for v in p.product_template_attribute_value_ids
                 )
             )
             if not variant:
                 raise UserError(f"Aucune variante produit pour {souscription.puissance_souscrite} kVA")
 
-            facture = self.env['account.move'].create({
-                'move_type': 'out_invoice',
-                'partner_id': souscription.partner_id.id,
-                'invoice_date': fields.Date.today(),
-                'souscription_id': souscription.id,
-                'invoice_line_ids': [(0, 0, {
-                    'product_id': variant.id,
-                    'name': variant.name,
-                    'quantity': 30.5,
-                    # 'price_unit': variant.list_price,
-                })],
-            })
+            # Pour chaque période sans facture
+            for periode in souscription.periode_ids.filtered(lambda p: not p.facture_id):
+                facture = self.env['account.move'].create({
+                    'move_type': 'out_invoice',
+                    'partner_id': souscription.partner_id.id,
+                    'invoice_date': periode.date_fin,
+                    'periode_id': periode.id,  # nouvelle archi
+                    'invoice_line_ids': [(0, 0, {
+                        'product_id': variant.id,
+                        'name': f"{variant.name} - {periode.mois_annee}",
+                        'quantity': periode.provision_kwh,
+                        # 'price_unit': variant.list_price,  # optionnel si pricelist
+                    })],
+                })
+
+            periode.facture_id = facture
     @api.model
     def ajouter_periodes_mensuelles(self):
         """

@@ -91,6 +91,11 @@ class Souscription(models.Model):
     ref_compteur = fields.Char(string="Référence compteur")
     numero_depannage = fields.Char(string="Numéro de dépannage")
 
+    historique_perimetre_ids = fields.One2many(
+        comodel_name="metier.perimetre",
+        compute="_compute_historique_perimetre",
+        string="Historique périmètre"
+    )
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -103,6 +108,15 @@ class Souscription(models.Model):
         for sous in self:
             sous.facture_ids = sous.periode_ids.mapped('facture_id')
 
+    @api.depends('pdl')
+    def _compute_historique_perimetre(self):
+        _logger.info(f"Calcul de l'historique")
+        for rec in self:
+            if rec.pdl:
+                rec.historique_perimetre_ids = self.env['metier.perimetre'].search([('pdl', '=', rec.pdl)])
+            else:
+                rec.historique_perimetre_ids = []
+    
     def creer_factures(self):
         _logger.info(f"Créer factures appelé pour {len(self)} souscriptions")
 

@@ -53,6 +53,16 @@
                             </list>
                         </field>
                     </page>
+                    <page string="Historique">
+                    <field name="historique_perimetre_ids">
+                        <list>
+                            <field name="date_evenement"/>
+                            <field name="evenement_declencheur"/>
+                            <field name="etat_contractuel"/>
+                            <field name="puissance_souscrite"/>
+                        </list>
+                    </field>
+                    </page>
                 </notebook>
                 <chatter open_attachments="True"/>
             </form>

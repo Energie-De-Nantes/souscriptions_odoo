@@ -6,13 +6,19 @@ class SouscriptionPeriode(models.Model):
     _description = 'Période de facturation énergétique'
     _order = 'date_debut'
 
-    souscription_id = fields.Many2one('souscription', required=True, ondelete='cascade', string='Souscription')
+    souscription_id = fields.Many2one(
+        'souscription', 
+        required=True,
+        readonly=True,
+        ondelete='cascade', 
+        string='Souscription')
     
-    date_debut = fields.Date(required=True)
-    date_fin = fields.Date(required=True)
+    date_debut = fields.Date(required=True, readonly=True)
+    date_fin = fields.Date(required=True, readonly=True)
     mois_annee = fields.Char(string='Mois', compute='_compute_mois_annee', store=True, readonly=True)
 
-    lisse = fields.Boolean(related='souscription_id.lisse', string='Lissé', store=True)
+    pdl = fields.Char(string="pdl", readonly=True)
+    lisse = fields.Boolean(string='Lissé', readonly=True) # related='souscription_id.lisse',  store=True)
 
     jours = fields.Integer(compute='_compute_jours', store=True)
     energie_kwh = fields.Float(string='Énergie consommée (kWh)')
@@ -21,7 +27,7 @@ class SouscriptionPeriode(models.Model):
         compute='_compute_provision_kwh',
         store=True,
     )
-    _fix_provision = fields.Boolean(default=False)
+    _fix_provision = fields.Boolean(default=False, readonly=True)
     
     turpe_fixe = fields.Float(string='TURPE Fixe (€)')
     turpe_variable = fields.Float(string='TURPE Variable (€)')

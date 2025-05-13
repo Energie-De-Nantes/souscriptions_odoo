@@ -13,6 +13,7 @@
                         <field name="etat_facturation_id"/>
                     </group>
                     <group string="Caractéristiques facturantes">
+                        <field name="pdl"/>
                         <field name="puissance_souscrite"/>
                         <field name="lisse"/>
                         <field name="provision_mensuelle_kwh" invisible="not lisse"/>
@@ -63,6 +64,7 @@
           <list string="Souscriptions">
             <field name="name"/>
             <field name="partner_id"/>
+            <field name="lisse"/>
             <field name="active"/>
           </list>
         </field>

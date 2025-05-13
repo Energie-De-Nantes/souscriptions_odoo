@@ -39,6 +39,7 @@ class Souscription(models.Model):
     # Données métier 
 
     ## Utiles facturation
+    pdl = fields.Char(string="pdl")
     lisse = fields.Boolean(string='Lissé', default=False)
     puissance_souscrite = fields.Selection(
     selection=[
@@ -69,7 +70,7 @@ class Souscription(models.Model):
         tracking=True
     )
     tarif_solidaire = fields.Boolean(string="Tarif solidaire", default=False, tracking=True)
-
+    
 
     ## Informations
     ref_compteur = fields.Char(string="Référence compteur")
@@ -139,6 +140,8 @@ class Souscription(models.Model):
                 'energie_kwh': 0,
                 'turpe_fixe': 0,
                 'turpe_variable': 0,
+                'pdl': souscription.pdl,
+                'lisse': souscription.lisse,
             })
     
     # def button_creer_factures(self):

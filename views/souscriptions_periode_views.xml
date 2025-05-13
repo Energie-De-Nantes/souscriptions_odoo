@@ -6,6 +6,8 @@
         <field name="arch" type="xml">
             <list>
                 <field name="souscription_id"/>
+                <field name="pdl"/>
+                <field name="mois_annee"/>
                 <field name="date_debut"/>
                 <field name="date_fin"/>
                 <field name="lisse"/>

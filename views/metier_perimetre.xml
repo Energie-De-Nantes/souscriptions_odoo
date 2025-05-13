@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!-- Vue liste sur les données périmètre -->
+    <record id="view_metier_perimetre_list" model="ir.ui.view">
+        <field name="name">metier.perimetre.list</field>
+        <field name="model">metier.perimetre</field>
+        <field name="arch" type="xml">
+            <list string="Historique Périmètre">
+                <field name="pdl"/>
+                <field name="date_evenement"/>
+                <field name="etat_contractuel"/>
+                <field name="evenement_declencheur"/>
+                <field name="puissance_souscrite"/>
+                <field name="ref_situation_contractuelle"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action fenêtre pour consulter les enregistrements -->
+    <record id="action_metier_perimetre" model="ir.actions.act_window">
+        <field name="name">Historique Périmètre</field>
+        <field name="res_model">metier.perimetre</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p>Consulte ici les données synthétiques du périmètre contractuel.</p>
+        </field>
+    </record>
+
+    <!-- Vue formulaire pour l'import -->
+    <record id="view_metier_perimetre_importer_form" model="ir.ui.view">
+        <field name="name">metier.perimetre.importer.form</field>
+        <field name="model">metier.perimetre.importer</field>
+        <field name="arch" type="xml">
+            <form string="Importer un fichier Parquet">
+                <group>
+                    <field name="fichier"/>
+                    <field name="filename"/>
+                </group>
+                <footer>
+                    <button name="action_import" type="object" string="Importer" class="btn-primary"/>
+                    <button string="Annuler" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action pour l'importeur -->
+    <record id="action_metier_perimetre_importer" model="ir.actions.act_window">
+        <field name="name">Importer un fichier Parquet</field>
+        <field name="res_model">metier.perimetre.importer</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Menus -->
+    <menuitem id="menu_metier_root" name="Métier" sequence="10"/>
+    <menuitem id="menu_perimetre" name="Périmètre" parent="menu_metier_root" sequence="20"/>
+
+    <menuitem id="menu_perimetre_donnees"
+              name="Historique"
+              parent="menu_perimetre"
+              action="action_metier_perimetre"
+              sequence="10"/>
+
+    <!-- Menu pour déclencher l'import -->
+    <menuitem id="menu_import_parquet"
+            name="Importer Parquet"
+            parent="menu_perimetre"
+            action="action_metier_perimetre_importer"
+            sequence="20"/>
+
+</odoo>

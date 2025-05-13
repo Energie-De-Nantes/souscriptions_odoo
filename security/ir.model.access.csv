@@ -2,3 +2,5 @@ id,name,model_id/id,group_id/id,perm_read,perm_write,perm_create,perm_unlink
 access_souscription_user,souscription,model_souscription,base.group_user,1,1,1,1
 access_souscription_periode_user,souscription.periode,model_souscription_periode,base.group_user,1,1,1,1
 access_souscription_etat_user,souscription.etat,model_souscription_etat,base.group_user,1,1,1,1
+access_metier_perimetre_user,access.metier.perimetre.user,model_metier_perimetre,base.group_user,1,1,1,1
+access_metier_perimetre_importer_user,access.metier.perimetre.importer.user,model_metier_perimetre_importer,base.group_user,1,0,1,0

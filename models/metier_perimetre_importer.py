@@ -31,6 +31,12 @@ class MetierPerimetreImporter(models.TransientModel):
 
     def action_import(self):
         df = self._parse_parquet_file()
+
+        RENAME_COLUMNS = {
+            col: col.lower().replace("à", "a").replace("è", "e").replace("é", "e").replace("ê", "e").replace("ç", "c")
+            for col in df.columns
+        }
+        df.rename(columns=RENAME_COLUMNS, inplace=True)
         nb_total = len(df)
         nb_imported = 0
         nb_skipped = 0
@@ -40,8 +46,8 @@ class MetierPerimetreImporter(models.TransientModel):
 
         for _, row in df.iterrows():
             if model.search([
-                ('ref_situation_contractuelle', '=', row['Ref_Situation_Contractuelle']),
-                ('date_evenement', '=', row['Date_Evenement'])
+                ('ref_situation_contractuelle', '=', row['ref_situation_contractuelle']),
+                ('date_evenement', '=', row['date_evenement'])
             ], limit=1):
                 nb_skipped += 1
                 continue

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Vue formulaire pour une prestation -->
+    <record id="view_metier_prestation_form" model="ir.ui.view">
+        <field name="name">metier.prestation.form</field>
+        <field name="model">metier.prestation</field>
+        <field name="arch" type="xml">
+            <form string="Ligne Prestation">
+                <sheet>
+                    <group string="Facturation">
+                        <field name="date_facture"/>
+                        <field name="num_facture"/>
+                        <field name="type_facturation"/>
+                    </group>
+                    <group string="Événement">
+                        <field name="id_ev"/>
+                        <field name="libelle_ev"/>
+                        <field name="nature_ev"/>
+                        <field name="date_debut"/>
+                        <field name="date_fin"/>
+                    </group>
+                    <group string="Montants">
+                        <field name="quantite"/>
+                        <field name="unite"/>
+                        <field name="prix_unitaire"/>
+                        <field name="montant_ht"/>
+                        <field name="taux_tva_applicable"/>
+                    </group>
+                    <group string="Références">
+                        <field name="pdl"/>
+                        <field name="source"/>
+                        <field name="marque"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Vue liste prestations -->
+    <record id="view_metier_prestation_list" model="ir.ui.view">
+        <field name="name">metier.prestation.list</field>
+        <field name="model">metier.prestation</field>
+        <field name="arch" type="xml">
+            <list string="Prestations facturées">
+                <field name="date_facture"/>
+                <field name="libelle_ev"/>
+                <field name="libelle_ev"/>
+                <field name="quantite"/>
+                <field name="montant_ht"/>
+                <field name="num_facture"/>
+                <field name="pdl"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Action fenêtre -->
+    <record id="action_metier_prestation" model="ir.actions.act_window">
+        <field name="name">Prestations</field>
+        <field name="res_model">metier.prestation</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p>Consulte ici les lignes de prestations issues de la facturation.</p>
+        </field>
+    </record>
+
+    <!-- Vue formulaire pour l'import -->
+    <record id="view_metier_prestation_importer_form" model="ir.ui.view">
+        <field name="name">metier.prestation.importer.form</field>
+        <field name="model">metier.prestation.importer</field>
+        <field name="arch" type="xml">
+            <form string="Importer un fichier Parquet">
+                <group>
+                    <field name="fichier"/>
+                    <field name="filename"/>
+                </group>
+                <footer>
+                    <button name="action_import" type="object" string="Importer" class="btn-primary"/>
+                    <button string="Annuler" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action pour l'importeur -->
+    <record id="action_metier_prestation_importer" model="ir.actions.act_window">
+        <field name="name">Importer un fichier Parquet</field>
+        <field name="res_model">metier.prestation.importer</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Menus -->
+    <menuitem id="menu_prestation" name="Prestations" parent="menu_metier_root" sequence="30"/>
+
+    <menuitem id="menu_prestation_donnees"
+              name="Historique"
+              parent="menu_prestation"
+              action="action_metier_prestation"
+              sequence="10"/>
+
+    <menuitem id="menu_import_prestation"
+              name="Importer Parquet"
+              parent="menu_prestation"
+              action="action_metier_prestation_importer"
+              sequence="20"/>
+</odoo>

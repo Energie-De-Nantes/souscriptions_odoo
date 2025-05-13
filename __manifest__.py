@@ -23,6 +23,7 @@
         "views/souscriptions_periode_views.xml",
 
         'views/metier_perimetre.xml',
+        'views/metier_prestation.xml',
 
     ],
 }

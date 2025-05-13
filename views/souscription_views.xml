@@ -63,6 +63,17 @@
                         </list>
                     </field>
                     </page>
+                    <page string="Prestations facturées">
+                        <field name="prestations_ids">
+                            <list>
+                                <field name="date_facture"/>
+                                <field name="libelle_ev"/>
+                                <field name="quantite"/>
+                                <field name="montant_ht"/>
+                                <field name="taux_tva_applicable"/>
+                            </list>
+                        </field>
+                    </page>
                 </notebook>
                 <chatter open_attachments="True"/>
             </form>

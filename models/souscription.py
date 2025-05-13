@@ -96,6 +96,12 @@ class Souscription(models.Model):
         compute="_compute_historique_perimetre",
         string="Historique périmètre"
     )
+
+    prestations_ids  = fields.One2many(
+        comodel_name="metier.prestation",
+        compute="_compute_prestations",
+        string="Prestations liées"
+    )
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -116,6 +122,14 @@ class Souscription(models.Model):
                 rec.historique_perimetre_ids = self.env['metier.perimetre'].search([('pdl', '=', rec.pdl)])
             else:
                 rec.historique_perimetre_ids = []
+    
+    @api.depends('pdl')
+    def _compute_prestations(self):
+        for rec in self:
+            if rec.pdl:
+                rec.prestations_ids  = self.env['metier.prestation'].search([('pdl', '=', rec.pdl)])
+            else:
+                rec.prestations_ids  = []
     
     def creer_factures(self):
         _logger.info(f"Créer factures appelé pour {len(self)} souscriptions")

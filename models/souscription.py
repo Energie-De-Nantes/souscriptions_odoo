@@ -27,10 +27,16 @@ class Souscription(models.Model):
         string="État de facturation",
         required=True
     )
+    # facture_ids = fields.One2many(
+    #     'account.move',
+    #     'souscription_id',
+    #     string='Factures')
     facture_ids = fields.One2many(
         'account.move',
-        'souscription_id',
-        string='Factures')
+        compute='_compute_factures_via_periodes',
+        string="Factures",
+        store=False
+    )
     periode_ids = fields.One2many(
         'souscription.periode', 
         'souscription_id', 
@@ -83,6 +89,11 @@ class Souscription(models.Model):
                 vals['name'] = self.env['ir.sequence'].next_by_code('souscription.sequence') or 'Nouveau'
         return super().create(vals_list)
     
+    @api.depends('periode_ids.facture_id')
+    def _compute_factures_via_periodes(self):
+        for sous in self:
+            sous.facture_ids = sous.periode_ids.mapped('facture_id')
+
     def creer_factures(self):
         
         #factures = self.env['account.move']

@@ -11,6 +11,8 @@
                         <field name="partner_id" />
                         <field name="active" />
                         <field name="etat_facturation_id"/>
+                        <field name="date_debut"/>
+                        <field name="date_fin"/>
                     </group>
                     <group string="Caractéristiques facturantes">
                         <field name="pdl"/>

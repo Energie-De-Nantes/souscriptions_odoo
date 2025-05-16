@@ -6,3 +6,5 @@ access_metier_perimetre_user,access.metier.perimetre.user,model_metier_perimetre
 access_metier_perimetre_importer_user,access.metier.perimetre.importer.user,model_metier_perimetre_importer,base.group_user,1,0,1,0
 access_metier_prestation_user,metier.prestation.user,model_metier_prestation,base.group_user,1,1,1,1
 access_metier_prestation_importer_user,metier.prestation.importer.user,model_metier_prestation_importer,base.group_user,1,0,1,0
+access_mesure_index_user,access_mesure_index_user,model_metier_mesure_index,base.group_user,1,1,1,1
+access_mesure_index_importer_user,access_mesure_index_importer_user,model_metier_mesure_index_importer,base.group_user,1,0,1,0

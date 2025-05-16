@@ -25,5 +25,7 @@
         'views/metier_perimetre.xml',
         'views/metier_prestation.xml',
 
+        'views/metier_mesure_index.xml',
+
     ],
 }

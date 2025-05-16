@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Vue formulaire pour une mesure index -->
+    <record id="view_mesure_index_form" model="ir.ui.view">
+        <field name="name">metier.mesure.index.form</field>
+        <field name="model">metier.mesure.index</field>
+        <field name="arch" type="xml">
+            <form string="Relevé Index">
+                <sheet>
+                    <group string="Relevé">
+                        <field name="date"/>
+                        <field name="pdl"/>
+                        <field name="souscription_id"/>
+                    </group>
+                    <group string="Valeurs mesurées">
+                        <field name="hph"/>
+                        <field name="hpb"/>
+                        <field name="hch"/>
+                        <field name="hcb"/>
+                        <!-- <field name="hp"/>
+                        <field name="hc"/>
+                        <field name="base"/> -->
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Vue liste des index -->
+    <record id="view_mesure_index_list" model="ir.ui.view">
+        <field name="name">metier.mesure.index.list</field>
+        <field name="model">metier.mesure.index</field>
+        <field name="arch" type="xml">
+            <list string="Historique Index">
+                <field name="date"/>
+                <field name="pdl"/>
+                <field name="souscription_id"/>
+                <field name="hph"/>
+                <field name="hpb"/>
+                <field name="hch"/>
+                <field name="hcb"/>
+                <!-- <field name="hp"/>
+                <field name="hc"/>
+                <field name="base"/> -->
+            </list>
+        </field>
+    </record>
+
+    <!-- Action fenêtre -->
+    <record id="action_mesure_index" model="ir.actions.act_window">
+        <field name="name">Relevés d’index</field>
+        <field name="res_model">metier.mesure.index</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p>Consulte ici les relevés mensuels utilisés pour la facturation.</p>
+        </field>
+    </record>
+
+    <!-- Vue formulaire pour l'import -->
+    <record id="view_mesure_index_importer_form" model="ir.ui.view">
+        <field name="name">metier.mesure.index.importer.form</field>
+        <field name="model">metier.mesure.index.importer</field>
+        <field name="arch" type="xml">
+            <form string="Importer un fichier Parquet">
+                <group>
+                    <field name="fichier"/>
+                    <field name="filename"/>
+                </group>
+                <footer>
+                    <button name="action_import" type="object" string="Importer" class="btn-primary"/>
+                    <button string="Annuler" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action pour l'importeur -->
+    <record id="action_mesure_index_importer" model="ir.actions.act_window">
+        <field name="name">Importer un fichier Parquet</field>
+        <field name="res_model">metier.mesure.index.importer</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Menus -->
+    <menuitem id="menu_index" name="Index" parent="menu_metier_root" sequence="40"/>
+
+    <menuitem id="menu_index_donnees"
+              name="Historique"
+              parent="menu_index"
+              action="action_mesure_index"
+              sequence="10"/>
+
+    <menuitem id="menu_import_index"
+              name="Importer Parquet"
+              parent="menu_index"
+              action="action_mesure_index_importer"
+              sequence="20"/>
+</odoo>

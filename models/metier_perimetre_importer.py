@@ -44,6 +44,9 @@ class MetierPerimetreImporter(models.TransientModel):
         model = self.env['metier.perimetre']
         fields_dict = self.env['metier.perimetre']._fields
 
+        index_model = self.env['metier.mesure.index']
+        sous_model = self.env['souscription']
+
         for _, row in df.iterrows():
             if model.search([
                 ('ref_situation_contractuelle', '=', row['ref_situation_contractuelle']),
@@ -51,27 +54,59 @@ class MetierPerimetreImporter(models.TransientModel):
             ], limit=1):
                 nb_skipped += 1
                 continue
+            index_avant = None
+            
+            # Création index AVANT
+            if is_valid(row.get('avant_date_releve')):
+                date = row['avant_date_releve']
+                index_avant = index_model.create({
+                    'date': date,
+                    'pdl': row['pdl'],
+                    'hph': row.get('avant_hph'),
+                    'hpb': row.get('avant_hpb'),
+                    'hch': row.get('avant_hch'),
+                    'hcb': row.get('avant_hcb'),
+                    'source': 'périmètre',
+                    'souscription_id': (
+                        sous_model.search([
+                            ("pdl", "=", row.get("pdl")),
+                            ("date_debut", "<=", date),
+                            ("date_fin", ">", date),
+                        ], limit=1).id or None
+                    ),
+                })
+            index_apres = None
+            # Création index APRES
+            if is_valid(row.get('apres_date_releve')):
+                date = row['apres_date_releve']
+                index_apres = index_model.create({
+                    'date': date,
+                    'pdl': row['pdl'],
+                    'hph': row.get('apres_hph'),
+                    'hpb': row.get('apres_hpb'),
+                    'hch': row.get('apres_hch'),
+                    'hcb': row.get('apres_hcb'),
+                    'source': 'périmètre',
+                    'souscription_id': (
+                        sous_model.search([
+                            ("pdl", "=", row.get("pdl")),
+                            ("date_debut", "<=", date),
+                            ("date_fin", ">", date),
+                        ], limit=1).id or None
+                    ),
+                })
 
-            # Convertit la Series pandas en dict Odoo compatible
-            row_dict = row.to_dict()
-
-            # Garde uniquement les champs valides du modèle
+            # Construction du dictionnaire des données valides pour le périmètre
             valid_data = {
-                key.lower(): sanitize_value(val) for key, val in row_dict.items()
+                key.lower(): sanitize_value(val)
+                for key, val in row.to_dict().items()
                 if key.lower() in fields_dict and is_valid(val)
             }
 
+            # Liaison des index au périmètre
+            valid_data["index_avant_id"] = index_avant.id if index_avant else None
+            valid_data["index_apres_id"] = index_apres.id if index_apres else None
+
+            # Création du périmètre
             model.create(valid_data)
             nb_imported += 1
-
-
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'title': "Import terminé",
-                'message': f"{nb_imported} lignes importées, {nb_skipped} doublons ignorés.",
-                'type': 'success',
-                'sticky': False,
-            }
-        }

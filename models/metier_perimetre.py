@@ -21,29 +21,19 @@ class MetierPerimetre(models.Model):
     date_evenement = fields.Datetime(string="Date Événement", readonly=True)
     date_derniere_modification_fta = fields.Char(string="Date Dernière Modif FTA", readonly=True)
 
-    # Index (Après)
-    apres_base = fields.Integer(readonly=True)
-    apres_hc = fields.Integer(readonly=True)
-    apres_hcb = fields.Integer(readonly=True)
-    apres_hch = fields.Integer(readonly=True)
-    apres_hp = fields.Integer(readonly=True)
-    apres_hpb = fields.Integer(readonly=True)
-    apres_hph = fields.Integer(readonly=True)
-    apres_id_calendrier_distributeur = fields.Char(readonly=True)
-    apres_id_calendrier_fournisseur = fields.Char(readonly=True)
-    apres_nature_index = fields.Char(readonly=True)
-
-    # Index (Avant)
-    avant_base = fields.Integer(readonly=True)
-    avant_hc = fields.Integer(readonly=True)
-    avant_hcb = fields.Integer(readonly=True)
-    avant_hch = fields.Integer(readonly=True)
-    avant_hp = fields.Integer(readonly=True)
-    avant_hpb = fields.Integer(readonly=True)
-    avant_hph = fields.Integer(readonly=True)
-    avant_id_calendrier_distributeur = fields.Char(readonly=True)
-    avant_id_calendrier_fournisseur = fields.Char(readonly=True)
-    avant_nature_index = fields.Char(readonly=True)
+    # Relations vers les index
+    index_avant_id = fields.Many2one(
+        "metier.mesure.index",
+        string="Index avant événement",
+        readonly=True,
+        ondelete="set null"
+    )
+    index_apres_id = fields.Many2one(
+        "metier.mesure.index",
+        string="Index après événement",
+        readonly=True,
+        ondelete="set null"
+    )
 
     # Métadonnées
     categorie = fields.Char(readonly=True)

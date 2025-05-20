@@ -21,34 +21,18 @@
                         <field name="source"/>
                         <field name="marque"/>
                         <field name="segment_clientele"/>
+                        <field name="index_apres_id"/>
+                        <field name="index_avant_id"/>
                     </group>
 
-                    <group string="Index avant événement" invisible="not avant_id_calendrier_distributeur">
-                        <div class="row mt-2 mb-2">
-                            <div class="col-1"><field name="avant_hp"/></div>
-                            <div class="col-1"><field name="avant_hph"/></div>
-                            <div class="col-1"><field name="avant_hpb"/></div>
-                            <div class="col-1"><field name="avant_hc"/></div>
-                            <div class="col-1"><field name="avant_hch"/></div>
-                            <div class="col-1"><field name="avant_hcb"/></div>
-                            <div class="col-1"><field name="avant_base"/></div>
-                            <div class="col-1"><field name="avant_id_calendrier_distributeur"/></div>
-                            <!-- <div class="col-1"><field name="avant_id_calendrier_fournisseur"/></div> -->
-                        </div>
+                    <group string="Index avant événement" invisible="not index_avant_id">
+                        
+                        <field name="index_avant_id" context="{'form_view_ref': 'souscriptions.view_mesure_index_form'}"/>
                     </group>
 
-                    <group string="Index après événement" invisible="not apres_id_calendrier_distributeur">
-                        <div class="row mt-2 mb-2">
-                            <div class="col-1"><field name="apres_hp"/></div>
-                            <div class="col-1"><field name="apres_hph"/></div>
-                            <div class="col-1"><field name="apres_hpb"/></div>
-                            <div class="col-1"><field name="apres_hc"/></div>
-                            <div class="col-1"><field name="apres_hch"/></div>
-                            <div class="col-1"><field name="apres_hcb"/></div>
-                            <div class="col-1"><field name="apres_base"/></div>
-                            <div class="col-1"><field name="apres_id_calendrier_distributeur"/></div>
-                            <!-- <div class="col-1"><field name="apres_id_calendrier_fournisseur"/></div> -->
-                        </div>
+                    <group string="Index après événement" invisible="not index_apres_id">
+                        
+                        <field name="index_apres_id" context="{'form_view_ref': 'souscriptions.view_mesure_index_form'}"/>
                     </group>
                 </sheet>
             </form>

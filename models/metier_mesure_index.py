@@ -4,10 +4,10 @@ class MesureIndex(models.Model):
     _name = "metier.mesure.index"
     _description = "Index de consommation mensuelle"
 
-    souscription_id = fields.Many2one("souscription", string="Souscription", required=True, index=True)
+    souscription_id = fields.Many2one("souscription", string="Souscription", required=False, index=True)
     date = fields.Date(string="Date du relevé", required=True, index=True)
-    source = fields.Char(String="Source de la donnée")
-    pdl = fields.Char(String="pdl")
+    source = fields.Char(string="Source de la donnée")
+    pdl = fields.Char(string="pdl")
 
     hph = fields.Float(string="HPH")
     hpb = fields.Float(string="HPB")

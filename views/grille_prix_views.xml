@@ -30,26 +30,6 @@
                     </group>
                     
                     <notebook>
-                        <page string="Prix Abonnements">
-                            <field name="ligne_ids" domain="[('produit', 'like', 'abonnement')]">
-                                <list editable="bottom">
-                                    <field name="produit" domain="[('produit', 'like', 'abonnement')]"/>
-                                    <field name="prix_unitaire"/>
-                                    <field name="unite" readonly="1"/>
-                                </list>
-                            </field>
-                        </page>
-                        
-                        <page string="Prix Énergies">
-                            <field name="ligne_ids" domain="[('produit', 'like', 'energie')]">
-                                <list editable="bottom">
-                                    <field name="produit" domain="[('produit', 'like', 'energie')]"/>
-                                    <field name="prix_unitaire"/>
-                                    <field name="unite" readonly="1"/>
-                                </list>
-                            </field>
-                        </page>
-                        
                         <page string="Tous les Prix">
                             <field name="ligne_ids">
                                 <list editable="bottom">

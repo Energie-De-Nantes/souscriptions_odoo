@@ -169,11 +169,11 @@ class Souscription(models.Model):
         # Création des lignes de facture selon type de tarif
         lines_vals = []
         
-        # Ligne abonnement (toujours présente)
+        # Ligne abonnement (proratisée selon nombre de jours)
         lines_vals.append((0, 0, {
             'product_id': variant.id,
-            'name': f"Abonnement {puissance} - {periode.mois_annee}",
-            'quantity': 1,
+            'name': f"Abonnement {puissance} - {periode.mois_annee} ({periode.jours} jours)",
+            'quantity': periode.jours,
             'price_unit': 0,  # Prix calculé par Odoo selon pricelist
         }))
 

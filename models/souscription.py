@@ -125,7 +125,7 @@ class Souscription(models.Model):
             # Pour chaque période sans facture
             for periode in souscription.periode_ids.filtered(lambda p: not p.facture_id):
                 try:
-                    facture = self._creer_facture_periode(periode)
+                    facture = souscription._creer_facture_periode(periode)  # Utiliser la souscription spécifique
                     periode.facture_id = facture
                     _logger.info(f"Facture {facture.name} créée pour période {periode.mois_annee}")
                 except Exception as e:

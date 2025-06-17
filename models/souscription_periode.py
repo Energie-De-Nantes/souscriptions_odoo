@@ -81,6 +81,12 @@ class SouscriptionPeriode(models.Model):
     _fix_provision = fields.Boolean(default=False, readonly=True)
 
     facture_id = fields.Many2one('account.move', string='Facture associée')
+    
+    _sql_constraints = [
+        ('unique_periode_souscription', 
+         'UNIQUE(souscription_id, date_debut, date_fin)',
+         'Une seule période par souscription et par dates début/fin.')
+    ]
 
     @api.model_create_multi
     def create(self, vals_list):

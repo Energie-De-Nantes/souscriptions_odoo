@@ -33,17 +33,6 @@
                     
                 </sheet>
                 <notebook>
-                    <page string="Factures">
-                        <field name="facture_ids" 
-                            context="{'default_move_type': 'out_invoice', 'default_partner_id': partner_id}">
-                          <list>
-                            <field name="name"/>
-                            <field name="invoice_date"/>
-                            <field name="amount_total"/>
-                            <field name="state"/>
-                          </list>
-                        </field>
-                      </page>
                       <page string="Périodes de facturation">
                         <field name="periode_ids">
                             <list editable="bottom">

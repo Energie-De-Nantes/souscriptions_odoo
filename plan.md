@@ -249,24 +249,47 @@ index_fin_id = fields.Many2one('metier.mesure.index')
 - Régularisation des écarts
 
 #### Processus Comptable : Génération Factures
-- Création des factures Odoo depuis **données période + données souscription**
-- Application des produits selon puissance souscrite et formule tarifaire
-- Génération des lignes comptables
+- Création des factures Odoo depuis **données période historisées**
+- Application des produits selon paramètres au moment de la période
+- Génération des lignes comptables adaptées au type de tarif
 - **Processus standard Odoo, pas logique métier**
 
-#### Données Nécessaires pour Génération Facture
+#### Logique de Création Facture
 ```python
-# Depuis SouscriptionPeriode
-- provision_hp_kwh, provision_hc_kwh, provision_base_kwh (quantités à facturer)
-- turpe_fixe, turpe_variable (montants TURPE)
-- type_periode (mensuelle, régularisation, ajustement)
-
-# Depuis Souscription  
-- puissance_souscrite (détermine le produit abonnement)
-- type_tarif (Base/HP-HC - détermine les produits énergie)
-- tarif_solidaire (prix spéciaux)
-- partner_id, pdl (données facture)
+def _creer_facture_periode(self, periode):
+    # 1. Récupération paramètres historisés
+    puissance = periode.puissance_souscrite_periode
+    tarif_solidaire = periode.tarif_solidaire_periode  
+    type_tarif = periode.type_tarif_periode
+    
+    # 2. Détermination produit abonnement
+    product_template = 'abonnement_solidaire' if tarif_solidaire else 'abonnement'
+    variant = find_variant_by_puissance(puissance)
+    
+    # 3. Lignes de facture selon type tarif historisé
+    lines = [
+        # Ligne abonnement (toujours)
+        ('Abonnement {puissance}', qty=1),
+        
+        # Lignes énergie selon type_tarif_periode
+        if type_tarif == 'Base':
+            ('Énergie Base', qty=provision_base_kwh)
+        else:  # HP/HC
+            ('Énergie HP', qty=provision_hp_kwh)
+            ('Énergie HC', qty=provision_hc_kwh)
+            
+        # Lignes TURPE si présentes
+        ('TURPE Fixe', price=turpe_fixe),
+        ('TURPE Variable', price=turpe_variable)
+    ]
 ```
+
+#### Avantages Nouvelle Logique
+- **Paramètres corrects** : Utilise les valeurs au moment de la période
+- **Lignes adaptées** : Base ou HP/HC selon historique
+- **TURPE intégré** : Coûts réseau directement facturés
+- **Traçabilité** : Lien période ↔ facture pour audit
+- **Flexibilité** : Support tous types de périodes (mensuelle, régularisation)
 
 ## Relations et Cardinalités entre Modèles
 

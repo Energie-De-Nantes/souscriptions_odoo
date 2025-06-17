@@ -111,71 +111,162 @@ class Souscription(models.Model):
     # Computed fields métier déplacés vers souscription_metier_mixin.py
     
     def creer_factures(self):
+        """
+        Crée les factures à partir des périodes de facturation.
+        Utilise les données historisées de chaque période pour générer les bonnes lignes.
+        """
         _logger.info(f"Créer factures appelé pour {len(self)} souscriptions")
 
         for souscription in self:
-            if not souscription.partner_id or not souscription.puissance_souscrite:
+            if not souscription.partner_id:
+                _logger.warning(f"Souscription {souscription.name} sans partenaire, ignorée")
                 continue
-
-            product_template = self.env.ref(
-                'souscriptions.souscriptions_product_template_abonnement_solidaire'
-                if souscription.tarif_solidaire
-                else 'souscriptions.souscriptions_product_template_abonnement'
-            )
-            _logger.info(f"Produit {product_template}")
-            if not product_template:
-                raise UserError(f"Aucun produit trouvé")
-            
-            variant = product_template.product_variant_ids.filtered(
-                lambda p: any(
-                    v.attribute_id.name == 'Puissance' and v.name.strip() == f"{int(souscription.puissance_souscrite)} kVA"
-                    for v in p.product_template_attribute_value_ids
-                )
-            )
-            if not variant:
-                raise UserError(f"Aucune variante produit pour {souscription.puissance_souscrite} kVA")
 
             # Pour chaque période sans facture
             for periode in souscription.periode_ids.filtered(lambda p: not p.facture_id):
-                facture = self.env['account.move'].create({
-                    'move_type': 'out_invoice',
-                    'partner_id': souscription.partner_id.id,
-                    'invoice_date': periode.date_fin,
-                    'periode_id': periode.id,  # nouvelle archi
-                    'invoice_line_ids': [(0, 0, {
-                        'product_id': variant.id,
-                        'name': f"{variant.name} - {periode.mois_annee}",
-                        'quantity': periode.provision_kwh,
-                        # 'price_unit': variant.list_price,  # optionnel si pricelist
-                    })],
-                })
+                try:
+                    facture = self._creer_facture_periode(periode)
+                    periode.facture_id = facture
+                    _logger.info(f"Facture {facture.name} créée pour période {periode.mois_annee}")
+                except Exception as e:
+                    _logger.error(f"Erreur création facture pour période {periode.mois_annee}: {e}")
+                    raise UserError(f"Erreur création facture pour {periode.mois_annee}: {e}")
 
-            periode.facture_id = facture
+    def _creer_facture_periode(self, periode):
+        """
+        Crée une facture pour une période donnée en utilisant les données historisées.
+        """
+        # Utilisation des données historisées de la période
+        puissance = periode.puissance_souscrite_periode or self.puissance_souscrite
+        tarif_solidaire = periode.tarif_solidaire_periode
+        type_tarif = periode.type_tarif_periode or dict(self._fields['type_tarif'].selection).get(self.type_tarif, self.type_tarif)
+        
+        if not puissance:
+            raise UserError(f"Aucune puissance définie pour la période {periode.mois_annee}")
+
+        # Détermination du produit selon tarif solidaire
+        product_template = self.env.ref(
+            'souscriptions.souscriptions_product_template_abonnement_solidaire'
+            if tarif_solidaire
+            else 'souscriptions.souscriptions_product_template_abonnement'
+        )
+        
+        if not product_template:
+            raise UserError(f"Produit abonnement non trouvé (solidaire: {tarif_solidaire})")
+
+        # Recherche de la variante selon puissance historisée
+        puissance_cherchee = puissance.replace(' kVA', '') if 'kVA' in puissance else puissance
+        variant = product_template.product_variant_ids.filtered(
+            lambda p: any(
+                v.attribute_id.name == 'Puissance' and v.name.strip() == f"{puissance_cherchee} kVA"
+                for v in p.product_template_attribute_value_ids
+            )
+        )
+        
+        if not variant:
+            raise UserError(f"Aucune variante produit pour {puissance}")
+
+        # Création des lignes de facture selon type de tarif
+        lines_vals = []
+        
+        # Ligne abonnement (toujours présente)
+        lines_vals.append((0, 0, {
+            'product_id': variant.id,
+            'name': f"Abonnement {puissance} - {periode.mois_annee}",
+            'quantity': 1,
+            'price_unit': 0,  # Prix calculé par Odoo selon pricelist
+        }))
+
+        # Lignes énergie selon type de tarif historisé
+        if type_tarif == 'Base':
+            if periode.provision_base_kwh > 0:
+                lines_vals.append((0, 0, {
+                    'name': f"Énergie Base {periode.provision_base_kwh:.2f} kWh - {periode.mois_annee}",
+                    'quantity': periode.provision_base_kwh,
+                    'price_unit': 0,  # Prix selon pricelist
+                }))
+        else:  # HP/HC
+            if periode.provision_hp_kwh > 0:
+                lines_vals.append((0, 0, {
+                    'name': f"Énergie HP {periode.provision_hp_kwh:.2f} kWh - {periode.mois_annee}",
+                    'quantity': periode.provision_hp_kwh,
+                    'price_unit': 0,
+                }))
+            if periode.provision_hc_kwh > 0:
+                lines_vals.append((0, 0, {
+                    'name': f"Énergie HC {periode.provision_hc_kwh:.2f} kWh - {periode.mois_annee}",
+                    'quantity': periode.provision_hc_kwh,
+                    'price_unit': 0,
+                }))
+
+        # Lignes TURPE si présentes
+        if periode.turpe_fixe > 0:
+            lines_vals.append((0, 0, {
+                'name': f"TURPE Fixe - {periode.mois_annee}",
+                'quantity': 1,
+                'price_unit': periode.turpe_fixe,
+            }))
+            
+        if periode.turpe_variable > 0:
+            lines_vals.append((0, 0, {
+                'name': f"TURPE Variable - {periode.mois_annee}",
+                'quantity': 1,
+                'price_unit': periode.turpe_variable,
+            }))
+
+        # Création de la facture
+        facture_vals = {
+            'move_type': 'out_invoice',
+            'partner_id': self.partner_id.id,
+            'invoice_date': periode.date_fin,
+            'periode_id': periode.id,
+            'invoice_line_ids': lines_vals,
+        }
+
+        return self.env['account.move'].create(facture_vals)
     
     @api.model
     def ajouter_periodes_mensuelles(self):
         """
         Crée une période de facturation (du 1er au dernier jour du mois précédent)
         pour chaque souscription active.
+        L'historisation des paramètres se fait automatiquement dans create().
         """
         # Calcul du 1er jour du mois en cours
         premier_mois_courant = date.today().replace(day=1)
 
-        # 1er jour du mois précédent
+        # 1er jour du mois précédent  
         premier_mois_precedent = (premier_mois_courant - timedelta(days=1)).replace(day=1)
 
         souscriptions = self.search([('active', '=', True)])
+        periodes_creees = 0
+        
         for souscription in souscriptions:
-            self.env['souscription.periode'].create({
-                'souscription_id': souscription.id,
-                'date_debut': premier_mois_precedent,
-                'date_fin': premier_mois_courant,
-                'energie_kwh': 0,
-                'turpe_fixe': 0,
-                'turpe_variable': 0,
-                'pdl': souscription.pdl,
-                'lisse': souscription.lisse,
-            })
+            # Vérifier qu'une période n'existe pas déjà pour ce mois
+            periode_existante = self.env['souscription.periode'].search([
+                ('souscription_id', '=', souscription.id),
+                ('date_debut', '=', premier_mois_precedent),
+                ('date_fin', '=', premier_mois_courant)
+            ])
+            
+            if not periode_existante:
+                self.env['souscription.periode'].create({
+                    'souscription_id': souscription.id,
+                    'date_debut': premier_mois_precedent,
+                    'date_fin': premier_mois_courant,
+                    'type_periode': 'mensuelle',
+                    # Les cadrans énergétiques restent à 0 (à remplir via pont externe)
+                    'energie_hph_kwh': 0,
+                    'energie_hpb_kwh': 0, 
+                    'energie_hch_kwh': 0,
+                    'energie_hcb_kwh': 0,
+                    'turpe_fixe': 0,
+                    'turpe_variable': 0,
+                    # L'historisation se fait automatiquement dans create()
+                })
+                periodes_creees += 1
+            
+        _logger.info(f"{periodes_creees} périodes créées pour {len(souscriptions)} souscriptions actives")
     
     # === API POUR PONT EXTERNE ===
     

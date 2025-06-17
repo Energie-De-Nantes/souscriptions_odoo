@@ -157,16 +157,15 @@ class Souscription(models.Model):
         else:
             produit_abo = f"abonnement_{puissance_num}kva"
         
-        # 4. Récupération des prix depuis la grille
-        prix_abo = prix_dict.get(produit_abo)
-        if prix_abo is None:
+        # 4. Récupération des prix depuis la grille (déjà en €/jour pour abonnements)
+        prix_abo_journalier = prix_dict.get(produit_abo)
+        if prix_abo_journalier is None:
             raise UserError(f"Prix abonnement non trouvé dans la grille : {produit_abo}")
 
         # 5. Création des lignes de facture avec prix directs
         lines_vals = []
         
-        # Ligne abonnement (proratisée selon nombre de jours)
-        prix_abo_journalier = prix_abo / 30  # Prix mensuel / 30 jours
+        # Ligne abonnement (prix déjà en €/jour, plus besoin de diviser)
         lines_vals.append((0, 0, {
             'name': f"Abonnement {puissance} - {periode.mois_annee} ({periode.jours} jours)",
             'quantity': periode.jours,

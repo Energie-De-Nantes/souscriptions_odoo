@@ -70,9 +70,9 @@ class GrillePrix(models.Model):
         return grille
     
     def get_prix_dict(self):
-        """Retourne un dict {produit: prix} pour toute la grille"""
+        """Retourne un dict {produit: prix_interne} pour toute la grille"""
         self.ensure_one()
-        return {ligne.produit: ligne.prix_unitaire for ligne in self.ligne_ids}
+        return {ligne.produit: ligne.prix_interne for ligne in self.ligne_ids}
     
     def copier_grille_precedente(self):
         """Action pour copier les lignes de la grille précédente"""
@@ -138,20 +138,39 @@ class GrillePrixLigne(models.Model):
         # ... autres puissances solidaires selon besoins
     ], string="Produit", required=True)
     
-    prix_unitaire = fields.Float("Prix unitaire (€)", required=True, digits=(16, 6))
+    prix_unitaire = fields.Float("Prix unitaire", required=True, digits=(16, 6),
+                                 help="Prix en €/mois pour abonnements, €/kWh pour énergies")
+    
+    # Prix interne en €/jour pour abonnements (calculé automatiquement)
+    prix_interne = fields.Float("Prix interne (€/jour)", compute='_compute_prix_interne', store=True,
+                               help="Prix utilisé pour les calculs de facturation")
     
     # Champs informatifs
-    unite = fields.Char("Unité", compute='_compute_unite', store=False)
+    unite_saisie = fields.Char("Unité saisie", compute='_compute_unites', store=False)
+    unite_calcul = fields.Char("Unité calcul", compute='_compute_unites', store=False)
     
     @api.depends('produit')
-    def _compute_unite(self):
+    def _compute_unites(self):
         for ligne in self:
             if 'abonnement' in ligne.produit:
-                ligne.unite = "€/mois"
+                ligne.unite_saisie = "€/mois"
+                ligne.unite_calcul = "€/jour"
             elif 'energie' in ligne.produit:
-                ligne.unite = "€/kWh"
+                ligne.unite_saisie = "€/kWh"
+                ligne.unite_calcul = "€/kWh"
             else:
-                ligne.unite = "€"
+                ligne.unite_saisie = "€"
+                ligne.unite_calcul = "€"
+    
+    @api.depends('produit', 'prix_unitaire')
+    def _compute_prix_interne(self):
+        for ligne in self:
+            if 'abonnement' in ligne.produit:
+                # Conversion €/mois → €/jour (divisé par 30)
+                ligne.prix_interne = ligne.prix_unitaire / 30.0
+            else:
+                # Pour énergies et autres : prix interne = prix saisi
+                ligne.prix_interne = ligne.prix_unitaire
     
     _sql_constraints = [
         ('unique_produit_grille', 

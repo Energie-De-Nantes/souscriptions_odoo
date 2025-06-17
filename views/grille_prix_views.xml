@@ -35,7 +35,9 @@
                                 <list editable="bottom">
                                     <field name="produit"/>
                                     <field name="prix_unitaire"/>
-                                    <field name="unite" readonly="1"/>
+                                    <field name="unite_saisie" readonly="1"/>
+                                    <field name="prix_interne" readonly="1"/>
+                                    <field name="unite_calcul" readonly="1"/>
                                 </list>
                             </field>
                         </page>

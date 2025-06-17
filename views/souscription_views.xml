@@ -38,9 +38,6 @@
                             <list editable="bottom">
                                 <field name="mois_annee"/>
                                 <field name="type_periode"/>
-                                <field name="type_tarif_periode"/>
-                                <field name="lisse_periode"/>
-                                <field name="tarif_solidaire_periode"/>
                                 <field name="energie_base_kwh"/>
                                 <field name="provision_base_kwh"/>
                                 <field name="jours"/>

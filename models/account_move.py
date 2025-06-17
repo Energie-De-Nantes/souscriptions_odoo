@@ -11,3 +11,5 @@ class AccountMove(models.Model):
         store=True,
         readonly=True,
     )
+
+    # is_energie = fields.Boolean(string="Facture d'énergie", default=False)

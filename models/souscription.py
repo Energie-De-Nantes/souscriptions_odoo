@@ -94,17 +94,8 @@ class Souscription(models.Model):
     ref_compteur = fields.Char(string="Référence compteur")
     numero_depannage = fields.Char(string="Numéro de dépannage")
 
-    historique_perimetre_ids = fields.One2many(
-        comodel_name="metier.perimetre",
-        compute="_compute_historique_perimetre",
-        string="Historique périmètre"
-    )
-
-    prestations_ids  = fields.One2many(
-        comodel_name="metier.prestation",
-        compute="_compute_prestations",
-        string="Prestations liées"
-    )
+    # Computed fields métier déplacés vers souscription_metier_mixin.py
+    # pour découplage des dépendances métier
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -117,22 +108,7 @@ class Souscription(models.Model):
         for sous in self:
             sous.facture_ids = sous.periode_ids.mapped('facture_id')
 
-    @api.depends('pdl')
-    def _compute_historique_perimetre(self):
-        _logger.info(f"Calcul de l'historique")
-        for rec in self:
-            if rec.pdl:
-                rec.historique_perimetre_ids = self.env['metier.perimetre'].search([('pdl', '=', rec.pdl)])
-            else:
-                rec.historique_perimetre_ids = []
-    
-    @api.depends('pdl')
-    def _compute_prestations(self):
-        for rec in self:
-            if rec.pdl:
-                rec.prestations_ids  = self.env['metier.prestation'].search([('pdl', '=', rec.pdl)])
-            else:
-                rec.prestations_ids  = []
+    # Computed fields métier déplacés vers souscription_metier_mixin.py
     
     def creer_factures(self):
         _logger.info(f"Créer factures appelé pour {len(self)} souscriptions")
@@ -200,3 +176,41 @@ class Souscription(models.Model):
                 'pdl': souscription.pdl,
                 'lisse': souscription.lisse,
             })
+    
+    # === API POUR PONT EXTERNE ===
+    
+    @api.model
+    def get_souscriptions_by_pdl(self, pdl_list):
+        """Récupère les souscriptions par liste de PDL - API pour pont externe"""
+        return self.search([('pdl', 'in', pdl_list)]).read([
+            'name', 'pdl', 'partner_id', 'date_debut', 'date_fin',
+            'puissance_souscrite', 'type_tarif', 'lisse', 'provision_mensuelle_kwh',
+            'tarif_solidaire', 'mode_paiement'
+        ])
+    
+    def get_billing_periods(self, date_start=None, date_end=None):
+        """Récupère les périodes de facturation pour cette souscription"""
+        domain = [('souscription_id', '=', self.id)]
+        if date_start:
+            domain.append(('date_debut', '>=', date_start))
+        if date_end:
+            domain.append(('date_fin', '<=', date_end))
+        
+        periods = self.env['souscription.periode'].search(domain)
+        return periods.read([
+            'date_debut', 'date_fin', 'type_periode', 'energie_kwh', 'provision_kwh',
+            'turpe_fixe', 'turpe_variable', 'facture_id'
+        ])
+    
+    @api.model
+    def create_billing_period(self, vals):
+        """Crée une période de facturation - API pour pont externe"""
+        return self.env['souscription.periode'].create(vals)
+    
+    def update_consumption_data(self, period_data):
+        """Met à jour les données de consommation - API pour pont externe"""
+        for period_vals in period_data:
+            period_id = period_vals.pop('id')
+            period = self.env['souscription.periode'].browse(period_id)
+            period.write(period_vals)
+        return True

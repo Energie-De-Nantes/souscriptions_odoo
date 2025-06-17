@@ -1,4 +1,5 @@
 from odoo import models, fields
+import pandas as pd
 
 class MesureIndexImporter(models.TransientModel):
     _name = "metier.mesure.index.importer"
@@ -15,7 +16,7 @@ class MesureIndexImporter(models.TransientModel):
 
     def action_import(self):
         df = self._parse_parquet_file()
-
+        df = df.where(pd.notna(df), None)
         model = self.env['metier.mesure.index']
         sous_model = self.env['souscription']
         count = 0

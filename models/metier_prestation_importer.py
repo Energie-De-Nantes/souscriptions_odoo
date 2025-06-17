@@ -5,6 +5,8 @@ from datetime import datetime
 from odoo import models, fields, api
 import math
 
+# from electricore.core.périmètre.fonctions import extraire_modifications_impactantes
+
 def is_valid(value):
     return not pd.isna(value) and not (isinstance(value, float) and math.isnan(value))
 
@@ -31,6 +33,7 @@ class MetierPrestationImporter(models.TransientModel):
         df.columns = [col.lower().replace("é", "e").replace("è", "e").replace("ê", "e")
                       .replace("à", "a").replace("ç", "c") for col in df.columns]
 
+        # mi = extraire_modifications_impactantes(df)
         model = self.env['metier.prestation']
         fields_dict = model._fields
 

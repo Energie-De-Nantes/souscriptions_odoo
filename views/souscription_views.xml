@@ -48,34 +48,18 @@
                         <field name="periode_ids">
                             <list editable="bottom">
                                 <field name="mois_annee"/>
-                                <field name="energie_kwh"/>
+                                <field name="type_periode"/>
+                                <field name="energie_base_kwh"/>
+                                <field name="provision_base_kwh"/>
                                 <field name="jours"/>
                                 <field name="turpe_fixe"/>
+                                <field name="turpe_variable"/>
                                 <field name="facture_id"/>
                             </list>
                         </field>
                     </page>
-                    <page string="Historique">
-                    <field name="historique_perimetre_ids">
-                        <list>
-                            <field name="date_evenement"/>
-                            <field name="evenement_declencheur"/>
-                            <field name="etat_contractuel"/>
-                            <field name="puissance_souscrite"/>
-                        </list>
-                    </field>
-                    </page>
-                    <page string="Prestations facturées">
-                        <field name="prestations_ids">
-                            <list>
-                                <field name="date_facture"/>
-                                <field name="libelle_ev"/>
-                                <field name="quantite"/>
-                                <field name="montant_ht"/>
-                                <field name="taux_tva_applicable"/>
-                            </list>
-                        </field>
-                    </page>
+                    <!-- Onglets métier supprimés pour version minimale -->
+                    <!-- Historique et Prestations disponibles via module souscriptions_bridge -->
                 </notebook>
                 <chatter open_attachments="True"/>
             </form>

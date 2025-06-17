@@ -17,9 +17,9 @@
                         <field name="hpb"/>
                         <field name="hch"/>
                         <field name="hcb"/>
-                        <!-- <field name="hp"/>
+                        <field name="hp"/>
                         <field name="hc"/>
-                        <field name="base"/> -->
+                        <field name="base"/>
                     </group>
                 </sheet>
             </form>
@@ -39,9 +39,9 @@
                 <field name="hpb"/>
                 <field name="hch"/>
                 <field name="hcb"/>
-                <!-- <field name="hp"/>
+                <field name="hp"/>
                 <field name="hc"/>
-                <field name="base"/> -->
+                <field name="base"/>
             </list>
         </field>
     </record>

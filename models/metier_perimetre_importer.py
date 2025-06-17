@@ -31,7 +31,7 @@ class MetierPerimetreImporter(models.TransientModel):
 
     def action_import(self):
         df = self._parse_parquet_file()
-
+        df = df.where(pd.notna(df), None)
         RENAME_COLUMNS = {
             col: col.lower().replace("à", "a").replace("è", "e").replace("é", "e").replace("ê", "e").replace("ç", "c")
             for col in df.columns
@@ -67,6 +67,7 @@ class MetierPerimetreImporter(models.TransientModel):
                     'hch': row.get('avant_hch'),
                     'hcb': row.get('avant_hcb'),
                     'source': 'périmètre',
+                    'validite': 'fin',
                     'souscription_id': (
                         sous_model.search([
                             ("pdl", "=", row.get("pdl")),
@@ -87,6 +88,7 @@ class MetierPerimetreImporter(models.TransientModel):
                     'hch': row.get('apres_hch'),
                     'hcb': row.get('apres_hcb'),
                     'source': 'périmètre',
+                    'validite': 'debut',
                     'souscription_id': (
                         sous_model.search([
                             ("pdl", "=", row.get("pdl")),

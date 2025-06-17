@@ -8,7 +8,7 @@
                     <button name="copier_grille_precedente" type="object" 
                             string="Copier grille précédente" 
                             class="btn-primary"
-                            invisible="context.get('default_date_debut', False)"/>
+                            invisible="not id"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">

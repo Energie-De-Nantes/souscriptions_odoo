@@ -31,10 +31,13 @@ class GrillePrix(models.Model):
     def _compute_is_current(self):
         today = fields.Date.today()
         for grille in self:
-            grille.is_current = (
-                grille.date_debut <= today and 
-                (not grille.date_fin or grille.date_fin >= today)
-            )
+            if grille.date_debut:
+                grille.is_current = (
+                    grille.date_debut <= today and 
+                    (not grille.date_fin or grille.date_fin >= today)
+                )
+            else:
+                grille.is_current = False
     
     @api.model_create_multi
     def create(self, vals_list):
@@ -152,10 +155,10 @@ class GrillePrixLigne(models.Model):
     @api.depends('produit')
     def _compute_unites(self):
         for ligne in self:
-            if 'abonnement' in ligne.produit:
+            if ligne.produit and 'abonnement' in ligne.produit:
                 ligne.unite_saisie = "€/mois"
                 ligne.unite_calcul = "€/jour"
-            elif 'energie' in ligne.produit:
+            elif ligne.produit and 'energie' in ligne.produit:
                 ligne.unite_saisie = "€/kWh"
                 ligne.unite_calcul = "€/kWh"
             else:
@@ -165,12 +168,12 @@ class GrillePrixLigne(models.Model):
     @api.depends('produit', 'prix_unitaire')
     def _compute_prix_interne(self):
         for ligne in self:
-            if 'abonnement' in ligne.produit:
+            if ligne.produit and 'abonnement' in ligne.produit:
                 # Conversion €/mois → €/jour (divisé par 30)
-                ligne.prix_interne = ligne.prix_unitaire / 30.0
+                ligne.prix_interne = ligne.prix_unitaire / 30.0 if ligne.prix_unitaire else 0.0
             else:
                 # Pour énergies et autres : prix interne = prix saisi
-                ligne.prix_interne = ligne.prix_unitaire
+                ligne.prix_interne = ligne.prix_unitaire or 0.0
     
     _sql_constraints = [
         ('unique_produit_grille', 

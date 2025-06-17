@@ -49,6 +49,241 @@ def _compute_prestations(self):
 #### Clé de Liaison
 - **PDL (Point De Livraison)** : Clé métier reliant tous les composants
 
+## Concept Central : Modèle Période de Facturation
+
+### Le Rôle Stratégique des SouscriptionPeriode
+
+Le modèle `SouscriptionPeriode` est le **cœur du système de facturation électrique**. Il résout le paradoxe entre données métier et processus comptable en servant de **couche de calcul intermédiaire**.
+
+#### Architecture en 3 Couches
+```
+Données Métier → SouscriptionPeriode → Processus Comptable
+(index, relevés)  (calculs, provisions)   (factures Odoo)
+```
+
+### Données Contenues dans une Période
+
+#### Données de Consommation par Cadrans
+Les **cadrans** sont des compteurs d'énergie qui ne comptent que sur certaines périodes :
+- **HPH** : Heures Pleines saison Haute (hiver)
+- **HPB** : Heures Pleines saison Basse (été) 
+- **HCH** : Heures Creuses saison Haute (hiver)
+- **HCB** : Heures Creuses saison Basse (été)
+- **HP** : Heures Pleines (agrégation HPH + HPB)
+- **HC** : Heures Creuses (agrégation HCH + HCB)
+- **BASE** : Tarif unique (HPH + HPB + HCH + HCB)
+
+#### Structure des Données Période
+```python
+# Consommations détaillées (pour calcul TURPE)
+energie_hph_kwh = fields.Float('Énergie HPH (kWh)')
+energie_hpb_kwh = fields.Float('Énergie HPB (kWh)') 
+energie_hch_kwh = fields.Float('Énergie HCH (kWh)')
+energie_hcb_kwh = fields.Float('Énergie HCB (kWh)')
+
+# Consommations facturables (selon contrat)
+energie_hp_kwh = fields.Float('Énergie HP (kWh)', compute='_compute_hp_hc')
+energie_hc_kwh = fields.Float('Énergie HC (kWh)', compute='_compute_hp_hc')
+energie_base_kwh = fields.Float('Énergie BASE (kWh)', compute='_compute_base')
+
+# Provisions (lissage) - selon type de contrat
+provision_hp_kwh = fields.Float('Provision HP (kWh)')
+provision_hc_kwh = fields.Float('Provision HC (kWh)')
+provision_base_kwh = fields.Float('Provision BASE (kWh)')
+
+# TURPE (calculé sur tous les cadrans)
+turpe_fixe = fields.Float('TURPE Fixe (€)')
+turpe_variable = fields.Float('TURPE Variable (€)')  # Utilise HPH+HPB+HCH+HCB
+
+# Métadonnées période
+type_periode = fields.Selection([
+    ('mensuelle', 'Mensuelle'),
+    ('regularisation', 'Régularisation'),
+    ('ajustement', 'Ajustement')
+], default='mensuelle')
+jours = fields.Integer('Nombre de jours', compute='_compute_jours')
+```
+
+#### Logique de Calcul
+```python
+@api.depends('energie_hph_kwh', 'energie_hpb_kwh', 'energie_hch_kwh', 'energie_hcb_kwh')
+def _compute_hp_hc(self):
+    for periode in self:
+        periode.energie_hp_kwh = periode.energie_hph_kwh + periode.energie_hpb_kwh
+        periode.energie_hc_kwh = periode.energie_hch_kwh + periode.energie_hcb_kwh
+
+@api.depends('energie_hp_kwh', 'energie_hc_kwh')  
+def _compute_base(self):
+    for periode in self:
+        periode.energie_base_kwh = periode.energie_hp_kwh + periode.energie_hc_kwh
+
+# Gestion des provisions selon type de contrat
+@api.depends('souscription_id.type_tarif', 'souscription_id.lisse')
+def _compute_provisions(self):
+    for periode in self:
+        if periode.souscription_id.lisse:
+            # Provisions fixes pour lissage
+            if periode.souscription_id.type_tarif == 'base':
+                periode.provision_base_kwh = periode.souscription_id.provision_mensuelle_base_kwh
+            else:  # HP/HC
+                periode.provision_hp_kwh = periode.souscription_id.provision_mensuelle_hp_kwh
+                periode.provision_hc_kwh = periode.souscription_id.provision_mensuelle_hc_kwh
+        else:
+            # Provisions = consommations réelles
+            periode.provision_hp_kwh = periode.energie_hp_kwh
+            periode.provision_hc_kwh = periode.energie_hc_kwh
+            periode.provision_base_kwh = periode.energie_base_kwh
+```
+
+### Processus de Régularisation des Lissés
+
+#### Principe des Contrats Lissés
+Les clients paient un **montant fixe mensuel** pour étaler les coûts de l'hiver sur toute l'année, au lieu de payer leur consommation réelle chaque mois.
+
+#### Mécanisme via les Périodes
+```python
+# Facturation mensuelle lissée
+if souscription.lisse:
+    periode.provision_kwh = souscription.provision_mensuelle_kwh  # Fixe
+    periode._fix_provision = True
+else:
+    periode.provision_kwh = periode.energie_kwh  # Réelle
+```
+
+#### Processus de Régularisation
+1. **Accumulation** : Chaque période garde la trace :
+   - `energie_kwh` : Consommation réelle du mois
+   - `provision_kwh` : Énergie facturée (fixe pour lissés)
+
+2. **Calcul d'écart** : À la fin de l'année
+   ```python
+   total_consomme = sum(periode.energie_kwh for periode in periodes_annee)
+   total_facture = sum(periode.provision_kwh for periode in periodes_annee)
+   ecart_regularisation = total_consomme - total_facture
+   ```
+
+3. **Période de régularisation** : Création d'une période spéciale
+   - `energie_kwh = 0` (pas de nouvelle consommation)
+   - `provision_kwh = ecart_regularisation` (positif ou négatif)
+
+#### Avantages du Modèle Période
+- **Historique complet** : Toutes les données de calcul sont conservées
+- **Audit facile** : Traçabilité de chaque facturation
+- **Flexibilité** : Possibilité d'ajuster les calculs sans toucher aux factures
+- **Régularisation simplifiée** : Données accumulées prêtes pour calcul d'écart
+
+### Point d'Alimentation Flexible
+
+#### Aujourd'hui : Alimentation Externe
+```python
+# Pont Python → API Odoo
+periode_vals = {
+    'energie_kwh': calcul_consommation_depuis_index(),
+    'turpe_fixe': calcul_turpe_fixe(),
+    'turpe_variable': calcul_turpe_variable(),
+    'provision_kwh': calcul_provision_selon_contrat()
+}
+periode.write(periode_vals)
+```
+
+#### Demain : Intégration Métier
+```python
+# Computed depuis données métier
+@api.depends('index_debut_id', 'index_fin_id')
+def _compute_energie_kwh(self):
+    for periode in self:
+        if periode.index_debut_id and periode.index_fin_id:
+            periode.energie_kwh = periode.index_fin_id.valeur - periode.index_debut_id.valeur
+
+# Ou références directes
+index_debut_id = fields.Many2one('metier.mesure.index')
+index_fin_id = fields.Many2one('metier.mesure.index')
+```
+
+### Séparation des Responsabilités
+
+#### SouscriptionPeriode : Calculs Métier
+- Calcul de consommation depuis les index
+- Gestion des provisions lissées
+- Calcul des coûts réseau (TURPE)
+- Régularisation des écarts
+
+#### Processus Comptable : Génération Factures
+- Création des factures Odoo depuis **données période + données souscription**
+- Application des produits selon puissance souscrite et formule tarifaire
+- Génération des lignes comptables
+- **Processus standard Odoo, pas logique métier**
+
+#### Données Nécessaires pour Génération Facture
+```python
+# Depuis SouscriptionPeriode
+- provision_hp_kwh, provision_hc_kwh, provision_base_kwh (quantités à facturer)
+- turpe_fixe, turpe_variable (montants TURPE)
+- type_periode (mensuelle, régularisation, ajustement)
+
+# Depuis Souscription  
+- puissance_souscrite (détermine le produit abonnement)
+- type_tarif (Base/HP-HC - détermine les produits énergie)
+- tarif_solidaire (prix spéciaux)
+- partner_id, pdl (données facture)
+```
+
+## Relations et Cardinalités entre Modèles
+
+### Structure Relationnelle
+```
+Souscription (1) ←→ (n) SouscriptionPeriode (1) ←→ (0..1) AccountMove
+     ↓                        ↓                           ↓
+  Contrat              Données calculs              Facture comptable
+(paramètres)          (consommations/provisions)      (document)
+```
+
+### Cardinalités Détaillées
+
+#### Souscription → SouscriptionPeriode (1:n)
+- **Une souscription** a **plusieurs périodes** (généralement mensuelle)
+- Relation : `periode_ids = fields.One2many('souscription.periode', 'souscription_id')`
+- Contrainte : Périodes non chevauchantes pour une même souscription
+
+#### SouscriptionPeriode → AccountMove (1:0..1)
+- **Une période** peut avoir **zéro ou une facture**
+- Relation : `facture_id = fields.Many2one('account.move')`
+- **Pas toujours 1:1** car :
+  - Périodes créées avant facturation
+  - Périodes de régularisation peuvent ne pas générer de facture
+  - Possibilité d'annulation/refacturation
+
+#### Types de Périodes et Facturation
+
+##### Périodes Mensuelles (`type_periode='mensuelle'`)
+- **Cardinalité** : 1 période → 1 facture (normale)
+- **Données** : Consommations du mois + provisions selon contrat
+- **Génération** : Automatique mensuelle
+
+##### Périodes de Régularisation (`type_periode='regularisation'`)
+- **Cardinalité** : 1 période → 1 facture (avoir/facture complémentaire)
+- **Données** : Écarts accumulés sur l'année pour lissés
+- **Génération** : Manuelle ou annuelle automatique
+
+##### Périodes d'Ajustement (`type_periode='ajustement'`)
+- **Cardinalité** : 1 période → 0..1 facture (selon besoin)
+- **Données** : Corrections ponctuelles
+- **Génération** : Manuelle uniquement
+
+#### Lien Facture ↔ Période
+```python
+# account_move.py - Lien uni-directionnel
+periode_id = fields.Many2one('souscription.periode')  # Facture pointe vers période
+
+# Usage : PDF facture récupère contexte depuis période
+def get_invoice_context(self):
+    return {
+        'consommation_reelle': self.periode_id.energie_kwh,
+        'provision_facturee': self.periode_id.provision_kwh,
+        'type_facturation': 'Lissé' if self.periode_id.lisse else 'Réel'
+    }
+```
+
 ## Architecture Cible
 
 ### Structure Modulaire en 3 Modules

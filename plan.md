@@ -102,6 +102,13 @@ type_periode = fields.Selection([
     ('ajustement', 'Ajustement')
 ], default='mensuelle')
 jours = fields.Integer('Nombre de jours', compute='_compute_jours')
+
+# HISTORISATION : État de la souscription au moment de la création
+type_tarif_periode = fields.Char('Type tarif (période)', readonly=True)
+tarif_solidaire_periode = fields.Boolean('Tarif solidaire (période)', readonly=True)
+lisse_periode = fields.Boolean('Lissé (période)', readonly=True)
+puissance_souscrite_periode = fields.Char('Puissance souscrite (période)', readonly=True)
+provision_mensuelle_kwh_periode = fields.Float('Provision mensuelle (période)', readonly=True)
 ```
 
 #### Logique de Calcul
@@ -166,9 +173,42 @@ else:
    - `energie_kwh = 0` (pas de nouvelle consommation)
    - `provision_kwh = ecart_regularisation` (positif ou négatif)
 
-#### Avantages du Modèle Période
+#### Historisation Automatique des Paramètres
+
+#### Principe d'Historisation
+Chaque période **capture automatiquement l'état de la souscription** au moment de sa création :
+
+```python
+# À la création d'une période, copie automatique de :
+type_tarif_periode = "Heures Pleines / Heures Creuses"  # État au moment T
+tarif_solidaire_periode = False                         # État au moment T
+puissance_souscrite_periode = "9 kVA"                   # État au moment T
+lisse_periode = True                                     # État au moment T
+```
+
+#### Cas d'Usage d'Historisation
+1. **Changement de puissance** : Client passe de 6 à 9 kVA en cours d'année
+   - Périodes jan-mars : `puissance_souscrite_periode = "6 kVA"`
+   - Périodes avr-déc : `puissance_souscrite_periode = "9 kVA"`
+
+2. **Activation tarif solidaire** : Client devient éligible en cours d'année
+   - Périodes jan-juin : `tarif_solidaire_periode = False`
+   - Périodes juil-déc : `tarif_solidaire_periode = True`
+
+3. **Changement type tarif** : Passage Base → HP/HC
+   - Anciennes périodes : `type_tarif_periode = "Base"`
+   - Nouvelles périodes : `type_tarif_periode = "Heures Pleines / Heures Creuses"`
+
+#### Avantages de l'Historisation
+- **Audit comptable** : Justification des calculs de facturation
+- **Conformité réglementaire** : Traçabilité des changements tarifaires
+- **Génération PDF factures** : Affichage des paramètres corrects selon la période
+- **Régularisations précises** : Calculs basés sur les bons paramètres historiques
+
+### Avantages du Modèle Période
 - **Historique complet** : Toutes les données de calcul sont conservées
-- **Audit facile** : Traçabilité de chaque facturation
+- **Historisation automatique** : État de la souscription figé à chaque période
+- **Audit facile** : Traçabilité de chaque facturation avec paramètres exacts
 - **Flexibilité** : Possibilité d'ajuster les calculs sans toucher aux factures
 - **Régularisation simplifiée** : Données accumulées prêtes pour calcul d'écart
 

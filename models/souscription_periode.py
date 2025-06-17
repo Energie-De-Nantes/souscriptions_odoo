@@ -48,6 +48,33 @@ class SouscriptionPeriode(models.Model):
     ], default='mensuelle', string='Type de période')
     jours = fields.Integer(compute='_compute_jours', store=True)
     
+    # État de la souscription au moment de la création de la période
+    # (copie en texte pour historisation - ces valeurs peuvent changer dans la souscription)
+    type_tarif_periode = fields.Char(
+        string='Type tarif (période)', readonly=True, 
+        help="Type de tarif au moment de la création de cette période"
+    )
+    
+    tarif_solidaire_periode = fields.Boolean(
+        string="Tarif solidaire (période)", readonly=True,
+        help="État du tarif solidaire au moment de la création de cette période"
+    )
+    
+    lisse_periode = fields.Boolean(
+        string='Lissé (période)', readonly=True,
+        help="État du lissage au moment de la création de cette période"
+    )
+    
+    puissance_souscrite_periode = fields.Char(
+        string='Puissance souscrite (période)', readonly=True,
+        help="Puissance souscrite au moment de la création de cette période"
+    )
+    
+    provision_mensuelle_kwh_periode = fields.Float(
+        string="Provision mensuelle (période)", readonly=True,
+        help="Provision mensuelle au moment de la création de cette période"
+    )
+    
     # Compatibilité (deprecated - à supprimer plus tard)
     energie_kwh = fields.Float(string='Énergie consommée (kWh)', compute='_compute_energie_kwh_compat', store=False)
     provision_kwh = fields.Float(string='Énergie provisionnée (kWh)', compute='_compute_provision_kwh_compat', store=False)
@@ -60,8 +87,19 @@ class SouscriptionPeriode(models.Model):
         for vals in vals_list:
             sous = self.env['souscription'].browse(vals['souscription_id'])
 
+            # Copie de l'état de la souscription au moment de la création
+            vals.update({
+                'type_tarif_periode': dict(sous._fields['type_tarif'].selection).get(sous.type_tarif, sous.type_tarif),
+                'tarif_solidaire_periode': sous.tarif_solidaire,
+                'lisse_periode': sous.lisse,
+                'puissance_souscrite_periode': f"{sous.puissance_souscrite} kVA" if sous.puissance_souscrite else '',
+                'provision_mensuelle_kwh_periode': sous.provision_mensuelle_kwh,
+                'pdl': sous.pdl,  # Copie du PDL aussi
+                'lisse': sous.lisse,  # Compatibilité ancien champ
+            })
+
+            # Gestion des provisions selon type de tarif
             if sous.lisse and sous.provision_mensuelle_kwh:
-                # Gestion des provisions selon type de tarif
                 if sous.type_tarif == 'base':
                     vals['provision_base_kwh'] = sous.provision_mensuelle_kwh
                 else:  # HP/HC - répartition temporaire 70% HP / 30% HC

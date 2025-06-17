@@ -1,0 +1,160 @@
+from odoo import models, fields, api
+from odoo.exceptions import UserError
+from datetime import timedelta
+import logging
+
+_logger = logging.getLogger(__name__)
+
+class GrillePrix(models.Model):
+    _name = 'grille.prix'
+    _description = 'Grille de prix énergétique'
+    _order = 'date_debut desc'
+
+    name = fields.Char("Nom de la grille", required=True)
+    date_debut = fields.Date("Valable à partir du", required=True)
+    date_fin = fields.Date("Valable jusqu'au", readonly=True, 
+                          help="Calculé automatiquement lors de la création d'une nouvelle grille")
+    active = fields.Boolean("Active", default=True)
+    
+    ligne_ids = fields.One2many('grille.prix.ligne', 'grille_id', string="Lignes de prix")
+    
+    # Champs calculés pour info
+    nb_lignes = fields.Integer("Nombre de lignes", compute='_compute_nb_lignes')
+    is_current = fields.Boolean("Grille actuelle", compute='_compute_is_current')
+    
+    @api.depends('ligne_ids')
+    def _compute_nb_lignes(self):
+        for grille in self:
+            grille.nb_lignes = len(grille.ligne_ids)
+    
+    @api.depends('date_debut', 'date_fin')
+    def _compute_is_current(self):
+        today = fields.Date.today()
+        for grille in self:
+            grille.is_current = (
+                grille.date_debut <= today and 
+                (not grille.date_fin or grille.date_fin >= today)
+            )
+    
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            date_debut_nouvelle = vals['date_debut']
+            
+            # Fermer la grille précédente (la plus récente avant cette date)
+            grille_precedente = self.search([
+                ('date_debut', '<', date_debut_nouvelle),
+                ('date_fin', '=', False)  # Grille ouverte
+            ], order='date_debut desc', limit=1)
+            
+            if grille_precedente:
+                # Fermer la grille précédente la veille de la nouvelle
+                date_fin_precedente = fields.Date.from_string(date_debut_nouvelle) - timedelta(days=1)
+                grille_precedente.date_fin = date_fin_precedente
+                _logger.info(f"Grille {grille_precedente.name} fermée au {date_fin_precedente}")
+        
+        return super().create(vals_list)
+    
+    @api.model
+    def get_grille_active(self, date_facture):
+        """Récupère la grille active à une date donnée"""
+        grille = self.search([
+            ('date_debut', '<=', date_facture),
+            '|', ('date_fin', '>=', date_facture), 
+                 ('date_fin', '=', False)
+        ], limit=1)
+        
+        if not grille:
+            raise UserError(f"Aucune grille de prix active pour la date {date_facture}")
+        
+        return grille
+    
+    def get_prix_dict(self):
+        """Retourne un dict {produit: prix} pour toute la grille"""
+        self.ensure_one()
+        return {ligne.produit: ligne.prix_unitaire for ligne in self.ligne_ids}
+    
+    def copier_grille_precedente(self):
+        """Action pour copier les lignes de la grille précédente"""
+        self.ensure_one()
+        
+        grille_precedente = self.search([
+            ('date_debut', '<', self.date_debut),
+            ('id', '!=', self.id)
+        ], order='date_debut desc', limit=1)
+        
+        if not grille_precedente:
+            raise UserError("Aucune grille précédente trouvée")
+        
+        # Supprimer les lignes existantes
+        self.ligne_ids.unlink()
+        
+        # Copier les lignes de la grille précédente
+        for ligne in grille_precedente.ligne_ids:
+            self.env['grille.prix.ligne'].create({
+                'grille_id': self.id,
+                'produit': ligne.produit,
+                'prix_unitaire': ligne.prix_unitaire,
+            })
+        
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'message': f"Lignes copiées depuis {grille_precedente.name}",
+                'type': 'success',
+            }
+        }
+
+
+class GrillePrixLigne(models.Model):
+    _name = 'grille.prix.ligne'
+    _description = 'Ligne de prix énergétique'
+    _order = 'produit'
+
+    grille_id = fields.Many2one('grille.prix', string="Grille", required=True, ondelete='cascade')
+    
+    produit = fields.Selection([
+        # Abonnements par puissance
+        ('abonnement_3kva', 'Abonnement 3 kVA'),
+        ('abonnement_6kva', 'Abonnement 6 kVA'),
+        ('abonnement_9kva', 'Abonnement 9 kVA'),
+        ('abonnement_12kva', 'Abonnement 12 kVA'),
+        ('abonnement_15kva', 'Abonnement 15 kVA'),
+        ('abonnement_18kva', 'Abonnement 18 kVA'),
+        ('abonnement_24kva', 'Abonnement 24 kVA'),
+        ('abonnement_30kva', 'Abonnement 30 kVA'),
+        ('abonnement_36kva', 'Abonnement 36 kVA'),
+        
+        # Énergies
+        ('energie_base', 'Énergie Base (€/kWh)'),
+        ('energie_hp', 'Énergie Heures Pleines (€/kWh)'),
+        ('energie_hc', 'Énergie Heures Creuses (€/kWh)'),
+        
+        # Abonnements solidaires
+        ('abonnement_solidaire_3kva', 'Abonnement Solidaire 3 kVA'),
+        ('abonnement_solidaire_6kva', 'Abonnement Solidaire 6 kVA'),
+        ('abonnement_solidaire_9kva', 'Abonnement Solidaire 9 kVA'),
+        # ... autres puissances solidaires selon besoins
+    ], string="Produit", required=True)
+    
+    prix_unitaire = fields.Float("Prix unitaire (€)", required=True, digits=(16, 6))
+    
+    # Champs informatifs
+    unite = fields.Char("Unité", compute='_compute_unite', store=False)
+    
+    @api.depends('produit')
+    def _compute_unite(self):
+        for ligne in self:
+            if 'abonnement' in ligne.produit:
+                ligne.unite = "€/mois"
+            elif 'energie' in ligne.produit:
+                ligne.unite = "€/kWh"
+            else:
+                ligne.unite = "€"
+    
+    _sql_constraints = [
+        ('unique_produit_grille', 
+         'UNIQUE(grille_id, produit)',
+         'Un produit ne peut apparaître qu\'une seule fois par grille.')
+    ]

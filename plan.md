@@ -347,6 +347,55 @@ def get_invoice_context(self):
     }
 ```
 
+## Système de Grilles de Prix
+
+### Architecture Optimisée pour Performance
+
+#### Modèle en 2 Niveaux
+```python
+# Grille de prix (header)
+class GrillePrix(models.Model):
+    name = "Grille tarifaire 2025"
+    date_debut = "2025-01-01"
+    date_fin = None  # Auto-calculé lors création nouvelle grille
+    
+    ligne_ids = One2many('grille.prix.ligne')
+
+# Lignes de prix
+class GrillePrixLigne(models.Model):
+    produit = 'abonnement_6kva'  # Clé pour récupération rapide
+    prix_unitaire = 15.80        # Prix en €
+```
+
+#### Gestion Automatique des Périodes
+- **Création nouvelle grille** → ferme automatiquement la précédente
+- **Date fin = date début nouvelle - 1 jour**
+- **Une seule grille ouverte** à la fois
+
+#### Récupération Optimisée (1 requête pour tous les prix)
+```python
+# Dans création facture
+grille_active = env['grille.prix'].get_grille_active(date_facture)
+prix_dict = grille_active.get_prix_dict()  # {produit: prix}
+
+# Usage direct sans requêtes supplémentaires
+prix_abo = prix_dict['abonnement_6kva']      # 15.80
+prix_base = prix_dict['energie_base']        # 0.1850
+prix_hp = prix_dict['energie_hp']            # 0.2010
+```
+
+#### Produits Supportés
+- **Abonnements** : `abonnement_3kva` à `abonnement_36kva`
+- **Abonnements solidaires** : `abonnement_solidaire_*kva`
+- **Énergies** : `energie_base`, `energie_hp`, `energie_hc`
+- **Unités** : €/mois pour abonnements, €/kWh pour énergies
+
+#### Interface Utilisateur
+- **Vue Kanban** : Aperçu rapide des grilles avec statut (active/fermée)
+- **Onglets séparés** : Abonnements / Énergies / Tous les prix
+- **Bouton "Copier précédente"** : Duplication facile pour nouvelles grilles
+- **Contraintes** : Un produit par grille uniquement
+
 ## Architecture Cible
 
 ### Structure Modulaire en 3 Modules

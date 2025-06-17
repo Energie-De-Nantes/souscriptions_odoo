@@ -29,6 +29,8 @@
         "data/souscription_sequence.xml",
         "data/souscription_etat_data.xml",
         "data/produits_abonnement.xml",
+        "data/grille_prix_demo.xml",
+        "views/grille_prix_views.xml",
         "views/souscription_views.xml",
         "views/souscriptions_periode_views.xml",
         

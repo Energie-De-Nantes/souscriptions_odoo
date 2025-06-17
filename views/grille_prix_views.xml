@@ -73,10 +73,10 @@
                 <field name="is_current"/>
                 <field name="nb_lignes"/>
                 <templates>
-                    <t t-name="kanban-box">
+                    <t t-name="card">
                         <div class="oe_kanban_global_click">
                             <div class="o_kanban_image">
-                                <i class="fa fa-calculator fa-2x" t-att-style="record.is_current.raw_value ? 'color: green' : 'color: gray'"/>
+                                <i class="fa fa-calculator fa-2x" title="Grille de prix" t-att-style="record.is_current.raw_value ? 'color: green' : 'color: gray'"/>
                             </div>
                             <div class="oe_kanban_details">
                                 <strong><field name="name"/></strong>
@@ -126,7 +126,9 @@
                     <field name="grille_id"/>
                     <field name="produit"/>
                     <field name="prix_unitaire"/>
-                    <field name="unite" readonly="1"/>
+                    <field name="unite_saisie" readonly="1"/>
+                    <field name="prix_interne" readonly="1"/>
+                    <field name="unite_calcul" readonly="1"/>
                 </group>
             </form>
         </field>

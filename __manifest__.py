@@ -41,4 +41,8 @@
         'views/metier_prestation.xml',
         'views/metier_mesure_index.xml',
     ],
+    
+    "demo": [
+        "demo/souscriptions_demo.xml",
+    ],
 }

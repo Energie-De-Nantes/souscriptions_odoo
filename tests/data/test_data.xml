@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- ================================ -->
+        <!-- DONNÉES SPÉCIFIQUES POUR TESTS  -->
+        <!-- ================================ -->
+        
+        <!-- Grille de prix tests avec tous les champs nécessaires -->
+        <record id="test_grille_prix_complete" model="grille.prix">
+            <field name="name">Grille Test Complète</field>
+            <field name="date_debut">2024-01-01</field>
+            <field name="date_fin">2024-12-31</field>
+            <field name="active">True</field>
+        </record>
+        
+        <!-- Prix énergies pour tests -->
+        <record id="test_prix_energie_base" model="grille.prix.ligne">
+            <field name="grille_id" ref="test_grille_prix_complete"/>
+            <field name="product_id" ref="souscriptions.souscriptions_product_energie_base"/>
+            <field name="prix_interne">0.2276</field>
+        </record>
+        
+        <record id="test_prix_energie_hp" model="grille.prix.ligne">
+            <field name="grille_id" ref="test_grille_prix_complete"/>
+            <field name="product_id" ref="souscriptions.souscriptions_product_energie_hp"/>
+            <field name="prix_interne">0.2516</field>
+        </record>
+        
+        <record id="test_prix_energie_hc" model="grille.prix.ligne">
+            <field name="grille_id" ref="test_grille_prix_complete"/>
+            <field name="product_id" ref="souscriptions.souscriptions_product_energie_hc"/>
+            <field name="prix_interne">0.2032</field>
+        </record>
+        
+        <!-- Client test -->
+        <record id="test_partner" model="res.partner">
+            <field name="name">Client Test</field>
+            <field name="is_company">False</field>
+        </record>
+        
+        <!-- État de facturation test -->
+        <record id="test_etat_actif" model="souscription.etat">
+            <field name="name">Test Actif</field>
+            <field name="sequence">1</field>
+        </record>
+        
+    </data>
+</odoo>

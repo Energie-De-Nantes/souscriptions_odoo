@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- ================================ -->
+        <!-- CLIENTS DE DÉMONSTRATION        -->
+        <!-- ================================ -->
+        
+        <!-- Client particulier BASE -->
+        <record id="demo_client_particulier_base" model="res.partner">
+            <field name="name">Marie Dupont</field>
+            <field name="is_company">False</field>
+            <field name="street">15 rue des Énergies Vertes</field>
+            <field name="city">Rennes</field>
+            <field name="zip">35000</field>
+            <field name="country_id" ref="base.fr"/>
+            <field name="email">marie.dupont@email.fr</field>
+            <field name="phone">02.99.12.34.56</field>
+        </record>
+        
+        <!-- Client particulier HP/HC -->
+        <record id="demo_client_particulier_hphc" model="res.partner">
+            <field name="name">Jean Martin</field>
+            <field name="is_company">False</field>
+            <field name="street">8 avenue du Développement Durable</field>
+            <field name="city">Nantes</field>
+            <field name="zip">44000</field>
+            <field name="country_id" ref="base.fr"/>
+            <field name="email">jean.martin@email.fr</field>
+            <field name="phone">02.40.78.90.12</field>
+        </record>
+        
+        <!-- Client PRO -->
+        <record id="demo_client_pro" model="res.partner">
+            <field name="name">Boulangerie Bio du Coin</field>
+            <field name="is_company">True</field>
+            <field name="street">3 place du Marché</field>
+            <field name="city">Saint-Malo</field>
+            <field name="zip">35400</field>
+            <field name="country_id" ref="base.fr"/>
+            <field name="email">contact@boulangerie-bio.fr</field>
+            <field name="phone">02.99.56.78.90</field>
+        </record>
+        
+        <!-- Client solidaire -->
+        <record id="demo_client_solidaire" model="res.partner">
+            <field name="name">Sophie Leroy</field>
+            <field name="is_company">False</field>
+            <field name="street">12 rue de la Solidarité</field>
+            <field name="city">Lorient</field>
+            <field name="zip">56100</field>
+            <field name="country_id" ref="base.fr"/>
+            <field name="email">sophie.leroy@email.fr</field>
+            <field name="phone">02.97.34.56.78</field>
+        </record>
+        
+        <!-- ================================ -->
+        <!-- SOUSCRIPTIONS DE DÉMONSTRATION  -->
+        <!-- ================================ -->
+        
+        <!-- Souscription particulier BASE 6 kVA -->
+        <record id="demo_souscription_particulier_base" model="souscription">
+            <field name="partner_id" ref="demo_client_particulier_base"/>
+            <field name="pdl">PDL22516914012345</field>
+            <field name="puissance_souscrite">6</field>
+            <field name="type_tarif">base</field>
+            <field name="date_debut">2024-01-15</field>
+            <field name="provision_mensuelle_kwh">280</field>
+            <field name="lisse">True</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="etat_facturation_id" ref="etat_a_facturer"/>
+            <field name="ref_compteur">85234567</field>
+        </record>
+        
+        <!-- Souscription particulier HP/HC 9 kVA -->
+        <record id="demo_souscription_particulier_hphc" model="souscription">
+            <field name="partner_id" ref="demo_client_particulier_hphc"/>
+            <field name="pdl">PDL22516914098765</field>
+            <field name="puissance_souscrite">9</field>
+            <field name="type_tarif">hphc</field>
+            <field name="date_debut">2024-03-01</field>
+            <field name="provision_mensuelle_kwh">450</field>
+            <field name="lisse">True</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="etat_facturation_id" ref="etat_actif"/>
+            <field name="ref_compteur">85987654</field>
+        </record>
+        
+        <!-- Souscription PRO avec majoration -->
+        <record id="demo_souscription_pro" model="souscription">
+            <field name="partner_id" ref="demo_client_pro"/>
+            <field name="pdl">PDL22516914055555</field>
+            <field name="puissance_souscrite">12</field>
+            <field name="type_tarif">base</field>
+            <field name="date_debut">2024-02-01</field>
+            <field name="provision_mensuelle_kwh">800</field>
+            <field name="lisse">False</field>
+            <field name="coeff_pro">15.0</field>
+            <field name="mode_paiement">virement</field>
+            <field name="etat_facturation_id" ref="etat_actif"/>
+            <field name="ref_compteur">85123456</field>
+        </record>
+        
+        <!-- Souscription solidaire -->
+        <record id="demo_souscription_solidaire" model="souscription">
+            <field name="partner_id" ref="demo_client_solidaire"/>
+            <field name="pdl">PDL22516914033333</field>
+            <field name="puissance_souscrite">3</field>
+            <field name="type_tarif">base</field>
+            <field name="date_debut">2024-04-01</field>
+            <field name="provision_mensuelle_kwh">150</field>
+            <field name="lisse">True</field>
+            <field name="tarif_solidaire">True</field>
+            <field name="mode_paiement">cheque_energie</field>
+            <field name="etat_facturation_id" ref="etat_actif"/>
+            <field name="ref_compteur">85111222</field>
+        </record>
+        
+        <!-- ================================ -->
+        <!-- PÉRIODES DE DÉMONSTRATION       -->
+        <!-- ================================ -->
+        
+        <!-- Période janvier 2024 - Particulier BASE -->
+        <record id="demo_periode_janvier_base" model="souscription.periode">
+            <field name="souscription_id" ref="demo_souscription_particulier_base"/>
+            <field name="date_debut">2024-01-01</field>
+            <field name="date_fin">2024-01-31</field>
+            <field name="type_periode">mensuelle</field>
+            <field name="provision_base_kwh">280</field>
+            <field name="energie_base_kwh">265</field>
+            <field name="turpe_fixe">8.50</field>
+            <field name="turpe_variable">12.30</field>
+        </record>
+        
+        <!-- Période février 2024 - Particulier BASE -->
+        <record id="demo_periode_fevrier_base" model="souscription.periode">
+            <field name="souscription_id" ref="demo_souscription_particulier_base"/>
+            <field name="date_debut">2024-02-01</field>
+            <field name="date_fin">2024-02-29</field>
+            <field name="type_periode">mensuelle</field>
+            <field name="provision_base_kwh">280</field>
+            <field name="energie_base_kwh">295</field>
+            <field name="turpe_fixe">8.50</field>
+            <field name="turpe_variable">13.75</field>
+        </record>
+        
+        <!-- Période mars 2024 - Particulier HP/HC -->
+        <record id="demo_periode_mars_hphc" model="souscription.periode">
+            <field name="souscription_id" ref="demo_souscription_particulier_hphc"/>
+            <field name="date_debut">2024-03-01</field>
+            <field name="date_fin">2024-03-31</field>
+            <field name="type_periode">mensuelle</field>
+            <field name="provision_hp_kwh">315</field>
+            <field name="provision_hc_kwh">135</field>
+            <field name="energie_hp_kwh">298</field>
+            <field name="energie_hc_kwh">142</field>
+            <field name="energie_hph_kwh">180</field>
+            <field name="energie_hpb_kwh">118</field>
+            <field name="energie_hch_kwh">85</field>
+            <field name="energie_hcb_kwh">57</field>
+            <field name="turpe_fixe">12.75</field>
+            <field name="turpe_variable">18.20</field>
+        </record>
+        
+        <!-- Période février 2024 - PRO -->
+        <record id="demo_periode_fevrier_pro" model="souscription.periode">
+            <field name="souscription_id" ref="demo_souscription_pro"/>
+            <field name="date_debut">2024-02-01</field>
+            <field name="date_fin">2024-02-29</field>
+            <field name="type_periode">mensuelle</field>
+            <field name="energie_base_kwh">850</field>
+            <field name="turpe_fixe">18.90</field>
+            <field name="turpe_variable">32.50</field>
+        </record>
+        
+        <!-- Période avril 2024 - Solidaire -->
+        <record id="demo_periode_avril_solidaire" model="souscription.periode">
+            <field name="souscription_id" ref="demo_souscription_solidaire"/>
+            <field name="date_debut">2024-04-01</field>
+            <field name="date_fin">2024-04-30</field>
+            <field name="type_periode">mensuelle</field>
+            <field name="provision_base_kwh">150</field>
+            <field name="energie_base_kwh">145</field>
+            <field name="turpe_fixe">4.25</field>
+            <field name="turpe_variable">6.80</field>
+        </record>
+        
+        <!-- ================================ -->
+        <!-- GRILLE DE PRIX COMPLÈTE         -->
+        <!-- ================================ -->
+        
+        <!-- Grille de prix réaliste 2024 -->
+        <record id="demo_grille_prix_complete_2024" model="grille.prix">
+            <field name="name">Tarifs électricité 2024 - Complets</field>
+            <field name="date_debut">2024-01-01</field>
+            <field name="date_fin">2024-12-31</field>
+            <field name="active">True</field>
+        </record>
+        
+        <!-- Prix énergies réalistes -->
+        <record id="demo_prix_energie_base_2024" model="grille.prix.ligne">
+            <field name="grille_id" ref="demo_grille_prix_complete_2024"/>
+            <field name="product_id" ref="souscriptions_product_energie_base"/>
+            <field name="prix_interne">0.2276</field>
+        </record>
+        
+        <record id="demo_prix_energie_hp_2024" model="grille.prix.ligne">
+            <field name="grille_id" ref="demo_grille_prix_complete_2024"/>
+            <field name="product_id" ref="souscriptions_product_energie_hp"/>
+            <field name="prix_interne">0.2516</field>
+        </record>
+        
+        <record id="demo_prix_energie_hc_2024" model="grille.prix.ligne">
+            <field name="grille_id" ref="demo_grille_prix_complete_2024"/>
+            <field name="product_id" ref="souscriptions_product_energie_hc"/>
+            <field name="prix_interne">0.2032</field>
+        </record>
+        
+    </data>
+</odoo>

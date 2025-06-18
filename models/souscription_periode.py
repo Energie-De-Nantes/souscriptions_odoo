@@ -75,6 +75,11 @@ class SouscriptionPeriode(models.Model):
         help="Provision mensuelle au moment de la création de cette période"
     )
     
+    coeff_pro_periode = fields.Float(
+        string="Coefficient PRO (période)", readonly=True,
+        help="Coefficient PRO au moment de la création de cette période"
+    )
+    
     # Compatibilité (deprecated - à supprimer plus tard)
     energie_kwh = fields.Float(string='Énergie consommée (kWh)', compute='_compute_energie_kwh_compat', store=False)
     provision_kwh = fields.Float(string='Énergie provisionnée (kWh)', compute='_compute_provision_kwh_compat', store=False)
@@ -100,6 +105,7 @@ class SouscriptionPeriode(models.Model):
                 'lisse_periode': sous.lisse,
                 'puissance_souscrite_periode': f"{sous.puissance_souscrite} kVA" if sous.puissance_souscrite else '',
                 'provision_mensuelle_kwh_periode': sous.provision_mensuelle_kwh,
+                'coeff_pro_periode': sous.coeff_pro,
                 'pdl': sous.pdl,  # Copie du PDL aussi
                 'lisse': sous.lisse,  # Compatibilité ancien champ
             })

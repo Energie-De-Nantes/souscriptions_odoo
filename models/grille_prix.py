@@ -77,6 +77,34 @@ class GrillePrix(models.Model):
         self.ensure_one()
         return {ligne.product_id.id: ligne.prix_interne for ligne in self.ligne_ids if ligne.product_id}
     
+    def get_prix_abonnement(self, puissance_kva, coeff_pro=0.0, is_solidaire=False):
+        """Calcule le prix d'abonnement dynamiquement selon la puissance et le coefficient PRO"""
+        self.ensure_one()
+        
+        # Recherche de la ligne abonnement standard ou solidaire
+        product_ref = 'souscriptions_product_abonnement_solidaire' if is_solidaire else 'souscriptions_product_abonnement_standard'
+        try:
+            product = self.env.ref(f'souscriptions.{product_ref}')
+        except:
+            raise UserError(f"Produit d'abonnement non trouvé : {product_ref}")
+            
+        ligne_abo = self.ligne_ids.filtered(lambda l: l.product_id == product and l.type_produit == 'abonnement')
+        if not ligne_abo:
+            type_abo = "solidaire" if is_solidaire else "standard"
+            raise UserError(f"Aucune ligne de prix abonnement {type_abo} dans la grille {self.name}")
+        
+        ligne = ligne_abo[0]
+        
+        # Calcul selon la formule : prix_base * (puissance/3) en €/mois
+        prix_mensuel = ligne.prix_base_3kva * (puissance_kva / 3.0)
+        
+        # Ajustement PRO avec coefficient personnalisé
+        if coeff_pro > 0:
+            prix_mensuel = prix_mensuel * (1 + coeff_pro / 100.0)
+        
+        # Conversion en €/jour
+        return prix_mensuel / 30.0
+    
     def dupliquer_cette_grille(self):
         """Action pour dupliquer cette grille avec toutes ses lignes"""
         self.ensure_one()
@@ -139,7 +167,7 @@ class GrillePrix(models.Model):
 class GrillePrixLigne(models.Model):
     _name = 'grille.prix.ligne'
     _description = 'Ligne de prix énergétique'
-    _order = 'product_id'
+    _order = 'type_produit, product_id'
 
     grille_id = fields.Many2one('grille.prix', string="Grille", required=True, ondelete='cascade')
     
@@ -147,19 +175,25 @@ class GrillePrixLigne(models.Model):
                                 domain=[('type', '=', 'service')],
                                 help="Produit de service pour la facturation énergétique")
     
-    prix_unitaire = fields.Float("Prix unitaire", required=True, digits=(16, 6),
-                                 help="Prix en €/mois pour abonnements, €/kWh pour énergies")
-    
-    # Prix interne en €/jour pour abonnements (calculé automatiquement)
-    prix_interne = fields.Float("Prix interne (€/jour)", compute='_compute_prix_interne', store=True,
-                               help="Prix utilisé pour les calculs de facturation")
-    
     # Type de produit pour la conversion des prix
     type_produit = fields.Selection([
-        ('abonnement', 'Abonnement (€/mois → €/jour)'),
+        ('abonnement', 'Tarifs abonnement'),
         ('energie', 'Énergie (€/kWh)'),
         ('autre', 'Autre (€)')
-    ], string="Type", required=True, default='autre')
+    ], string="Type", required=True, default='energie')
+    
+    # Pour les abonnements : prix de base 3kVA
+    prix_base_3kva = fields.Float("Prix base 3 kVA (€/mois)", digits=(16, 6),
+                                 help="Prix de base pour 3 kVA, utilisé pour calculer les autres puissances")
+    
+    # Pour les énergies : prix unitaire classique  
+    prix_unitaire = fields.Float("Prix unitaire (€/kWh)", digits=(16, 6),
+                                 help="Prix unitaire pour les énergies")
+    
+    
+    # Prix interne calculé
+    prix_interne = fields.Float("Prix interne", compute='_compute_prix_interne', store=True,
+                               help="Prix utilisé pour les calculs de facturation")
     
     # Champs informatifs
     unite_saisie = fields.Char("Unité saisie", compute='_compute_unites', store=False)
@@ -169,7 +203,7 @@ class GrillePrixLigne(models.Model):
     def _compute_unites(self):
         for ligne in self:
             if ligne.type_produit == 'abonnement':
-                ligne.unite_saisie = "€/mois"
+                ligne.unite_saisie = "€/mois (base 3kVA)"
                 ligne.unite_calcul = "€/jour"
             elif ligne.type_produit == 'energie':
                 ligne.unite_saisie = "€/kWh"
@@ -178,12 +212,12 @@ class GrillePrixLigne(models.Model):
                 ligne.unite_saisie = "€"
                 ligne.unite_calcul = "€"
     
-    @api.depends('type_produit', 'prix_unitaire')
+    @api.depends('type_produit', 'prix_unitaire', 'prix_base_3kva')
     def _compute_prix_interne(self):
         for ligne in self:
             if ligne.type_produit == 'abonnement':
-                # Conversion €/mois → €/jour (divisé par 30)
-                ligne.prix_interne = ligne.prix_unitaire / 30.0 if ligne.prix_unitaire else 0.0
+                # Pour les abonnements, on stocke le prix base 3kVA en €/jour
+                ligne.prix_interne = ligne.prix_base_3kva / 30.0 if ligne.prix_base_3kva else 0.0
             else:
                 # Pour énergies et autres : prix interne = prix saisi
                 ligne.prix_interne = ligne.prix_unitaire or 0.0

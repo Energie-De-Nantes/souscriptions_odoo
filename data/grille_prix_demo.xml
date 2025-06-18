@@ -7,7 +7,23 @@
             <field name="is_current" eval="True"/>
         </record>
         
-        <!-- Énergies uniquement pour commencer -->
+        <!-- Tarifs abonnement standard -->
+        <record id="prix_abonnement_standard" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2025"/>
+            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
+            <field name="type_produit">abonnement</field>
+            <field name="prix_base_3kva">12.50</field>
+        </record>
+        
+        <!-- Tarifs abonnement solidaire -->
+        <record id="prix_abonnement_solidaire" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2025"/>
+            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
+            <field name="type_produit">abonnement</field>
+            <field name="prix_base_3kva">10.00</field>
+        </record>
+        
+        <!-- Énergies -->
         <record id="prix_energie_base" model="grille.prix.ligne">
             <field name="grille_id" ref="grille_prix_2025"/>
             <field name="product_id" ref="souscriptions_product_energie_base"/>
@@ -28,8 +44,5 @@
             <field name="type_produit">energie</field>
             <field name="prix_unitaire">0.1520</field>
         </record>
-        
-        <!-- Les abonnements seront ajoutés manuellement via l'interface 
-             car ils utilisent des variants créés automatiquement -->
     </data>
 </odoo>

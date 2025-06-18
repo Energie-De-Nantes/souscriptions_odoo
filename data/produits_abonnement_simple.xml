@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+    <!-- Produits d'abonnement simplifiés -->
+    
+    <!-- Abonnement électricité standard -->
+    <record id="souscriptions_product_abonnement_standard" model="product.product">
+        <field name="name">Abonnement électricité</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+    </record>
+
+    <!-- Abonnement électricité solidaire -->
+    <record id="souscriptions_product_abonnement_solidaire" model="product.product">
+        <field name="name">Abonnement électricité solidaire</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+        <field name="taxes_id" eval="[(6, 0, [])]"/>
+    </record>
+</odoo>

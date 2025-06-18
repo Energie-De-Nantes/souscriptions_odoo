@@ -30,6 +30,7 @@
                     </group>
                     <group string="Paiement">
                         <field name="mode_paiement"/>
+                        <field name="coeff_pro" string="Majoration PRO (%)"/>
                     </group>
                     
                     <group string="Infos">

@@ -90,6 +90,10 @@ class Souscription(models.Model):
         ('virement', 'Virement'),
         ('cheque', 'Chèque'),
     ], string="Mode de paiement", tracking=True)
+    
+    # Coefficient PRO personnalisé  
+    coeff_pro = fields.Float("Majoration PRO (%)", default=0.0, digits=(5, 2),
+                            help="Majoration en % appliquée au tarif de base (0% pour les particuliers)", tracking=True)
     ## Informations
     ref_compteur = fields.Char(string="Référence compteur")
     numero_depannage = fields.Char(string="Numéro de dépannage")
@@ -132,29 +136,15 @@ class Souscription(models.Model):
                     _logger.error(f"Erreur création facture pour période {periode.mois_annee}: {e}")
                     raise UserError(f"Erreur création facture pour {periode.mois_annee}: {e}")
 
-    def _get_produit_abonnement(self, puissance, tarif_solidaire):
-        """Trouve le variant de produit d'abonnement correspondant aux critères"""
-        # Recherche du template selon le type d'abonnement
-        if tarif_solidaire:
-            template_xmlid = 'souscriptions.souscriptions_product_template_abonnement_solidaire'
-        else:
-            template_xmlid = 'souscriptions.souscriptions_product_template_abonnement'
+    def _get_produit_abonnement(self, tarif_solidaire):
+        """Trouve le produit d'abonnement selon le type"""
+        product_ref = 'souscriptions_product_abonnement_solidaire' if tarif_solidaire else 'souscriptions_product_abonnement_standard'
         
-        template = self.env.ref(template_xmlid, raise_if_not_found=False)
-        if not template:
+        try:
+            return self.env.ref(f'souscriptions.{product_ref}')
+        except:
             type_abo = "solidaire" if tarif_solidaire else "standard"
-            raise UserError(f"Template d'abonnement {type_abo} non trouvé")
-        
-        # Recherche du variant avec la bonne puissance
-        variant = template.product_variant_ids.filtered(
-            lambda v: puissance in v.name or puissance.replace(' ', '') in v.name.replace(' ', '')
-        )
-        
-        if not variant:
-            type_abo = "solidaire" if tarif_solidaire else "standard" 
-            raise UserError(f"Aucun variant d'abonnement {type_abo} trouvé pour {puissance}")
-        
-        return variant[0]  # Premier variant trouvé
+            raise UserError(f"Produit d'abonnement {type_abo} non trouvé")
     
     def _get_produit_energie(self, type_energie):
         """Trouve le produit d'énergie correspondant au type (base, hp, hc)"""
@@ -177,33 +167,45 @@ class Souscription(models.Model):
     def _creer_facture_periode(self, periode):
         """
         Crée une facture pour une période donnée en utilisant les données historisées
-        et la grille de prix active.
+        et la grille de prix active avec calcul dynamique.
         """
-        # 1. Récupération de la grille active et des prix
+        # 1. Récupération de la grille active
         grille_active = self.env['grille.prix'].get_grille_active(periode.date_fin)
-        prix_dict = grille_active.get_prix_dict()  # {product_id: prix_interne}
+        prix_dict = grille_active.get_prix_dict()  # {product_id: prix_interne} pour les énergies
         
         # 2. Utilisation des données historisées de la période
-        puissance = periode.puissance_souscrite_periode or self.puissance_souscrite
+        puissance_str = periode.puissance_souscrite_periode or self.puissance_souscrite
         tarif_solidaire = periode.tarif_solidaire_periode
         type_tarif = periode.type_tarif_periode or dict(self._fields['type_tarif'].selection).get(self.type_tarif, self.type_tarif)
         
-        if not puissance:
+        if not puissance_str:
             raise UserError(f"Aucune puissance définie pour la période {periode.mois_annee}")
 
-        # 3. Création des lignes de facture avec vrais produits
+        # Extraction de la puissance numérique (ex: "6 kVA" -> 6.0)
+        try:
+            puissance_kva = float(puissance_str.replace(' kVA', '').replace(',', '.'))
+        except:
+            raise UserError(f"Format de puissance invalide : {puissance_str}")
+
+        # 3. Création des lignes de facture
         lines_vals = []
         
-        # Ligne abonnement
-        produit_abo = self._get_produit_abonnement(puissance, tarif_solidaire)
-        prix_abo_journalier = prix_dict.get(produit_abo.id)
+        # Ligne abonnement avec calcul dynamique (utilise le coefficient historisé)
+        coeff_pro_historise = periode.coeff_pro_periode if hasattr(periode, 'coeff_pro_periode') else self.coeff_pro
+        produit_abo = self._get_produit_abonnement(tarif_solidaire)
+        prix_abo_journalier = grille_active.get_prix_abonnement(
+            puissance_kva, 
+            coeff_pro=coeff_pro_historise,
+            is_solidaire=tarif_solidaire
+        )
         
-        if prix_abo_journalier is None:
-            raise UserError(f"Prix non trouvé dans la grille pour le produit : {produit_abo.name}")
-
+        # Nom descriptif de la ligne
+        type_client = f"PRO +{coeff_pro_historise:g}%" if coeff_pro_historise > 0 else "PART"
+        puissance_desc = f"{puissance_kva:g} kVA"  # :g supprime les .0 inutiles
+        
         lines_vals.append((0, 0, {
             'product_id': produit_abo.id,
-            'name': f"{produit_abo.name} - {periode.mois_annee} ({periode.jours} jours)",
+            'name': f"{produit_abo.name} {puissance_desc} {type_client} - {periode.mois_annee} ({periode.jours} jours)",
             'quantity': periode.jours,
             'price_unit': prix_abo_journalier,
         }))
@@ -249,7 +251,7 @@ class Souscription(models.Model):
                     'price_unit': prix_hc,
                 }))
 
-        # Lignes TURPE si présentes (sans produit pour l'instant)
+        # Lignes TURPE si présentes (affichage réglementaire, pas comptabilisé)
         if periode.turpe_fixe > 0:
             lines_vals.append((0, 0, {
                 'name': f"TURPE Fixe - {periode.mois_annee}",
@@ -264,7 +266,7 @@ class Souscription(models.Model):
                 'price_unit': periode.turpe_variable,
             }))
 
-        # 6. Création de la facture
+        # 4. Création de la facture
         facture_vals = {
             'move_type': 'out_invoice',
             'partner_id': self.partner_id.id,

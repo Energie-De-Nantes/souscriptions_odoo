@@ -28,7 +28,7 @@
         "security/ir.model.access.csv",
         "data/souscription_sequence.xml",
         "data/souscription_etat_data.xml",
-        "data/produits_abonnement.xml",
+        "data/produits_abonnement_simple.xml",
         "data/produits_energie.xml",
         "data/grille_prix_demo.xml",
         "report/souscription_contrat_report.xml",

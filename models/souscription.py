@@ -211,45 +211,53 @@ class Souscription(models.Model):
         }))
 
         # Lignes énergie selon type de tarif historisé
-        if type_tarif == 'Base':
-            if periode.provision_base_kwh > 0:
-                produit_base = self._get_produit_energie('base')
-                prix_base = prix_dict.get(produit_base.id)
-                if prix_base is None:
-                    raise UserError(f"Prix non trouvé dans la grille pour le produit : {produit_base.name}")
-                    
-                lines_vals.append((0, 0, {
-                    'product_id': produit_base.id,
-                    'name': f"{produit_base.name} {periode.provision_base_kwh:.2f} kWh - {periode.mois_annee}",
-                    'quantity': periode.provision_base_kwh,
-                    'price_unit': prix_base,
-                }))
-        else:  # HP/HC
-            if periode.provision_hp_kwh > 0:
-                produit_hp = self._get_produit_energie('hp')
-                prix_hp = prix_dict.get(produit_hp.id)
-                if prix_hp is None:
-                    raise UserError(f"Prix non trouvé dans la grille pour le produit : {produit_hp.name}")
-                    
-                lines_vals.append((0, 0, {
-                    'product_id': produit_hp.id,
-                    'name': f"{produit_hp.name} {periode.provision_hp_kwh:.2f} kWh - {periode.mois_annee}",
-                    'quantity': periode.provision_hp_kwh,
-                    'price_unit': prix_hp,
-                }))
+        # Le type_tarif peut être la clé ('base', 'hphc') ou le libellé complet
+        is_base_tarif = (
+            type_tarif == 'base' or 
+            type_tarif == 'Base' or 
+            'Base' in str(type_tarif)
+        )
+        
+        if is_base_tarif:
+            # Tarif BASE : toujours afficher la ligne énergie base (même si 0)
+            produit_base = self._get_produit_energie('base')
+            prix_base = prix_dict.get(produit_base.id)
+            if prix_base is None:
+                raise UserError(f"Prix non trouvé dans la grille pour le produit : {produit_base.name}")
                 
-            if periode.provision_hc_kwh > 0:
-                produit_hc = self._get_produit_energie('hc')
-                prix_hc = prix_dict.get(produit_hc.id)
-                if prix_hc is None:
-                    raise UserError(f"Prix non trouvé dans la grille pour le produit : {produit_hc.name}")
-                    
-                lines_vals.append((0, 0, {
-                    'product_id': produit_hc.id,
-                    'name': f"{produit_hc.name} {periode.provision_hc_kwh:.2f} kWh - {periode.mois_annee}",
-                    'quantity': periode.provision_hc_kwh,
-                    'price_unit': prix_hc,
-                }))
+            lines_vals.append((0, 0, {
+                'product_id': produit_base.id,
+                'name': f"{produit_base.name} {periode.provision_base_kwh:.2f} kWh - {periode.mois_annee}",
+                'quantity': periode.provision_base_kwh,
+                'price_unit': prix_base,
+            }))
+        else:  # HP/HC
+            # Tarif HP/HC : toujours afficher les deux lignes HP et HC (même si 0)
+            # Ligne HP
+            produit_hp = self._get_produit_energie('hp')
+            prix_hp = prix_dict.get(produit_hp.id)
+            if prix_hp is None:
+                raise UserError(f"Prix non trouvé dans la grille pour le produit : {produit_hp.name}")
+                
+            lines_vals.append((0, 0, {
+                'product_id': produit_hp.id,
+                'name': f"{produit_hp.name} {periode.provision_hp_kwh:.2f} kWh - {periode.mois_annee}",
+                'quantity': periode.provision_hp_kwh,
+                'price_unit': prix_hp,
+            }))
+            
+            # Ligne HC
+            produit_hc = self._get_produit_energie('hc')
+            prix_hc = prix_dict.get(produit_hc.id)
+            if prix_hc is None:
+                raise UserError(f"Prix non trouvé dans la grille pour le produit : {produit_hc.name}")
+                
+            lines_vals.append((0, 0, {
+                'product_id': produit_hc.id,
+                'name': f"{produit_hc.name} {periode.provision_hc_kwh:.2f} kWh - {periode.mois_annee}",
+                'quantity': periode.provision_hc_kwh,
+                'price_unit': prix_hc,
+            }))
 
         # Lignes TURPE si présentes (affichage réglementaire, pas comptabilisé)
         if periode.turpe_fixe > 0:

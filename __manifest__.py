@@ -32,8 +32,8 @@
         "data/produits_energie.xml",
         "data/grille_prix_demo.xml",
         "report/souscription_contrat_report.xml",
-        "views/grille_prix_views.xml",
         "views/souscription_views.xml",
+        "views/grille_prix_views.xml",
         "views/souscriptions_periode_views.xml",
         
         # Données métier (à déplacer vers souscriptions_metier plus tard)

@@ -32,3 +32,6 @@ htmlcov/
 .cache
 nosetests.xml
 coverage
+
+# Odoo logs (symlink)
+odoo-server.log

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo noupdate="1">
+    <!-- Produits d'énergie -->
+    
+    <!-- Énergie Base -->
+    <record id="souscriptions_product_energie_base" model="product.product">
+        <field name="name">Énergie Base</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="uom_po_id" ref="uom.product_uom_kgm"/>
+    </record>
+
+    <!-- Énergie Heures Pleines -->
+    <record id="souscriptions_product_energie_hp" model="product.product">
+        <field name="name">Énergie HP</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="uom_po_id" ref="uom.product_uom_kgm"/>
+    </record>
+
+    <!-- Énergie Heures Creuses -->
+    <record id="souscriptions_product_energie_hc" model="product.product">
+        <field name="name">Énergie HC</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="uom_po_id" ref="uom.product_uom_kgm"/>
+    </record>
+
+    <!-- Produits TURPE -->
+    <record id="souscriptions_product_turpe_fixe" model="product.product">
+        <field name="name">TURPE Fixe</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+    </record>
+
+    <record id="souscriptions_product_turpe_variable" model="product.product">
+        <field name="name">TURPE Variable</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+    </record>
+</odoo>

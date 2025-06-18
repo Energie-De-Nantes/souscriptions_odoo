@@ -5,10 +5,15 @@
         <field name="arch" type="xml">
             <form string="Grille de Prix">
                 <header>
-                    <button name="copier_grille_precedente" type="object" 
-                            string="Copier grille précédente" 
+                    <button name="dupliquer_cette_grille" type="object" 
+                            string="Dupliquer cette grille" 
                             class="btn-primary"
                             invisible="not id"/>
+                    <button name="definir_comme_grille_actuelle" type="object" 
+                            string="Définir comme grille actuelle" 
+                            class="btn-secondary"
+                            invisible="not id"
+                            help="Active cette grille et ferme l'ancienne grille actuelle"/>
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
@@ -33,7 +38,8 @@
                         <page string="Tous les Prix">
                             <field name="ligne_ids">
                                 <list editable="bottom">
-                                    <field name="produit"/>
+                                    <field name="product_id"/>
+                                    <field name="type_produit"/>
                                     <field name="prix_unitaire"/>
                                     <field name="unite_saisie" readonly="1"/>
                                     <field name="prix_interne" readonly="1"/>
@@ -124,7 +130,8 @@
             <form string="Ligne de Prix">
                 <group>
                     <field name="grille_id"/>
-                    <field name="produit"/>
+                    <field name="product_id"/>
+                    <field name="type_produit"/>
                     <field name="prix_unitaire"/>
                     <field name="unite_saisie" readonly="1"/>
                     <field name="prix_interne" readonly="1"/>

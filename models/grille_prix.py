@@ -20,24 +20,14 @@ class GrillePrix(models.Model):
     
     # Champs calculés pour info
     nb_lignes = fields.Integer("Nombre de lignes", compute='_compute_nb_lignes')
-    is_current = fields.Boolean("Grille actuelle", compute='_compute_is_current')
+    is_current = fields.Boolean("Grille actuelle", default=False, 
+                               help="Une seule grille peut être active à la fois")
     
     @api.depends('ligne_ids')
     def _compute_nb_lignes(self):
         for grille in self:
             grille.nb_lignes = len(grille.ligne_ids)
     
-    @api.depends('date_debut', 'date_fin')
-    def _compute_is_current(self):
-        today = fields.Date.today()
-        for grille in self:
-            if grille.date_debut:
-                grille.is_current = (
-                    grille.date_debut <= today and 
-                    (not grille.date_fin or grille.date_fin >= today)
-                )
-            else:
-                grille.is_current = False
     
     @api.model_create_multi
     def create(self, vals_list):
@@ -59,87 +49,103 @@ class GrillePrix(models.Model):
         return super().create(vals_list)
     
     @api.model
-    def get_grille_active(self, date_facture):
-        """Récupère la grille active à une date donnée"""
-        grille = self.search([
-            ('date_debut', '<=', date_facture),
-            '|', ('date_fin', '>=', date_facture), 
-                 ('date_fin', '=', False)
-        ], limit=1)
+    def get_grille_active(self, date_facture=None):
+        """Récupère la grille marquée comme active"""
+        grille = self.search([('is_current', '=', True)], limit=1)
         
         if not grille:
-            raise UserError(f"Aucune grille de prix active pour la date {date_facture}")
+            raise UserError("Aucune grille de prix définie comme active")
         
         return grille
     
-    def get_prix_dict(self):
-        """Retourne un dict {produit: prix_interne} pour toute la grille"""
-        self.ensure_one()
-        return {ligne.produit: ligne.prix_interne for ligne in self.ligne_ids}
+    @api.constrains('is_current')
+    def _check_unique_current_grille(self):
+        """S'assure qu'une seule grille est marquée comme actuelle"""
+        for grille in self.filtered('is_current'):
+            autres_actives = self.search([
+                ('is_current', '=', True),
+                ('id', '!=', grille.id)
+            ])
+            if autres_actives:
+                raise UserError(
+                    f"Une seule grille peut être active à la fois. "
+                    f"La grille '{autres_actives[0].name}' est déjà active."
+                )
     
-    def copier_grille_precedente(self):
-        """Action pour copier les lignes de la grille précédente"""
+    def get_prix_dict(self):
+        """Retourne un dict {product_id: prix_interne} pour toute la grille"""
+        self.ensure_one()
+        return {ligne.product_id.id: ligne.prix_interne for ligne in self.ligne_ids if ligne.product_id}
+    
+    def dupliquer_cette_grille(self):
+        """Action pour dupliquer cette grille avec toutes ses lignes"""
         self.ensure_one()
         
-        grille_precedente = self.search([
-            ('date_debut', '<', self.date_debut),
-            ('id', '!=', self.id)
-        ], order='date_debut desc', limit=1)
+        # Créer une copie de la grille avec date d'aujourd'hui
+        today = fields.Date.today()
         
-        if not grille_precedente:
-            raise UserError("Aucune grille précédente trouvée")
-        
-        # Supprimer les lignes existantes
-        self.ligne_ids.unlink()
-        
-        # Copier les lignes de la grille précédente
-        for ligne in grille_precedente.ligne_ids:
-            self.env['grille.prix.ligne'].create({
-                'grille_id': self.id,
-                'produit': ligne.produit,
+        # Préparer les lignes à copier
+        lignes_vals = []
+        for ligne in self.ligne_ids:
+            lignes_vals.append((0, 0, {
+                'product_id': ligne.product_id.id,
                 'prix_unitaire': ligne.prix_unitaire,
-            })
+            }))
+        
+        # Créer la nouvelle grille avec ses lignes (pas active par défaut)
+        nouvelle_grille = self.create({
+            'name': f"Copie de {self.name}",
+            'date_debut': today,
+            'date_fin': False,
+            'is_current': False,  # Pas active par défaut
+            'ligne_ids': lignes_vals,
+        })
+        
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'grille.prix',
+            'res_id': nouvelle_grille.id,
+            'view_mode': 'form',
+            'target': 'current',
+            'context': {
+                'form_view_initial_mode': 'edit',
+            }
+        }
+    
+    def definir_comme_grille_actuelle(self):
+        """Action pour définir cette grille comme la grille actuelle"""
+        self.ensure_one()
+        
+        # Décocher toutes les autres grilles
+        autres_grilles = self.search([
+            ('is_current', '=', True),
+            ('id', '!=', self.id)
+        ])
+        
+        if autres_grilles:
+            autres_grilles.write({'is_current': False})
+            _logger.info(f"Grilles {autres_grilles.mapped('name')} désactivées")
+        
+        # Activer cette grille
+        self.is_current = True
+        _logger.info(f"Grille {self.name} définie comme active")
         
         return {
             'type': 'ir.actions.client',
-            'tag': 'display_notification',
-            'params': {
-                'message': f"Lignes copiées depuis {grille_precedente.name}",
-                'type': 'success',
-            }
+            'tag': 'reload',
         }
 
 
 class GrillePrixLigne(models.Model):
     _name = 'grille.prix.ligne'
     _description = 'Ligne de prix énergétique'
-    _order = 'produit'
+    _order = 'product_id'
 
     grille_id = fields.Many2one('grille.prix', string="Grille", required=True, ondelete='cascade')
     
-    produit = fields.Selection([
-        # Abonnements par puissance
-        ('abonnement_3kva', 'Abonnement 3 kVA'),
-        ('abonnement_6kva', 'Abonnement 6 kVA'),
-        ('abonnement_9kva', 'Abonnement 9 kVA'),
-        ('abonnement_12kva', 'Abonnement 12 kVA'),
-        ('abonnement_15kva', 'Abonnement 15 kVA'),
-        ('abonnement_18kva', 'Abonnement 18 kVA'),
-        ('abonnement_24kva', 'Abonnement 24 kVA'),
-        ('abonnement_30kva', 'Abonnement 30 kVA'),
-        ('abonnement_36kva', 'Abonnement 36 kVA'),
-        
-        # Énergies
-        ('energie_base', 'Énergie Base (€/kWh)'),
-        ('energie_hp', 'Énergie Heures Pleines (€/kWh)'),
-        ('energie_hc', 'Énergie Heures Creuses (€/kWh)'),
-        
-        # Abonnements solidaires
-        ('abonnement_solidaire_3kva', 'Abonnement Solidaire 3 kVA'),
-        ('abonnement_solidaire_6kva', 'Abonnement Solidaire 6 kVA'),
-        ('abonnement_solidaire_9kva', 'Abonnement Solidaire 9 kVA'),
-        # ... autres puissances solidaires selon besoins
-    ], string="Produit", required=True)
+    product_id = fields.Many2one('product.product', string="Produit", required=True,
+                                domain=[('type', '=', 'service')],
+                                help="Produit de service pour la facturation énergétique")
     
     prix_unitaire = fields.Float("Prix unitaire", required=True, digits=(16, 6),
                                  help="Prix en €/mois pour abonnements, €/kWh pour énergies")
@@ -148,27 +154,34 @@ class GrillePrixLigne(models.Model):
     prix_interne = fields.Float("Prix interne (€/jour)", compute='_compute_prix_interne', store=True,
                                help="Prix utilisé pour les calculs de facturation")
     
+    # Type de produit pour la conversion des prix
+    type_produit = fields.Selection([
+        ('abonnement', 'Abonnement (€/mois → €/jour)'),
+        ('energie', 'Énergie (€/kWh)'),
+        ('autre', 'Autre (€)')
+    ], string="Type", required=True, default='autre')
+    
     # Champs informatifs
     unite_saisie = fields.Char("Unité saisie", compute='_compute_unites', store=False)
     unite_calcul = fields.Char("Unité calcul", compute='_compute_unites', store=False)
     
-    @api.depends('produit')
+    @api.depends('type_produit')
     def _compute_unites(self):
         for ligne in self:
-            if ligne.produit and 'abonnement' in ligne.produit:
+            if ligne.type_produit == 'abonnement':
                 ligne.unite_saisie = "€/mois"
                 ligne.unite_calcul = "€/jour"
-            elif ligne.produit and 'energie' in ligne.produit:
+            elif ligne.type_produit == 'energie':
                 ligne.unite_saisie = "€/kWh"
                 ligne.unite_calcul = "€/kWh"
             else:
                 ligne.unite_saisie = "€"
                 ligne.unite_calcul = "€"
     
-    @api.depends('produit', 'prix_unitaire')
+    @api.depends('type_produit', 'prix_unitaire')
     def _compute_prix_interne(self):
         for ligne in self:
-            if ligne.produit and 'abonnement' in ligne.produit:
+            if ligne.type_produit == 'abonnement':
                 # Conversion €/mois → €/jour (divisé par 30)
                 ligne.prix_interne = ligne.prix_unitaire / 30.0 if ligne.prix_unitaire else 0.0
             else:
@@ -177,6 +190,6 @@ class GrillePrixLigne(models.Model):
     
     _sql_constraints = [
         ('unique_produit_grille', 
-         'UNIQUE(grille_id, produit)',
+         'UNIQUE(grille_id, product_id)',
          'Un produit ne peut apparaître qu\'une seule fois par grille.')
     ]

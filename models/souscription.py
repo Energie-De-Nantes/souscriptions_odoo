@@ -132,14 +132,56 @@ class Souscription(models.Model):
                     _logger.error(f"Erreur création facture pour période {periode.mois_annee}: {e}")
                     raise UserError(f"Erreur création facture pour {periode.mois_annee}: {e}")
 
+    def _get_produit_abonnement(self, puissance, tarif_solidaire):
+        """Trouve le variant de produit d'abonnement correspondant aux critères"""
+        # Recherche du template selon le type d'abonnement
+        if tarif_solidaire:
+            template_xmlid = 'souscriptions.souscriptions_product_template_abonnement_solidaire'
+        else:
+            template_xmlid = 'souscriptions.souscriptions_product_template_abonnement'
+        
+        template = self.env.ref(template_xmlid, raise_if_not_found=False)
+        if not template:
+            type_abo = "solidaire" if tarif_solidaire else "standard"
+            raise UserError(f"Template d'abonnement {type_abo} non trouvé")
+        
+        # Recherche du variant avec la bonne puissance
+        variant = template.product_variant_ids.filtered(
+            lambda v: puissance in v.name or puissance.replace(' ', '') in v.name.replace(' ', '')
+        )
+        
+        if not variant:
+            type_abo = "solidaire" if tarif_solidaire else "standard" 
+            raise UserError(f"Aucun variant d'abonnement {type_abo} trouvé pour {puissance}")
+        
+        return variant[0]  # Premier variant trouvé
+    
+    def _get_produit_energie(self, type_energie):
+        """Trouve le produit d'énergie correspondant au type (base, hp, hc)"""
+        xmlid_map = {
+            'base': 'souscriptions.souscriptions_product_energie_base',
+            'hp': 'souscriptions.souscriptions_product_energie_hp', 
+            'hc': 'souscriptions.souscriptions_product_energie_hc'
+        }
+        
+        xmlid = xmlid_map.get(type_energie.lower())
+        if not xmlid:
+            raise UserError(f"Type d'énergie non reconnu : {type_energie}")
+            
+        produit = self.env.ref(xmlid, raise_if_not_found=False)
+        if not produit:
+            raise UserError(f"Produit d'énergie {type_energie} non trouvé")
+        
+        return produit
+
     def _creer_facture_periode(self, periode):
         """
         Crée une facture pour une période donnée en utilisant les données historisées
         et la grille de prix active.
         """
-        # 1. Récupération de TOUS les prix en une seule requête
+        # 1. Récupération de la grille active et des prix
         grille_active = self.env['grille.prix'].get_grille_active(periode.date_fin)
-        prix_dict = grille_active.get_prix_dict()  # {produit: prix}
+        prix_dict = grille_active.get_prix_dict()  # {product_id: prix_interne}
         
         # 2. Utilisation des données historisées de la période
         puissance = periode.puissance_souscrite_periode or self.puissance_souscrite
@@ -149,25 +191,19 @@ class Souscription(models.Model):
         if not puissance:
             raise UserError(f"Aucune puissance définie pour la période {periode.mois_annee}")
 
-        # 3. Détermination des clés produits selon paramètres historisés
-        puissance_num = puissance.replace(' kVA', '').replace(' ', '').lower()
-        
-        if tarif_solidaire:
-            produit_abo = f"abonnement_solidaire_{puissance_num}kva"
-        else:
-            produit_abo = f"abonnement_{puissance_num}kva"
-        
-        # 4. Récupération des prix depuis la grille (déjà en €/jour pour abonnements)
-        prix_abo_journalier = prix_dict.get(produit_abo)
-        if prix_abo_journalier is None:
-            raise UserError(f"Prix abonnement non trouvé dans la grille : {produit_abo}")
-
-        # 5. Création des lignes de facture avec prix directs
+        # 3. Création des lignes de facture avec vrais produits
         lines_vals = []
         
-        # Ligne abonnement (prix déjà en €/jour, plus besoin de diviser)
+        # Ligne abonnement
+        produit_abo = self._get_produit_abonnement(puissance, tarif_solidaire)
+        prix_abo_journalier = prix_dict.get(produit_abo.id)
+        
+        if prix_abo_journalier is None:
+            raise UserError(f"Prix non trouvé dans la grille pour le produit : {produit_abo.name}")
+
         lines_vals.append((0, 0, {
-            'name': f"Abonnement {puissance} - {periode.mois_annee} ({periode.jours} jours)",
+            'product_id': produit_abo.id,
+            'name': f"{produit_abo.name} - {periode.mois_annee} ({periode.jours} jours)",
             'quantity': periode.jours,
             'price_unit': prix_abo_journalier,
         }))
@@ -175,39 +211,45 @@ class Souscription(models.Model):
         # Lignes énergie selon type de tarif historisé
         if type_tarif == 'Base':
             if periode.provision_base_kwh > 0:
-                prix_base = prix_dict.get('energie_base')
+                produit_base = self._get_produit_energie('base')
+                prix_base = prix_dict.get(produit_base.id)
                 if prix_base is None:
-                    raise UserError("Prix énergie Base non trouvé dans la grille")
+                    raise UserError(f"Prix non trouvé dans la grille pour le produit : {produit_base.name}")
                     
                 lines_vals.append((0, 0, {
-                    'name': f"Énergie Base {periode.provision_base_kwh:.2f} kWh - {periode.mois_annee}",
+                    'product_id': produit_base.id,
+                    'name': f"{produit_base.name} {periode.provision_base_kwh:.2f} kWh - {periode.mois_annee}",
                     'quantity': periode.provision_base_kwh,
                     'price_unit': prix_base,
                 }))
         else:  # HP/HC
             if periode.provision_hp_kwh > 0:
-                prix_hp = prix_dict.get('energie_hp')
+                produit_hp = self._get_produit_energie('hp')
+                prix_hp = prix_dict.get(produit_hp.id)
                 if prix_hp is None:
-                    raise UserError("Prix énergie HP non trouvé dans la grille")
+                    raise UserError(f"Prix non trouvé dans la grille pour le produit : {produit_hp.name}")
                     
                 lines_vals.append((0, 0, {
-                    'name': f"Énergie HP {periode.provision_hp_kwh:.2f} kWh - {periode.mois_annee}",
+                    'product_id': produit_hp.id,
+                    'name': f"{produit_hp.name} {periode.provision_hp_kwh:.2f} kWh - {periode.mois_annee}",
                     'quantity': periode.provision_hp_kwh,
                     'price_unit': prix_hp,
                 }))
                 
             if periode.provision_hc_kwh > 0:
-                prix_hc = prix_dict.get('energie_hc')
+                produit_hc = self._get_produit_energie('hc')
+                prix_hc = prix_dict.get(produit_hc.id)
                 if prix_hc is None:
-                    raise UserError("Prix énergie HC non trouvé dans la grille")
+                    raise UserError(f"Prix non trouvé dans la grille pour le produit : {produit_hc.name}")
                     
                 lines_vals.append((0, 0, {
-                    'name': f"Énergie HC {periode.provision_hc_kwh:.2f} kWh - {periode.mois_annee}",
+                    'product_id': produit_hc.id,
+                    'name': f"{produit_hc.name} {periode.provision_hc_kwh:.2f} kWh - {periode.mois_annee}",
                     'quantity': periode.provision_hc_kwh,
                     'price_unit': prix_hc,
                 }))
 
-        # Lignes TURPE si présentes (prix fixes, pas dans la grille)
+        # Lignes TURPE si présentes (sans produit pour l'instant)
         if periode.turpe_fixe > 0:
             lines_vals.append((0, 0, {
                 'name': f"TURPE Fixe - {periode.mois_annee}",

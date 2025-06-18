@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Action pour générer le rapport -->
+    <record id="action_souscription_contrat_report" model="ir.actions.report">
+        <field name="name">Contrat de Souscription</field>
+        <field name="model">souscription</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">souscriptions.souscription_contrat_document</field>
+        <field name="report_file">souscriptions.souscription_contrat_document</field>
+        <field name="binding_model_id" ref="model_souscription"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <!-- Template du document de contrat -->
+    <template id="souscription_contrat_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="souscription">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <!-- En-tête du contrat -->
+                        <div class="text-center mb-4">
+                            <h2>CONTRAT DE FOURNITURE D'ÉLECTRICITÉ</h2>
+                            <h4>Référence: <span t-field="souscription.name"/></h4>
+                        </div>
+
+                        <!-- Informations des parties -->
+                        <div class="row mb-4">
+                            <div class="col-6">
+                                <h5>FOURNISSEUR</h5>
+                                <div t-field="user.company_id.partner_id" t-options="{'widget': 'contact', 'fields': ['name', 'address', 'phone', 'email'], 'no_marker': True}"/>
+                            </div>
+                            <div class="col-6">
+                                <h5>SOUSCRIPTEUR·TRICE</h5>
+                                <div t-if="souscription.partner_id">
+                                    <div t-field="souscription.partner_id" t-options="{'widget': 'contact', 'fields': ['name', 'address', 'phone', 'email'], 'no_marker': True}"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Caractéristiques du contrat -->
+                        <div class="mb-4">
+                            <h5>CARACTÉRISTIQUES DU CONTRAT</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Point de Livraison (PDL):</strong></td>
+                                    <td><span t-field="souscription.pdl"/></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Puissance souscrite:</strong></td>
+                                    <td><span t-field="souscription.puissance_souscrite"/></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Type de tarification:</strong></td>
+                                    <td>
+                                        <span t-if="souscription.type_tarif == 'base'">Base</span>
+                                        <span t-if="souscription.type_tarif == 'hphc'">Heures Pleines / Heures Creuses</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Tarif solidaire:</strong></td>
+                                    <td>
+                                        <span t-if="souscription.tarif_solidaire">Oui</span>
+                                        <span t-if="not souscription.tarif_solidaire">Non</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Référence compteur:</strong></td>
+                                    <td><span t-field="souscription.ref_compteur"/></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Numéro de dépannage:</strong></td>
+                                    <td><span t-field="souscription.numero_depannage"/></td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Modalités de facturation -->
+                        <div class="mb-4">
+                            <h5>MODALITÉS DE FACTURATION</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Période contractuelle:</strong></td>
+                                    <td>
+                                        Du <span t-field="souscription.date_debut" t-options="{'widget': 'date'}"/>
+                                        au <span t-field="souscription.date_fin" t-options="{'widget': 'date'}"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Facturation lissée:</strong></td>
+                                    <td>
+                                        <span t-if="souscription.lisse">Oui</span>
+                                        <span t-if="not souscription.lisse">Non</span>
+                                    </td>
+                                </tr>
+                                <tr t-if="souscription.lisse">
+                                    <td><strong>Provision mensuelle estimée:</strong></td>
+                                    <td><span t-field="souscription.provision_mensuelle_kwh"/> kWh</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Mode de paiement:</strong></td>
+                                    <td>
+                                        <span t-if="souscription.mode_paiement == 'prelevement'">Prélèvement</span>
+                                        <span t-if="souscription.mode_paiement == 'cheque_energie'">Chèque énergie</span>
+                                        <span t-if="souscription.mode_paiement == 'monnaie_locale'">Monnaie locale</span>
+                                        <span t-if="souscription.mode_paiement == 'especes'">Espèces</span>
+                                        <span t-if="souscription.mode_paiement == 'virement'">Virement</span>
+                                        <span t-if="souscription.mode_paiement == 'cheque'">Chèque</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Grille de prix en vigueur -->
+                        <div class="mb-4">
+                            <h5>TARIFICATION EN VIGUEUR</h5>
+                            <t t-set="grille_active" t-value="request.env['grille.prix'].get_grille_active(souscription.date_debut or datetime.date.today())"/>
+                            <div t-if="grille_active">
+                                <p><strong>Grille de prix:</strong> <span t-field="grille_active.name"/></p>
+                                <p><strong>Période de validité:</strong> 
+                                   Du <span t-field="grille_active.date_debut" t-options="{'widget': 'date'}"/>
+                                   au <span t-field="grille_active.date_fin" t-options="{'widget': 'date'}"/>
+                                </p>
+                                
+                                <!-- Tarifs selon la grille de prix -->
+                                <h6>Tarifs appliqués</h6>
+                                <table class="table table-sm table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Produit</th>
+                                            <th>Type</th>
+                                            <th>Prix unitaire</th>
+                                            <th>Unité</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr t-foreach="grille_active.ligne_ids" t-as="ligne">
+                                            <td><span t-field="ligne.product_id.name"/></td>
+                                            <td>
+                                                <span t-if="ligne.type_produit == 'abonnement'">Abonnement</span>
+                                                <span t-if="ligne.type_produit == 'energie'">Énergie</span>
+                                                <span t-if="ligne.type_produit == 'autre'">Autre</span>
+                                            </td>
+                                            <td><span t-esc="'%.4f' % ligne.prix_unitaire"/></td>
+                                            <td><span t-field="ligne.unite_saisie"/></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Conditions générales -->
+                        <div class="mb-4">
+                            <h5>CONDITIONS CONTRACTUELLES</h5>
+                            <ul>
+                                <li>Ce contrat est conclu pour une durée indéterminée.</li>
+                                <li>La facturation s'effectue mensuellement selon les modalités définies ci-dessus.</li>
+                                <li>Les tarifs appliqués sont ceux en vigueur à la date de facturation.</li>
+                                <li>En cas de facturation lissée, une régularisation sera effectuée annuellement.</li>
+                                <li>Le client dispose d'un délai de 14 jours pour résilier ce contrat sans motif.</li>
+                                <li>Les conditions générales de vente s'appliquent en complément du présent contrat.</li>
+                            </ul>
+                        </div>
+
+                        <!-- Signatures -->
+                        <div class="row mt-5">
+                            <div class="col-6">
+                                <p><strong>Le Fournisseur</strong></p>
+                                <br/><br/>
+                                <p>Date et signature:</p>
+                            </div>
+                            <div class="col-6">
+                                <p><strong>Le Souscripteur</strong></p>
+                                <br/><br/>
+                                <p>Date et signature:</p>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

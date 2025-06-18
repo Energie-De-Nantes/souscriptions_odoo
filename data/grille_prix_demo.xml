@@ -4,69 +4,32 @@
         <record id="grille_prix_2025" model="grille.prix">
             <field name="name">Grille tarifaire 2025</field>
             <field name="date_debut">2025-01-01</field>
+            <field name="is_current" eval="True"/>
         </record>
         
-        <!-- Abonnements standard -->
-        <record id="prix_abo_3kva" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="produit">abonnement_3kva</field>
-            <field name="prix_unitaire">12.50</field>
-        </record>
-        
-        <record id="prix_abo_6kva" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="produit">abonnement_6kva</field>
-            <field name="prix_unitaire">15.80</field>
-        </record>
-        
-        <record id="prix_abo_9kva" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="produit">abonnement_9kva</field>
-            <field name="prix_unitaire">19.20</field>
-        </record>
-        
-        <record id="prix_abo_12kva" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="produit">abonnement_12kva</field>
-            <field name="prix_unitaire">22.85</field>
-        </record>
-        
-        <!-- Énergies -->
+        <!-- Énergies uniquement pour commencer -->
         <record id="prix_energie_base" model="grille.prix.ligne">
             <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="produit">energie_base</field>
+            <field name="product_id" ref="souscriptions_product_energie_base"/>
+            <field name="type_produit">energie</field>
             <field name="prix_unitaire">0.1850</field>
         </record>
         
         <record id="prix_energie_hp" model="grille.prix.ligne">
             <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="produit">energie_hp</field>
+            <field name="product_id" ref="souscriptions_product_energie_hp"/>
+            <field name="type_produit">energie</field>
             <field name="prix_unitaire">0.2010</field>
         </record>
         
         <record id="prix_energie_hc" model="grille.prix.ligne">
             <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="produit">energie_hc</field>
+            <field name="product_id" ref="souscriptions_product_energie_hc"/>
+            <field name="type_produit">energie</field>
             <field name="prix_unitaire">0.1520</field>
         </record>
         
-        <!-- Abonnements solidaires (prix réduits) -->
-        <record id="prix_abo_solidaire_3kva" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="produit">abonnement_solidaire_3kva</field>
-            <field name="prix_unitaire">10.00</field>
-        </record>
-        
-        <record id="prix_abo_solidaire_6kva" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="produit">abonnement_solidaire_6kva</field>
-            <field name="prix_unitaire">12.50</field>
-        </record>
-        
-        <record id="prix_abo_solidaire_9kva" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="produit">abonnement_solidaire_9kva</field>
-            <field name="prix_unitaire">15.00</field>
-        </record>
+        <!-- Les abonnements seront ajoutés manuellement via l'interface 
+             car ils utilisent des variants créés automatiquement -->
     </data>
 </odoo>

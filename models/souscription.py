@@ -200,12 +200,12 @@ class Souscription(models.Model):
         )
         
         # Nom descriptif de la ligne
-        type_client = f"PRO +{coeff_pro_historise:g}%" if coeff_pro_historise > 0 else "PART"
+        type_client = "PRO" if coeff_pro_historise > 0 else "PART"
         puissance_desc = f"{puissance_kva:g} kVA"  # :g supprime les .0 inutiles
         
         lines_vals.append((0, 0, {
             'product_id': produit_abo.id,
-            'name': f"{produit_abo.name} {puissance_desc} {type_client} - {periode.mois_annee} ({periode.jours} jours)",
+            'name': f"{produit_abo.name} {puissance_desc} {type_client}",
             'quantity': periode.jours,
             'price_unit': prix_abo_journalier,
         }))
@@ -227,7 +227,7 @@ class Souscription(models.Model):
                 
             lines_vals.append((0, 0, {
                 'product_id': produit_base.id,
-                'name': f"{produit_base.name} {periode.provision_base_kwh:.2f} kWh - {periode.mois_annee}",
+                'name': produit_base.name,
                 'quantity': periode.provision_base_kwh,
                 'price_unit': prix_base,
             }))
@@ -241,7 +241,7 @@ class Souscription(models.Model):
                 
             lines_vals.append((0, 0, {
                 'product_id': produit_hp.id,
-                'name': f"{produit_hp.name} {periode.provision_hp_kwh:.2f} kWh - {periode.mois_annee}",
+                'name': produit_hp.name,
                 'quantity': periode.provision_hp_kwh,
                 'price_unit': prix_hp,
             }))
@@ -254,7 +254,7 @@ class Souscription(models.Model):
                 
             lines_vals.append((0, 0, {
                 'product_id': produit_hc.id,
-                'name': f"{produit_hc.name} {periode.provision_hc_kwh:.2f} kWh - {periode.mois_annee}",
+                'name': produit_hc.name,
                 'quantity': periode.provision_hc_kwh,
                 'price_unit': prix_hc,
             }))
@@ -262,14 +262,14 @@ class Souscription(models.Model):
         # Lignes TURPE si présentes (affichage réglementaire, pas comptabilisé)
         if periode.turpe_fixe > 0:
             lines_vals.append((0, 0, {
-                'name': f"TURPE Fixe - {periode.mois_annee}",
+                'name': "TURPE Fixe",
                 'quantity': 1,
                 'price_unit': periode.turpe_fixe,
             }))
             
         if periode.turpe_variable > 0:
             lines_vals.append((0, 0, {
-                'name': f"TURPE Variable - {periode.mois_annee}",
+                'name': "TURPE Variable",
                 'quantity': 1,
                 'price_unit': periode.turpe_variable,
             }))

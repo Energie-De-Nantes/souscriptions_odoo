@@ -2,9 +2,9 @@
 <odoo noupdate="1">
     <!-- Produits d'abonnement simplifiés -->
     
-    <!-- Abonnement électricité standard -->
+    <!-- Abonnement standard -->
     <record id="souscriptions_product_abonnement_standard" model="product.product">
-        <field name="name">Abonnement électricité</field>
+        <field name="name">Abonnement</field>
         <field name="type">service</field>
         <field name="sale_ok" eval="True"/>
         <field name="purchase_ok" eval="False"/>
@@ -12,9 +12,9 @@
         <field name="standard_price">0.0</field>
     </record>
 
-    <!-- Abonnement électricité solidaire -->
+    <!-- Abonnement solidaire -->
     <record id="souscriptions_product_abonnement_solidaire" model="product.product">
-        <field name="name">Abonnement électricité solidaire</field>
+        <field name="name">Abonnement solidaire</field>
         <field name="type">service</field>
         <field name="sale_ok" eval="True"/>
         <field name="purchase_ok" eval="False"/>

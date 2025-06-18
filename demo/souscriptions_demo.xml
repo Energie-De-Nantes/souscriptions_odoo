@@ -81,7 +81,7 @@
             <field name="provision_mensuelle_kwh">450</field>
             <field name="lisse">True</field>
             <field name="mode_paiement">prelevement</field>
-            <field name="etat_facturation_id" ref="etat_actif"/>
+            <field name="etat_facturation_id" ref="etat_a_facturer"/>
             <field name="ref_compteur">85987654</field>
         </record>
         
@@ -96,7 +96,7 @@
             <field name="lisse">False</field>
             <field name="coeff_pro">15.0</field>
             <field name="mode_paiement">virement</field>
-            <field name="etat_facturation_id" ref="etat_actif"/>
+            <field name="etat_facturation_id" ref="etat_a_facturer"/>
             <field name="ref_compteur">85123456</field>
         </record>
         
@@ -111,7 +111,7 @@
             <field name="lisse">True</field>
             <field name="tarif_solidaire">True</field>
             <field name="mode_paiement">cheque_energie</field>
-            <field name="etat_facturation_id" ref="etat_actif"/>
+            <field name="etat_facturation_id" ref="etat_a_facturer"/>
             <field name="ref_compteur">85111222</field>
         </record>
         

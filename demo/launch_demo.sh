@@ -16,13 +16,15 @@ fi
 echo "🗄️  Création d'une nouvelle base de données..."
 createdb $DB_NAME
 
-echo "📊 Installation du module avec données de démo..."
+echo "📊 Installation du module..."
 odoo -d $DB_NAME \
      --addons-path="$ADDONS_PATH" \
      -i souscriptions \
      --load-language=fr_FR \
-     --without-demo=False \
      --stop-after-init
+
+echo "📝 Création des données de démo..."
+./demo/create_demo_via_shell.sh
 
 echo ""
 echo "✅ Démo prête ! Lancement du serveur..."

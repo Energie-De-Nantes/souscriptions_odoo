@@ -116,7 +116,7 @@
             <kanban default_group_by="etat_facturation_id">
                 <field name="etat_facturation_id"/>
                 <templates>
-                    <t t-name="kanban-box">
+                    <t t-name="card">
                         <div class="oe_kanban_global_click">
                             <strong><field name="name"/></strong><br/>
                             <span><field name="etat_facturation_id"/></span>

@@ -30,7 +30,7 @@
 
     "data": [
         # Phase 1 - Core (toujours actif)
-        "security/ir.model.access.csv",
+        "security/ir.model.access.core.csv",
         "data/souscription_sequence.xml",
         "data/souscription_etat_data.xml",
         "data/produits_abonnement_simple.xml",
@@ -42,6 +42,7 @@
         "views/core/souscriptions_periode_views.xml",
         
         # Phase 2 - Métier (à décommenter lors de l'activation)
+        # "security/ir.model.access.metier.csv",
         # "views/metier/metier_perimetre.xml",
         # "views/metier/metier_prestation.xml",
         # "views/metier/metier_mesure_index.xml",

@@ -9,7 +9,8 @@ if [ "$MODE" = "enable" ]; then
     # Décommenter l'import métier dans models/__init__.py
     sed -i 's/# from \. import metier/from . import metier/' models/__init__.py
     
-    # Décommenter les vues métier dans __manifest__.py
+    # Décommenter les vues métier et permissions dans __manifest__.py
+    sed -i '/"security\/ir\.model\.access\.metier\.csv"/s/# //' __manifest__.py
     sed -i '/"views\/metier/s/# //' __manifest__.py
     
     echo "Module métier activé."
@@ -25,7 +26,8 @@ elif [ "$MODE" = "disable" ]; then
     # Commenter l'import métier
     sed -i 's/^from \. import metier/# from . import metier/' models/__init__.py
     
-    # Commenter les vues métier
+    # Commenter les vues métier et permissions
+    sed -i '/"security\/ir\.model\.access\.metier\.csv"/s/^/# /' __manifest__.py
     sed -i '/"views\/metier/s/^/# /' __manifest__.py
     
     echo "Module métier désactivé."

@@ -37,7 +37,7 @@
         "data/produits_energie.xml",
         "data/grille_prix_demo.xml",
         "report/souscription_contrat_report.xml",
-        # "reports/facture_energie_template.xml",  # Temporairement désactivé
+        # "reports/facture_energie_template.xml",  # Template problématique - XPath non trouvé
         "views/core/souscription_views.xml",
         "views/core/grille_prix_views.xml",
         "views/core/souscriptions_periode_views.xml",

@@ -58,7 +58,7 @@
         <!-- ================================ -->
         
         <!-- Souscription particulier BASE 6 kVA -->
-        <record id="demo_souscription_particulier_base" model="souscription">
+        <record id="demo_souscription_particulier_base" model="souscription.souscription">
             <field name="partner_id" ref="demo_client_particulier_base"/>
             <field name="pdl">PDL22516914012345</field>
             <field name="puissance_souscrite">6</field>
@@ -72,7 +72,7 @@
         </record>
         
         <!-- Souscription particulier HP/HC 9 kVA -->
-        <record id="demo_souscription_particulier_hphc" model="souscription">
+        <record id="demo_souscription_particulier_hphc" model="souscription.souscription">
             <field name="partner_id" ref="demo_client_particulier_hphc"/>
             <field name="pdl">PDL22516914098765</field>
             <field name="puissance_souscrite">9</field>
@@ -86,7 +86,7 @@
         </record>
         
         <!-- Souscription PRO avec majoration -->
-        <record id="demo_souscription_pro" model="souscription">
+        <record id="demo_souscription_pro" model="souscription.souscription">
             <field name="partner_id" ref="demo_client_pro"/>
             <field name="pdl">PDL22516914055555</field>
             <field name="puissance_souscrite">12</field>
@@ -101,7 +101,7 @@
         </record>
         
         <!-- Souscription solidaire -->
-        <record id="demo_souscription_solidaire" model="souscription">
+        <record id="demo_souscription_solidaire" model="souscription.souscription">
             <field name="partner_id" ref="demo_client_solidaire"/>
             <field name="pdl">PDL22516914033333</field>
             <field name="puissance_souscrite">3</field>

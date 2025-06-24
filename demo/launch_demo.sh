@@ -4,16 +4,38 @@
 DB_NAME="souscriptions_demo"
 ADDONS_PATH="/home/virgile/addons_odoo,/usr/lib/python3/dist-packages/odoo/addons"
 
-echo "🚀 Lancement Odoo avec données de démo..."
+echo "🚀 Préparation de la démo Odoo avec données de test..."
 echo "Base de données: $DB_NAME"
-echo "URL: http://localhost:8069"
-echo "Login: admin / admin"
-echo ""
 
+# Vérifier si la base existe
+if psql -lqt | cut -d \| -f 1 | grep -qw $DB_NAME; then
+    echo "🗄️  Suppression de la base existante pour recréer avec les données de démo..."
+    dropdb $DB_NAME 2>/dev/null || true
+fi
+
+echo "🗄️  Création d'une nouvelle base de données..."
+createdb $DB_NAME
+
+echo "📊 Installation du module avec données de démo..."
 odoo -d $DB_NAME \
      --addons-path="$ADDONS_PATH" \
      -i souscriptions \
      --load-language=fr_FR \
-     --without-demo=False
+     --without-demo=False \
+     --stop-after-init
 
-echo "✅ Démo prête sur http://localhost:8069"
+echo ""
+echo "✅ Démo prête ! Lancement du serveur..."
+echo "URL: http://localhost:8069"
+echo "Login: admin / admin"
+echo ""
+echo "Données de démo disponibles :"
+echo "  - 4 clients (particuliers et PRO)"
+echo "  - 4 souscriptions avec différents profils"
+echo "  - Grille de prix de démonstration"
+echo ""
+
+# Lancer le serveur en mode interactif
+odoo -d $DB_NAME \
+     --addons-path="$ADDONS_PATH" \
+     --load-language=fr_FR

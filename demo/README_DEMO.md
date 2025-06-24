@@ -1,13 +1,29 @@
 # Données de démonstration - Souscriptions
 
-## Installation avec données de démo
+## Scripts de démo disponibles
 
+### 1. Démo complète (recommandé)
+```bash
+./demo/launch_demo.sh
+```
+Ce script :
+- Recrée une base propre avec données de démo
+- Lance Odoo en mode interactif
+- URL : http://localhost:8069 (admin/admin)
+
+### 2. Chargement des données uniquement
+```bash
+./demo/load_demo_data.sh
+```
+Charge les données de démo dans la base existante.
+
+### 3. Installation manuelle
 ```bash
 # Base propre avec données de démo
-odoo -d souscriptions_demo --addons-path=/home/virgile/addons_odoo,/usr/lib/python3/dist-packages/odoo/addons -i souscriptions --load-language=fr_FR --stop-after-init
+odoo -d souscriptions_demo --addons-path=/home/virgile/addons_odoo -i souscriptions --without-demo=False --stop-after-init
 
 # Tests uniquement
-odoo -d souscriptions_test --addons-path=/home/virgile/addons_odoo,/usr/lib/python3/dist-packages/odoo/addons --test-tags souscriptions --stop-after-init
+odoo -d souscriptions_test --addons-path=/home/virgile/addons_odoo --test-tags souscriptions --stop-after-init
 ```
 
 ## Jeux de données créés

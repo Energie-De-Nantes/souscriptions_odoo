@@ -365,3 +365,19 @@ class Souscription(models.Model):
             period = self.env['souscription.periode'].browse(period_id)
             period.write(period_vals)
         return True
+
+    @api.model
+    def generer_lot_prelevement_mensuel(self):
+        """Génère un lot de prélèvement pour les souscriptions en prélèvement automatique"""
+        # Fonctionnalité à implémenter dans une version ultérieure
+        # Pour l'instant, on retourne un message d'information
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Génération de lot de prélèvement',
+                'message': 'Fonctionnalité en cours de développement - Version minimale',
+                'type': 'info',
+                'sticky': False,
+            }
+        }

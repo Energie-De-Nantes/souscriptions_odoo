@@ -51,20 +51,20 @@ class Souscription(models.Model):
     pdl = fields.Char(string="pdl")
     lisse = fields.Boolean(string='Lissé', default=False)
     puissance_souscrite = fields.Selection(
-    selection=[
-        ('3', '3 kVA'),
-        ('6', '6 kVA'),
-        ('9', '9 kVA'),
-        ('12', '12 kVA'),
-        ('15', '15 kVA'),
-        ('18', '18 kVA'),
-        ('24', '24 kVA'),
-        ('30', '30 kVA'),
-        ('36', '36 kVA'),
-    ],
-    string='Puissance souscrite (kVA)',
-    required=True,
-    tracking=True
+        selection=[
+            ('3', '3 kVA'),
+            ('6', '6 kVA'),
+            ('9', '9 kVA'),
+            ('12', '12 kVA'),
+            ('15', '15 kVA'),
+            ('18', '18 kVA'),
+            ('24', '24 kVA'),
+            ('30', '30 kVA'),
+            ('36', '36 kVA'),
+        ],
+        string='Puissance souscrite (kVA)',
+        required=True,
+        tracking=True
     )
     provision_mensuelle_kwh = fields.Float(
         string="Provision mensuelle (kWh)",
@@ -190,6 +190,12 @@ class Souscription(models.Model):
         # 3. Création des lignes de facture
         lines_vals = []
         
+        # Section Abonnement
+        lines_vals.append((0, 0, {
+            'display_type': 'line_section',
+            'name': "Abonnement",
+        }))
+        
         # Ligne abonnement avec calcul dynamique (utilise le coefficient historisé)
         coeff_pro_historise = periode.coeff_pro_periode if hasattr(periode, 'coeff_pro_periode') else self.coeff_pro
         produit_abo = self._get_produit_abonnement(tarif_solidaire)
@@ -209,7 +215,20 @@ class Souscription(models.Model):
             'quantity': periode.jours,
             'price_unit': prix_abo_journalier,
         }))
+        
+        # Note TURPE fixe sous l'abonnement
+        if periode.turpe_fixe > 0:
+            lines_vals.append((0, 0, {
+                'display_type': 'line_note',
+                'name': f"Dont turpe fixe: {periode.turpe_fixe:.2f}€",
+            }))
 
+        # Section Énergie
+        lines_vals.append((0, 0, {
+            'display_type': 'line_section',
+            'name': "Énergie",
+        }))
+        
         # Lignes énergie selon type de tarif historisé
         # Le type_tarif peut être la clé ('base', 'hphc') ou le libellé complet
         is_base_tarif = (
@@ -259,19 +278,11 @@ class Souscription(models.Model):
                 'price_unit': prix_hc,
             }))
 
-        # Lignes TURPE si présentes (affichage réglementaire, pas comptabilisé)
-        if periode.turpe_fixe > 0:
-            lines_vals.append((0, 0, {
-                'name': "TURPE Fixe",
-                'quantity': 1,
-                'price_unit': periode.turpe_fixe,
-            }))
-            
+        # Note TURPE variable sous l'énergie
         if periode.turpe_variable > 0:
             lines_vals.append((0, 0, {
-                'name': "TURPE Variable",
-                'quantity': 1,
-                'price_unit': periode.turpe_variable,
+                'display_type': 'line_note', 
+                'name': f"Dont turpe variable: {periode.turpe_variable:.2f}€",
             }))
 
         # 4. Création de la facture

@@ -20,7 +20,7 @@ class TestSouscription(TransactionCase):
     
     def test_souscription_creation(self):
         """Test création basique d'une souscription"""
-        souscription = self.env['souscription'].create({
+        souscription = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
             'pdl': 'PDL123456',
             'puissance_souscrite': '6',
@@ -36,7 +36,7 @@ class TestSouscription(TransactionCase):
     
     def test_souscription_hphc(self):
         """Test création souscription HP/HC"""
-        souscription = self.env['souscription'].create({
+        souscription = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
             'pdl': 'PDL789',
             'puissance_souscrite': '9',
@@ -50,7 +50,7 @@ class TestSouscription(TransactionCase):
     
     def test_coefficient_pro(self):
         """Test majoration PRO"""
-        souscription = self.env['souscription'].create({
+        souscription = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
             'pdl': 'PDL456',
             'puissance_souscrite': '12',
@@ -63,7 +63,7 @@ class TestSouscription(TransactionCase):
     
     def test_tarif_solidaire(self):
         """Test tarif solidaire"""
-        souscription = self.env['souscription'].create({
+        souscription = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
             'pdl': 'PDL999',
             'puissance_souscrite': '3',

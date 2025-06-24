@@ -15,7 +15,7 @@ class SouscriptionEtat(models.Model):
     color = fields.Integer("Couleur")
 
 class Souscription(models.Model):
-    _name = 'souscription'
+    _name = 'souscription.souscription'
     _description = 'Souscription Électricité'
     _inherit = ['mail.thread']
 

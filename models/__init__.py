@@ -1,11 +1,4 @@
-from . import souscription_metier_mixin
-from . import grille_prix
-from . import souscription
-from . import souscription_periode
-from . import account_move
-from . import metier_perimetre
-from . import metier_perimetre_importer
-from . import metier_prestation
-from . import metier_prestation_importer
-from . import metier_mesure_index
-from . import metier_mesure_index_importer
+from . import core
+
+# Phase 2 - À décommenter lors de l'activation du module métier
+# from . import metier

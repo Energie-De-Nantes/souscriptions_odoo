@@ -12,7 +12,7 @@ class TestBasic(TransactionCase):
     def test_models_exist(self):
         """Test que les modèles principaux existent"""
         # Test modèle souscription
-        souscription_model = self.env['souscription']
+        souscription_model = self.env['souscription.souscription']
         self.assertTrue(souscription_model)
         
         # Test modèle période

@@ -38,30 +38,30 @@
                         <field name="numero_depannage" widget="phone"/>
                     </group>
                     
+                    <notebook>
+                        <page string="Périodes de facturation">
+                            <field name="periode_ids">
+                                <list editable="bottom">
+                                    <field name="mois_annee"/>
+                                    <field name="type_periode"/>
+                                    <field name="type_tarif_periode"/>
+                                    <field name="energie_base_kwh" invisible="type_tarif_periode != 'Base'"/>
+                                    <field name="provision_base_kwh" invisible="type_tarif_periode != 'Base'"/>
+                                    <field name="energie_hp_kwh" invisible="type_tarif_periode == 'Base'"/>
+                                    <field name="provision_hp_kwh" invisible="type_tarif_periode == 'Base'"/>
+                                    <field name="energie_hc_kwh" invisible="type_tarif_periode == 'Base'"/>
+                                    <field name="provision_hc_kwh" invisible="type_tarif_periode == 'Base'"/>
+                                    <field name="jours"/>
+                                    <field name="turpe_fixe"/>
+                                    <field name="turpe_variable"/>
+                                    <field name="facture_id"/>
+                                </list>
+                            </field>
+                        </page>
+                        <!-- Onglets métier supprimés pour version minimale -->
+                        <!-- Historique et Prestations disponibles via module souscriptions_bridge -->
+                    </notebook>
                 </sheet>
-                <notebook>
-                      <page string="Périodes de facturation">
-                        <field name="periode_ids">
-                            <list editable="bottom">
-                                <field name="mois_annee"/>
-                                <field name="type_periode"/>
-                                <field name="type_tarif_periode"/>
-                                <field name="energie_base_kwh" invisible="type_tarif_periode != 'Base'"/>
-                                <field name="provision_base_kwh" invisible="type_tarif_periode != 'Base'"/>
-                                <field name="energie_hp_kwh" invisible="type_tarif_periode == 'Base'"/>
-                                <field name="provision_hp_kwh" invisible="type_tarif_periode == 'Base'"/>
-                                <field name="energie_hc_kwh" invisible="type_tarif_periode == 'Base'"/>
-                                <field name="provision_hc_kwh" invisible="type_tarif_periode == 'Base'"/>
-                                <field name="jours"/>
-                                <field name="turpe_fixe"/>
-                                <field name="turpe_variable"/>
-                                <field name="facture_id"/>
-                            </list>
-                        </field>
-                    </page>
-                    <!-- Onglets métier supprimés pour version minimale -->
-                    <!-- Historique et Prestations disponibles via module souscriptions_bridge -->
-                </notebook>
                 <chatter open_attachments="True"/>
             </form>
         </field>

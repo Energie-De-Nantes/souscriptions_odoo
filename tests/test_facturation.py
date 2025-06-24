@@ -26,7 +26,7 @@ class TestFacturation(TransactionCase):
             'active': True,
         })
         
-        self.souscription = self.env['souscription'].create({
+        self.souscription = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
             'pdl': 'PDL_TEST_001',
             'puissance_souscrite': '6',
@@ -52,7 +52,7 @@ class TestFacturation(TransactionCase):
     
     def test_creation_periode_hphc(self):
         """Test création période HP/HC"""
-        souscription_hphc = self.env['souscription'].create({
+        souscription_hphc = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
             'pdl': 'PDL_HPHC_001',
             'puissance_souscrite': '9',
@@ -102,7 +102,7 @@ class TestFacturation(TransactionCase):
         count_before = len(self.souscription.periode_ids)
         
         # Appeler la méthode de création des périodes
-        self.env['souscription'].ajouter_periodes_mensuelles()
+        self.env['souscription.souscription'].ajouter_periodes_mensuelles()
         
         # Vérifier qu'une période a été créée
         count_after = len(self.souscription.periode_ids)
@@ -110,7 +110,7 @@ class TestFacturation(TransactionCase):
     
     def test_api_externe_get_souscriptions_by_pdl(self):
         """Test API pour pont externe - recherche par PDL"""
-        result = self.env['souscription'].get_souscriptions_by_pdl(['PDL_TEST_001'])
+        result = self.env['souscription.souscription'].get_souscriptions_by_pdl(['PDL_TEST_001'])
         
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]['pdl'], 'PDL_TEST_001')

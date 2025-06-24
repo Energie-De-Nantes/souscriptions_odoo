@@ -7,7 +7,7 @@ class SouscriptionPeriode(models.Model):
     _order = 'date_debut'
 
     souscription_id = fields.Many2one(
-        'souscription', 
+        'souscription.souscription', 
         required=True,
         readonly=True,
         ondelete='cascade', 
@@ -96,7 +96,7 @@ class SouscriptionPeriode(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
-            sous = self.env['souscription'].browse(vals['souscription_id'])
+            sous = self.env['souscription.souscription'].browse(vals['souscription_id'])
 
             # Copie de l'état de la souscription au moment de la création
             vals.update({

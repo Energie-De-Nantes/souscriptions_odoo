@@ -45,7 +45,7 @@ class MetierPerimetreImporter(models.TransientModel):
         fields_dict = self.env['metier.perimetre']._fields
 
         index_model = self.env['metier.mesure.index']
-        sous_model = self.env['souscription']
+        sous_model = self.env['souscription.souscription']
 
         for _, row in df.iterrows():
             if model.search([

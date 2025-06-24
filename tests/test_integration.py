@@ -50,7 +50,7 @@ class TestIntegration(TransactionCase):
     def test_workflow_complet_base(self):
         """Test workflow complet : souscription BASE -> période -> facture"""
         # 1. Créer souscription BASE
-        souscription = self.env['souscription'].create({
+        souscription = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
             'pdl': 'PDL_INTEG_BASE',
             'puissance_souscrite': '6',
@@ -103,7 +103,7 @@ class TestIntegration(TransactionCase):
     def test_workflow_complet_hphc(self):
         """Test workflow complet : souscription HP/HC -> période -> facture"""
         # 1. Créer souscription HP/HC
-        souscription = self.env['souscription'].create({
+        souscription = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
             'pdl': 'PDL_INTEG_HPHC',
             'puissance_souscrite': '9',
@@ -145,7 +145,7 @@ class TestIntegration(TransactionCase):
     
     def test_workflow_solidaire(self):
         """Test workflow tarif solidaire"""
-        souscription = self.env['souscription'].create({
+        souscription = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
             'pdl': 'PDL_SOLIDAIRE',
             'puissance_souscrite': '6',
@@ -181,7 +181,7 @@ class TestIntegration(TransactionCase):
                 'name': f'Client Multi {i+1}',
             })
             
-            sous = self.env['souscription'].create({
+            sous = self.env['souscription.souscription'].create({
                 'partner_id': partner.id,
                 'pdl': f'PDL_MULTI_{i+1}',
                 'puissance_souscrite': '6',
@@ -200,7 +200,7 @@ class TestIntegration(TransactionCase):
             })
         
         # Facturation groupée
-        souscriptions_recordset = self.env['souscription'].browse([s.id for s in souscriptions])
+        souscriptions_recordset = self.env['souscription.souscription'].browse([s.id for s in souscriptions])
         souscriptions_recordset.creer_factures()
         
         # Vérifier que toutes les factures sont créées
@@ -214,7 +214,7 @@ class TestIntegration(TransactionCase):
         # Désactiver la grille
         self.grille.active = False
         
-        souscription = self.env['souscription'].create({
+        souscription = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
             'pdl': 'PDL_ERREUR',
             'puissance_souscrite': '6',

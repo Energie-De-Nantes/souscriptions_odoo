@@ -18,7 +18,7 @@ class MesureIndexImporter(models.TransientModel):
         df = self._parse_parquet_file()
         df = df.where(pd.notna(df), None)
         model = self.env['metier.mesure.index']
-        sous_model = self.env['souscription']
+        sous_model = self.env['souscription.souscription']
         count = 0
 
         for _, row in df.iterrows():

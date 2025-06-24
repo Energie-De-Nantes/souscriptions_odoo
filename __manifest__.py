@@ -37,7 +37,7 @@
         "data/produits_energie.xml",
         "data/grille_prix_demo.xml",
         "report/souscription_contrat_report.xml",
-        "reports/facture_energie_template.xml",
+        # "reports/facture_energie_template.xml",  # Temporairement désactivé
         "views/core/souscription_views.xml",
         "views/core/grille_prix_views.xml",
         "views/core/souscriptions_periode_views.xml",

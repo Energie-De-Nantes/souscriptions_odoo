@@ -1,7 +1,7 @@
 <odoo>
     <record id="view_souscription_form" model="ir.ui.view">
         <field name="name">souscription.form</field>
-        <field name="model">souscription</field>
+        <field name="model">souscription.souscription</field>
         <field name="type">form</field>
         <field name="arch" type="xml">
             <form string="Souscription">
@@ -68,7 +68,7 @@
     </record>
     <record id="view_souscription_list" model="ir.ui.view">
         <field name="name">souscription.list</field>
-        <field name="model">souscription</field>
+        <field name="model">souscription.souscription</field>
         <field name="arch" type="xml">
           <list string="Souscriptions">
             <field name="name"/>
@@ -82,8 +82,8 @@
     <!-- Action serveur (pour déclencher la méthode Python) -->
     <record id="action_creer_factures" model="ir.actions.server">
         <field name="name">Créer factures</field>
-        <field name="model_id" ref="model_souscription"/>
-        <field name="binding_model_id" ref="model_souscription"/>
+        <field name="model_id" ref="model_souscription_souscription"/>
+        <field name="binding_model_id" ref="model_souscription_souscription"/>
         <field name="binding_view_types">list</field>
         <field name="state">code</field>
         <field name="code">
@@ -92,8 +92,8 @@
     </record>
     <record id="action_ajouter_periodes_mensuelles" model="ir.actions.server">
         <field name="name">Créer les périodes du mois précédent</field>
-        <field name="model_id" ref="model_souscription"/>
-        <field name="binding_model_id" ref="model_souscription"/>
+        <field name="model_id" ref="model_souscription_souscription"/>
+        <field name="binding_model_id" ref="model_souscription_souscription"/>
         <field name="binding_view_types">list</field>
         <field name="state">code</field>
         <field name="code">
@@ -102,15 +102,15 @@
     </record>
     <record id="action_generer_lot_prelevement" model="ir.actions.server">
         <field name="name">Générer lot prélèvement</field>
-        <field name="model_id" ref="souscriptions.model_souscription"/>
-        <field name="binding_model_id" ref="souscriptions.model_souscription"/>
+        <field name="model_id" ref="model_souscription_souscription"/>
+        <field name="binding_model_id" ref="model_souscription_souscription"/>
         <field name="binding_view_types">list</field>
         <field name="state">code</field>
-        <field name="code">env['souscription'].generer_lot_prelevement_mensuel()</field>
+        <field name="code">env['souscription.souscription'].generer_lot_prelevement_mensuel()</field>
     </record>
     <record id="view_souscription_kanban" model="ir.ui.view">
         <field name="name">souscription.kanban</field>
-        <field name="model">souscription</field>
+        <field name="model">souscription.souscription</field>
         <field name="type">kanban</field>
         <field name="arch" type="xml">
             <kanban default_group_by="etat_facturation_id">
@@ -129,7 +129,7 @@
 
     <record id="action_souscription" model="ir.actions.act_window">
         <field name="name">Souscriptions</field>
-        <field name="res_model">souscription</field>
+        <field name="res_model">souscription.souscription</field>
         <field name="view_mode">kanban,list,form</field>
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'list', 'view_id': ref('view_souscription_list')}),

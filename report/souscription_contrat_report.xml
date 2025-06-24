@@ -3,11 +3,11 @@
     <!-- Action pour générer le rapport -->
     <record id="action_souscription_contrat_report" model="ir.actions.report">
         <field name="name">Contrat de Souscription</field>
-        <field name="model">souscription</field>
+        <field name="model">souscription.souscription</field>
         <field name="report_type">qweb-pdf</field>
         <field name="report_name">souscriptions.souscription_contrat_document</field>
         <field name="report_file">souscriptions.souscription_contrat_document</field>
-        <field name="binding_model_id" ref="model_souscription"/>
+        <field name="binding_model_id" ref="model_souscription_souscription"/>
         <field name="binding_type">report</field>
     </record>
 

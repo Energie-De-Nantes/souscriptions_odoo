@@ -60,11 +60,31 @@ if existing:
 clients = env["res.partner"].create(clients_data)
 print(f"✅ {len(clients)} clients créés")
 
-# Récupérer l'état de facturation
-etat = env["souscription.etat"].search([], limit=1)
-if not etat:
-    etat = env["souscription.etat"].create({"name": "Actif", "sequence": 1})
-    print("État de facturation créé")
+# Test du modèle souscription.etat
+print("\\nTest du modèle souscription.etat...")
+try:
+    # Récupérer l'état de facturation
+    etat = env["souscription.etat"].search([], limit=1)
+    if not etat:
+        etat = env["souscription.etat"].create({"name": "Actif", "sequence": 1})
+        print("État de facturation créé")
+    else:
+        print(f"État trouvé : {etat.name}")
+        
+    # Lister tous les états
+    tous_etats = env["souscription.etat"].search([])
+    print(f"Nombre total d'états : {len(tous_etats)}")
+    for e in tous_etats:
+        print(f"  - {e.name} (séquence: {e.sequence})")
+        
+except Exception as e:
+    print(f"ERREUR avec souscription.etat : {e}")
+    # Vérifier si le module souscriptions est bien installé
+    modules = env["ir.module.module"].search([("name", "=", "souscriptions")])
+    if modules:
+        print(f"Module souscriptions : état = {modules[0].state}")
+    else:
+        print("Module souscriptions non trouvé !")
 
 # Souscriptions de démo
 souscriptions_data = [

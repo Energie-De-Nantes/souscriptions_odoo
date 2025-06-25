@@ -18,6 +18,7 @@ tests/
 ├── test_invoice_template.py    # Tests du template de facture (TransactionCase)
 ├── test_souscription.py        # Tests des souscriptions (TransactionCase)
 ├── test_ui.py                  # Tests d'interface utilisateur (HttpCase)
+├── test_portal.py              # Tests du portal client (HttpCase)
 └── test_workflow.py            # Tests de workflow complexes (SavepointCase)
 ```
 
@@ -36,6 +37,7 @@ make test-basic            # Tests basiques
 make test-workflow         # Workflow et intégration
 make test-ui               # Interface utilisateur
 make test-reports          # Rapports et PDF
+make test-portal           # Portal client
 
 # Tests rapides (sans recréer la DB)
 make quick-test
@@ -107,6 +109,15 @@ odoo -d test_db --test-enable --test-tags TestInvoiceTemplate --stop-after-init
 - Génération de rapports PDF
 - Prévisualisation HTML
 - Tag: `souscriptions_ui`, `souscriptions_reports`
+
+### Tests du portal (`test_portal.py`) - HttpCase
+- Authentification et sécurité portal
+- Navigation et interface client
+- Affichage adaptatif Base vs HP/HC
+- Calculs et totaux automatiques
+- Intégration avec le système Odoo
+- Gestion des cas limites
+- Tag: `portal`, `portal_integration`
 
 ### Helpers communs (`common.py`)
 - `SouscriptionsTestMixin`: Données et helpers partagés

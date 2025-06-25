@@ -1,0 +1,112 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Odoo: Run All Tests",
+            "type": "shell",
+            "command": "python",
+            "args": ["test_runner.py", "all", "--verbose"],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Odoo: Run Basic Tests",
+            "type": "shell",
+            "command": "python",
+            "args": ["test_runner.py", "basic", "--verbose"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Odoo: Run Template Tests",
+            "type": "shell",
+            "command": "python",
+            "args": ["test_runner.py", "template", "--verbose"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Odoo: Quick Test",
+            "type": "shell",
+            "command": "python",
+            "args": ["test_runner.py", "--quick"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Odoo: Install Module",
+            "type": "shell",
+            "command": "odoo",
+            "args": [
+                "-d", "souscriptions_test",
+                "-i", "souscriptions", 
+                "--stop-after-init",
+                "--addons-path", "/home/virgile/addons_odoo"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Odoo: Update Module",
+            "type": "shell",
+            "command": "odoo",
+            "args": [
+                "-d", "souscriptions_test",
+                "-u", "souscriptions",
+                "--stop-after-init",
+                "--addons-path", "/home/virgile/addons_odoo"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Make: All Tests",
+            "type": "shell",
+            "command": "make",
+            "args": ["test"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            }
+        }
+    ]
+}

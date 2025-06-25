@@ -1,0 +1,62 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Odoo: Run Tests",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_runner.py",
+            "args": ["all", "--verbose"],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:/home/virgile/addons_odoo"
+            }
+        },
+        {
+            "name": "Odoo: Run Basic Tests",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_runner.py",
+            "args": ["basic", "--verbose"],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Odoo: Run Template Tests",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_runner.py",
+            "args": ["template", "--verbose"],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Odoo: Install Module",
+            "type": "python",
+            "request": "launch",
+            "program": "odoo",
+            "args": [
+                "-d", "souscriptions_test",
+                "-i", "souscriptions",
+                "--stop-after-init",
+                "--addons-path", "/home/virgile/addons_odoo"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Odoo: Demo Server",
+            "type": "python",
+            "request": "launch",
+            "program": "odoo",
+            "args": [
+                "-d", "souscriptions_demo",
+                "--dev=reload,qweb,werkzeug,xml",
+                "--addons-path", "/home/virgile/addons_odoo"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

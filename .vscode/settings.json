@@ -18,5 +18,48 @@
         "titleBar.inactiveBackground": "#dd053199",
         "titleBar.inactiveForeground": "#e7e7e799"
     },
-    "peacock.remoteColor": "#dd0531"
+    "peacock.remoteColor": "#dd0531",
+    
+    "python.testing.unittestEnabled": true,
+    "python.testing.pytestEnabled": false,
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s", 
+        "./tests",
+        "-p",
+        "test_*.py"
+    ],
+    "python.testing.cwd": "${workspaceFolder}",
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
+    
+    "python.defaultInterpreterPath": "/usr/bin/python3",
+    
+    "files.associations": {
+        "*.xml": "xml",
+        "*.py": "python"
+    },
+    
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.linting.flake8Enabled": false,
+    
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": ["--line-length=88"],
+    
+    "editor.formatOnSave": true,
+    "editor.rulers": [88],
+    
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.pyc": true
+    },
+    
+    "python.envFile": "${workspaceFolder}/.env",
+    
+    "odoo.addonsPath": [
+        "/home/virgile/addons_odoo"
+    ],
+    
+    "xml.validation.enabled": true,
+    "xml.format.enabled": true
 }

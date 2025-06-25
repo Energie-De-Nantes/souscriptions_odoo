@@ -1,0 +1,71 @@
+# Makefile simplifié pour le module Odoo souscriptions
+# Suit les recommandations Python unittest et commandes Odoo officielles
+
+# Variables
+PYTHON = python3
+ODOO = odoo
+DB_NAME ?= souscriptions_test
+MODULE_NAME = souscriptions
+
+.PHONY: help test install update clean
+
+# Aide par défaut
+help:
+	@echo "🚀 Module Odoo souscriptions - Commandes essentielles"
+	@echo ""
+	@echo "Tests (recommandé: utiliser test_runner.py):"
+	@echo "  test              Tests avec test_runner.py (recommandé)"
+	@echo "  test-odoo         Tests avec commande Odoo directe"
+	@echo "  test-unittest     Tests avec unittest discovery"
+	@echo ""
+	@echo "Développement:"
+	@echo "  install           Installer le module"
+	@echo "  update            Mettre à jour le module"
+	@echo "  demo              Mode démo"
+	@echo "  shell             Shell Odoo"
+	@echo ""
+	@echo "Maintenance:"
+	@echo "  clean             Nettoyer"
+	@echo ""
+	@echo "📘 Utilisation recommandée:"
+	@echo "  $(PYTHON) test_runner.py --help"
+	@echo "  $(PYTHON) test_runner.py basic"
+	@echo "  $(PYTHON) test_runner.py template --verbose"
+
+# Tests - Méthode recommandée avec test_runner.py
+test:
+	@echo "🧪 Tests avec test_runner.py (méthode recommandée)"
+	$(PYTHON) test_runner.py all --install
+
+# Tests - Commande Odoo directe (backup)
+test-odoo:
+	@echo "🧪 Tests avec commande Odoo directe"
+	$(ODOO) -d $(DB_NAME) --test-enable --test-tags souscriptions --stop-after-init -i $(MODULE_NAME)
+
+# Tests - Unittest discovery (exploration)
+test-unittest:
+	@echo "🔍 Découverte des tests avec unittest"
+	$(PYTHON) -m unittest discover -s tests -p "test_*.py" -v
+
+# Développement
+install:
+	$(ODOO) -d $(DB_NAME) -i $(MODULE_NAME) --stop-after-init
+
+update:
+	$(ODOO) -d $(DB_NAME) -u $(MODULE_NAME) --stop-after-init
+
+demo:
+	$(ODOO) -d $(DB_NAME) --dev=reload,qweb,werkzeug,xml
+
+shell:
+	$(ODOO) shell -d $(DB_NAME)
+
+# Maintenance
+clean:
+	find . -name "*.pyc" -delete
+	find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+	rm -f /tmp/facture_*.html
+
+# Validation avant commit
+pre-commit: clean test
+	@echo "✅ Validation réussie!"

@@ -187,7 +187,7 @@ class SouscriptionsTestMixin:
                                f"Au moins {expected_notes} notes TURPE attendues")
         
         # Vérifier les lignes produit
-        product_lines = lines.filtered(lambda l: not l.display_type)
+        product_lines = lines.filtered(lambda l: l.display_type == 'product')
         self.assertGreater(len(product_lines), 0, "Au moins une ligne produit attendue")
 
 

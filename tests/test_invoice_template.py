@@ -227,7 +227,7 @@ class TestInvoiceTemplate(TransactionCase):
         # Doit contenir des sections et des notes
         sections = lines.filtered(lambda l: l.display_type == 'line_section')
         notes = lines.filtered(lambda l: l.display_type == 'line_note')
-        product_lines = lines.filtered(lambda l: not l.display_type)
+        product_lines = lines.filtered(lambda l: l.display_type == 'product')
         
         # Vérifications
         self.assertTrue(len(sections) >= 2)  # Au moins Abonnement et Énergie
@@ -299,7 +299,7 @@ class TestInvoiceTemplate(TransactionCase):
         self.assertGreater(facture.amount_untaxed, 0)
         
         # Vérifier que le total correspond aux lignes
-        product_lines = facture.invoice_line_ids.filtered(lambda l: not l.display_type)
+        product_lines = facture.invoice_line_ids.filtered(lambda l: l.display_type == 'product')
         calculated_total = sum(line.price_subtotal for line in product_lines)
         
         self.assertEqual(facture.amount_untaxed, calculated_total)

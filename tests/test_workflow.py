@@ -125,13 +125,13 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
         
         # Facture Base toujours valide
         self.assertTrue(facture_base.is_facture_energie)
-        base_lines = facture_base.invoice_line_ids.filtered(lambda l: not l.display_type)
+        base_lines = facture_base.invoice_line_ids.filtered(lambda l: l.display_type == 'product')
         base_energy_lines = [l for l in base_lines if 'Base' in l.name]
         self.assertTrue(len(base_energy_lines) > 0)
         
         # Facture HP/HC correcte
         self.assertTrue(facture_hphc.is_facture_energie)
-        hphc_lines = facture_hphc.invoice_line_ids.filtered(lambda l: not l.display_type)
+        hphc_lines = facture_hphc.invoice_line_ids.filtered(lambda l: l.display_type == 'product')
         hp_lines = [l for l in hphc_lines if 'HP' in l.name]
         hc_lines = [l for l in hphc_lines if 'HC' in l.name]
         self.assertTrue(len(hp_lines) > 0)

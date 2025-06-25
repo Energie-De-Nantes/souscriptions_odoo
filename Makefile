@@ -25,7 +25,9 @@ help:
 	@echo "  test-template     Tests du template de facture uniquement"
 	@echo "  test-facturation  Tests de facturation uniquement"
 	@echo "  test-basic        Tests basiques uniquement"
-	@echo "  test-integration  Tests d'intégration uniquement"
+	@echo "  test-workflow     Tests de workflow/intégration uniquement"
+	@echo "  test-ui           Tests d'interface utilisateur uniquement"
+	@echo "  test-reports      Tests de rapports uniquement"
 	@echo "  test-verbose      Tests avec logs détaillés"
 	@echo ""
 	@echo "$(YELLOW)Développement:$(NC)"
@@ -63,9 +65,17 @@ test-basic:
 	@echo "$(BLUE)🧪 Tests basiques$(NC)"
 	./run_tests.sh --basic $(DB_NAME)
 
-test-integration:
-	@echo "$(BLUE)🧪 Tests d'intégration$(NC)"
+test-workflow:
+	@echo "$(BLUE)🧪 Tests de workflow$(NC)"
 	./run_tests.sh --integration $(DB_NAME)
+
+test-ui:
+	@echo "$(BLUE)🧪 Tests d'interface utilisateur$(NC)"
+	./run_tests.sh --ui $(DB_NAME)
+
+test-reports:
+	@echo "$(BLUE)🧪 Tests de rapports$(NC)"
+	./run_tests.sh --reports $(DB_NAME)
 
 test-verbose:
 	@echo "$(BLUE)🧪 Tests avec logs détaillés$(NC)"
@@ -134,7 +144,9 @@ t: test
 tf: test-facturation
 tt: test-template
 tb: test-basic
-ti: test-integration
+tw: test-workflow
+tu: test-ui
+tr: test-reports
 i: install
 u: update
 d: demo

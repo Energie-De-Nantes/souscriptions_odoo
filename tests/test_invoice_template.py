@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import re
 
 
-@tagged('souscriptions', 'post_install', '-at_install')
+@tagged('souscriptions', 'souscriptions_template', 'post_install', '-at_install')
 class TestInvoiceTemplate(TransactionCase):
     """Tests du template de facture personnalisé d'électricité"""
     

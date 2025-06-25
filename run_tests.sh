@@ -47,7 +47,9 @@ OPTIONS:
     -t, --template      Lancer uniquement les tests de template
     -f, --facturation   Lancer uniquement les tests de facturation
     -b, --basic         Lancer uniquement les tests basiques
-    -i, --integration   Lancer uniquement les tests d'intégration
+    -i, --integration   Lancer uniquement les tests d'intégration/workflow
+    -u, --ui            Lancer uniquement les tests d'interface utilisateur
+    -r, --reports       Lancer uniquement les tests de rapports
     -v, --verbose       Mode verbeux
     -c, --coverage      Avec couverture de code (si pytest-odoo disponible)
     --create-db         Forcer la création d'une nouvelle base de données
@@ -84,19 +86,27 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -t|--template)
-            TEST_TAGS="souscriptions,TestInvoiceTemplate"
+            TEST_TAGS="souscriptions_template"
             shift
             ;;
         -f|--facturation)
-            TEST_TAGS="souscriptions,TestFacturation"
+            TEST_TAGS="souscriptions_facturation"
             shift
             ;;
         -b|--basic)
-            TEST_TAGS="souscriptions,TestBasic"
+            TEST_TAGS="souscriptions_basic"
             shift
             ;;
         -i|--integration)
-            TEST_TAGS="souscriptions,TestIntegration"
+            TEST_TAGS="souscriptions_workflow"
+            shift
+            ;;
+        -u|--ui)
+            TEST_TAGS="souscriptions_ui"
+            shift
+            ;;
+        -r|--reports)
+            TEST_TAGS="souscriptions_reports"
             shift
             ;;
         -v|--verbose)

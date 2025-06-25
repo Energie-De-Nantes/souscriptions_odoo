@@ -8,14 +8,17 @@ Ce répertoire contient tous les tests automatisés du module souscriptions, uti
 tests/
 ├── README.md                   # Cette documentation
 ├── __init__.py                 # Initialisation des tests
+├── common.py                   # Helpers et mixins communs
 ├── data/
 │   └── test_fixtures.xml       # Données de test réutilisables
-├── test_basic.py               # Tests basiques des modèles
-├── test_facturation.py         # Tests de facturation et génération de factures
-├── test_grille_prix.py         # Tests des grilles de prix
-├── test_integration.py         # Tests d'intégration
-├── test_invoice_template.py    # Tests du template de facture personnalisé
-└── test_souscription.py        # Tests des souscriptions
+├── test_basic.py               # Tests basiques des modèles (TransactionCase)
+├── test_facturation.py         # Tests de facturation (TransactionCase)
+├── test_grille_prix.py         # Tests des grilles de prix (TransactionCase)
+├── test_integration.py         # Tests d'intégration legacy
+├── test_invoice_template.py    # Tests du template de facture (TransactionCase)
+├── test_souscription.py        # Tests des souscriptions (TransactionCase)
+├── test_ui.py                  # Tests d'interface utilisateur (HttpCase)
+└── test_workflow.py            # Tests de workflow complexes (SavepointCase)
 ```
 
 ## 🚀 Lancement des tests
@@ -30,7 +33,9 @@ make test
 make test-template          # Template de facture
 make test-facturation      # Facturation
 make test-basic            # Tests basiques
-make test-integration      # Intégration
+make test-workflow         # Workflow et intégration
+make test-ui               # Interface utilisateur
+make test-reports          # Rapports et PDF
 
 # Tests rapides (sans recréer la DB)
 make quick-test
@@ -65,30 +70,48 @@ odoo -d test_db --test-enable --test-tags TestInvoiceTemplate --stop-after-init
 
 ## 🧪 Types de tests
 
-### Tests basiques (`test_basic.py`)
+### Tests basiques (`test_basic.py`) - TransactionCase
 - Import des modèles
 - Existence des modèles principaux
 - Tests de base
+- Tag: `souscriptions_basic`
 
-### Tests de facturation (`test_facturation.py`)
+### Tests de facturation (`test_facturation.py`) - TransactionCase
 - Création de périodes de facturation
 - Génération de factures avec TURPE
 - Tests Base et HP/HC
 - Calculs des montants
 - Gestion des erreurs
+- Tag: `souscriptions_facturation`
 
-### Tests du template (`test_invoice_template.py`)
+### Tests du template (`test_invoice_template.py`) - TransactionCase
 - Rendu HTML du template personnalisé
 - Affichage des informations souscription
 - Notes TURPE correctes
 - Sections Abonnement/Énergie
 - Support tarif solidaire
 - Fallback pour factures non-énergie
+- Tag: `souscriptions_template`
 
-### Tests d'intégration (`test_integration.py`)
-- Workflows complets
-- API externes
-- Tests end-to-end
+### Tests de workflow (`test_workflow.py`) - SavepointCase
+- Workflows complets avec savepoints
+- Scénarios de migration de tarifs
+- Régularisation de contrats lissés
+- Gestion d'erreurs avec rollback
+- Tests de performance batch
+- Tag: `souscriptions_workflow`
+
+### Tests d'interface (`test_ui.py`) - HttpCase
+- Vues et formulaires web
+- Navigation dans l'interface
+- Génération de rapports PDF
+- Prévisualisation HTML
+- Tag: `souscriptions_ui`, `souscriptions_reports`
+
+### Helpers communs (`common.py`)
+- `SouscriptionsTestMixin`: Données et helpers partagés
+- `SouscriptionsTestCase`: Classe de base avec mixin
+- `SouscriptionsFormTestCase`: Spécialisée pour les formulaires
 
 ## 📊 Données de test
 

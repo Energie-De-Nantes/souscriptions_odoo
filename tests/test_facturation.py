@@ -3,7 +3,7 @@ from odoo.exceptions import UserError
 from datetime import date, timedelta
 
 
-@tagged('souscriptions', 'post_install', '-at_install')
+@tagged('souscriptions', 'souscriptions_facturation', 'post_install', '-at_install')
 class TestFacturation(TransactionCase):
     
     def setUp(self):

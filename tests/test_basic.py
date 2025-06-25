@@ -1,7 +1,7 @@
 from odoo.tests.common import TransactionCase, tagged
 
 
-@tagged('souscriptions', 'post_install', '-at_install')
+@tagged('souscriptions', 'souscriptions_basic', 'post_install', '-at_install')
 class TestBasic(TransactionCase):
     """Test basique pour vérifier que les tests fonctionnent"""
     

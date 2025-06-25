@@ -308,7 +308,6 @@
             <field name="name">Énergie HP - Janvier 2024</field>
             <field name="quantity">215</field>
             <field name="price_unit">0.2516</field>
-            <field name="account_id" ref="account.a_sale"/>
         </record>
         
         <!-- Ligne facture janvier - Énergie HC -->
@@ -318,7 +317,6 @@
             <field name="name">Énergie HC - Janvier 2024</field>
             <field name="quantity">95</field>
             <field name="price_unit">0.2032</field>
-            <field name="account_id" ref="account.a_sale"/>
         </record>
         
         <!-- Ligne facture janvier - Abonnement -->
@@ -328,7 +326,6 @@
             <field name="name">Abonnement 6 kVA - Janvier 2024</field>
             <field name="quantity">1</field>
             <field name="price_unit">12.60</field>
-            <field name="account_id" ref="account.a_sale"/>
         </record>
         
         <!-- Facture février 2024 - Admin -->
@@ -347,7 +344,6 @@
             <field name="name">Énergie HP - Février 2024</field>
             <field name="quantity">245</field>
             <field name="price_unit">0.2516</field>
-            <field name="account_id" ref="account.a_sale"/>
         </record>
         
         <!-- Ligne facture février - Énergie HC -->
@@ -357,7 +353,6 @@
             <field name="name">Énergie HC - Février 2024</field>
             <field name="quantity">105</field>
             <field name="price_unit">0.2032</field>
-            <field name="account_id" ref="account.a_sale"/>
         </record>
         
         <!-- Ligne facture février - Abonnement -->
@@ -367,7 +362,6 @@
             <field name="name">Abonnement 6 kVA - Février 2024</field>
             <field name="quantity">1</field>
             <field name="price_unit">12.60</field>
-            <field name="account_id" ref="account.a_sale"/>
         </record>
         
         <!-- Facture mars 2024 - Admin (en attente de paiement) -->
@@ -386,7 +380,6 @@
             <field name="name">Énergie HP - Mars 2024</field>
             <field name="quantity">220</field>
             <field name="price_unit">0.2516</field>
-            <field name="account_id" ref="account.a_sale"/>
         </record>
         
         <!-- Ligne facture mars - Énergie HC -->
@@ -396,7 +389,6 @@
             <field name="name">Énergie HC - Mars 2024</field>
             <field name="quantity">85</field>
             <field name="price_unit">0.2032</field>
-            <field name="account_id" ref="account.a_sale"/>
         </record>
         
         <!-- Ligne facture mars - Abonnement -->
@@ -406,7 +398,6 @@
             <field name="name">Abonnement 6 kVA - Mars 2024</field>
             <field name="quantity">1</field>
             <field name="price_unit">12.60</field>
-            <field name="account_id" ref="account.a_sale"/>
         </record>
         
     </data>

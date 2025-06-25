@@ -37,7 +37,7 @@ make test-basic            # Tests basiques
 make test-workflow         # Workflow et intégration
 make test-ui               # Interface utilisateur
 make test-reports          # Rapports et PDF
-make test-portal           # Portal client
+make test-portal           # Portal usager·ère
 
 # Tests rapides (sans recréer la DB)
 make quick-test
@@ -112,7 +112,7 @@ odoo -d test_db --test-enable --test-tags TestInvoiceTemplate --stop-after-init
 
 ### Tests du portal (`test_portal.py`) - HttpCase
 - Authentification et sécurité portal
-- Navigation et interface client
+- Navigation et interface usager·ère
 - Affichage adaptatif Base vs HP/HC
 - Calculs et totaux automatiques
 - Intégration avec le système Odoo

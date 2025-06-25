@@ -1,5 +1,5 @@
 """
-Tests unitaires pour le portal client du module souscriptions.
+Tests unitaires pour le portal usager·ère du module souscriptions.
 """
 
 import json
@@ -11,7 +11,7 @@ from datetime import date
 
 @tagged('post_install', '-at_install', 'portal')
 class PortalTestCase(SouscriptionsTestMixin, HttpCase):
-    """Tests du portal client pour les souscriptions."""
+    """Tests du portal usager·ère pour les souscriptions."""
 
     @classmethod
     def setUpClass(cls):

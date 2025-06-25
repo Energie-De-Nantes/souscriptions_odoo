@@ -190,7 +190,7 @@
                                     <t t-if="souscription.coeff_pro > 0">
                                         <div class="alert alert-warning">
                                             <p class="mb-0">
-                                                <i class="fa fa-building"/> Client professionnel
+                                                <i class="fa fa-building"/> Usager·ère professionnel·le
                                                 <br/>Majoration : <strong><t t-esc="souscription.coeff_pro"/>%</strong>
                                             </p>
                                         </div>

@@ -1,8 +1,8 @@
-# Portal Client - Module Souscriptions
+# Portal Usager·ère - Module Souscriptions
 
 ## Vue d'ensemble
 
-Le portal client utilise le framework Portal standard d'Odoo pour permettre aux usager·ères de consulter leurs souscriptions électriques. Cette approche suit les bonnes pratiques d'Odoo 18 et s'intègre naturellement avec les autres modules.
+Le portal usager·ère utilise le framework Portal standard d'Odoo pour permettre aux usager·ères de consulter leurs souscriptions électriques. Cette approche suit les bonnes pratiques d'Odoo 18 et s'intègre naturellement avec les autres modules.
 
 ## Accès
 
@@ -56,7 +56,7 @@ Le portal client utilise le framework Portal standard d'Odoo pour permettre aux 
 
 ## Différences avec l'ancienne approche
 
-L'approche Portal remplace l'espace client autonome en :
+L'approche Portal remplace l'espace usager·ère autonome en :
 - Utilisant les templates standards au lieu de HTML custom
 - S'intégrant au module website (quand il fonctionne)
 - Réutilisant les composants Odoo (pagination, breadcrumbs, etc.)

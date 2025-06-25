@@ -68,7 +68,17 @@ class Souscription(models.Model):
     )
     provision_mensuelle_kwh = fields.Float(
         string="Provision mensuelle (kWh)",
-        help="Énergie estimée mensuelle à facturer si lissage activé.",
+        help="Énergie estimée mensuelle à facturer si lissage activé (tarif Base).",
+        tracking=True
+    )
+    provision_hp_kwh = fields.Float(
+        string="Provision HP mensuelle (kWh)",
+        help="Énergie estimée mensuelle Heures Pleines si lissage activé (tarif HP/HC).",
+        tracking=True
+    )
+    provision_hc_kwh = fields.Float(
+        string="Provision HC mensuelle (kWh)",
+        help="Énergie estimée mensuelle Heures Creuses si lissage activé (tarif HP/HC).",
         tracking=True
     )
     type_tarif = fields.Selection(

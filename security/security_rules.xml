@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Portal Access Rules for Souscriptions -->
+    
+    <!-- Souscriptions: Only own subscriptions -->
+    <record id="souscription_portal_rule" model="ir.rule">
+        <field name="name">Portal: Own subscriptions only</field>
+        <field name="model_id" ref="model_souscription_souscription"/>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    
+    <!-- Périodes: Only periods from own subscriptions -->
+    <record id="periode_portal_rule" model="ir.rule">
+        <field name="name">Portal: Own subscription periods only</field>
+        <field name="model_id" ref="model_souscription_periode"/>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="domain_force">[('souscription_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    
+    <!-- Account Moves: Only invoices from own subscriptions -->
+    <record id="account_move_portal_rule" model="ir.rule">
+        <field name="name">Portal: Own subscription invoices only</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="domain_force">[('souscription_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+    
+</odoo>

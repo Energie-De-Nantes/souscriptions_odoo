@@ -7,3 +7,4 @@ access_grille_prix_ligne_user,grille.prix.ligne,model_grille_prix_ligne,base.gro
 access_souscription_portal,souscription.souscription portal,model_souscription_souscription,base.group_portal,1,0,0,0
 access_souscription_periode_portal,souscription.periode portal,model_souscription_periode,base.group_portal,1,0,0,0
 access_souscription_etat_portal,souscription.etat portal,model_souscription_etat,base.group_portal,1,0,0,0
+access_account_move_portal,account.move portal,account.model_account_move,base.group_portal,1,0,0,0

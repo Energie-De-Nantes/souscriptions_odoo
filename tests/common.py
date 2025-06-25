@@ -70,8 +70,9 @@ class SouscriptionsTestMixin:
             'type_tarif': 'hphc',
             'etat_facturation_id': cls.etat_facturation.id,
             'date_debut': date(2024, 1, 1),
-            'provision_hp_kwh': 200.0,
-            'provision_hc_kwh': 120.0,
+            'provision_hp_kwh': 200.0,  # Provision HP mensuelle
+            'provision_hc_kwh': 120.0,  # Provision HC mensuelle
+            'lisse': True,
             'ref_compteur': 'COMP_TEST_002',
         })
     

@@ -59,3 +59,23 @@ class SouscriptionPortal(CustomerPortal):
         }
         
         return request.render("souscriptions.portal_souscription_page", values)
+
+    @http.route(['/my/souscription/<int:souscription_id>/periodes'], type='http', auth="user", website=True)
+    def portal_souscription_periodes(self, souscription_id=None, **kw):
+        partner = request.env.user.partner_id
+        souscription = request.env['souscription.souscription'].browse(souscription_id)
+        
+        # Vérifier que la souscription appartient bien au partenaire
+        if not souscription.exists() or souscription.partner_id != partner:
+            return request.redirect('/my')
+            
+        # Récupérer les périodes triées par date
+        periodes = souscription.periode_ids.sorted('date_debut', reverse=True)
+        
+        values = {
+            'souscription': souscription,
+            'periodes': periodes,
+            'page_name': 'souscription_periodes',
+        }
+        
+        return request.render("souscriptions.portal_souscription_periodes", values)

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Menu pour accéder au portal depuis le backend -->
+    <record id="action_portal_souscriptions" model="ir.actions.act_url">
+        <field name="name">Espace Client (Portal)</field>
+        <field name="url">/my/souscriptions</field>
+        <field name="target">self</field>
+    </record>
+    
+    <menuitem id="menu_portal_souscriptions"
+              name="Espace Client"
+              parent="menu_souscription_root"
+              action="action_portal_souscriptions"
+              sequence="100"/>
+</odoo>

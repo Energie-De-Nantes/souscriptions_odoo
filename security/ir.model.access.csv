@@ -4,3 +4,6 @@ access_souscription_periode_user,souscription.periode,model_souscription_periode
 access_souscription_etat_user,souscription.etat,model_souscription_etat,base.group_user,1,1,1,1
 access_grille_prix_user,grille.prix,model_grille_prix,base.group_user,1,1,1,1
 access_grille_prix_ligne_user,grille.prix.ligne,model_grille_prix_ligne,base.group_user,1,1,1,1
+access_souscription_portal,souscription.souscription portal,model_souscription_souscription,base.group_portal,1,0,0,0
+access_souscription_periode_portal,souscription.periode portal,model_souscription_periode,base.group_portal,1,0,0,0
+access_souscription_etat_portal,souscription.etat portal,model_souscription_etat,base.group_portal,1,0,0,0

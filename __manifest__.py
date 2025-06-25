@@ -1,7 +1,7 @@
 {
     "name": "Souscriptions",
     "version": "1.0.0",
-    "depends": ["base", "mail", "contacts", "account"],
+    "depends": ["base", "mail", "contacts", "account", "website", "portal"],
     "author": "Virgile Daugé",
     "category": "Energy",
     "license": "AGPL-3",
@@ -41,6 +41,8 @@
         "views/core/souscription_views.xml",
         "views/core/grille_prix_views.xml",
         "views/core/souscriptions_periode_views.xml",
+        "views/core/souscription_portal_menu.xml",
+        "views/simple_portal_templates.xml",
         
         # Phase 2 - Métier (à décommenter lors de l'activation)
         # "security/ir.model.access.metier.csv",

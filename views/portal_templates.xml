@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Ajouter les souscriptions au menu portal -->
+    <template id="portal_my_home_souscriptions" name="Mes Souscriptions" inherit_id="portal.portal_my_home" priority="20">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="url">/my/souscriptions</t>
+                <t t-set="title">Souscriptions</t>
+                <t t-set="placeholder_count" t-value="'souscription_count'"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!-- Liste des souscriptions -->
+    <template id="portal_my_souscriptions" name="Mes Souscriptions">
+        <t t-call="web.frontend_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Mes Souscriptions Électriques</t>
+            </t>
+            
+            <t t-if="not souscriptions">
+                <div class="alert alert-warning mt8" role="alert">
+                    <p class="mb-0">Aucune souscription électrique trouvée.</p>
+                    <p class="mb-0">Contactez votre fournisseur pour plus d'informations.</p>
+                </div>
+            </t>
+            
+            <t t-else="">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>PDL</th>
+                                <th>Puissance</th>
+                                <th>Type de tarif</th>
+                                <th>État</th>
+                                <th class="text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="souscriptions" t-as="souscription">
+                                <tr>
+                                    <td>
+                                        <a t-attf-href="/my/souscription/#{souscription.id}">
+                                            <t t-esc="souscription.name"/>
+                                        </a>
+                                    </td>
+                                    <td><t t-esc="souscription.pdl or '-'"/></td>
+                                    <td><t t-esc="souscription.puissance_souscrite"/></td>
+                                    <td>
+                                        <t t-if="souscription.type_tarif == 'base'">Base</t>
+                                        <t t-else="">HP/HC</t>
+                                        <t t-if="souscription.tarif_solidaire">
+                                            <span class="badge rounded-pill text-bg-info ms-1">Solidaire</span>
+                                        </t>
+                                    </td>
+                                    <td>
+                                        <span t-attf-class="badge rounded-pill text-bg-#{souscription.active and 'success' or 'secondary'}">
+                                            <t t-esc="souscription.active and 'Active' or 'Inactive'"/>
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a t-attf-href="/my/souscription/#{souscription.id}" class="btn btn-sm btn-primary">
+                                            <i class="fa fa-eye"/> Consulter
+                                        </a>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div t-if="pager" class="o_portal_pager text-center">
+                    <t t-call="portal.pager"/>
+                </div>
+            </t>
+        </t>
+    </template>
+
+    <!-- Détail d'une souscription -->
+    <template id="portal_souscription_page" name="Détail Souscription">
+        <t t-call="web.frontend_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            
+            <div class="row mt16">
+                <!-- Sidebar -->
+                <div class="col-lg-3 d-print-none">
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">Informations</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <small class="text-muted d-block">Période contractuelle</small>
+                                <span t-field="souscription.date_debut" t-options='{"widget": "date"}'/>
+                                <t t-if="souscription.date_fin">
+                                    <span> - </span>
+                                    <span t-field="souscription.date_fin" t-options='{"widget": "date"}'/>
+                                </t>
+                                <t t-else="">
+                                    <span class="text-muted"> - En cours</span>
+                                </t>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <small class="text-muted d-block">État de facturation</small>
+                                <span t-field="souscription.etat_facturation_id.name" class="badge rounded-pill text-bg-primary"/>
+                            </div>
+                            
+                            <div>
+                                <small class="text-muted d-block">Mode de paiement</small>
+                                <t t-if="souscription.mode_paiement">
+                                    <span t-field="souscription.mode_paiement"/>
+                                </t>
+                                <t t-else="">
+                                    <span class="text-muted">Non défini</span>
+                                </t>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contenu principal -->
+                <div class="col-lg-9">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="row">
+                                <div class="col">
+                                    <h4 class="mb-0">
+                                        Souscription <span t-field="souscription.name"/>
+                                    </h4>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-body">
+                            <!-- Informations techniques -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <h5>Informations techniques</h5>
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td class="text-muted">PDL</td>
+                                            <td class="fw-bold"><t t-esc="souscription.pdl or '-'"/></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Puissance souscrite</td>
+                                            <td class="fw-bold"><t t-field="souscription.puissance_souscrite"/></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Type de tarif</td>
+                                            <td class="fw-bold">
+                                                <t t-if="souscription.type_tarif == 'base'">Base</t>
+                                                <t t-else="">Heures Pleines / Heures Creuses</t>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Tarif solidaire</td>
+                                            <td>
+                                                <t t-if="souscription.tarif_solidaire">
+                                                    <span class="badge rounded-pill text-bg-success">Oui</span>
+                                                </t>
+                                                <t t-else="">
+                                                    <span class="badge rounded-pill text-bg-secondary">Non</span>
+                                                </t>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <h5>Facturation</h5>
+                                    <t t-if="souscription.lisse">
+                                        <div class="alert alert-info">
+                                            <h6 class="alert-heading">
+                                                <i class="fa fa-info-circle"/> Facturation lissée
+                                            </h6>
+                                            <p class="mb-0">
+                                                Provision mensuelle : <strong><t t-field="souscription.provision_mensuelle_kwh"/> kWh</strong>
+                                            </p>
+                                        </div>
+                                    </t>
+                                    <t t-else="">
+                                        <p class="text-muted">Facturation au réel</p>
+                                    </t>
+                                    
+                                    <t t-if="souscription.coeff_pro > 0">
+                                        <div class="alert alert-warning">
+                                            <p class="mb-0">
+                                                <i class="fa fa-building"/> Client professionnel
+                                                <br/>Majoration : <strong><t t-esc="souscription.coeff_pro"/>%</strong>
+                                            </p>
+                                        </div>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- Factures récentes -->
+                            <h5 class="mt-4">Factures récentes</h5>
+                            <t t-if="souscription.facture_ids">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Numéro</th>
+                                                <th>Date</th>
+                                                <th>Période</th>
+                                                <th>Montant TTC</th>
+                                                <th>État</th>
+                                                <th class="text-end">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-foreach="souscription.facture_ids[:10]" t-as="facture">
+                                                <tr>
+                                                    <td>
+                                                        <a t-attf-href="/my/invoices/#{facture.id}">
+                                                            <t t-esc="facture.name"/>
+                                                        </a>
+                                                    </td>
+                                                    <td>
+                                                        <t t-field="facture.invoice_date" t-options='{"widget": "date"}'/>
+                                                    </td>
+                                                    <td>
+                                                        <t t-if="facture.periode_id">
+                                                            <t t-esc="facture.periode_id.mois_annee"/>
+                                                        </t>
+                                                        <t t-else="">-</t>
+                                                    </td>
+                                                    <td>
+                                                        <t t-field="facture.amount_total" t-options='{"widget": "monetary", "display_currency": facture.currency_id}'/>
+                                                    </td>
+                                                    <td>
+                                                        <t t-if="facture.payment_state == 'paid'">
+                                                            <span class="badge rounded-pill text-bg-success">
+                                                                <i class="fa fa-check"/> Payée
+                                                            </span>
+                                                        </t>
+                                                        <t t-elif="facture.payment_state == 'partial'">
+                                                            <span class="badge rounded-pill text-bg-warning">Partielle</span>
+                                                        </t>
+                                                        <t t-else="">
+                                                            <span class="badge rounded-pill text-bg-danger">Impayée</span>
+                                                        </t>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <a t-attf-href="/my/invoices/#{facture.id}" 
+                                                           class="btn btn-sm btn-secondary"
+                                                           title="Télécharger PDF">
+                                                            <i class="fa fa-download"/>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </t>
+                            <t t-else="">
+                                <p class="text-muted">Aucune facture émise pour cette souscription.</p>
+                            </t>
+
+                            <!-- Informations de contact -->
+                            <div class="mt-4 pt-3 border-top">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p class="text-muted mb-1">Référence compteur</p>
+                                        <p class="fw-bold"><t t-esc="souscription.ref_compteur or '-'"/></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="text-muted mb-1">Numéro de dépannage</p>
+                                        <p class="fw-bold"><t t-esc="souscription.numero_depannage or '09 726 750 XX'"/></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+</odoo>

@@ -115,6 +115,21 @@
             <field name="ref_compteur">85111222</field>
         </record>
         
+        <!-- Souscription pour l'administrateur (portal testing) -->
+        <record id="demo_souscription_admin" model="souscription.souscription">
+            <field name="partner_id" ref="base.partner_admin"/>
+            <field name="pdl">PDL22516914099999</field>
+            <field name="puissance_souscrite">6</field>
+            <field name="type_tarif">hphc</field>
+            <field name="date_debut">2024-01-01</field>
+            <field name="provision_mensuelle_kwh">320</field>
+            <field name="lisse">True</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="etat_facturation_id" ref="etat_a_facturer"/>
+            <field name="ref_compteur">85999888</field>
+            <field name="numero_depannage">09 726 750 35</field>
+        </record>
+        
         <!-- ================================ -->
         <!-- PÉRIODES DE DÉMONSTRATION       -->
         <!-- ================================ -->
@@ -185,6 +200,64 @@
         </record>
         
         <!-- ================================ -->
+        <!-- PÉRIODES ADMIN (PORTAL TESTING) -->
+        <!-- ================================ -->
+        
+        <!-- Période janvier 2024 - Admin -->
+        <record id="demo_periode_janvier_admin" model="souscription.periode">
+            <field name="souscription_id" ref="demo_souscription_admin"/>
+            <field name="date_debut">2024-01-01</field>
+            <field name="date_fin">2024-01-31</field>
+            <field name="type_periode">mensuelle</field>
+            <field name="provision_hp_kwh">230</field>
+            <field name="provision_hc_kwh">90</field>
+            <field name="energie_hp_kwh">215</field>
+            <field name="energie_hc_kwh">95</field>
+            <field name="energie_hph_kwh">130</field>
+            <field name="energie_hpb_kwh">85</field>
+            <field name="energie_hch_kwh">60</field>
+            <field name="energie_hcb_kwh">35</field>
+            <field name="turpe_fixe">8.50</field>
+            <field name="turpe_variable">14.20</field>
+        </record>
+        
+        <!-- Période février 2024 - Admin -->
+        <record id="demo_periode_fevrier_admin" model="souscription.periode">
+            <field name="souscription_id" ref="demo_souscription_admin"/>
+            <field name="date_debut">2024-02-01</field>
+            <field name="date_fin">2024-02-29</field>
+            <field name="type_periode">mensuelle</field>
+            <field name="provision_hp_kwh">230</field>
+            <field name="provision_hc_kwh">90</field>
+            <field name="energie_hp_kwh">245</field>
+            <field name="energie_hc_kwh">105</field>
+            <field name="energie_hph_kwh">150</field>
+            <field name="energie_hpb_kwh">95</field>
+            <field name="energie_hch_kwh">70</field>
+            <field name="energie_hcb_kwh">35</field>
+            <field name="turpe_fixe">8.50</field>
+            <field name="turpe_variable">16.10</field>
+        </record>
+        
+        <!-- Période mars 2024 - Admin -->
+        <record id="demo_periode_mars_admin" model="souscription.periode">
+            <field name="souscription_id" ref="demo_souscription_admin"/>
+            <field name="date_debut">2024-03-01</field>
+            <field name="date_fin">2024-03-31</field>
+            <field name="type_periode">mensuelle</field>
+            <field name="provision_hp_kwh">230</field>
+            <field name="provision_hc_kwh">90</field>
+            <field name="energie_hp_kwh">220</field>
+            <field name="energie_hc_kwh">85</field>
+            <field name="energie_hph_kwh">135</field>
+            <field name="energie_hpb_kwh">85</field>
+            <field name="energie_hch_kwh">55</field>
+            <field name="energie_hcb_kwh">30</field>
+            <field name="turpe_fixe">8.50</field>
+            <field name="turpe_variable">13.90</field>
+        </record>
+        
+        <!-- ================================ -->
         <!-- GRILLE DE PRIX COMPLÈTE         -->
         <!-- ================================ -->
         
@@ -213,6 +286,127 @@
             <field name="grille_id" ref="demo_grille_prix_complete_2024"/>
             <field name="product_id" ref="souscriptions_product_energie_hc"/>
             <field name="prix_interne">0.2032</field>
+        </record>
+        
+        <!-- ================================ -->
+        <!-- FACTURES ADMIN (PORTAL TESTING) -->
+        <!-- ================================ -->
+        
+        <!-- Facture janvier 2024 - Admin -->
+        <record id="demo_facture_janvier_admin" model="account.move">
+            <field name="move_type">out_invoice</field>
+            <field name="partner_id" ref="base.partner_admin"/>
+            <field name="invoice_date">2024-02-05</field>
+            <field name="invoice_date_due">2024-02-20</field>
+            <field name="periode_id" ref="demo_periode_janvier_admin"/>
+        </record>
+        
+        <!-- Ligne facture janvier - Énergie HP -->
+        <record id="demo_facture_janvier_admin_line_hp" model="account.move.line">
+            <field name="move_id" ref="demo_facture_janvier_admin"/>
+            <field name="product_id" ref="souscriptions_product_energie_hp"/>
+            <field name="name">Énergie HP - Janvier 2024</field>
+            <field name="quantity">215</field>
+            <field name="price_unit">0.2516</field>
+            <field name="account_id" ref="account.a_sale"/>
+        </record>
+        
+        <!-- Ligne facture janvier - Énergie HC -->
+        <record id="demo_facture_janvier_admin_line_hc" model="account.move.line">
+            <field name="move_id" ref="demo_facture_janvier_admin"/>
+            <field name="product_id" ref="souscriptions_product_energie_hc"/>
+            <field name="name">Énergie HC - Janvier 2024</field>
+            <field name="quantity">95</field>
+            <field name="price_unit">0.2032</field>
+            <field name="account_id" ref="account.a_sale"/>
+        </record>
+        
+        <!-- Ligne facture janvier - Abonnement -->
+        <record id="demo_facture_janvier_admin_line_abo" model="account.move.line">
+            <field name="move_id" ref="demo_facture_janvier_admin"/>
+            <field name="product_id" ref="souscriptions_product_abonnement_6kva"/>
+            <field name="name">Abonnement 6 kVA - Janvier 2024</field>
+            <field name="quantity">1</field>
+            <field name="price_unit">12.60</field>
+            <field name="account_id" ref="account.a_sale"/>
+        </record>
+        
+        <!-- Facture février 2024 - Admin -->
+        <record id="demo_facture_fevrier_admin" model="account.move">
+            <field name="move_type">out_invoice</field>
+            <field name="partner_id" ref="base.partner_admin"/>
+            <field name="invoice_date">2024-03-05</field>
+            <field name="invoice_date_due">2024-03-20</field>
+            <field name="periode_id" ref="demo_periode_fevrier_admin"/>
+        </record>
+        
+        <!-- Ligne facture février - Énergie HP -->
+        <record id="demo_facture_fevrier_admin_line_hp" model="account.move.line">
+            <field name="move_id" ref="demo_facture_fevrier_admin"/>
+            <field name="product_id" ref="souscriptions_product_energie_hp"/>
+            <field name="name">Énergie HP - Février 2024</field>
+            <field name="quantity">245</field>
+            <field name="price_unit">0.2516</field>
+            <field name="account_id" ref="account.a_sale"/>
+        </record>
+        
+        <!-- Ligne facture février - Énergie HC -->
+        <record id="demo_facture_fevrier_admin_line_hc" model="account.move.line">
+            <field name="move_id" ref="demo_facture_fevrier_admin"/>
+            <field name="product_id" ref="souscriptions_product_energie_hc"/>
+            <field name="name">Énergie HC - Février 2024</field>
+            <field name="quantity">105</field>
+            <field name="price_unit">0.2032</field>
+            <field name="account_id" ref="account.a_sale"/>
+        </record>
+        
+        <!-- Ligne facture février - Abonnement -->
+        <record id="demo_facture_fevrier_admin_line_abo" model="account.move.line">
+            <field name="move_id" ref="demo_facture_fevrier_admin"/>
+            <field name="product_id" ref="souscriptions_product_abonnement_6kva"/>
+            <field name="name">Abonnement 6 kVA - Février 2024</field>
+            <field name="quantity">1</field>
+            <field name="price_unit">12.60</field>
+            <field name="account_id" ref="account.a_sale"/>
+        </record>
+        
+        <!-- Facture mars 2024 - Admin (en attente de paiement) -->
+        <record id="demo_facture_mars_admin" model="account.move">
+            <field name="move_type">out_invoice</field>
+            <field name="partner_id" ref="base.partner_admin"/>
+            <field name="invoice_date">2024-04-05</field>
+            <field name="invoice_date_due">2024-04-20</field>
+            <field name="periode_id" ref="demo_periode_mars_admin"/>
+        </record>
+        
+        <!-- Ligne facture mars - Énergie HP -->
+        <record id="demo_facture_mars_admin_line_hp" model="account.move.line">
+            <field name="move_id" ref="demo_facture_mars_admin"/>
+            <field name="product_id" ref="souscriptions_product_energie_hp"/>
+            <field name="name">Énergie HP - Mars 2024</field>
+            <field name="quantity">220</field>
+            <field name="price_unit">0.2516</field>
+            <field name="account_id" ref="account.a_sale"/>
+        </record>
+        
+        <!-- Ligne facture mars - Énergie HC -->
+        <record id="demo_facture_mars_admin_line_hc" model="account.move.line">
+            <field name="move_id" ref="demo_facture_mars_admin"/>
+            <field name="product_id" ref="souscriptions_product_energie_hc"/>
+            <field name="name">Énergie HC - Mars 2024</field>
+            <field name="quantity">85</field>
+            <field name="price_unit">0.2032</field>
+            <field name="account_id" ref="account.a_sale"/>
+        </record>
+        
+        <!-- Ligne facture mars - Abonnement -->
+        <record id="demo_facture_mars_admin_line_abo" model="account.move.line">
+            <field name="move_id" ref="demo_facture_mars_admin"/>
+            <field name="product_id" ref="souscriptions_product_abonnement_6kva"/>
+            <field name="name">Abonnement 6 kVA - Mars 2024</field>
+            <field name="quantity">1</field>
+            <field name="price_unit">12.60</field>
+            <field name="account_id" ref="account.a_sale"/>
         </record>
         
     </data>

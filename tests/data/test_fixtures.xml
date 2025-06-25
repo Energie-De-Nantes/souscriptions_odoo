@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Fixtures de données pour les tests -->
+    
+    <!-- États de facturation pour tests -->
+    <record id="etat_test_actif" model="souscription.etat">
+        <field name="name">Test - À facturer</field>
+        <field name="sequence">1</field>
+    </record>
+    
+    <record id="etat_test_facture" model="souscription.etat">
+        <field name="name">Test - Facturé</field>
+        <field name="sequence">2</field>
+    </record>
+    
+    <!-- Clients de test -->
+    <record id="partner_test_marie" model="res.partner">
+        <field name="name">Marie Dupont Test</field>
+        <field name="is_company">False</field>
+        <field name="street">15 rue des Tests Unitaires</field>
+        <field name="city">Rennes</field>
+        <field name="zip">35000</field>
+        <field name="country_id" ref="base.fr"/>
+        <field name="email">marie.test@example.com</field>
+        <field name="phone">02.99.00.00.01</field>
+    </record>
+    
+    <record id="partner_test_jean" model="res.partner">
+        <field name="name">Jean Martin Test</field>
+        <field name="is_company">False</field>
+        <field name="street">8 avenue des Tests HP/HC</field>
+        <field name="city">Nantes</field>
+        <field name="zip">44000</field>
+        <field name="country_id" ref="base.fr"/>
+        <field name="email">jean.test@example.com</field>
+        <field name="phone">02.40.00.00.02</field>
+    </record>
+    
+    <record id="partner_test_entreprise" model="res.partner">
+        <field name="name">Entreprise Test SARL</field>
+        <field name="is_company">True</field>
+        <field name="street">3 place des Tests Pro</field>
+        <field name="city">Saint-Malo</field>
+        <field name="zip">35400</field>
+        <field name="country_id" ref="base.fr"/>
+        <field name="email">contact@entreprise-test.fr</field>
+        <field name="phone">02.99.00.00.03</field>
+    </record>
+    
+    <record id="partner_test_solidaire" model="res.partner">
+        <field name="name">Sophie Leroy Test</field>
+        <field name="is_company">False</field>
+        <field name="street">12 rue des Tests Solidaires</field>
+        <field name="city">Lorient</field>
+        <field name="zip">56100</field>
+        <field name="country_id" ref="base.fr"/>
+        <field name="email">sophie.test@example.com</field>
+        <field name="phone">02.97.00.00.04</field>
+    </record>
+    
+    <!-- Grille de prix pour tests -->
+    <record id="grille_prix_test" model="grille.prix">
+        <field name="name">Grille Prix Test</field>
+        <field name="date_debut">2024-01-01</field>
+        <field name="date_fin">2024-12-31</field>
+        <field name="active">True</field>
+    </record>
+    
+    <!-- Souscriptions de test -->
+    <record id="souscription_test_base" model="souscription.souscription">
+        <field name="partner_id" ref="partner_test_marie"/>
+        <field name="pdl">PDL_TEST_BASE_001</field>
+        <field name="puissance_souscrite">6</field>
+        <field name="type_tarif">base</field>
+        <field name="etat_facturation_id" ref="etat_test_actif"/>
+        <field name="date_debut">2024-01-01</field>
+        <field name="tarif_solidaire">False</field>
+        <field name="lisse">True</field>
+        <field name="provision_mensuelle_kwh">280.0</field>
+        <field name="ref_compteur">TEST_COMP_001</field>
+    </record>
+    
+    <record id="souscription_test_hphc" model="souscription.souscription">
+        <field name="partner_id" ref="partner_test_jean"/>
+        <field name="pdl">PDL_TEST_HPHC_002</field>
+        <field name="puissance_souscrite">9</field>
+        <field name="type_tarif">hphc</field>
+        <field name="etat_facturation_id" ref="etat_test_actif"/>
+        <field name="date_debut">2024-01-01</field>
+        <field name="tarif_solidaire">False</field>
+        <field name="lisse">True</field>
+        <field name="provision_hp_kwh">200.0</field>
+        <field name="provision_hc_kwh">120.0</field>
+        <field name="ref_compteur">TEST_COMP_002</field>
+    </record>
+    
+    <record id="souscription_test_pro" model="souscription.souscription">
+        <field name="partner_id" ref="partner_test_entreprise"/>
+        <field name="pdl">PDL_TEST_PRO_003</field>
+        <field name="puissance_souscrite">12</field>
+        <field name="type_tarif">base</field>
+        <field name="etat_facturation_id" ref="etat_test_actif"/>
+        <field name="date_debut">2024-01-01</field>
+        <field name="tarif_solidaire">False</field>
+        <field name="lisse">False</field>
+        <field name="coeff_pro">15.0</field>
+        <field name="ref_compteur">TEST_COMP_003</field>
+    </record>
+    
+    <record id="souscription_test_solidaire" model="souscription.souscription">
+        <field name="partner_id" ref="partner_test_solidaire"/>
+        <field name="pdl">PDL_TEST_SOLIDAIRE_004</field>
+        <field name="puissance_souscrite">3</field>
+        <field name="type_tarif">base</field>
+        <field name="etat_facturation_id" ref="etat_test_actif"/>
+        <field name="date_debut">2024-01-01</field>
+        <field name="tarif_solidaire">True</field>
+        <field name="lisse">False</field>
+        <field name="ref_compteur">TEST_COMP_004</field>
+    </record>
+    
+    <!-- Périodes de test avec données variées -->
+    <record id="periode_test_base_janvier" model="souscription.periode">
+        <field name="souscription_id" ref="souscription_test_base"/>
+        <field name="date_debut">2024-01-01</field>
+        <field name="date_fin">2024-01-31</field>
+        <field name="type_periode">mensuelle</field>
+        <field name="jours">31</field>
+        <field name="energie_hph_kwh">140.0</field>
+        <field name="energie_hpb_kwh">56.0</field>
+        <field name="energie_hch_kwh">56.0</field>
+        <field name="energie_hcb_kwh">28.0</field>
+        <field name="provision_base_kwh">280.0</field>
+        <field name="turpe_fixe">8.5</field>
+        <field name="turpe_variable">4.2</field>
+    </record>
+    
+    <record id="periode_test_hphc_janvier" model="souscription.periode">
+        <field name="souscription_id" ref="souscription_test_hphc"/>
+        <field name="date_debut">2024-01-01</field>
+        <field name="date_fin">2024-01-31</field>
+        <field name="type_periode">mensuelle</field>
+        <field name="jours">31</field>
+        <field name="energie_hph_kwh">120.0</field>
+        <field name="energie_hpb_kwh">80.0</field>
+        <field name="energie_hch_kwh">72.0</field>
+        <field name="energie_hcb_kwh">48.0</field>
+        <field name="provision_hp_kwh">200.0</field>
+        <field name="provision_hc_kwh">120.0</field>
+        <field name="turpe_fixe">12.8</field>
+        <field name="turpe_variable">5.76</field>
+    </record>
+    
+    <record id="periode_test_pro_janvier" model="souscription.periode">
+        <field name="souscription_id" ref="souscription_test_pro"/>
+        <field name="date_debut">2024-01-01</field>
+        <field name="date_fin">2024-01-31</field>
+        <field name="type_periode">mensuelle</field>
+        <field name="jours">31</field>
+        <field name="energie_hph_kwh">175.0</field>
+        <field name="energie_hpb_kwh">70.0</field>
+        <field name="energie_hch_kwh">70.0</field>
+        <field name="energie_hcb_kwh">35.0</field>
+        <field name="turpe_fixe">15.0</field>
+        <field name="turpe_variable">5.25</field>
+    </record>
+    
+    <record id="periode_test_solidaire_janvier" model="souscription.periode">
+        <field name="souscription_id" ref="souscription_test_solidaire"/>
+        <field name="date_debut">2024-01-01</field>
+        <field name="date_fin">2024-01-31</field>
+        <field name="type_periode">mensuelle</field>
+        <field name="jours">31</field>
+        <field name="energie_hph_kwh">90.0</field>
+        <field name="energie_hpb_kwh">36.0</field>
+        <field name="energie_hch_kwh">36.0</field>
+        <field name="energie_hcb_kwh">18.0</field>
+        <field name="turpe_fixe">6.0</field>
+        <field name="turpe_variable">2.7</field>
+    </record>
+    
+</odoo>

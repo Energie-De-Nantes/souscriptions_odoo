@@ -1,0 +1,204 @@
+# Tests du module Souscriptions
+
+Ce répertoire contient tous les tests automatisés du module souscriptions, utilisant le framework de test intégré d'Odoo.
+
+## 📁 Structure
+
+```
+tests/
+├── README.md                   # Cette documentation
+├── __init__.py                 # Initialisation des tests
+├── data/
+│   └── test_fixtures.xml       # Données de test réutilisables
+├── test_basic.py               # Tests basiques des modèles
+├── test_facturation.py         # Tests de facturation et génération de factures
+├── test_grille_prix.py         # Tests des grilles de prix
+├── test_integration.py         # Tests d'intégration
+├── test_invoice_template.py    # Tests du template de facture personnalisé
+└── test_souscription.py        # Tests des souscriptions
+```
+
+## 🚀 Lancement des tests
+
+### Méthode recommandée : Makefile
+
+```bash
+# Tous les tests
+make test
+
+# Tests spécifiques
+make test-template          # Template de facture
+make test-facturation      # Facturation
+make test-basic            # Tests basiques
+make test-integration      # Intégration
+
+# Tests rapides (sans recréer la DB)
+make quick-test
+
+# Aide
+make help
+```
+
+### Script wrapper
+
+```bash
+# Tous les tests avec création de DB
+./run_tests.sh --create-db
+
+# Tests spécifiques
+./run_tests.sh --template
+./run_tests.sh --facturation --verbose
+
+# Aide
+./run_tests.sh --help
+```
+
+### Commande Odoo directe
+
+```bash
+# Tests avec tags
+odoo -d test_db --test-enable --test-tags souscriptions --stop-after-init
+
+# Tests spécifiques
+odoo -d test_db --test-enable --test-tags TestInvoiceTemplate --stop-after-init
+```
+
+## 🧪 Types de tests
+
+### Tests basiques (`test_basic.py`)
+- Import des modèles
+- Existence des modèles principaux
+- Tests de base
+
+### Tests de facturation (`test_facturation.py`)
+- Création de périodes de facturation
+- Génération de factures avec TURPE
+- Tests Base et HP/HC
+- Calculs des montants
+- Gestion des erreurs
+
+### Tests du template (`test_invoice_template.py`)
+- Rendu HTML du template personnalisé
+- Affichage des informations souscription
+- Notes TURPE correctes
+- Sections Abonnement/Énergie
+- Support tarif solidaire
+- Fallback pour factures non-énergie
+
+### Tests d'intégration (`test_integration.py`)
+- Workflows complets
+- API externes
+- Tests end-to-end
+
+## 📊 Données de test
+
+### Fixtures (`tests/data/test_fixtures.xml`)
+- États de facturation de test
+- Clients de test (particuliers, entreprise, solidaire)
+- Souscriptions avec différents profils
+- Périodes avec données réalistes
+
+### Utilisation des fixtures
+```python
+def setUp(self):
+    super().setUp()
+    # Les fixtures sont automatiquement chargées
+    self.souscription_test = self.env.ref('souscriptions.souscription_test_base')
+```
+
+## 🎯 Meilleures pratiques
+
+### Structure des tests
+```python
+@tagged('souscriptions', 'post_install', '-at_install')
+class TestMonModule(TransactionCase):
+    
+    def setUp(self):
+        super().setUp()
+        # Setup des données communes
+    
+    def test_feature_specific(self):
+        """Description claire du test"""
+        # Arrange
+        # Act  
+        # Assert
+```
+
+### Tags recommandés
+- `souscriptions` : Tag principal du module
+- `post_install` : Tests après installation
+- `-at_install` : Ne pas lancer à l'installation
+
+### Assertions courantes
+```python
+# Existence et égalité
+self.assertTrue(facture.is_facture_energie)
+self.assertEqual(facture.souscription_id, souscription)
+
+# Contenu HTML
+self.assertIn('Facture d\'Électricité', html_content)
+
+# Exceptions
+with self.assertRaises(UserError):
+    method_that_should_fail()
+
+# Collections
+self.assertGreater(len(lines), 0)
+lines = records.filtered(lambda r: r.field == value)
+```
+
+## 🔧 Configuration
+
+### Variables d'environnement
+- `ODOO_PATH` : Chemin vers l'exécutable Odoo
+- `ADDONS_PATH` : Chemin vers les addons
+
+### Base de données de test
+- Par défaut : `souscriptions_test`
+- Recréée automatiquement avec `--create-db`
+- Conservée pour inspection avec `--keep-db`
+
+## 📈 Couverture de test
+
+### Tests actuels couvrent :
+- ✅ Modèles de base (souscription, période, grille prix)
+- ✅ Génération de factures avec TURPE
+- ✅ Template de facture personnalisé 
+- ✅ Types de tarifs (Base, HP/HC, Solidaire)
+- ✅ Calculs et montants
+- ✅ Gestion d'erreurs
+
+### À ajouter :
+- [ ] Tests de performance
+- [ ] Tests de migration
+- [ ] Tests d'API REST
+- [ ] Tests de sécurité
+- [ ] Tests de workflow métier complet
+
+## 🚨 Dépannage
+
+### Tests qui échouent
+1. Vérifier que le module est bien installé
+2. Vérifier les dépendances (produits, grilles prix)
+3. Consulter les logs avec `--verbose`
+4. Vérifier les fixtures dans `tests/data/`
+
+### Base de données
+```bash
+# Recréer la base de test
+make test  # Recrée automatiquement
+
+# Shell de debug
+make shell
+```
+
+### Problèmes courants
+- **Modèles non trouvés** : Module non installé ou mal configuré
+- **Fixtures manquantes** : Fichier XML mal formé ou non chargé
+- **Template errors** : Vérifier la syntaxe QWeb et les champs
+
+## 📚 Ressources
+
+- [Documentation tests Odoo](https://www.odoo.com/documentation/18.0/developer/reference/backend/testing.html)
+- [TransactionCase API](https://www.odoo.com/documentation/18.0/developer/reference/backend/testing.html#odoo.tests.common.TransactionCase)
+- [Tags de test](https://www.odoo.com/documentation/18.0/developer/reference/backend/testing.html#test-selection)

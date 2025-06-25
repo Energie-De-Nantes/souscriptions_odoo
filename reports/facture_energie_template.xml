@@ -49,6 +49,24 @@
                                 </div>
                             </div>
 
+                            <!-- Historique de consommation (graphique) -->
+                            <t t-set="consumption_data" t-value="o.get_historical_consumption_data()"/>
+                            <div t-if="consumption_data.get('has_data')" class="row mb-4">
+                                <div class="col-12">
+                                    <div style="background-color: #F5F7FA; padding: 15px; border-radius: 5px; border-left: 4px solid #2E7D32;">
+                                        <h5 style="color: #2E7D32; margin-bottom: 15px;">
+                                            📊 Historique de consommation (12 derniers mois)
+                                        </h5>
+                                        <div style="height: 300px; position: relative;">
+                                            <canvas id="consumptionChart" width="800" height="300"></canvas>
+                                        </div>
+                                        <p class="text-muted text-center mt-2 mb-0" style="font-size: 0.85em;">
+                                            Consommation en kWh sur <span t-esc="consumption_data.get('nb_periodes')"/> période(s)
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Informations client et facture -->
                             <div class="row">
                                 <div class="col-6">
@@ -130,6 +148,100 @@
                                     Service Client Énergie : 0800 XXX XXX | energie@example.com
                                 </small>
                             </div>
+
+                            <!-- Chart.js Integration -->
+                            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                            <script t-if="consumption_data.get('has_data')">
+                                document.addEventListener('DOMContentLoaded', function() {
+                                    var ctx = document.getElementById('consumptionChart');
+                                    if (!ctx) return;
+                                    
+                                    var ctx2d = ctx.getContext('2d');
+                                    var chartData = <t t-esc="consumption_data" t-options="{'widget': 'json'}"/>;
+                                    
+                                    var datasets = [];
+                                    var colors = {
+                                        base: '#2E7D32',     // Vert principal
+                                        hp: '#43A047',       // Vert HP
+                                        hc: '#66BB6A'        // Vert HC plus clair
+                                    };
+                                    
+                                    if (chartData.type_tarif === 'base') {
+                                        datasets.push({
+                                            label: 'Consommation Base (kWh)',
+                                            data: chartData.data_base,
+                                            backgroundColor: colors.base,
+                                            borderColor: colors.base,
+                                            borderWidth: 1
+                                        });
+                                    } else {
+                                        datasets.push({
+                                            label: 'Heures Pleines (kWh)',
+                                            data: chartData.data_hp,
+                                            backgroundColor: colors.hp,
+                                            borderColor: colors.hp,
+                                            borderWidth: 1
+                                        });
+                                        datasets.push({
+                                            label: 'Heures Creuses (kWh)',
+                                            data: chartData.data_hc,
+                                            backgroundColor: colors.hc,
+                                            borderColor: colors.hc,
+                                            borderWidth: 1
+                                        });
+                                    }
+                                    
+                                    new Chart(ctx2d, {
+                                        type: 'bar',
+                                        data: {
+                                            labels: chartData.labels,
+                                            datasets: datasets
+                                        },
+                                        options: {
+                                            responsive: true,
+                                            maintainAspectRatio: false,
+                                            scales: {
+                                                y: {
+                                                    beginAtZero: true,
+                                                    title: {
+                                                        display: true,
+                                                        text: 'Consommation (kWh)',
+                                                        color: '#2E7D32',
+                                                        font: { weight: 'bold' }
+                                                    },
+                                                    grid: { color: '#E8F5E8' }
+                                                },
+                                                x: {
+                                                    title: {
+                                                        display: true,
+                                                        text: 'Période',
+                                                        color: '#2E7D32',
+                                                        font: { weight: 'bold' }
+                                                    },
+                                                    grid: { color: '#E8F5E8' }
+                                                }
+                                            },
+                                            plugins: {
+                                                legend: {
+                                                    display: chartData.type_tarif !== 'base',
+                                                    position: 'top',
+                                                    labels: { color: '#2E7D32' }
+                                                },
+                                                tooltip: {
+                                                    backgroundColor: 'rgba(46, 125, 50, 0.9)',
+                                                    titleColor: 'white',
+                                                    bodyColor: 'white',
+                                                    callbacks: {
+                                                        label: function(context) {
+                                                            return context.dataset.label + ': ' + context.parsed.y + ' kWh';
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+                                });
+                            </script>
                         </div>
                     </t>
                 </t>

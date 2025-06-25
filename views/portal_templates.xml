@@ -13,7 +13,7 @@
 
     <!-- Liste des souscriptions -->
     <template id="portal_my_souscriptions" name="Mes Souscriptions">
-        <t t-call="web.frontend_layout">
+        <t t-call="portal.portal_layout">
             <t t-set="breadcrumbs_searchbar" t-value="True"/>
             
             <t t-call="portal.portal_searchbar">
@@ -82,7 +82,7 @@
 
     <!-- Détail d'une souscription -->
     <template id="portal_souscription_page" name="Détail Souscription">
-        <t t-call="web.frontend_layout">
+        <t t-call="portal.portal_layout">
             <t t-set="breadcrumbs_searchbar" t-value="True"/>
             
             <div class="row mt16">
@@ -95,10 +95,10 @@
                         <div class="card-body">
                             <div class="mb-3">
                                 <small class="text-muted d-block">Période contractuelle</small>
-                                <span t-field="souscription.date_debut" t-options='{"widget": "date"}'/>
+                                <span t-esc="souscription.date_debut.strftime('%d/%m/%Y') if souscription.date_debut else '-'"/>
                                 <t t-if="souscription.date_fin">
                                     <span> - </span>
-                                    <span t-field="souscription.date_fin" t-options='{"widget": "date"}'/>
+                                    <span t-esc="souscription.date_fin.strftime('%d/%m/%Y') if souscription.date_fin else '-'"/>
                                 </t>
                                 <t t-else="">
                                     <span class="text-muted"> - En cours</span>
@@ -107,13 +107,13 @@
                             
                             <div class="mb-3">
                                 <small class="text-muted d-block">État de facturation</small>
-                                <span t-field="souscription.etat_facturation_id.name" class="badge rounded-pill text-bg-primary"/>
+                                <span t-esc="souscription.etat_facturation_id.name" class="badge rounded-pill text-bg-primary"/>
                             </div>
                             
                             <div>
                                 <small class="text-muted d-block">Mode de paiement</small>
                                 <t t-if="souscription.mode_paiement">
-                                    <span t-field="souscription.mode_paiement"/>
+                                    <span t-esc="dict(souscription._fields['mode_paiement'].selection).get(souscription.mode_paiement, souscription.mode_paiement) if souscription.mode_paiement else 'Non défini'"/>
                                 </t>
                                 <t t-else="">
                                     <span class="text-muted">Non défini</span>
@@ -130,7 +130,7 @@
                             <div class="row">
                                 <div class="col">
                                     <h4 class="mb-0">
-                                        Souscription <span t-field="souscription.name"/>
+                                        Souscription <span t-esc="souscription.name"/>
                                     </h4>
                                 </div>
                             </div>
@@ -148,7 +148,7 @@
                                         </tr>
                                         <tr>
                                             <td class="text-muted">Puissance souscrite</td>
-                                            <td class="fw-bold"><t t-field="souscription.puissance_souscrite"/></td>
+                                            <td class="fw-bold"><t t-esc="souscription.puissance_souscrite"/></td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">Type de tarif</td>
@@ -179,7 +179,7 @@
                                                 <i class="fa fa-info-circle"/> Facturation lissée
                                             </h6>
                                             <p class="mb-0">
-                                                Provision mensuelle : <strong><t t-field="souscription.provision_mensuelle_kwh"/> kWh</strong>
+                                                Provision mensuelle : <strong><t t-esc="souscription.provision_mensuelle_kwh"/> kWh</strong>
                                             </p>
                                         </div>
                                     </t>
@@ -222,7 +222,7 @@
                                                         </a>
                                                     </td>
                                                     <td>
-                                                        <t t-field="facture.invoice_date" t-options='{"widget": "date"}'/>
+                                                        <t t-esc="facture.invoice_date.strftime('%d/%m/%Y') if facture.invoice_date else '-'"/>
                                                     </td>
                                                     <td>
                                                         <t t-if="facture.periode_id">
@@ -231,7 +231,7 @@
                                                         <t t-else="">-</t>
                                                     </td>
                                                     <td>
-                                                        <t t-field="facture.amount_total" t-options='{"widget": "monetary", "display_currency": facture.currency_id}'/>
+                                                        <strong><t t-esc="'%.2f' % facture.amount_total"/> €</strong>
                                                     </td>
                                                     <td>
                                                         <t t-if="facture.payment_state == 'paid'">

@@ -16,7 +16,7 @@ class SouscriptionPortal(CustomerPortal):
             values['souscription_count'] = souscription_count
         return values
 
-    @http.route(['/my/souscriptions', '/my/souscriptions/page/<int:page>'], type='http', auth="user", website=False)
+    @http.route(['/my/souscriptions', '/my/souscriptions/page/<int:page>'], type='http', auth="user", website=True)
     def portal_my_souscriptions(self, page=1, **kw):
         values = self._prepare_portal_layout_values()
         partner = request.env.user.partner_id
@@ -44,7 +44,7 @@ class SouscriptionPortal(CustomerPortal):
         
         return request.render("souscriptions.portal_my_souscriptions", values)
 
-    @http.route(['/my/souscription/<int:souscription_id>'], type='http', auth="user", website=False)
+    @http.route(['/my/souscription/<int:souscription_id>'], type='http', auth="user", website=True)
     def portal_my_souscription(self, souscription_id=None, **kw):
         partner = request.env.user.partner_id
         souscription = request.env['souscription.souscription'].browse(souscription_id)

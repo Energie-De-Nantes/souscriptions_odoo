@@ -322,7 +322,7 @@
         <!-- Ligne facture janvier - Abonnement -->
         <record id="demo_facture_janvier_admin_line_abo" model="account.move.line">
             <field name="move_id" ref="demo_facture_janvier_admin"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_6kva"/>
+            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
             <field name="name">Abonnement 6 kVA - Janvier 2024</field>
             <field name="quantity">1</field>
             <field name="price_unit">12.60</field>
@@ -358,7 +358,7 @@
         <!-- Ligne facture février - Abonnement -->
         <record id="demo_facture_fevrier_admin_line_abo" model="account.move.line">
             <field name="move_id" ref="demo_facture_fevrier_admin"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_6kva"/>
+            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
             <field name="name">Abonnement 6 kVA - Février 2024</field>
             <field name="quantity">1</field>
             <field name="price_unit">12.60</field>
@@ -394,7 +394,7 @@
         <!-- Ligne facture mars - Abonnement -->
         <record id="demo_facture_mars_admin_line_abo" model="account.move.line">
             <field name="move_id" ref="demo_facture_mars_admin"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_6kva"/>
+            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
             <field name="name">Abonnement 6 kVA - Mars 2024</field>
             <field name="quantity">1</field>
             <field name="price_unit">12.60</field>

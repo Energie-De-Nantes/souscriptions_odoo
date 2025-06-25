@@ -157,7 +157,7 @@
                                     if (!ctx) return;
                                     
                                     var ctx2d = ctx.getContext('2d');
-                                    var chartData = <t t-esc="consumption_data" t-options="{'widget': 'json'}"/>;
+                                    var chartData = <t t-out="o.get_historical_consumption_data_json()"/>;
                                     
                                     var datasets = [];
                                     var colors = {

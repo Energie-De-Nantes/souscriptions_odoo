@@ -1,4 +1,5 @@
 from odoo import models, fields, api
+import json
 
 class AccountMove(models.Model):
     _inherit = 'account.move'
@@ -78,3 +79,9 @@ class AccountMove(models.Model):
             'data_hc': data_hc,
             'nb_periodes': len(labels)
         }
+    
+    def get_historical_consumption_data_json(self):
+        """Retourne les données de consommation au format JSON pour le template"""
+        self.ensure_one()
+        data = self.get_historical_consumption_data()
+        return json.dumps(data) if data else '{}'

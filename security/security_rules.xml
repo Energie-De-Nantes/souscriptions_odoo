@@ -26,12 +26,12 @@
         <field name="perm_unlink" eval="False"/>
     </record>
     
-    <!-- Account Moves: Only invoices from own subscriptions -->
+    <!-- Account Moves: Only invoices from own subscriptions or standard partner invoices -->
     <record id="account_move_portal_rule" model="ir.rule">
         <field name="name">Portal: Own subscription invoices only</field>
         <field name="model_id" ref="account.model_account_move"/>
         <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
-        <field name="domain_force">[('souscription_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="domain_force">['|', ('souscription_id.partner_id', '=', user.partner_id.id), '&amp;', ('souscription_id', '=', False), ('partner_id', '=', user.partner_id.id)]</field>
         <field name="perm_read" eval="True"/>
         <field name="perm_write" eval="False"/>
         <field name="perm_create" eval="False"/>

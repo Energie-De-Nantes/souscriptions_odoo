@@ -23,9 +23,11 @@
                     <group string="Caractéristiques facturantes">
                         <field name="pdl"/>
                         <field name="puissance_souscrite"/>
-                        <field name="lisse"/>
-                        <field name="provision_mensuelle_kwh" invisible="not lisse"/>
                         <field name="type_tarif"/>
+                        <field name="lisse"/>
+                        <field name="provision_mensuelle_kwh" invisible="not lisse or type_tarif != 'base'" string="Provision mensuelle Base (kWh)"/>
+                        <field name="provision_hp_kwh" invisible="not lisse or type_tarif != 'hphc'" string="Provision HP (kWh)"/>
+                        <field name="provision_hc_kwh" invisible="not lisse or type_tarif != 'hphc'" string="Provision HC (kWh)"/>
                         <field name="tarif_solidaire"/>
                     </group>
                     <group string="Paiement">

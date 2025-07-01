@@ -1,5 +1,5 @@
 from odoo import models, fields, api
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 import re
 from datetime import date
 
@@ -46,6 +46,17 @@ class RaccordementDemande(models.Model):
     ], string='État kanban', default='normal')
     
     # Informations souscription
+    pro = fields.Boolean(
+        string='Professionnel', 
+        default=False,
+        tracking=True,
+        help="Cocher si c'est une demande professionnelle (création d'une société)"
+    )
+    siret = fields.Char(
+        string='N° SIRET',
+        tracking=True,
+        help="Numéro SIRET de l'entreprise (14 chiffres)"
+    )
     pdl = fields.Char(string='PDL', required=True, tracking=True)
     date_debut_souhaitee = fields.Date(
         string='Date de début souhaitée',
@@ -243,6 +254,23 @@ class RaccordementDemande(models.Model):
         except ValueError:
             return False
     
+    @api.constrains('pro', 'siret')
+    def _check_siret_required_for_pro(self):
+        """Vérifie que le SIRET est renseigné pour les demandes professionnelles"""
+        for record in self:
+            if record.pro and not record.siret:
+                raise ValidationError("Le numéro SIRET est obligatoire pour les demandes professionnelles.")
+    
+    @api.constrains('siret')
+    def _check_siret_format(self):
+        """Valide le format du SIRET (14 chiffres)"""
+        for record in self:
+            if record.siret:
+                # Nettoyer le SIRET (supprimer espaces et caractères non numériques)
+                siret_clean = re.sub(r'[^\d]', '', record.siret)
+                if len(siret_clean) != 14 or not siret_clean.isdigit():
+                    raise ValidationError("Le numéro SIRET doit contenir exactement 14 chiffres.")
+    
     @api.onchange('stage_id')
     def _onchange_stage_id(self):
         """Actions lors du changement d'étape"""
@@ -320,19 +348,39 @@ class RaccordementDemande(models.Model):
             raise UserError(f"Erreur lors de la création des entrées : {str(e)}")
     
     def _create_partner(self):
-        """Crée un contact res.partner"""
-        partner_vals = {
-            'name': f"{self.contact_prenom} {self.contact_nom}" if self.contact_prenom else self.contact_nom,
-            'email': self.contact_email,
-            'phone': self.contact_telephone,
-            'mobile': self.contact_mobile,
-            'street': self.contact_street,
-            'street2': self.contact_street2,
-            'zip': self.contact_zip,
-            'city': self.contact_city,
-            'country_id': self.contact_country_id.id,
-            'is_company': False,
-        }
+        """Crée un contact res.partner (particulier ou société selon le champ pro)"""
+        if self.pro:
+            # Demande professionnelle : créer une société
+            partner_vals = {
+                'name': self.contact_nom,  # Nom de la société
+                'email': self.contact_email,
+                'phone': self.contact_telephone,
+                'mobile': self.contact_mobile,
+                'street': self.contact_street,
+                'street2': self.contact_street2,
+                'zip': self.contact_zip,
+                'city': self.contact_city,
+                'country_id': self.contact_country_id.id,
+                'is_company': True,  # C'est une société
+            }
+            
+            # Ajouter le SIRET si renseigné
+            if self.siret:
+                partner_vals['siret'] = self.siret
+        else:
+            # Demande particulière : créer un contact individuel
+            partner_vals = {
+                'name': f"{self.contact_prenom} {self.contact_nom}" if self.contact_prenom else self.contact_nom,
+                'email': self.contact_email,
+                'phone': self.contact_telephone,
+                'mobile': self.contact_mobile,
+                'street': self.contact_street,
+                'street2': self.contact_street2,
+                'zip': self.contact_zip,
+                'city': self.contact_city,
+                'country_id': self.contact_country_id.id,
+                'is_company': False,  # C'est un particulier
+            }
         
         # Vérifier si un contact existe déjà avec cet email
         existing_partner = self.env['res.partner'].search([

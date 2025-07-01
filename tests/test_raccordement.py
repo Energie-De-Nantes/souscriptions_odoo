@@ -336,6 +336,127 @@ class TestRaccordementIban(SouscriptionsTestMixin, TransactionCase):
         # Ceci ne devrait pas arriver en pratique, mais testons la robustesse
         very_long_invalid = 'AA' + '1' * 100  # IBAN artificiellement long
         self.assertFalse(demande._validate_iban(very_long_invalid))
+    
+    def test_pro_field_default_and_tracking(self):
+        """Test du champ PRO : valeur par défaut et tracking"""
+        # Test valeur par défaut (False)
+        demande = self.create_base_demande()
+        self.assertFalse(demande.pro)
+        
+        # Test modification du champ PRO
+        demande.pro = True
+        self.assertTrue(demande.pro)
+        
+        # Test création avec PRO=True
+        demande_pro = self.create_base_demande(pro=True, siret="12345678901234")
+        self.assertTrue(demande_pro.pro)
+
+
+@tagged('souscriptions', 'souscriptions_raccordement_siret', 'post_install', '-at_install')
+class TestRaccordementSiret(SouscriptionsTestMixin, TransactionCase):
+    """Tests spécifiques pour la validation SIRET"""
+    
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setUpSouscriptionsData()
+    
+    def create_base_demande(self, **kwargs):
+        """Helper pour créer une demande de base"""
+        defaults = {
+            'pdl': 'TEST123456789',
+            'date_debut_souhaitee': date.today() + timedelta(days=30),
+            'puissance_souscrite': '6',
+            'contact_nom': 'Test',
+            'contact_email': 'test@example.com',
+            'contact_street': 'Test Street',
+            'contact_zip': '12345',
+            'contact_city': 'Test City',
+        }
+        defaults.update(kwargs)
+        return self.env['raccordement.demande'].create(defaults)
+    
+    def test_siret_required_for_pro(self):
+        """Test que le SIRET est obligatoire pour les demandes PRO"""
+        from odoo.exceptions import ValidationError
+        
+        # Test que la création PRO sans SIRET échoue
+        with self.assertRaises(ValidationError) as cm:
+            self.create_base_demande(pro=True)  # Pas de SIRET
+        
+        self.assertIn("SIRET est obligatoire", str(cm.exception))
+        
+        # Test que la création PRO avec SIRET fonctionne
+        demande = self.create_base_demande(pro=True, siret="12345678901234")
+        self.assertTrue(demande.pro)
+        self.assertEqual(demande.siret, "12345678901234")
+    
+    def test_siret_not_required_for_particulier(self):
+        """Test que le SIRET n'est pas obligatoire pour les particuliers"""
+        # Test création particulier sans SIRET (doit fonctionner)
+        demande = self.create_base_demande(pro=False)
+        self.assertFalse(demande.pro)
+        self.assertFalse(demande.siret)
+        
+        # Test création particulier avec SIRET (doit fonctionner aussi)
+        demande_avec_siret = self.create_base_demande(pro=False, siret="12345678901234")
+        self.assertFalse(demande_avec_siret.pro)
+        self.assertEqual(demande_avec_siret.siret, "12345678901234")
+    
+    def test_siret_format_validation(self):
+        """Test de validation du format SIRET"""
+        from odoo.exceptions import ValidationError
+        
+        # Test SIRET valide (14 chiffres)
+        demande_valid = self.create_base_demande(pro=True, siret="12345678901234")
+        self.assertEqual(demande_valid.siret, "12345678901234")
+        
+        # Test SIRET trop court
+        with self.assertRaises(ValidationError) as cm:
+            self.create_base_demande(pro=True, siret="123456789")
+        self.assertIn("14 chiffres", str(cm.exception))
+        
+        # Test SIRET trop long
+        with self.assertRaises(ValidationError) as cm:
+            self.create_base_demande(pro=True, siret="123456789012345")
+        self.assertIn("14 chiffres", str(cm.exception))
+        
+        # Test SIRET avec lettres
+        with self.assertRaises(ValidationError) as cm:
+            self.create_base_demande(pro=True, siret="1234567890123A")
+        self.assertIn("14 chiffres", str(cm.exception))
+        
+        # Test SIRET avec caractères spéciaux
+        with self.assertRaises(ValidationError) as cm:
+            self.create_base_demande(pro=True, siret="12345-67890-123")
+        self.assertIn("14 chiffres", str(cm.exception))
+    
+    def test_siret_format_cleaning(self):
+        """Test que les espaces sont nettoyés dans la validation SIRET"""
+        from odoo.exceptions import ValidationError
+        
+        # SIRET avec espaces (devrait échouer car nettoyage ne s'applique que pour validation)
+        with self.assertRaises(ValidationError) as cm:
+            self.create_base_demande(pro=True, siret="123 456 789 012 34")
+        self.assertIn("14 chiffres", str(cm.exception))
+    
+    def test_siret_change_pro_status(self):
+        """Test changement de statut PRO avec SIRET"""
+        from odoo.exceptions import ValidationError
+        
+        # Créer une demande particulière
+        demande = self.create_base_demande(pro=False)
+        
+        # Passer en PRO sans SIRET (doit échouer)
+        with self.assertRaises(ValidationError) as cm:
+            demande.pro = True
+        self.assertIn("SIRET est obligatoire", str(cm.exception))
+        
+        # Ajouter un SIRET puis passer en PRO (doit fonctionner)
+        demande.siret = "12345678901234"
+        demande.pro = True
+        self.assertTrue(demande.pro)
+        self.assertEqual(demande.siret, "12345678901234")
 
 
 @tagged('souscriptions', 'souscriptions_raccordement', 'post_install', '-at_install')
@@ -382,7 +503,7 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
         return self.env['raccordement.demande'].create(defaults)
     
     def test_create_odoo_entries_complete(self):
-        """Test de création des entrées Odoo avec données complètes"""
+        """Test de création des entrées Odoo avec données complètes (particulier)"""
         demande = self.create_complete_demande()
         
         # Passer à l'étape finale
@@ -393,12 +514,46 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
         self.assertTrue(demande.partner_bank_id, "Compte bancaire devrait être créé")
         self.assertTrue(demande.souscription_id, "Souscription devrait être créée")
         
-        # Vérifier les données du contact
+        # Vérifier les données du contact (particulier)
         partner = demande.partner_id
         self.assertEqual(partner.name, "Test User")  # prénom + nom
         self.assertEqual(partner.email, "test@example.com")
         self.assertEqual(partner.street, "Test Street")
         self.assertEqual(partner.city, "Test City")
+        self.assertFalse(partner.is_company)  # C'est un particulier
+        
+        # Vérifier les données de la souscription
+        souscription = demande.souscription_id
+        self.assertEqual(souscription.pdl, "TEST123456789")
+        self.assertEqual(souscription.puissance_souscrite, "6")
+        self.assertEqual(souscription.type_tarif, "base")
+        self.assertEqual(souscription.partner_id, partner)
+    
+    def test_create_odoo_entries_pro(self):
+        """Test de création des entrées Odoo pour une demande professionnelle"""
+        demande = self.create_complete_demande(
+            pro=True,
+            contact_nom="SARL Test Énergie",  # Nom de société
+            contact_prenom="",  # Pas de prénom pour une société
+            siret="12345678901234",  # SIRET valide (14 chiffres)
+        )
+        
+        # Passer à l'étape finale
+        demande.stage_id = self.stage_final
+        
+        # Vérifier que les entrées ont été créées
+        self.assertTrue(demande.partner_id, "Contact société devrait être créé")
+        self.assertTrue(demande.partner_bank_id, "Compte bancaire devrait être créé")
+        self.assertTrue(demande.souscription_id, "Souscription devrait être créée")
+        
+        # Vérifier les données du contact (société)
+        partner = demande.partner_id
+        self.assertEqual(partner.name, "SARL Test Énergie")  # Nom de société uniquement
+        self.assertEqual(partner.email, "test@example.com")
+        self.assertEqual(partner.street, "Test Street")
+        self.assertEqual(partner.city, "Test City")
+        self.assertTrue(partner.is_company)  # C'est une société
+        self.assertEqual(partner.siret, "12345678901234")  # SIRET transmis
         
         # Vérifier les données de la souscription
         souscription = demande.souscription_id

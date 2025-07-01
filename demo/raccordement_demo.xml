@@ -78,15 +78,16 @@
             <field name="stage_id" ref="souscriptions.stage_demande_sge"/>
         </record>
         
-        <!-- Demande 4: Demande mesures faite -->
+        <!-- Demande 4: Demande mesures faite (PROFESSIONNELLE) -->
         <record id="demo_raccordement_4" model="raccordement.demande">
+            <field name="pro">True</field>
+            <field name="siret">12345678901234</field>
             <field name="pdl">47896325147896</field>
             <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=4)).strftime('%Y-%m-%d')"/>
             <field name="puissance_souscrite">12</field>
             <field name="type_tarif">hphc</field>
             <field name="tarif_solidaire">False</field>
-            <field name="contact_prenom">Pierre</field>
-            <field name="contact_nom">Leroy</field>
+            <field name="contact_nom">Boulangerie Leroy SARL</field>
             <field name="contact_email">pierre.leroy@example.com</field>
             <field name="contact_telephone">0456789012</field>
             <field name="contact_street">23 rue du Commerce</field>
@@ -94,7 +95,7 @@
             <field name="contact_zip">44000</field>
             <field name="contact_city">Nantes</field>
             <field name="mode_paiement">prelevement</field>
-            <field name="bank_acc_holder_name">Pierre Leroy SARL</field>
+            <field name="bank_acc_holder_name">Boulangerie Leroy SARL</field>
             <field name="bank_iban">ES9121000418450200051332</field>
             <field name="bank_bic">BNPAGFPP</field>
             <field name="sepa_mandate_date" eval="(DateTime.today() - relativedelta(days=7)).strftime('%Y-%m-%d')"/>
@@ -156,16 +157,17 @@
             <field name="notes">Bénéficiaire du chèque énergie</field>
         </record>
         
-        <!-- Demande 7: Sans mobile -->
+        <!-- Demande 7: Professionnelle sans mobile -->
         <record id="demo_raccordement_7" model="raccordement.demande">
+            <field name="pro">True</field>
+            <field name="siret">98765432109876</field>
             <field name="pdl">70123456789012</field>
             <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(months=2)).strftime('%Y-%m-%d')"/>
             <field name="puissance_souscrite">9</field>
             <field name="type_tarif">base</field>
             <field name="tarif_solidaire">False</field>
             <field name="provision_mensuelle_kwh">350</field>
-            <field name="contact_prenom">Claire</field>
-            <field name="contact_nom">Petit</field>
+            <field name="contact_nom">Cabinet Dentaire Petit SAS</field>
             <field name="contact_email">claire.petit@example.com</field>
             <field name="contact_telephone">0789012345</field>
             <field name="contact_street">28 boulevard Gambetta</field>

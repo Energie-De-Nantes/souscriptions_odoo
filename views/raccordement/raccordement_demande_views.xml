@@ -28,6 +28,8 @@
                     </group>
                     <group>
                         <group name="souscription_info" string="Informations Souscription">
+                            <field name="pro" />
+                            <field name="siret" invisible="pro == False" />
                             <field name="pdl" />
                             <field name="date_debut_souhaitee" />
                             <field name="puissance_souscrite" />
@@ -119,6 +121,7 @@
                     options='{"group_by_tooltip": {"description": "Description"}}' />
                 <field name="color" />
                 <field name="pdl" />
+                <field name="pro" />
                 <field name="contact_nom" />
                 <field name="contact_prenom" />
                 <field name="date_debut_souhaitee" />
@@ -163,8 +166,9 @@
                                         <i class="fa fa-calendar" title="Date début" />
                                         <field name="date_debut_souhaitee" />
                                     </div>
-                                    <div t-if="record.iban_valide.raw_value" class="mt-1">
-                                        <span class="badge badge-success">IBAN OK</span>
+                                    <div class="mt-1">
+                                        <span t-if="record.pro.raw_value" class="badge badge-info">PRO</span>
+                                        <span t-if="record.iban_valide.raw_value" class="badge badge-success">IBAN OK</span>
                                     </div>
                                 </div>
                                 <div class="o_kanban_record_bottom">
@@ -190,6 +194,8 @@
         <field name="arch" type="xml">
             <list>
                 <field name="name" />
+                <field name="pro" />
+                <field name="siret" optional="hide" />
                 <field name="pdl" />
                 <field name="contact_nom" />
                 <field name="contact_email" />
@@ -209,8 +215,12 @@
             <search>
                 <field name="name" />
                 <field name="pdl" />
+                <field name="siret" />
                 <field name="contact_nom" />
                 <field name="contact_email" />
+                <filter string="Professionnel" name="pro" domain="[('pro', '=', True)]" />
+                <filter string="Particulier" name="particulier" domain="[('pro', '=', False)]" />
+                <separator />
                 <filter string="IBAN validé" name="iban_ok" domain="[('iban_valide', '=', True)]" />
                 <filter string="Souscription créée" name="souscrit"
                     domain="[('souscription_id', '!=', False)]" />

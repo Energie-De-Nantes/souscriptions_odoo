@@ -553,7 +553,10 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
         self.assertEqual(partner.street, "Test Street")
         self.assertEqual(partner.city, "Test City")
         self.assertTrue(partner.is_company)  # C'est une société
-        self.assertEqual(partner.siret, "12345678901234")  # SIRET transmis
+        
+        # Vérifier SIRET seulement si le champ existe (dépend de l10n_fr)
+        if 'siret' in self.env['res.partner']._fields:
+            self.assertEqual(partner.siret, "12345678901234")  # SIRET transmis
         
         # Vérifier les données de la souscription
         souscription = demande.souscription_id

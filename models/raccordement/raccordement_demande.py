@@ -364,9 +364,12 @@ class RaccordementDemande(models.Model):
                 'is_company': True,  # C'est une société
             }
             
-            # Ajouter le SIRET si renseigné
+            # Ajouter le SIRET si renseigné et si le champ existe sur res.partner
             if self.siret:
-                partner_vals['siret'] = self.siret
+                if 'siret' in self.env['res.partner']._fields:
+                    partner_vals['siret'] = self.siret
+                else:
+                    _logger.warning("Champ SIRET non disponible sur res.partner. Installez le module l10n_fr pour activer cette fonctionnalité.")
         else:
             # Demande particulière : créer un contact individuel
             partner_vals = {

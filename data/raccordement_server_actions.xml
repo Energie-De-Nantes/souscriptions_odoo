@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Action serveur pour vérifier les IBAN en lot -->
+        <record id="action_server_verify_iban_batch" model="ir.actions.server">
+            <field name="name">Vérifier IBAN en lot</field>
+            <field name="model_id" ref="model_raccordement_demande"/>
+            <field name="binding_model_id" ref="model_raccordement_demande"/>
+            <field name="binding_view_types">list</field>
+            <field name="state">code</field>
+            <field name="code">action = model.action_verify_iban_batch()</field>
+        </record>
+        
+        <!-- Action serveur pour forcer la vérification IBAN -->
+        <record id="action_server_force_verify_iban" model="ir.actions.server">
+            <field name="name">Forcer validation IBAN</field>
+            <field name="model_id" ref="model_raccordement_demande"/>
+            <field name="binding_model_id" ref="model_raccordement_demande"/>
+            <field name="binding_view_types">form</field>
+            <field name="state">code</field>
+            <field name="code">
+for record in records:
+    action = record.action_force_verify_iban()
+            </field>
+        </record>
+        
+        <!-- Action cron pour automatiser la vérification IBAN périodiquement -->
+        <record id="cron_auto_verify_iban" model="ir.cron">
+            <field name="name">Vérification automatique IBAN raccordements</field>
+            <field name="model_id" ref="model_raccordement_demande"/>
+            <field name="state">code</field>
+            <field name="code">model.cron_auto_verify_iban()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">hours</field>
+            <field name="active">False</field>
+        </record>
+        
+    </data>
+</odoo>

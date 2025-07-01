@@ -5,3 +5,4 @@ from . import test_grille_prix
 from . import test_integration
 from . import test_portal
 from . import test_raccordement
+from . import test_raccordement_automation

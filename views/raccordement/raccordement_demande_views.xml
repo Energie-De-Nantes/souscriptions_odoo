@@ -7,6 +7,12 @@
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <button name="action_force_verify_iban" 
+                            string="Valider IBAN" 
+                            type="object" 
+                            class="btn-primary"
+                            invisible="not bank_iban or not iban_valide or mode_paiement != 'prelevement'"
+                            help="Forcer le passage à l'étape IBAN validé"/>
                     <field name="stage_id" widget="statusbar" options="{'clickable': '1'}"/>
                 </header>
                 <sheet>

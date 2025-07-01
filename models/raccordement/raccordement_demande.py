@@ -258,7 +258,7 @@ class RaccordementDemande(models.Model):
                     }
     
     def write(self, vals):
-        """Override write pour déclencher la création lors du passage à l'étape finale"""
+        """Override write pour déclencher les automatisations"""
         res = super().write(vals)
         
         # Si on change l'étape
@@ -267,6 +267,11 @@ class RaccordementDemande(models.Model):
                 # Si on passe à l'étape finale et qu'on n'a pas encore créé les entrées
                 if record.stage_id.is_close and not record.souscription_id:
                     record._create_odoo_entries()
+        
+        # Si l'IBAN est modifié, vérifier s'il faut auto-avancer
+        if any(field in vals for field in ['bank_iban', 'mode_paiement']):
+            for record in self:
+                record._auto_advance_if_iban_valid()
         
         return res
     
@@ -372,3 +377,149 @@ class RaccordementDemande(models.Model):
             souscription_vals['etat_facturation_id'] = etat_initial.id
         
         return self.env['souscription.souscription'].create(souscription_vals)
+    
+    def _auto_advance_if_iban_valid(self):
+        """Avance automatiquement à l'étape IBAN validé si l'IBAN est valide"""
+        self.ensure_one()
+        
+        # Seulement pour les prélèvements
+        if self.mode_paiement != 'prelevement':
+            return
+        
+        # Seulement si IBAN présent et valide
+        if not self.bank_iban or not self.iban_valide:
+            return
+        
+        # Chercher les étapes
+        stage_demande_recue = self.env.ref('souscriptions.stage_demande_recue', raise_if_not_found=False)
+        stage_iban_valide = self.env.ref('souscriptions.stage_iban_valide', raise_if_not_found=False)
+        
+        if not stage_demande_recue or not stage_iban_valide:
+            return
+        
+        # Avancer seulement si on est dans l'étape initiale
+        if self.stage_id == stage_demande_recue:
+            self.stage_id = stage_iban_valide
+            self.message_post(
+                body="IBAN vérifié automatiquement et demande déplacée vers l'étape 'IBAN validé'.",
+                message_type='notification'
+            )
+    
+    @api.model
+    def action_verify_iban_batch(self):
+        """Action serveur pour vérifier les IBAN en lot"""
+        stage_demande_recue = self.env.ref('souscriptions.stage_demande_recue', raise_if_not_found=False)
+        stage_iban_valide = self.env.ref('souscriptions.stage_iban_valide', raise_if_not_found=False)
+        
+        if not stage_demande_recue or not stage_iban_valide:
+            raise UserError("Étapes de raccordement non trouvées. Vérifiez la configuration.")
+        
+        # Chercher les demandes avec IBAN valide dans l'étape initiale
+        demandes_to_move = self.search([
+            ('stage_id', '=', stage_demande_recue.id),
+            ('bank_iban', '!=', False),
+            ('iban_valide', '=', True),
+            ('mode_paiement', '=', 'prelevement'),
+        ])
+        
+        count_moved = 0
+        for demande in demandes_to_move:
+            demande.stage_id = stage_iban_valide
+            demande.message_post(
+                body="IBAN vérifié en lot et demande déplacée vers l'étape 'IBAN validé'.",
+                message_type='notification'
+            )
+            count_moved += 1
+        
+        # Notifier l'utilisateur
+        if count_moved > 0:
+            message = f"{count_moved} demande(s) déplacée(s) automatiquement vers 'IBAN validé'"
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Vérification IBAN',
+                    'message': message,
+                    'type': 'success',
+                    'sticky': False,
+                }
+            }
+        else:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Vérification IBAN',
+                    'message': 'Aucune demande à déplacer (IBAN déjà validés ou invalides)',
+                    'type': 'info',
+                    'sticky': False,
+                }
+            }
+    
+    @api.model
+    def cron_auto_verify_iban(self):
+        """Cron job pour vérifier automatiquement les IBAN"""
+        stage_demande_recue = self.env.ref('souscriptions.stage_demande_recue', raise_if_not_found=False)
+        stage_iban_valide = self.env.ref('souscriptions.stage_iban_valide', raise_if_not_found=False)
+        
+        if not stage_demande_recue or not stage_iban_valide:
+            _logger.warning("Étapes de raccordement non trouvées pour le cron IBAN")
+            return
+        
+        # Chercher les demandes avec IBAN valide dans l'étape initiale
+        demandes_to_move = self.search([
+            ('stage_id', '=', stage_demande_recue.id),
+            ('bank_iban', '!=', False),
+            ('iban_valide', '=', True),
+            ('mode_paiement', '=', 'prelevement'),
+        ])
+        
+        count_moved = 0
+        for demande in demandes_to_move:
+            demande.stage_id = stage_iban_valide
+            demande.message_post(
+                body="IBAN vérifié automatiquement par le système et demande déplacée vers l'étape 'IBAN validé'.",
+                message_type='notification'
+            )
+            count_moved += 1
+        
+        if count_moved > 0:
+            _logger.info(f"Cron IBAN: {count_moved} demande(s) déplacée(s) automatiquement vers 'IBAN validé'")
+    
+    def action_force_verify_iban(self):
+        """Action pour forcer la vérification IBAN sur cette demande"""
+        self.ensure_one()
+        
+        if not self.bank_iban:
+            raise UserError("Aucun IBAN renseigné pour cette demande.")
+        
+        if not self.iban_valide:
+            raise UserError(f"L'IBAN {self.bank_iban} n'est pas valide.")
+        
+        if self.mode_paiement != 'prelevement':
+            raise UserError("Cette demande n'utilise pas le prélèvement automatique.")
+        
+        # Forcer le passage à l'étape IBAN validé
+        stage_iban_valide = self.env.ref('souscriptions.stage_iban_valide', raise_if_not_found=False)
+        if not stage_iban_valide:
+            raise UserError("Étape 'IBAN validé' non trouvée.")
+        
+        if self.stage_id.sequence >= stage_iban_valide.sequence:
+            raise UserError("Cette demande est déjà dans une étape avancée.")
+        
+        self.stage_id = stage_iban_valide
+        self.message_post(
+            body="IBAN vérifié manuellement et demande déplacée vers l'étape 'IBAN validé'.",
+            message_type='notification'
+        )
+        
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'IBAN vérifié',
+                'message': f"Demande {self.name} déplacée vers l'étape 'IBAN validé'",
+                'type': 'success',
+                'sticky': False,
+            }
+        }

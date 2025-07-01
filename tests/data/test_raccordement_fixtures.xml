@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Étapes de test pour les raccordements -->
+        <record id="test_stage_new" model="raccordement.stage">
+            <field name="name">Test Nouvelle</field>
+            <field name="sequence">10</field>
+            <field name="color">1</field>
+            <field name="description">Étape de test pour nouvelles demandes</field>
+        </record>
+        
+        <record id="test_stage_validated" model="raccordement.stage">
+            <field name="name">Test Validée</field>
+            <field name="sequence">20</field>
+            <field name="color">3</field>
+            <field name="description">Étape de test pour demandes validées</field>
+        </record>
+        
+        <record id="test_stage_final" model="raccordement.stage">
+            <field name="name">Test Souscrite</field>
+            <field name="sequence">99</field>
+            <field name="color">10</field>
+            <field name="fold">True</field>
+            <field name="is_close">True</field>
+            <field name="description">Étape finale de test</field>
+        </record>
+        
+        <!-- Demandes de raccordement de test -->
+        <record id="test_demande_base" model="raccordement.demande">
+            <field name="name">TEST-RACC-001</field>
+            <field name="pdl">PDL_TEST_RACC_001</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(months=1)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">6</field>
+            <field name="type_tarif">base</field>
+            <field name="tarif_solidaire">False</field>
+            <field name="provision_mensuelle_kwh">250</field>
+            <field name="contact_prenom">Jean</field>
+            <field name="contact_nom">TestUser</field>
+            <field name="contact_email">jean.testuser@example.com</field>
+            <field name="contact_telephone">0123456789</field>
+            <field name="contact_street">123 rue de Test</field>
+            <field name="contact_zip">12345</field>
+            <field name="contact_city">TestVille</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="bank_acc_holder_name">Jean TestUser</field>
+            <field name="bank_iban">FR7612345678901234567890123</field>
+            <field name="bank_bic">BNPAFRPP</field>
+            <field name="stage_id" ref="test_stage_new"/>
+            <field name="notes">Demande de test pour tarif base</field>
+        </record>
+        
+        <record id="test_demande_hphc" model="raccordement.demande">
+            <field name="name">TEST-RACC-002</field>
+            <field name="pdl">PDL_TEST_RACC_002</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=3)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">9</field>
+            <field name="type_tarif">hphc</field>
+            <field name="tarif_solidaire">False</field>
+            <field name="provision_hp_kwh">180</field>
+            <field name="provision_hc_kwh">120</field>
+            <field name="contact_prenom">Marie</field>
+            <field name="contact_nom">TestPro</field>
+            <field name="contact_email">marie.testpro@example.com</field>
+            <field name="contact_telephone">0234567890</field>
+            <field name="contact_mobile">0612345678</field>
+            <field name="contact_street">456 avenue du Test</field>
+            <field name="contact_zip">67890</field>
+            <field name="contact_city">TestVille Pro</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="bank_acc_holder_name">Marie TestPro</field>
+            <field name="bank_iban">FR7698765432109876543210987</field>
+            <field name="bank_bic">SOGEFRPP</field>
+            <field name="sepa_mandate_date" eval="DateTime.today().strftime('%Y-%m-%d')"/>
+            <field name="sepa_mandate_ref">SEPA-TEST-001</field>
+            <field name="stage_id" ref="test_stage_validated"/>
+            <field name="notes">Demande de test pour tarif HP/HC</field>
+        </record>
+        
+        <record id="test_demande_solidaire" model="raccordement.demande">
+            <field name="name">TEST-RACC-003</field>
+            <field name="pdl">PDL_TEST_RACC_003</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=2)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">3</field>
+            <field name="type_tarif">base</field>
+            <field name="tarif_solidaire">True</field>
+            <field name="provision_mensuelle_kwh">120</field>
+            <field name="contact_prenom">Paul</field>
+            <field name="contact_nom">TestSolidaire</field>
+            <field name="contact_email">paul.testsolidaire@example.com</field>
+            <field name="contact_telephone">0345678901</field>
+            <field name="contact_street">789 place du Test</field>
+            <field name="contact_zip">54321</field>
+            <field name="contact_city">TestVille Solidaire</field>
+            <field name="mode_paiement">cheque_energie</field>
+            <field name="stage_id" ref="test_stage_new"/>
+            <field name="notes">Demande de test pour tarif solidaire</field>
+        </record>
+        
+        <record id="test_demande_invalid_iban" model="raccordement.demande">
+            <field name="name">TEST-RACC-004</field>
+            <field name="pdl">PDL_TEST_RACC_004</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=4)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">6</field>
+            <field name="type_tarif">base</field>
+            <field name="tarif_solidaire">False</field>
+            <field name="provision_mensuelle_kwh">200</field>
+            <field name="contact_prenom">Sophie</field>
+            <field name="contact_nom">TestInvalidIban</field>
+            <field name="contact_email">sophie.testinvalid@example.com</field>
+            <field name="contact_telephone">0456789012</field>
+            <field name="contact_street">321 rue du Test Invalide</field>
+            <field name="contact_zip">98765</field>
+            <field name="contact_city">TestVille Invalid</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="bank_acc_holder_name">Sophie TestInvalidIban</field>
+            <field name="bank_iban">INVALID123</field>
+            <field name="stage_id" ref="test_stage_new"/>
+            <field name="notes">Demande de test avec IBAN invalide</field>
+            <field name="kanban_state">blocked</field>
+        </record>
+        
+    </data>
+</odoo>

@@ -24,42 +24,6 @@ tests/
 
 ## 🚀 Lancement des tests
 
-### Méthode recommandée : Makefile
-
-```bash
-# Tous les tests
-make test
-
-# Tests spécifiques
-make test-template          # Template de facture
-make test-facturation      # Facturation
-make test-basic            # Tests basiques
-make test-workflow         # Workflow et intégration
-make test-ui               # Interface utilisateur
-make test-reports          # Rapports et PDF
-make test-portal           # Portal usager·ère
-
-# Tests rapides (sans recréer la DB)
-make quick-test
-
-# Aide
-make help
-```
-
-### Script wrapper
-
-```bash
-# Tous les tests avec création de DB
-./run_tests.sh --create-db
-
-# Tests spécifiques
-./run_tests.sh --template
-./run_tests.sh --facturation --verbose
-
-# Aide
-./run_tests.sh --help
-```
-
 ### Commande Odoo directe
 
 ```bash

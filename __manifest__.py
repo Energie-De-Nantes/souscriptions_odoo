@@ -59,5 +59,6 @@
     "demo": [
         "demo/souscriptions_demo.xml",
         "demo/raccordement_demo.xml",
+        "tests/data/test_raccordement_fixtures.xml",
     ],
 }

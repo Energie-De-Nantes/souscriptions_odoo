@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Menu principal Raccordements -->
+    <menuitem id="menu_raccordement_root"
+              name="Raccordements"
+              sequence="5"
+              web_icon="souscriptions,static/description/icon.png"/>
+    
+    <!-- Sous-menu Demandes -->
+    <menuitem id="menu_raccordement_demande"
+              name="Demandes de raccordement"
+              parent="menu_raccordement_root"
+              action="action_raccordement_demande"
+              sequence="10"/>
+    
+    <!-- Menu Configuration -->
+    <menuitem id="menu_raccordement_config"
+              name="Configuration"
+              parent="menu_raccordement_root"
+              sequence="100"/>
+    
+    <!-- Sous-menu Étapes -->
+    <record id="action_raccordement_stage" model="ir.actions.act_window">
+        <field name="name">Étapes de raccordement</field>
+        <field name="res_model">raccordement.stage</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    
+    <menuitem id="menu_raccordement_stage"
+              name="Étapes"
+              parent="menu_raccordement_config"
+              action="action_raccordement_stage"
+              sequence="10"/>
+</odoo>

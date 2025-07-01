@@ -37,6 +37,8 @@
         "data/produits_abonnement_simple.xml",
         "data/produits_energie.xml",
         "data/grille_prix_demo.xml",
+        "data/raccordement_sequence.xml",
+        "data/raccordement_stages.xml",
         "report/souscription_contrat_report.xml",
         "reports/facture_energie_template.xml",
         "views/core/souscription_views.xml",
@@ -44,6 +46,8 @@
         "views/core/souscriptions_periode_views.xml",
         "views/core/souscription_portal_menu.xml",
         "views/portal_templates.xml",
+        "views/raccordement/raccordement_demande_views.xml",
+        "views/raccordement/raccordement_menu.xml",
         
         # Phase 2 - Métier (à décommenter lors de l'activation)
         # "security/ir.model.access.metier.csv",
@@ -54,5 +58,6 @@
     
     "demo": [
         "demo/souscriptions_demo.xml",
+        "demo/raccordement_demo.xml",
     ],
 }

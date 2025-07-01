@@ -8,3 +8,5 @@ access_souscription_portal,souscription.souscription portal,model_souscription_s
 access_souscription_periode_portal,souscription.periode portal,model_souscription_periode,base.group_portal,1,0,0,0
 access_souscription_etat_portal,souscription.etat portal,model_souscription_etat,base.group_portal,1,0,0,0
 access_account_move_portal,account.move portal,account.model_account_move,base.group_portal,1,0,0,0
+access_raccordement_demande_user,raccordement.demande,model_raccordement_demande,base.group_user,1,1,1,1
+access_raccordement_stage_user,raccordement.stage,model_raccordement_stage,base.group_user,1,1,1,1

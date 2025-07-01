@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Demandes de raccordement de démonstration -->
+        
+        <!-- Demande 1: Nouvelle demande -->
+        <record id="demo_raccordement_1" model="raccordement.demande">
+            <field name="pdl">14325698745236</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(months=1)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">6</field>
+            <field name="type_tarif">base</field>
+            <field name="tarif_solidaire">False</field>
+            <field name="provision_mensuelle_kwh">250</field>
+            <field name="contact_prenom">Marie</field>
+            <field name="contact_nom">Dupont</field>
+            <field name="contact_email">marie.dupont@example.com</field>
+            <field name="contact_telephone">0123456789</field>
+            <field name="contact_mobile">0612345678</field>
+            <field name="contact_street">15 rue de la Paix</field>
+            <field name="contact_zip">75001</field>
+            <field name="contact_city">Paris</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="bank_acc_holder_name">Marie Dupont</field>
+            <field name="bank_iban">FR7612345678901234567890123</field>
+            <field name="bank_bic">BNPAFRPP</field>
+            <field name="stage_id" ref="souscriptions.stage_demande_recue"/>
+            <field name="notes">Nouvelle demande de raccordement pour un appartement</field>
+        </record>
+        
+        <!-- Demande 2: IBAN validé -->
+        <record id="demo_raccordement_2" model="raccordement.demande">
+            <field name="pdl">25874136985247</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=3)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">9</field>
+            <field name="type_tarif">hphc</field>
+            <field name="tarif_solidaire">False</field>
+            <field name="provision_hp_kwh">180</field>
+            <field name="provision_hc_kwh">120</field>
+            <field name="contact_prenom">Jean</field>
+            <field name="contact_nom">Martin</field>
+            <field name="contact_email">jean.martin@example.com</field>
+            <field name="contact_telephone">0234567890</field>
+            <field name="contact_street">42 avenue Victor Hugo</field>
+            <field name="contact_zip">69001</field>
+            <field name="contact_city">Lyon</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="bank_acc_holder_name">Jean Martin</field>
+            <field name="bank_iban">FR7698765432109876543210987</field>
+            <field name="bank_bic">SOGEFRPP</field>
+            <field name="sepa_mandate_date" eval="DateTime.today().strftime('%Y-%m-%d')"/>
+            <field name="sepa_mandate_ref">SEPA-2024-001</field>
+            <field name="stage_id" ref="souscriptions.stage_iban_valide"/>
+        </record>
+        
+        <!-- Demande 3: Demande SGE faite -->
+        <record id="demo_raccordement_3" model="raccordement.demande">
+            <field name="pdl">36985214736985</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=2)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">6</field>
+            <field name="type_tarif">base</field>
+            <field name="tarif_solidaire">True</field>
+            <field name="provision_mensuelle_kwh">200</field>
+            <field name="contact_prenom">Sophie</field>
+            <field name="contact_nom">Bernard</field>
+            <field name="contact_email">sophie.bernard@example.com</field>
+            <field name="contact_telephone">0345678901</field>
+            <field name="contact_mobile">0623456789</field>
+            <field name="contact_street">8 place de la République</field>
+            <field name="contact_zip">33000</field>
+            <field name="contact_city">Bordeaux</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="bank_acc_holder_name">Sophie Bernard</field>
+            <field name="bank_iban">FR7611223344556677889900112</field>
+            <field name="bank_bic">CMCIFRPP</field>
+            <field name="sepa_mandate_date" eval="(DateTime.today() - relativedelta(days=3)).strftime('%Y-%m-%d')"/>
+            <field name="sepa_mandate_ref">SEPA-2024-002</field>
+            <field name="date_demande_sge" eval="(DateTime.today() - relativedelta(days=2)).strftime('%Y-%m-%d')"/>
+            <field name="stage_id" ref="souscriptions.stage_demande_sge"/>
+        </record>
+        
+        <!-- Demande 4: Demande mesures faite -->
+        <record id="demo_raccordement_4" model="raccordement.demande">
+            <field name="pdl">47896325147896</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=4)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">12</field>
+            <field name="type_tarif">hphc</field>
+            <field name="tarif_solidaire">False</field>
+            <field name="contact_prenom">Pierre</field>
+            <field name="contact_nom">Leroy</field>
+            <field name="contact_email">pierre.leroy@example.com</field>
+            <field name="contact_telephone">0456789012</field>
+            <field name="contact_street">23 rue du Commerce</field>
+            <field name="contact_street2">Bâtiment B</field>
+            <field name="contact_zip">44000</field>
+            <field name="contact_city">Nantes</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="bank_acc_holder_name">Pierre Leroy SARL</field>
+            <field name="bank_iban">FR7699887766554433221100998</field>
+            <field name="bank_bic">BNPAGFPP</field>
+            <field name="sepa_mandate_date" eval="(DateTime.today() - relativedelta(days=7)).strftime('%Y-%m-%d')"/>
+            <field name="sepa_mandate_ref">SEPA-2024-003</field>
+            <field name="date_demande_sge" eval="(DateTime.today() - relativedelta(days=5)).strftime('%Y-%m-%d')"/>
+            <field name="date_demande_mesures" eval="(DateTime.today() - relativedelta(days=3)).strftime('%Y-%m-%d')"/>
+            <field name="stage_id" ref="souscriptions.stage_demande_mesures"/>
+            <field name="notes">Client professionnel - Boulangerie</field>
+            <field name="kanban_state">blocked</field>
+        </record>
+        
+        <!-- Demande 5: Estimation mensualité -->
+        <record id="demo_raccordement_5" model="raccordement.demande">
+            <field name="pdl">58963214789632</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(days=15)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">6</field>
+            <field name="type_tarif">hphc</field>
+            <field name="tarif_solidaire">False</field>
+            <field name="provision_hp_kwh">150</field>
+            <field name="provision_hc_kwh">100</field>
+            <field name="contact_prenom">Isabelle</field>
+            <field name="contact_nom">Moreau</field>
+            <field name="contact_email">isabelle.moreau@example.com</field>
+            <field name="contact_telephone">0567890123</field>
+            <field name="contact_mobile">0634567890</field>
+            <field name="contact_street">17 impasse des Lilas</field>
+            <field name="contact_zip">31000</field>
+            <field name="contact_city">Toulouse</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="bank_acc_holder_name">Isabelle Moreau</field>
+            <field name="bank_iban">FR7655443322110099887766554</field>
+            <field name="bank_bic">AGRIFRPP</field>
+            <field name="sepa_mandate_date" eval="(DateTime.today() - relativedelta(days=10)).strftime('%Y-%m-%d')"/>
+            <field name="sepa_mandate_ref">SEPA-2024-004</field>
+            <field name="date_demande_sge" eval="(DateTime.today() - relativedelta(days=8)).strftime('%Y-%m-%d')"/>
+            <field name="date_demande_mesures" eval="(DateTime.today() - relativedelta(days=5)).strftime('%Y-%m-%d')"/>
+            <field name="date_estimation" eval="(DateTime.today() - relativedelta(days=1)).strftime('%Y-%m-%d')"/>
+            <field name="stage_id" ref="souscriptions.stage_estimation"/>
+            <field name="kanban_state">done</field>
+        </record>
+        
+        <!-- Demande 6: Mode paiement autre que prélèvement -->
+        <record id="demo_raccordement_6" model="raccordement.demande">
+            <field name="pdl">69874521369874</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=5)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">3</field>
+            <field name="type_tarif">base</field>
+            <field name="tarif_solidaire">True</field>
+            <field name="provision_mensuelle_kwh">120</field>
+            <field name="contact_prenom">Paul</field>
+            <field name="contact_nom">Dubois</field>
+            <field name="contact_email">paul.dubois@example.com</field>
+            <field name="contact_telephone">0678901234</field>
+            <field name="contact_street">5 rue des Écoles</field>
+            <field name="contact_zip">59000</field>
+            <field name="contact_city">Lille</field>
+            <field name="mode_paiement">cheque_energie</field>
+            <field name="stage_id" ref="souscriptions.stage_demande_recue"/>
+            <field name="notes">Bénéficiaire du chèque énergie</field>
+        </record>
+        
+        <!-- Demande 7: Sans mobile -->
+        <record id="demo_raccordement_7" model="raccordement.demande">
+            <field name="pdl">70123456789012</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(months=2)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">9</field>
+            <field name="type_tarif">base</field>
+            <field name="tarif_solidaire">False</field>
+            <field name="provision_mensuelle_kwh">350</field>
+            <field name="contact_prenom">Claire</field>
+            <field name="contact_nom">Petit</field>
+            <field name="contact_email">claire.petit@example.com</field>
+            <field name="contact_telephone">0789012345</field>
+            <field name="contact_street">28 boulevard Gambetta</field>
+            <field name="contact_zip">67000</field>
+            <field name="contact_city">Strasbourg</field>
+            <field name="mode_paiement">virement</field>
+            <field name="stage_id" ref="souscriptions.stage_demande_recue"/>
+        </record>
+        
+        <!-- Demande 8: IBAN non valide pour test -->
+        <record id="demo_raccordement_8" model="raccordement.demande">
+            <field name="pdl">81234567890123</field>
+            <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=6)).strftime('%Y-%m-%d')"/>
+            <field name="puissance_souscrite">6</field>
+            <field name="type_tarif">base</field>
+            <field name="tarif_solidaire">False</field>
+            <field name="provision_mensuelle_kwh">280</field>
+            <field name="contact_prenom">Marc</field>
+            <field name="contact_nom">Richard</field>
+            <field name="contact_email">marc.richard@example.com</field>
+            <field name="contact_telephone">0890123456</field>
+            <field name="contact_street">11 quai de la Loire</field>
+            <field name="contact_zip">37000</field>
+            <field name="contact_city">Tours</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="bank_acc_holder_name">Marc Richard</field>
+            <field name="bank_iban">FR123456</field>
+            <field name="stage_id" ref="souscriptions.stage_demande_recue"/>
+            <field name="notes">IBAN à vérifier</field>
+            <field name="kanban_state">blocked</field>
+        </record>
+        
+    </data>
+</odoo>

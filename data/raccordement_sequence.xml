@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Séquence pour les demandes de raccordement -->
+        <record id="sequence_raccordement_demande" model="ir.sequence">
+            <field name="name">Demande de raccordement</field>
+            <field name="code">raccordement.demande.sequence</field>
+            <field name="prefix">RACC/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>

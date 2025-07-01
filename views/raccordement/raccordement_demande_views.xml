@@ -7,155 +7,161 @@
         <field name="arch" type="xml">
             <form>
                 <header>
-                    <button name="action_force_verify_iban" 
-                            string="Valider IBAN" 
-                            type="object" 
-                            class="btn-primary"
-                            invisible="not bank_iban or not iban_valide or mode_paiement != 'prelevement'"
-                            help="Forcer le passage à l'étape IBAN validé"/>
-                    <field name="stage_id" widget="statusbar" options="{'clickable': '1'}"/>
+                    <field name="stage_id" widget="statusbar" options="{'clickable': '1'}" />
                 </header>
                 <sheet>
                     <div class="oe_button_box" name="button_box">
-                        <field name="souscription_id" invisible="1"/>
-                        <field name="partner_id" invisible="1"/>
+                        <field name="souscription_id" invisible="1" />
+                        <field name="partner_id" invisible="1" />
                     </div>
                     <div class="oe_title">
                         <h1>
-                            <field name="name" readonly="1"/>
+                            <field name="name" readonly="1" />
                         </h1>
                     </div>
-                    <group name="created_records" invisible="souscription_id == False and partner_id == False">
+                    <group name="created_records"
+                        invisible="souscription_id == False and partner_id == False">
                         <group>
-                            <field name="souscription_id" invisible="souscription_id == False"/>
-                            <field name="partner_id" invisible="partner_id == False"/>
+                            <field name="souscription_id" invisible="souscription_id == False" />
+                            <field name="partner_id" invisible="partner_id == False" />
                         </group>
                     </group>
                     <group>
                         <group name="souscription_info" string="Informations Souscription">
-                            <field name="pdl"/>
-                            <field name="date_debut_souhaitee"/>
-                            <field name="puissance_souscrite"/>
-                            <field name="type_tarif"/>
-                            <field name="tarif_solidaire"/>
-                            <field name="mode_paiement"/>
+                            <field name="pdl" />
+                            <field name="date_debut_souhaitee" />
+                            <field name="puissance_souscrite" />
+                            <field name="type_tarif" />
+                            <field name="tarif_solidaire" />
+                            <field name="mode_paiement" />
                         </group>
                         <group name="dates_suivi" string="Suivi">
-                            <field name="date_demande_sge"/>
-                            <field name="date_demande_mesures"/>
-                            <field name="date_estimation"/>
-                            <field name="kanban_state" widget="state_selection"/>
+                            <field name="date_demande_sge" />
+                            <field name="date_demande_mesures" />
+                            <field name="date_estimation" />
+                            <field name="kanban_state" widget="state_selection" />
                         </group>
                     </group>
-                    
+
                     <notebook>
                         <page string="Provisions énergétiques" name="provisions">
                             <group>
                                 <group invisible="type_tarif != 'base'">
-                                    <field name="provision_mensuelle_kwh"/>
+                                    <field name="provision_mensuelle_kwh" />
                                 </group>
                                 <group invisible="type_tarif != 'hphc'">
-                                    <field name="provision_hp_kwh"/>
-                                    <field name="provision_hc_kwh"/>
+                                    <field name="provision_hp_kwh" />
+                                    <field name="provision_hc_kwh" />
                                 </group>
                             </group>
                         </page>
-                        
+
                         <page string="Contact" name="contact">
                             <group>
                                 <group>
-                                    <field name="contact_prenom"/>
-                                    <field name="contact_nom"/>
-                                    <field name="contact_email" widget="email"/>
-                                    <field name="contact_telephone" widget="phone"/>
-                                    <field name="contact_mobile" widget="phone"/>
+                                    <field name="contact_prenom" />
+                                    <field name="contact_nom" />
+                                    <field name="contact_email" widget="email" />
+                                    <field name="contact_telephone" widget="phone" />
+                                    <field name="contact_mobile" widget="phone" />
                                 </group>
                                 <group>
-                                    <label for="contact_street" string="Adresse"/>
+                                    <label for="contact_street" string="Adresse" />
                                     <div class="o_address_format">
-                                        <field name="contact_street" placeholder="Rue..." class="o_address_street"/>
-                                        <field name="contact_street2" placeholder="Rue 2..." class="o_address_street"/>
-                                        <field name="contact_city" placeholder="Ville" class="o_address_city"/>
-                                        <field name="contact_zip" placeholder="Code postal" class="o_address_zip"/>
-                                        <field name="contact_country_id" placeholder="Pays" class="o_address_country" options='{"no_open": True, "no_create": True}'/>
+                                        <field name="contact_street" placeholder="Rue..."
+                                            class="o_address_street" />
+                                        <field name="contact_street2" placeholder="Rue 2..."
+                                            class="o_address_street" />
+                                        <field name="contact_city" placeholder="Ville"
+                                            class="o_address_city" />
+                                        <field name="contact_zip" placeholder="Code postal"
+                                            class="o_address_zip" />
+                                        <field name="contact_country_id" placeholder="Pays"
+                                            class="o_address_country"
+                                            options='{"no_open": True, "no_create": True}' />
                                     </div>
                                 </group>
                             </group>
                         </page>
-                        
-                        <page string="Informations bancaires" name="bank" invisible="mode_paiement != 'prelevement'">
+
+                        <page string="Informations bancaires" name="bank"
+                            invisible="mode_paiement != 'prelevement'">
                             <group>
                                 <group>
-                                    <field name="bank_acc_holder_name"/>
-                                    <field name="bank_iban"/>
-                                    <field name="bank_bic"/>
-                                    <field name="iban_valide" readonly="1"/>
+                                    <field name="bank_acc_holder_name" />
+                                    <field name="bank_iban" />
+                                    <field name="bank_bic" />
+                                    <field name="iban_valide" readonly="1" />
                                 </group>
                                 <group>
-                                    <field name="sepa_mandate_date"/>
-                                    <field name="sepa_mandate_ref"/>
+                                    <field name="sepa_mandate_date" />
+                                    <field name="sepa_mandate_ref" />
                                 </group>
                             </group>
                         </page>
-                        
+
                         <page string="Notes" name="notes">
-                            <field name="notes" nolabel="1"/>
+                            <field name="notes" nolabel="1" />
                         </page>
                     </notebook>
                 </sheet>
-                <div class="oe_chatter">
-                    <field name="message_follower_ids"/>
-                    <field name="activity_ids"/>
-                    <field name="message_ids"/>
-                </div>
             </form>
         </field>
     </record>
-    
+
     <!-- Vue kanban -->
     <record id="view_raccordement_demande_kanban" model="ir.ui.view">
         <field name="name">raccordement.demande.kanban</field>
         <field name="model">raccordement.demande</field>
         <field name="arch" type="xml">
             <kanban default_group_by="stage_id" class="o_kanban_small_column">
-                <field name="stage_id" options='{"group_by_tooltip": {"description": "Description"}}'/>
-                <field name="color"/>
-                <field name="pdl"/>
-                <field name="contact_nom"/>
-                <field name="contact_prenom"/>
-                <field name="date_debut_souhaitee"/>
-                <field name="iban_valide"/>
-                <field name="kanban_state"/>
-                <progressbar field="kanban_state" colors='{"done": "success", "blocked": "danger"}'/>
+                <field name="stage_id"
+                    options='{"group_by_tooltip": {"description": "Description"}}' />
+                <field name="color" />
+                <field name="pdl" />
+                <field name="contact_nom" />
+                <field name="contact_prenom" />
+                <field name="date_debut_souhaitee" />
+                <field name="iban_valide" />
+                <field name="kanban_state" />
+                <progressbar field="kanban_state" colors='{"done": "success", "blocked": "danger"}' />
                 <templates>
                     <t t-name="card">
-                        <div t-attf-class="oe_kanban_color_#{kanban_getcolor(record.color.raw_value)} oe_kanban_card oe_kanban_global_click">
+                        <div
+                            t-attf-class="oe_kanban_color_#{kanban_getcolor(record.color.raw_value)} oe_kanban_card oe_kanban_global_click">
                             <div class="oe_kanban_content">
                                 <div class="o_kanban_record_top mb-2">
                                     <div class="o_kanban_record_headings">
                                         <strong class="o_kanban_record_title">
-                                            <field name="name"/>
+                                            <field name="name" />
                                         </strong>
                                     </div>
                                     <div class="o_dropdown_kanban dropdown">
-                                        <a role="button" class="dropdown-toggle o-no-caret btn" data-toggle="dropdown" data-display="static" href="#" aria-label="Dropdown menu" title="Dropdown menu">
-                                            <span class="fa fa-ellipsis-v"/>
+                                        <a role="button" class="dropdown-toggle o-no-caret btn"
+                                            data-toggle="dropdown" data-display="static" href="#"
+                                            aria-label="Dropdown menu" title="Dropdown menu">
+                                            <span class="fa fa-ellipsis-v" />
                                         </a>
                                         <div class="dropdown-menu" role="menu">
-                                            <a t-if="widget.editable" role="menuitem" type="edit" class="dropdown-item">Modifier</a>
-                                            <a t-if="widget.deletable" role="menuitem" type="delete" class="dropdown-item">Supprimer</a>
+                                            <a t-if="widget.editable" role="menuitem" type="edit"
+                                                class="dropdown-item">Modifier</a>
+                                            <a t-if="widget.deletable" role="menuitem" type="delete"
+                                                class="dropdown-item">Supprimer</a>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="o_kanban_record_body">
                                     <div>
-                                        <strong>PDL:</strong> <field name="pdl"/>
+                                        <strong>PDL:</strong>
+                                        <field name="pdl" />
                                     </div>
                                     <div>
-                                        <field name="contact_prenom"/> <field name="contact_nom"/>
+                                        <field name="contact_prenom" />
+                                        <field name="contact_nom" />
                                     </div>
                                     <div class="text-muted">
-                                        <i class="fa fa-calendar" title="Date début"/> <field name="date_debut_souhaitee"/>
+                                        <i class="fa fa-calendar" title="Date début" />
+                                        <field name="date_debut_souhaitee" />
                                     </div>
                                     <div t-if="record.iban_valide.raw_value" class="mt-1">
                                         <span class="badge badge-success">IBAN OK</span>
@@ -163,10 +169,10 @@
                                 </div>
                                 <div class="o_kanban_record_bottom">
                                     <div class="oe_kanban_bottom_left">
-                                        <field name="kanban_state" widget="state_selection"/>
+                                        <field name="kanban_state" widget="state_selection" />
                                     </div>
                                     <div class="oe_kanban_bottom_right">
-                                        <field name="activity_ids" widget="kanban_activity"/>
+                                        <field name="activity_ids" widget="kanban_activity" />
                                     </div>
                                 </div>
                             </div>
@@ -176,59 +182,62 @@
             </kanban>
         </field>
     </record>
-    
+
     <!-- Vue liste -->
     <record id="view_raccordement_demande_tree" model="ir.ui.view">
         <field name="name">raccordement.demande.tree</field>
         <field name="model">raccordement.demande</field>
         <field name="arch" type="xml">
             <list>
-                <field name="name"/>
-                <field name="pdl"/>
-                <field name="contact_nom"/>
-                <field name="contact_email"/>
-                <field name="date_debut_souhaitee"/>
-                <field name="stage_id"/>
-                <field name="iban_valide"/>
-                <field name="souscription_id"/>
+                <field name="name" />
+                <field name="pdl" />
+                <field name="contact_nom" />
+                <field name="contact_email" />
+                <field name="date_debut_souhaitee" />
+                <field name="stage_id" />
+                <field name="iban_valide" />
+                <field name="souscription_id" />
             </list>
         </field>
     </record>
-    
+
     <!-- Vue recherche -->
     <record id="view_raccordement_demande_search" model="ir.ui.view">
         <field name="name">raccordement.demande.search</field>
         <field name="model">raccordement.demande</field>
         <field name="arch" type="xml">
             <search>
-                <field name="name"/>
-                <field name="pdl"/>
-                <field name="contact_nom"/>
-                <field name="contact_email"/>
-                <filter string="IBAN validé" name="iban_ok" domain="[('iban_valide', '=', True)]"/>
-                <filter string="Souscription créée" name="souscrit" domain="[('souscription_id', '!=', False)]"/>
-                <separator/>
-                <filter string="Archivé" name="inactive" domain="[('active', '=', False)]"/>
+                <field name="name" />
+                <field name="pdl" />
+                <field name="contact_nom" />
+                <field name="contact_email" />
+                <filter string="IBAN validé" name="iban_ok" domain="[('iban_valide', '=', True)]" />
+                <filter string="Souscription créée" name="souscrit"
+                    domain="[('souscription_id', '!=', False)]" />
+                <separator />
+                <filter string="Archivé" name="inactive" domain="[('active', '=', False)]" />
                 <group expand="0" string="Grouper par">
-                    <filter name="stage" string="Étape" context="{'group_by': 'stage_id'}"/>
-                    <filter name="month" string="Mois de début" context="{'group_by': 'date_debut_souhaitee:month'}"/>
+                    <filter name="stage" string="Étape" context="{'group_by': 'stage_id'}" />
+                    <filter name="month" string="Mois de début"
+                        context="{'group_by': 'date_debut_souhaitee:month'}" />
                 </group>
             </search>
         </field>
     </record>
-    
+
     <!-- Action -->
     <record id="action_raccordement_demande" model="ir.actions.act_window">
         <field name="name">Demandes de raccordement</field>
         <field name="res_model">raccordement.demande</field>
         <field name="view_mode">kanban,list,form</field>
-        <field name="search_view_id" ref="view_raccordement_demande_search"/>
+        <field name="search_view_id" ref="view_raccordement_demande_search" />
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 Créer une nouvelle demande de raccordement
             </p>
             <p>
-                Gérez les demandes de raccordement depuis leur réception jusqu'à la création de la souscription.
+                Gérez les demandes de raccordement depuis leur réception jusqu'à la création de la
+                souscription.
             </p>
         </field>
     </record>

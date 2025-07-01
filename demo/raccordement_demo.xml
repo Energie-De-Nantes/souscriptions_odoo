@@ -21,7 +21,7 @@
             <field name="contact_city">Paris</field>
             <field name="mode_paiement">prelevement</field>
             <field name="bank_acc_holder_name">Marie Dupont</field>
-            <field name="bank_iban">FR7612345678901234567890123</field>
+            <field name="bank_iban">FR1420041010050500013M02606</field>
             <field name="bank_bic">BNPAFRPP</field>
             <field name="stage_id" ref="souscriptions.stage_demande_recue"/>
             <field name="notes">Nouvelle demande de raccordement pour un appartement</field>
@@ -45,7 +45,7 @@
             <field name="contact_city">Lyon</field>
             <field name="mode_paiement">prelevement</field>
             <field name="bank_acc_holder_name">Jean Martin</field>
-            <field name="bank_iban">FR7698765432109876543210987</field>
+            <field name="bank_iban">DE89370400440532013000</field>
             <field name="bank_bic">SOGEFRPP</field>
             <field name="sepa_mandate_date" eval="DateTime.today().strftime('%Y-%m-%d')"/>
             <field name="sepa_mandate_ref">SEPA-2024-001</field>
@@ -70,7 +70,7 @@
             <field name="contact_city">Bordeaux</field>
             <field name="mode_paiement">prelevement</field>
             <field name="bank_acc_holder_name">Sophie Bernard</field>
-            <field name="bank_iban">FR7611223344556677889900112</field>
+            <field name="bank_iban">GB29NWBK60161331926819</field>
             <field name="bank_bic">CMCIFRPP</field>
             <field name="sepa_mandate_date" eval="(DateTime.today() - relativedelta(days=3)).strftime('%Y-%m-%d')"/>
             <field name="sepa_mandate_ref">SEPA-2024-002</field>
@@ -95,7 +95,7 @@
             <field name="contact_city">Nantes</field>
             <field name="mode_paiement">prelevement</field>
             <field name="bank_acc_holder_name">Pierre Leroy SARL</field>
-            <field name="bank_iban">FR7699887766554433221100998</field>
+            <field name="bank_iban">ES9121000418450200051332</field>
             <field name="bank_bic">BNPAGFPP</field>
             <field name="sepa_mandate_date" eval="(DateTime.today() - relativedelta(days=7)).strftime('%Y-%m-%d')"/>
             <field name="sepa_mandate_ref">SEPA-2024-003</field>
@@ -125,7 +125,7 @@
             <field name="contact_city">Toulouse</field>
             <field name="mode_paiement">prelevement</field>
             <field name="bank_acc_holder_name">Isabelle Moreau</field>
-            <field name="bank_iban">FR7655443322110099887766554</field>
+            <field name="bank_iban">IT60X0542811101000000123456</field>
             <field name="bank_bic">AGRIFRPP</field>
             <field name="sepa_mandate_date" eval="(DateTime.today() - relativedelta(days=10)).strftime('%Y-%m-%d')"/>
             <field name="sepa_mandate_ref">SEPA-2024-004</field>
@@ -192,7 +192,7 @@
             <field name="contact_city">Tours</field>
             <field name="mode_paiement">prelevement</field>
             <field name="bank_acc_holder_name">Marc Richard</field>
-            <field name="bank_iban">FR123456</field>
+            <field name="bank_iban">FR1420041010050500013M02607</field>
             <field name="stage_id" ref="souscriptions.stage_demande_recue"/>
             <field name="notes">IBAN à vérifier</field>
             <field name="kanban_state">blocked</field>

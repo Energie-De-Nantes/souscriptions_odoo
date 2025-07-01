@@ -82,9 +82,9 @@ class TestRaccordementBasic(SouscriptionsTestMixin, TransactionCase):
 class TestRaccordementIban(SouscriptionsTestMixin, TransactionCase):
     """Tests de validation IBAN"""
     
-    def test_iban_validation_valid(self):
-        """Test de validation IBAN avec un IBAN valide"""
-        demande = self.env['raccordement.demande'].create({
+    def create_base_demande(self, **kwargs):
+        """Helper pour créer une demande de base"""
+        defaults = {
             'pdl': 'TEST123456789',
             'date_debut_souhaitee': date.today() + timedelta(days=30),
             'puissance_souscrite': '6',
@@ -93,58 +93,249 @@ class TestRaccordementIban(SouscriptionsTestMixin, TransactionCase):
             'contact_street': 'Test Street',
             'contact_zip': '12345',
             'contact_city': 'Test City',
-            'bank_iban': 'FR7612345678901234567890123',
-        })
-        
+        }
+        defaults.update(kwargs)
+        return self.env['raccordement.demande'].create(defaults)
+    
+    # Tests existants mis à jour avec IBAN réellement valides
+    def test_iban_validation_valid(self):
+        """Test de validation IBAN avec un IBAN réellement valide"""
+        demande = self.create_base_demande(bank_iban='FR1420041010050500013M02606')
         self.assertTrue(demande.iban_valide)
     
     def test_iban_validation_invalid_too_short(self):
         """Test de validation IBAN avec un IBAN trop court"""
-        demande = self.env['raccordement.demande'].create({
-            'pdl': 'TEST123456789',
-            'date_debut_souhaitee': date.today() + timedelta(days=30),
-            'puissance_souscrite': '6',
-            'contact_nom': 'Test',
-            'contact_email': 'test@example.com',
-            'contact_street': 'Test Street',
-            'contact_zip': '12345',
-            'contact_city': 'Test City',
-            'bank_iban': 'FR123',
-        })
-        
+        demande = self.create_base_demande(bank_iban='FR123')
         self.assertFalse(demande.iban_valide)
     
     def test_iban_validation_invalid_format(self):
         """Test de validation IBAN avec un format invalide"""
-        demande = self.env['raccordement.demande'].create({
-            'pdl': 'TEST123456789',
-            'date_debut_souhaitee': date.today() + timedelta(days=30),
-            'puissance_souscrite': '6',
-            'contact_nom': 'Test',
-            'contact_email': 'test@example.com',
-            'contact_street': 'Test Street',
-            'contact_zip': '12345',
-            'contact_city': 'Test City',
-            'bank_iban': '123456789INVALID',
-        })
-        
+        demande = self.create_base_demande(bank_iban='123456789INVALID')
         self.assertFalse(demande.iban_valide)
     
     def test_iban_validation_empty(self):
         """Test de validation IBAN avec un IBAN vide"""
-        demande = self.env['raccordement.demande'].create({
-            'pdl': 'TEST123456789',
-            'date_debut_souhaitee': date.today() + timedelta(days=30),
-            'puissance_souscrite': '6',
-            'contact_nom': 'Test',
-            'contact_email': 'test@example.com',
-            'contact_street': 'Test Street',
-            'contact_zip': '12345',
-            'contact_city': 'Test City',
-            'bank_iban': '',
-        })
-        
+        demande = self.create_base_demande(bank_iban='')
         self.assertFalse(demande.iban_valide)
+    
+    # Nouveaux tests détaillés pour _validate_iban()
+    def test_validate_iban_method_valid_cases(self):
+        """Test méthode _validate_iban avec IBAN réellement valides"""
+        demande = self.create_base_demande()
+        
+        # IBAN français valide
+        self.assertTrue(demande._validate_iban('FR1420041010050500013M02606'))
+        
+        # IBAN avec espaces (doit être nettoyé)
+        self.assertTrue(demande._validate_iban('FR14 2004 1010 0505 0001 3M02 606'))
+        
+        # IBAN en minuscules (doit être converti)
+        self.assertTrue(demande._validate_iban('fr1420041010050500013m02606'))
+        
+        # IBAN allemand valide
+        self.assertTrue(demande._validate_iban('DE89370400440532013000'))
+        
+        # IBAN britannique valide
+        self.assertTrue(demande._validate_iban('GB29NWBK60161331926819'))
+        
+        # IBAN espagnol valide
+        self.assertTrue(demande._validate_iban('ES9121000418450200051332'))
+        
+        # IBAN italien valide
+        self.assertTrue(demande._validate_iban('IT60X0542811101000000123456'))
+    
+    def test_validate_iban_method_invalid_cases(self):
+        """Test méthode _validate_iban avec cas invalides"""
+        demande = self.create_base_demande()
+        
+        # IBAN vide
+        self.assertFalse(demande._validate_iban(''))
+        self.assertFalse(demande._validate_iban(None))
+        
+        # IBAN trop court
+        self.assertFalse(demande._validate_iban('FR76123'))
+        self.assertFalse(demande._validate_iban('DE89370'))
+        
+        # Format invalide - pas de lettres au début
+        self.assertFalse(demande._validate_iban('1234567890123456789'))
+        
+        # Format invalide - pas de chiffres après les lettres
+        self.assertFalse(demande._validate_iban('FRAB1234567890123456789'))
+        
+        # Format invalide - caractères spéciaux
+        self.assertFalse(demande._validate_iban('FR76-1234-5678-9012-3456'))
+        self.assertFalse(demande._validate_iban('FR76_1234_5678_9012_3456'))
+        self.assertFalse(demande._validate_iban('FR76@1234567890123456789'))
+        
+        # Format invalide - une seule lettre au début
+        self.assertFalse(demande._validate_iban('F7612345678901234567890123'))
+        
+        # Format invalide - trois lettres au début
+        self.assertFalse(demande._validate_iban('FRA1234567890123456789'))
+        
+        # IBAN avec checksum invalide (format correct mais modulo 97 échoue)
+        self.assertFalse(demande._validate_iban('FR1420041010050500013M02607'))  # 07 au lieu de 06
+        self.assertFalse(demande._validate_iban('DE89370400440532013001'))      # 01 au lieu de 00
+        self.assertFalse(demande._validate_iban('GB29NWBK60161331926818'))
+    
+    def test_compute_iban_valide_field(self):
+        """Test du champ calculé _compute_iban_valide"""
+        # Test avec IBAN valide
+        demande1 = self.create_base_demande(bank_iban='FR1420041010050500013M02606')
+        self.assertTrue(demande1.iban_valide)
+        
+        # Test avec IBAN invalide (checksum incorrecte)
+        demande2 = self.create_base_demande(bank_iban='FR1420041010050500013M02607')
+        self.assertFalse(demande2.iban_valide)
+        
+        # Test avec IBAN format invalide
+        demande3 = self.create_base_demande(bank_iban='INVALID123')
+        self.assertFalse(demande3.iban_valide)
+        
+        # Test avec IBAN vide
+        demande4 = self.create_base_demande(bank_iban='')
+        self.assertFalse(demande4.iban_valide)
+    
+    def test_compute_iban_valide_update_trigger(self):
+        """Test que le champ calculé se met à jour lors des changements"""
+        demande = self.create_base_demande(bank_iban='INVALID123')
+        
+        # Initialement invalide
+        self.assertFalse(demande.iban_valide)
+        
+        # Changer vers un IBAN valide
+        demande.bank_iban = 'FR1420041010050500013M02606'
+        # Force le recalcul du champ calculé
+        demande._compute_iban_valide()
+        self.assertTrue(demande.iban_valide)
+        
+        # Changer vers un IBAN avec checksum invalide
+        demande.bank_iban = 'FR1420041010050500013M02607'
+        demande._compute_iban_valide()
+        self.assertFalse(demande.iban_valide)
+        
+        # Changer vers un IBAN format invalide
+        demande.bank_iban = 'BAD'
+        demande._compute_iban_valide()
+        self.assertFalse(demande.iban_valide)
+        
+        # Vider l'IBAN
+        demande.bank_iban = ''
+        demande._compute_iban_valide()
+        self.assertFalse(demande.iban_valide)
+    
+    def test_compute_iban_valide_multiple_records(self):
+        """Test champ calculé sur plusieurs enregistrements simultanément"""
+        # Créer plusieurs demandes avec différents IBAN
+        demandes = self.env['raccordement.demande']
+        
+        demande1 = self.create_base_demande(
+            pdl='PDL001',
+            bank_iban='FR1420041010050500013M02606'  # IBAN français valide
+        )
+        demande2 = self.create_base_demande(
+            pdl='PDL002', 
+            bank_iban='FR1420041010050500013M02607'  # IBAN français invalide (checksum)
+        )
+        demande3 = self.create_base_demande(
+            pdl='PDL003',
+            bank_iban='INVALID123'  # Format invalide
+        )
+        demande4 = self.create_base_demande(
+            pdl='PDL004',
+            bank_iban=''  # Vide
+        )
+        demande5 = self.create_base_demande(
+            pdl='PDL005',
+            bank_iban='DE89370400440532013000'  # IBAN allemand valide
+        )
+        
+        demandes = demande1 + demande2 + demande3 + demande4 + demande5
+        
+        # Forcer le recalcul sur tous les enregistrements
+        demandes._compute_iban_valide()
+        
+        # Vérifier les résultats
+        self.assertTrue(demande1.iban_valide)   # IBAN français valide
+        self.assertFalse(demande2.iban_valide)  # IBAN français invalide (checksum)
+        self.assertFalse(demande3.iban_valide)  # Format invalide
+        self.assertFalse(demande4.iban_valide)  # IBAN vide
+        self.assertTrue(demande5.iban_valide)   # IBAN allemand valide
+    
+    def test_iban_spaces_and_case_normalization(self):
+        """Test normalisation des espaces et de la casse"""
+        demande = self.create_base_demande()
+        
+        # Test différents formats d'espacement du même IBAN valide
+        iban_formats = [
+            'FR1420041010050500013M02606',
+            'FR14 2004 1010 0505 0001 3M02 606',
+            'FR14  2004  1010  0505  0001  3M02  606',
+            'FR142004 1010 0505 0001 3M02606',
+            ' FR14 2004 1010 0505 0001 3M02 606 ',
+        ]
+        
+        for iban_format in iban_formats:
+            self.assertTrue(demande._validate_iban(iban_format), 
+                          f"IBAN format should be valid: {iban_format}")
+        
+        # Test différentes casses du même IBAN valide
+        case_formats = [
+            'FR1420041010050500013M02606',
+            'fr1420041010050500013m02606',
+            'Fr1420041010050500013M02606',
+            'fR1420041010050500013m02606',
+        ]
+        
+        for case_format in case_formats:
+            self.assertTrue(demande._validate_iban(case_format),
+                          f"IBAN case should be valid: {case_format}")
+    
+    def test_iban_modulo97_algorithm(self):
+        """Test spécifique de l'algorithme modulo 97"""
+        demande = self.create_base_demande()
+        
+        # Test de la méthode _check_iban_modulo directement
+        self.assertTrue(demande._check_iban_modulo('FR1420041010050500013M02606'))
+        self.assertFalse(demande._check_iban_modulo('FR1420041010050500013M02607'))
+        
+        # Test avec différents pays
+        self.assertTrue(demande._check_iban_modulo('DE89370400440532013000'))
+        self.assertTrue(demande._check_iban_modulo('GB29NWBK60161331926819'))
+        self.assertTrue(demande._check_iban_modulo('ES9121000418450200051332'))
+        
+        # Test avec checksums incorrectes
+        self.assertFalse(demande._check_iban_modulo('DE89370400440532013001'))
+        self.assertFalse(demande._check_iban_modulo('GB29NWBK60161331926818'))
+        self.assertFalse(demande._check_iban_modulo('ES9121000418450200051333'))
+    
+    def test_iban_validation_edge_cases(self):
+        """Test des cas limites de validation IBAN"""
+        demande = self.create_base_demande()
+        
+        # Test avec None
+        self.assertFalse(demande._validate_iban(None))
+        
+        # Test avec chaîne vide
+        self.assertFalse(demande._validate_iban(''))
+        
+        # Test avec espaces seulement
+        self.assertFalse(demande._validate_iban('   '))
+        
+        # Test avec IBAN très long (mais valide)
+        # Ce serait un IBAN de Saint-Marin par exemple
+        # self.assertTrue(demande._validate_iban('SM86U0322509800000000270100'))
+        
+        # Test avec caractères numériques seulement
+        self.assertFalse(demande._validate_iban('1234567890123456789'))
+        
+        # Test avec caractères alphabétiques seulement
+        self.assertFalse(demande._validate_iban('ABCDEFGHIJKLMNOPQRS'))
+        
+        # Test gestion d'erreur pour numeric_string trop grand (edge case)
+        # Ceci ne devrait pas arriver en pratique, mais testons la robustesse
+        very_long_invalid = 'AA' + '1' * 100  # IBAN artificiellement long
+        self.assertFalse(demande._validate_iban(very_long_invalid))
 
 
 @tagged('souscriptions', 'souscriptions_raccordement', 'post_install', '-at_install')
@@ -181,7 +372,7 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
             'contact_zip': '12345',
             'contact_city': 'Test City',
             'mode_paiement': 'prelevement',
-            'bank_iban': 'FR7612345678901234567890123',
+            'bank_iban': 'FR1420041010050500013M02606',
             'bank_bic': 'BNPAFRPP',
             'bank_acc_holder_name': 'Test User',
             'sepa_mandate_date': date.today(),

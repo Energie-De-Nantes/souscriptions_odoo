@@ -7,7 +7,7 @@ set -e
 echo "🔨 Construction de l'image Docker pour la démo..."
 
 # S'assurer qu'on est dans le bon répertoire
-if [ ! -f "docker-compose.yml" ]; then
+if [ ! -f "docker/docker-compose.yml" ]; then
     echo "❌ Erreur: Ce script doit être exécuté depuis le répertoire racine du projet"
     exit 1
 fi
@@ -18,7 +18,7 @@ LATEST="virgile42d/odoo-souscription-demo:latest"
 
 # Construire l'image
 echo "📦 Construction de l'image $TAG..."
-docker build -t $TAG -t $LATEST .
+docker build -f docker/Dockerfile -t $TAG -t $LATEST .
 
 # Se connecter à Docker Hub (demande identifiants si pas déjà connecté)
 echo "🔐 Connexion à Docker Hub..."
@@ -37,5 +37,5 @@ echo "   1. docker pull $LATEST"
 echo "   2. docker-compose -f docker-compose.demo.yml up -d"
 echo ""
 echo "Ou directement:"
-echo "   curl -O https://raw.githubusercontent.com/Energie-De-Nantes/souscriptions_odoo/refactor/minimal-version/docker-compose.demo.yml"
+echo "   curl -O https://raw.githubusercontent.com/Energie-De-Nantes/souscriptions_odoo/refactor/minimal-version/docker/docker-compose.demo.yml"
 echo "   docker-compose -f docker-compose.demo.yml up -d"

@@ -1,50 +1,31 @@
-# Git
-.git
+# Fichiers de développement
+*.pyc
+__pycache__/
+*.log
+.git/
 .gitignore
 
-# Python
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.egg
-*.egg-info
-dist
-build
-
-# Virtual environments
-venv/
-env/
-ENV/
-
-# IDE
-.vscode/
-.idea/
+# Fichiers temporaires et caches
+*.tmp
 *.swp
-*.swo
 *~
 
-# OS
-.DS_Store
-Thumbs.db
+# Documentation non nécessaire dans l'image
+*.md
+plan.md
 
-# Logs
-*.log
+# Tests (optionnel, peuvent être exclus pour réduire la taille)
+tests/
 
-# Test results
-.coverage
-htmlcov/
-.pytest_cache/
+# Fichiers de configuration locaux
+odoo-server.log
+unittest.cfg
 
-# Documentation
-docs/_build/
+# Démonstration locale (scripts non Docker)
+demo/launch_*.sh
+demo/load_demo_data.sh
+toggle_metier.sh
 
-# Temporary files
-*.tmp
-*.bak
-
-# Docker files themselves (avoid recursive copy)
-Dockerfile
-docker-compose.yml
-.dockerignore
+# VSCode/IDE
+.vscode/
+.idea/

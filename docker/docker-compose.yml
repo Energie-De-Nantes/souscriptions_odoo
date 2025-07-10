@@ -16,7 +16,9 @@ services:
       retries: 5
 
   odoo:
-    build: .
+    build: 
+      context: ../
+      dockerfile: docker/Dockerfile
     depends_on:
       db:
         condition: service_healthy
@@ -28,7 +30,7 @@ services:
       - PASSWORD=odoo
     volumes:
       - odoo-web-data:/var/lib/odoo
-      - ./:/mnt/extra-addons/souscriptions:ro
+      - ../:/mnt/extra-addons/souscriptions:ro
       - ./config/odoo.conf:/etc/odoo/odoo.conf:ro
     command: >
       odoo
@@ -39,7 +41,9 @@ services:
       --load-language=fr_FR
 
   odoo-dev:
-    build: .
+    build: 
+      context: ../
+      dockerfile: docker/Dockerfile
     depends_on:
       db:
         condition: service_healthy
@@ -51,7 +55,7 @@ services:
       - PASSWORD=odoo
     volumes:
       - odoo-web-data:/var/lib/odoo
-      - ./:/mnt/extra-addons/souscriptions:rw
+      - ../:/mnt/extra-addons/souscriptions:rw
     command: >
       odoo
       --db_host=db

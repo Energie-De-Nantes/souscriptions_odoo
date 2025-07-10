@@ -1,16 +1,27 @@
 # Déploiement ultra-simple avec Docker Hub
 
-## Pour la machine de démo (2 commandes!)
+## Option 1 : Une seule commande (vraiment !)
 
 ```bash
-# 1. Télécharger le fichier de configuration
-curl -O https://raw.githubusercontent.com/Energie-De-Nantes/souscriptions_odoo/refactor/minimal-version/docker-compose.demo.yml
-
-# 2. Lancer la démo
-docker-compose -f docker-compose.demo.yml up -d
+curl -sSL https://raw.githubusercontent.com/Energie-De-Nantes/souscriptions_odoo/refactor/minimal-version/scripts/demo_oneliner.sh | bash
 ```
 
-C'est tout ! Accès sur http://localhost:8069 (admin/admin)
+C'est tout ! Cette commande va :
+- Télécharger et lancer PostgreSQL
+- Télécharger et lancer Odoo avec le module pré-configuré
+- Créer automatiquement les données de démo
+
+Accès sur http://localhost:8069 (admin/admin)
+
+## Option 2 : Avec docker-compose (si vous préférez)
+
+```bash
+# Télécharger le fichier de configuration
+curl -O https://raw.githubusercontent.com/Energie-De-Nantes/souscriptions_odoo/refactor/minimal-version/docker-compose.demo.yml
+
+# Lancer la démo
+docker-compose -f docker-compose.demo.yml up -d
+```
 
 ## Pour mettre à jour
 

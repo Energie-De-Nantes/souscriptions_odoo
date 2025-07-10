@@ -6,7 +6,8 @@ set -e
 # Fonction pour attendre PostgreSQL
 wait_for_postgres() {
     echo "Attente de PostgreSQL..."
-    until PGPASSWORD=$PASSWORD psql -h "$HOST" -U "$USER" -c '\q' 2>/dev/null; do
+    export PGPASSWORD=$PASSWORD
+    until psql -h "$HOST" -U "$USER" -d postgres -c '\q' 2>/dev/null; do
         echo -n "."
         sleep 1
     done
@@ -17,13 +18,14 @@ wait_for_postgres() {
 wait_for_postgres
 
 # Vérifier si la base de données existe déjà
-if PGPASSWORD=$PASSWORD psql -h "$HOST" -U "$USER" -lqt | cut -d \| -f 1 | grep -qw souscriptions_demo; then
+export PGPASSWORD=$PASSWORD
+if psql -h "$HOST" -U "$USER" -d postgres -lqt | cut -d \| -f 1 | grep -qw souscriptions_demo; then
     echo "✅ Base de données déjà initialisée"
 else
     echo "🗄️ Initialisation de la base de données..."
     
     # Créer la base
-    PGPASSWORD=$PASSWORD createdb -h "$HOST" -U "$USER" souscriptions_demo
+    createdb -h "$HOST" -U "$USER" souscriptions_demo
     
     # Initialiser Odoo avec le module
     odoo --db_host="$HOST" --db_user="$USER" --db_password="$PASSWORD" \
@@ -81,6 +83,9 @@ souscriptions_data = [
     (partners[3], "18", "hphc", False, 0, 250, 150)
 ]
 
+# Récupérer l'état de facturation par défaut
+etat_a_facturer = env.ref("souscriptions.etat_a_facturer")
+
 for i, (partner, puissance, tarif, lisse, base_kwh, hp_kwh, hc_kwh) in enumerate(souscriptions_data):
     env["souscription.souscription"].create({
         "partner_id": partner.id,
@@ -95,7 +100,8 @@ for i, (partner, puissance, tarif, lisse, base_kwh, hp_kwh, hc_kwh) in enumerate
         "mode_paiement": "prelevement" if i % 2 == 0 else "virement",
         "coeff_pro": 10.0 if partner.is_company else 0.0,
         "ref_compteur": f"COMP{i+1:04d}",
-        "numero_depannage": "09 726 750 01"
+        "numero_depannage": "09 726 750 01",
+        "etat_facturation_id": etat_a_facturer.id
     })
 
 env.cr.commit()

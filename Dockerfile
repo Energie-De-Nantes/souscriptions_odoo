@@ -2,10 +2,11 @@ FROM odoo:18.0
 
 USER root
 
-# Installer les dépendances Python disponibles via apt
+# Installer les dépendances Python et PostgreSQL client
 RUN apt-get update && apt-get install -y \
     python3-pandas \
     python3-watchdog \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Installer les packages non disponibles via pip

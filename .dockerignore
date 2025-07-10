@@ -1,0 +1,50 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info
+dist
+build
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test results
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Documentation
+docs/_build/
+
+# Temporary files
+*.tmp
+*.bak
+
+# Docker files themselves (avoid recursive copy)
+Dockerfile
+docker-compose.yml
+.dockerignore

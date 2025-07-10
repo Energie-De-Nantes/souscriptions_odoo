@@ -24,3 +24,10 @@ USER odoo
 # Configuration par défaut
 ENV ODOO_RC=/etc/odoo/odoo.conf
 ENV ADDONS_PATH=/mnt/extra-addons
+
+# Copier et utiliser notre script d'entrée personnalisé
+COPY --chown=odoo:odoo docker-entrypoint-init.sh /
+RUN chmod +x /docker-entrypoint-init.sh
+
+# Utiliser notre entrypoint qui initialise automatiquement la démo
+ENTRYPOINT ["/docker-entrypoint-init.sh"]

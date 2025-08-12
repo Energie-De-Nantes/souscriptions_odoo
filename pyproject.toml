@@ -15,7 +15,10 @@ babel = "^2.14.0"  # Pour la localisation française
 psycopg2-binary = "^2.9.0"  # Pour vérifier les données dans PostgreSQL
 
 [tool.poetry.group.dev.dependencies]
-# Dépendances de développement si nécessaire
+# Pour le rechargement automatique du code Odoo (d'après doc Odoo officielle)
+watchdog = "^6.0.0"  # Module watchdog pour auto-reload
+inotify = "^0.2.10"  # Module inotify exact requis par Odoo
+# Autres outils de développement (à décommenter si besoin)
 # pytest = "^7.4.0"
 # black = "^23.0.0"
 # ruff = "^0.1.0"

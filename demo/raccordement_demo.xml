@@ -23,7 +23,7 @@
             <field name="bank_acc_holder_name">Marie Dupont</field>
             <field name="bank_iban">FR1420041010050500013M02606</field>
             <field name="bank_bic">BNPAFRPP</field>
-            <field name="stage_id" ref="souscriptions.stage_demande_recue"/>
+            <field name="stage_id" ref="stage_demande_recue"/>
             <field name="notes">Nouvelle demande de raccordement pour un appartement</field>
         </record>
         
@@ -49,7 +49,7 @@
             <field name="bank_bic">SOGEFRPP</field>
             <field name="sepa_mandate_date" eval="DateTime.today().strftime('%Y-%m-%d')"/>
             <field name="sepa_mandate_ref">SEPA-2024-001</field>
-            <field name="stage_id" ref="souscriptions.stage_iban_valide"/>
+            <field name="stage_id" ref="stage_iban_valide"/>
         </record>
         
         <!-- Demande 3: Demande SGE faite -->
@@ -75,7 +75,7 @@
             <field name="sepa_mandate_date" eval="(DateTime.today() - relativedelta(days=3)).strftime('%Y-%m-%d')"/>
             <field name="sepa_mandate_ref">SEPA-2024-002</field>
             <field name="date_demande_sge" eval="(DateTime.today() - relativedelta(days=2)).strftime('%Y-%m-%d')"/>
-            <field name="stage_id" ref="souscriptions.stage_demande_sge"/>
+            <field name="stage_id" ref="stage_demande_sge"/>
         </record>
         
         <!-- Demande 4: Demande mesures faite (PROFESSIONNELLE) -->
@@ -102,7 +102,7 @@
             <field name="sepa_mandate_ref">SEPA-2024-003</field>
             <field name="date_demande_sge" eval="(DateTime.today() - relativedelta(days=5)).strftime('%Y-%m-%d')"/>
             <field name="date_demande_mesures" eval="(DateTime.today() - relativedelta(days=3)).strftime('%Y-%m-%d')"/>
-            <field name="stage_id" ref="souscriptions.stage_demande_mesures"/>
+            <field name="stage_id" ref="stage_demande_mesures"/>
             <field name="notes">Client professionnel - Boulangerie</field>
             <field name="kanban_state">blocked</field>
         </record>
@@ -133,7 +133,7 @@
             <field name="date_demande_sge" eval="(DateTime.today() - relativedelta(days=8)).strftime('%Y-%m-%d')"/>
             <field name="date_demande_mesures" eval="(DateTime.today() - relativedelta(days=5)).strftime('%Y-%m-%d')"/>
             <field name="date_estimation" eval="(DateTime.today() - relativedelta(days=1)).strftime('%Y-%m-%d')"/>
-            <field name="stage_id" ref="souscriptions.stage_estimation"/>
+            <field name="stage_id" ref="stage_estimation"/>
             <field name="kanban_state">done</field>
         </record>
         
@@ -153,7 +153,7 @@
             <field name="contact_zip">59000</field>
             <field name="contact_city">Lille</field>
             <field name="mode_paiement">cheque_energie</field>
-            <field name="stage_id" ref="souscriptions.stage_demande_recue"/>
+            <field name="stage_id" ref="stage_demande_recue"/>
             <field name="notes">Bénéficiaire du chèque énergie</field>
         </record>
         
@@ -174,7 +174,7 @@
             <field name="contact_zip">67000</field>
             <field name="contact_city">Strasbourg</field>
             <field name="mode_paiement">virement</field>
-            <field name="stage_id" ref="souscriptions.stage_demande_recue"/>
+            <field name="stage_id" ref="stage_demande_recue"/>
         </record>
         
         <!-- Demande 8: IBAN non valide pour test -->
@@ -195,7 +195,7 @@
             <field name="mode_paiement">prelevement</field>
             <field name="bank_acc_holder_name">Marc Richard</field>
             <field name="bank_iban">FR1420041010050500013M02607</field>
-            <field name="stage_id" ref="souscriptions.stage_demande_recue"/>
+            <field name="stage_id" ref="stage_demande_recue"/>
             <field name="notes">IBAN à vérifier</field>
             <field name="kanban_state">blocked</field>
         </record>

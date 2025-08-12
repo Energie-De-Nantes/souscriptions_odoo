@@ -118,7 +118,7 @@
     <menuitem
         id="menu_grille_prix"
         name="Grilles de Prix"
-        parent="souscriptions.menu_souscription_root"
+        parent="menu_souscription_root"
         action="action_grille_prix"
         sequence="20"/>
         

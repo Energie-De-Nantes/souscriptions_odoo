@@ -84,7 +84,7 @@ class GrillePrix(models.Model):
         # Recherche de la ligne abonnement standard ou solidaire
         product_ref = 'souscriptions_product_abonnement_solidaire' if is_solidaire else 'souscriptions_product_abonnement_standard'
         try:
-            product = self.env.ref(f'souscriptions.{product_ref}')
+            product = self.env.ref(f'souscriptions_odoo.{product_ref}')
         except:
             raise UserError(f"Produit d'abonnement non trouvé : {product_ref}")
             

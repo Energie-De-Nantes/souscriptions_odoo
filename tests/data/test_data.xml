@@ -16,19 +16,19 @@
         <!-- Prix énergies pour tests -->
         <record id="test_prix_energie_base" model="grille.prix.ligne">
             <field name="grille_id" ref="test_grille_prix_complete"/>
-            <field name="product_id" ref="souscriptions.souscriptions_product_energie_base"/>
+            <field name="product_id" ref="souscriptions_odoo.souscriptions_product_energie_base"/>
             <field name="prix_interne">0.2276</field>
         </record>
         
         <record id="test_prix_energie_hp" model="grille.prix.ligne">
             <field name="grille_id" ref="test_grille_prix_complete"/>
-            <field name="product_id" ref="souscriptions.souscriptions_product_energie_hp"/>
+            <field name="product_id" ref="souscriptions_odoo.souscriptions_product_energie_hp"/>
             <field name="prix_interne">0.2516</field>
         </record>
         
         <record id="test_prix_energie_hc" model="grille.prix.ligne">
             <field name="grille_id" ref="test_grille_prix_complete"/>
-            <field name="product_id" ref="souscriptions.souscriptions_product_energie_hc"/>
+            <field name="product_id" ref="souscriptions_odoo.souscriptions_product_energie_hc"/>
             <field name="prix_interne">0.2032</field>
         </record>
         

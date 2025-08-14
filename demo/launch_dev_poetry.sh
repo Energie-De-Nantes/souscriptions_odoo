@@ -31,10 +31,10 @@ if ! psql -lqt | cut -d \| -f 1 | grep -qw $DB_NAME; then
         echo "✅ Base de données créée"
         
         # Installer le module
-        echo "📊 Installation du module souscriptions..."
+        echo "📊 Installation du module souscriptions_odoo..."
         poetry run odoo -d $DB_NAME \
              --addons-path="$ADDONS_PATH" \
-             -i souscriptions \
+             -i souscriptions_odoo \
              --load-language=fr_FR \
              --stop-after-init
     else

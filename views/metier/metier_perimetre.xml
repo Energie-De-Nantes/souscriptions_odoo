@@ -27,12 +27,12 @@
 
                     <group string="Index avant événement" invisible="not index_avant_id">
                         
-                        <field name="index_avant_id" context="{'form_view_ref': 'souscriptions.view_mesure_index_form'}"/>
+                        <field name="index_avant_id" context="{'form_view_ref': 'souscriptions_odoo.view_mesure_index_form'}"/>
                     </group>
 
                     <group string="Index après événement" invisible="not index_apres_id">
                         
-                        <field name="index_apres_id" context="{'form_view_ref': 'souscriptions.view_mesure_index_form'}"/>
+                        <field name="index_apres_id" context="{'form_view_ref': 'souscriptions_odoo.view_mesure_index_form'}"/>
                     </group>
                 </sheet>
             </form>

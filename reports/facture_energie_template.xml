@@ -148,7 +148,7 @@
         <field name="name">Facture d'Électricité</field>
         <field name="model">account.move</field>
         <field name="report_type">qweb-pdf</field>
-        <field name="report_name">souscriptions.report_facture_energie</field>
+        <field name="report_name">souscriptions_odoo.report_facture_energie</field>
         <field name="report_file">Facture_Energie</field>
         <field name="print_report_name">'Facture_Energie_%s' % (object.name)</field>
         <field name="binding_model_id" ref="account.model_account_move"/>

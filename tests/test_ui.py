@@ -39,7 +39,7 @@ class TestSouscriptionsUI(SouscriptionsTestMixin, HttpCase):
         self.authenticate('test_souscriptions', 'test_souscriptions')
         
         # Accéder à la vue liste des souscriptions
-        response = self.url_open('/web#action=souscriptions.action_souscription_souscription')
+        response = self.url_open('/web#action=souscriptions_odoo.action_souscription_souscription')
         self.assertEqual(response.status_code, 200)
         
         # Vérifier que la page contient les éléments attendus
@@ -79,7 +79,7 @@ class TestSouscriptionsUI(SouscriptionsTestMixin, HttpCase):
             self.create_test_periode(self.souscription_base)
         
         # Accéder à la vue des périodes
-        response = self.url_open('/web#action=souscriptions.action_souscription_periode')
+        response = self.url_open('/web#action=souscriptions_odoo.action_souscription_periode')
         self.assertEqual(response.status_code, 200)
 
 
@@ -111,7 +111,7 @@ class TestSouscriptionsReports(SouscriptionsTestMixin, HttpCase):
     def test_facture_energie_pdf(self):
         """Test de génération du PDF de facture d'énergie."""
         # Test de génération via l'interface web
-        report_url = f'/report/pdf/souscriptions.report_facture_energie/{self.facture_test.id}'
+        report_url = f'/report/pdf/souscriptions_odoo.report_facture_energie/{self.facture_test.id}'
         
         response = self.url_open(report_url)
         
@@ -125,7 +125,7 @@ class TestSouscriptionsReports(SouscriptionsTestMixin, HttpCase):
     def test_facture_energie_html_preview(self):
         """Test de prévisualisation HTML de la facture."""
         # Prévisualisation HTML (sans PDF)
-        report_url = f'/report/html/souscriptions.report_facture_energie/{self.facture_test.id}'
+        report_url = f'/report/html/souscriptions_odoo.report_facture_energie/{self.facture_test.id}'
         
         response = self.url_open(report_url)
         self.assertEqual(response.status_code, 200)
@@ -139,7 +139,7 @@ class TestSouscriptionsReports(SouscriptionsTestMixin, HttpCase):
     def test_report_souscription_contrat(self):
         """Test du rapport de contrat de souscription."""
         # Si un rapport de contrat existe
-        report_url = f'/report/pdf/souscriptions.report_souscription_contrat/{self.souscription_base.id}'
+        report_url = f'/report/pdf/souscriptions_odoo.report_souscription_contrat/{self.souscription_base.id}'
         
         response = self.url_open(report_url)
         

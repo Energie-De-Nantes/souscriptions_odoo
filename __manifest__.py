@@ -1,5 +1,5 @@
 {
-    "name": "Souscriptions",
+    "name": "Souscriptions Électricité",
     "version": "1.0.0",
     "depends": ["base", "mail", "contacts", "account", "portal"],
     "author": "Virgile Daugé",

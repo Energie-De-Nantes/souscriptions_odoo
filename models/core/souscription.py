@@ -151,7 +151,7 @@ class Souscription(models.Model):
         product_ref = 'souscriptions_product_abonnement_solidaire' if tarif_solidaire else 'souscriptions_product_abonnement_standard'
         
         try:
-            return self.env.ref(f'souscriptions.{product_ref}')
+            return self.env.ref(f'souscriptions_odoo.{product_ref}')
         except:
             type_abo = "solidaire" if tarif_solidaire else "standard"
             raise UserError(f"Produit d'abonnement {type_abo} non trouvé")
@@ -159,9 +159,9 @@ class Souscription(models.Model):
     def _get_produit_energie(self, type_energie):
         """Trouve le produit d'énergie correspondant au type (base, hp, hc)"""
         xmlid_map = {
-            'base': 'souscriptions.souscriptions_product_energie_base',
-            'hp': 'souscriptions.souscriptions_product_energie_hp', 
-            'hc': 'souscriptions.souscriptions_product_energie_hc'
+            'base': 'souscriptions_odoo.souscriptions_product_energie_base',
+            'hp': 'souscriptions_odoo.souscriptions_product_energie_hp', 
+            'hc': 'souscriptions_odoo.souscriptions_product_energie_hc'
         }
         
         xmlid = xmlid_map.get(type_energie.lower())

@@ -42,7 +42,7 @@ class SouscriptionPortal(CustomerPortal):
             'default_url': '/my/souscriptions',
         })
         
-        return request.render("souscriptions.portal_my_souscriptions", values)
+        return request.render("souscriptions_odoo.portal_my_souscriptions", values)
 
     @http.route(['/my/souscription/<int:souscription_id>'], type='http', auth="user", website=True)
     def portal_my_souscription(self, souscription_id=None, **kw):
@@ -58,7 +58,7 @@ class SouscriptionPortal(CustomerPortal):
             'page_name': 'souscription',
         }
         
-        return request.render("souscriptions.portal_souscription_page", values)
+        return request.render("souscriptions_odoo.portal_souscription_page", values)
 
     @http.route(['/my/souscription/<int:souscription_id>/periodes'], type='http', auth="user", website=True)
     def portal_souscription_periodes(self, souscription_id=None, **kw):
@@ -78,4 +78,4 @@ class SouscriptionPortal(CustomerPortal):
             'page_name': 'souscription_periodes',
         }
         
-        return request.render("souscriptions.portal_souscription_periodes", values)
+        return request.render("souscriptions_odoo.portal_souscription_periodes", values)

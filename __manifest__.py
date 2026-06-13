@@ -6,23 +6,24 @@
     "category": "Energy",
     "license": "AGPL-3",
     "description": """
-        Gestion des souscriptions électriques
-        
-        Module principal pour la gestion des contrats de fourniture d'électricité.
-        Remplace le module abonnement standard d'Odoo qui n'est pas adapté 
-        aux spécificités de la fourniture d'électricité.
-        
-        Fonctionnalités :
-        - Gestion des contrats de souscription avec cadrans énergétiques
-        - Périodes de facturation mensuelles avec support lissage
-        - Intégration avec la facturation Odoo
-        - Support facturation HP/HC et Base
-        - Régularisation des contrats lissés
+Gestion des souscriptions électriques
 
-        Les calculs métier et l'ingestion des données Enedis (périmètre,
-        prestations, index, TURPE, accise) sont délégués à electricore, qui
-        alimente les périodes de facturation via son API.
-    """,
+Module principal pour la gestion des contrats de fourniture d'électricité.
+Remplace le module abonnement standard d'Odoo qui n'est pas adapté aux
+spécificités de la fourniture d'électricité.
+
+Fonctionnalités :
+
+- Gestion des contrats de souscription avec cadrans énergétiques
+- Périodes de facturation mensuelles avec support lissage
+- Intégration avec la facturation Odoo
+- Support facturation HP/HC et Base
+- Régularisation des contrats lissés
+
+Les calculs métier et l'ingestion des données Enedis (périmètre, prestations,
+index, TURPE, accise) sont délégués à electricore, qui alimente les périodes
+de facturation via son API.
+""",
     "installable": True,
     "application": True,
     "auto_install": False, 

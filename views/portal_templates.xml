@@ -198,67 +198,90 @@
                                 </div>
                             </div>
 
-                            <!-- Navigation vers les périodes -->
-                            <div class="text-center mb-4">
-                                <a t-attf-href="/my/souscription/#{souscription.id}/periodes" 
-                                   class="btn btn-primary">
-                                    <i class="fa fa-calendar"/> Voir l'historique des consommations
-                                </a>
-                            </div>
-                            
-                            <!-- Factures récentes -->
-                            <h5 class="mt-4">Factures récentes</h5>
-                            <t t-if="souscription.facture_ids">
+                            <!-- Historique des consommations (intégré à la page) -->
+                            <h5 class="mt-4">Historique des consommations</h5>
+                            <t t-if="not periodes">
+                                <p class="text-muted">Aucune période facturée pour cette souscription.</p>
+                            </t>
+                            <t t-else="">
                                 <div class="table-responsive">
-                                    <table class="table table-sm table-striped">
+                                    <table class="table table-sm table-striped align-middle">
                                         <thead>
                                             <tr>
-                                                <th>Numéro</th>
-                                                <th>Date</th>
                                                 <th>Période</th>
-                                                <th>Montant TTC</th>
-                                                <th>État</th>
-                                                <th class="text-end">Actions</th>
+                                                <th>Type</th>
+                                                <t t-if="souscription.type_tarif == 'base'">
+                                                    <th class="text-end">Énergie Base (kWh)</th>
+                                                </t>
+                                                <t t-else="">
+                                                    <th class="text-end">Énergie HP (kWh)</th>
+                                                    <th class="text-end">Énergie HC (kWh)</th>
+                                                </t>
+                                                <th class="text-end">TURPE Fixe (€)</th>
+                                                <th class="text-end">TURPE Variable (€)</th>
+                                                <th class="text-end">Montant TTC</th>
+                                                <th class="text-center">Paiement</th>
+                                                <th class="text-center">Facture</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <t t-foreach="souscription.facture_ids[:10]" t-as="facture">
-                                                <tr>
+                                            <t t-foreach="periodes" t-as="periode">
+                                                <tr t-attf-class="#{'collapse periode-extra' if periode_index &gt;= 12 else ''}">
                                                     <td>
-                                                        <a t-attf-href="/my/invoices/#{facture.id}">
-                                                            <t t-esc="facture.name"/>
-                                                        </a>
+                                                        <strong t-esc="periode.date_debut.strftime('%m/%Y') if periode.date_debut else '-'"/>
+                                                        <br/>
+                                                        <small class="text-muted">
+                                                            <t t-esc="periode.date_debut.strftime('%d/%m/%Y') if periode.date_debut else ''"/> -
+                                                            <t t-esc="periode.date_fin.strftime('%d/%m/%Y') if periode.date_fin else ''"/>
+                                                        </small>
                                                     </td>
                                                     <td>
-                                                        <t t-esc="facture.invoice_date.strftime('%d/%m/%Y') if facture.invoice_date else '-'"/>
+                                                        <span class="badge rounded-pill text-bg-secondary">
+                                                            <t t-esc="dict(periode._fields['type_periode'].selection).get(periode.type_periode, periode.type_periode)"/>
+                                                        </span>
                                                     </td>
-                                                    <td>
-                                                        <t t-if="facture.periode_id">
-                                                            <t t-esc="facture.periode_id.mois_annee"/>
+                                                    <t t-if="souscription.type_tarif == 'base'">
+                                                        <td class="text-end">
+                                                            <strong><t t-esc="periode.energie_base_kwh or 0"/></strong>
+                                                            <t t-if="periode.provision_base_kwh">
+                                                                <br/><small class="text-muted">Prov: <t t-esc="periode.provision_base_kwh"/></small>
+                                                            </t>
+                                                        </td>
+                                                    </t>
+                                                    <t t-else="">
+                                                        <td class="text-end">
+                                                            <strong><t t-esc="periode.energie_hp_kwh or 0"/></strong>
+                                                            <t t-if="periode.provision_hp_kwh">
+                                                                <br/><small class="text-muted">Prov: <t t-esc="periode.provision_hp_kwh"/></small>
+                                                            </t>
+                                                        </td>
+                                                        <td class="text-end">
+                                                            <strong><t t-esc="periode.energie_hc_kwh or 0"/></strong>
+                                                            <t t-if="periode.provision_hc_kwh">
+                                                                <br/><small class="text-muted">Prov: <t t-esc="periode.provision_hc_kwh"/></small>
+                                                            </t>
+                                                        </td>
+                                                    </t>
+                                                    <td class="text-end"><t t-esc="'%.2f' % (periode.turpe_fixe or 0)"/></td>
+                                                    <td class="text-end"><t t-esc="'%.2f' % (periode.turpe_variable or 0)"/></td>
+                                                    <td class="text-end">
+                                                        <strong><t t-esc="'%.2f' % (periode.facture_id.amount_total or 0)"/> €</strong>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <t t-if="periode.facture_id.payment_state == 'paid'">
+                                                            <span class="badge rounded-pill text-bg-success"><i class="fa fa-check"/> Payée</span>
                                                         </t>
-                                                        <t t-else="">-</t>
-                                                    </td>
-                                                    <td>
-                                                        <strong><t t-esc="'%.2f' % facture.amount_total"/> €</strong>
-                                                    </td>
-                                                    <td>
-                                                        <t t-if="facture.payment_state == 'paid'">
-                                                            <span class="badge rounded-pill text-bg-success">
-                                                                <i class="fa fa-check"/> Payée
-                                                            </span>
-                                                        </t>
-                                                        <t t-elif="facture.payment_state == 'partial'">
+                                                        <t t-elif="periode.facture_id.payment_state == 'partial'">
                                                             <span class="badge rounded-pill text-bg-warning">Partielle</span>
                                                         </t>
                                                         <t t-else="">
                                                             <span class="badge rounded-pill text-bg-danger">Impayée</span>
                                                         </t>
                                                     </td>
-                                                    <td class="text-end">
-                                                        <a t-attf-href="/my/invoices/#{facture.id}" 
-                                                           class="btn btn-sm btn-secondary"
-                                                           title="Télécharger PDF">
-                                                            <i class="fa fa-download"/>
+                                                    <td class="text-center">
+                                                        <a t-attf-href="/my/invoices/#{periode.facture_id.id}"
+                                                           class="btn btn-sm btn-outline-primary" title="Voir la facture">
+                                                            <i class="fa fa-file-text-o"/> <t t-esc="periode.facture_id.name"/>
                                                         </a>
                                                     </td>
                                                 </tr>
@@ -266,9 +289,56 @@
                                         </tbody>
                                     </table>
                                 </div>
-                            </t>
-                            <t t-else="">
-                                <p class="text-muted">Aucune facture émise pour cette souscription.</p>
+
+                                <t t-if="len(periodes) &gt; 12">
+                                    <div class="text-center mb-3">
+                                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                                data-bs-toggle="collapse" data-bs-target=".periode-extra"
+                                                aria-expanded="false">
+                                            <i class="fa fa-chevron-down"/> Voir plus
+                                        </button>
+                                    </div>
+                                </t>
+
+                                <!-- Totaux (sur toutes les périodes facturées) + glossaire -->
+                                <t t-set="total_kwh" t-value="0"/>
+                                <t t-set="total_turpe" t-value="0"/>
+                                <t t-set="total_facture" t-value="0"/>
+                                <t t-foreach="periodes" t-as="p">
+                                    <t t-if="souscription.type_tarif == 'base'">
+                                        <t t-set="total_kwh" t-value="total_kwh + (p.energie_base_kwh or 0)"/>
+                                    </t>
+                                    <t t-else="">
+                                        <t t-set="total_kwh" t-value="total_kwh + (p.energie_hp_kwh or 0) + (p.energie_hc_kwh or 0)"/>
+                                    </t>
+                                    <t t-set="total_turpe" t-value="total_turpe + (p.turpe_fixe or 0) + (p.turpe_variable or 0)"/>
+                                    <t t-set="total_facture" t-value="total_facture + (p.facture_id.amount_total or 0)"/>
+                                </t>
+                                <div class="row mt-3">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-header py-2"><h6 class="mb-0"><i class="fa fa-info-circle"/> Informations</h6></div>
+                                            <div class="card-body py-2">
+                                                <p class="mb-1"><strong>TURPE</strong> : Tarif d'Utilisation des Réseaux Publics d'Électricité</p>
+                                                <p class="mb-1"><strong>HP/HC</strong> : Heures Pleines / Heures Creuses</p>
+                                                <t t-if="souscription.lisse">
+                                                    <p class="mb-0"><strong>Facturation lissée</strong> : les écarts entre provision et consommation réelle sont régularisés périodiquement.</p>
+                                                </t>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-header py-2"><h6 class="mb-0"><i class="fa fa-calculator"/> Totaux</h6></div>
+                                            <div class="card-body py-2">
+                                                <p class="mb-1"><strong>Consommation totale :</strong> <t t-esc="'%.0f' % total_kwh"/> kWh</p>
+                                                <p class="mb-1"><strong>TURPE total :</strong> <t t-esc="'%.2f' % total_turpe"/> €</p>
+                                                <p class="mb-1"><strong>Total facturé :</strong> <t t-esc="'%.2f' % total_facture"/> €</p>
+                                                <p class="mb-0"><strong>Nombre de périodes :</strong> <t t-esc="len(periodes)"/></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </t>
 
                             <!-- Informations de contact -->
@@ -291,217 +361,4 @@
         </t>
     </template>
 
-    <!-- Vue des périodes d'une souscription -->
-    <template id="portal_souscription_periodes" name="Périodes de facturation">
-        <t t-call="portal.portal_layout">
-            <t t-set="breadcrumbs_searchbar" t-value="True"/>
-            
-            <nav aria-label="breadcrumb" class="mb-4">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item">
-                        <a href="/my/souscriptions">Mes Souscriptions</a>
-                    </li>
-                    <li class="breadcrumb-item">
-                        <a t-attf-href="/my/souscription/#{souscription.id}">
-                            <t t-esc="souscription.name"/>
-                        </a>
-                    </li>
-                    <li class="breadcrumb-item active" aria-current="page">
-                        Périodes de facturation
-                    </li>
-                </ol>
-            </nav>
-            
-            <div class="row">
-                <div class="col-12">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h1>Historique des consommations</h1>
-                        <div class="text-muted">
-                            <small>Souscription : <strong><t t-esc="souscription.name"/></strong></small>
-                        </div>
-                    </div>
-                    
-                    <!-- Informations du contrat en résumé -->
-                    <div class="card mb-4">
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <small class="text-muted">PDL</small><br/>
-                                    <strong><t t-esc="souscription.pdl"/></strong>
-                                </div>
-                                <div class="col-md-3">
-                                    <small class="text-muted">Puissance</small><br/>
-                                    <strong><t t-esc="souscription.puissance_souscrite"/> kVA</strong>
-                                </div>
-                                <div class="col-md-3">
-                                    <small class="text-muted">Type de tarif</small><br/>
-                                    <strong>
-                                        <t t-if="souscription.type_tarif == 'base'">Base</t>
-                                        <t t-else="">HP/HC</t>
-                                    </strong>
-                                </div>
-                                <div class="col-md-3">
-                                    <small class="text-muted">Facturation</small><br/>
-                                    <strong>
-                                        <t t-if="souscription.lisse">Lissée</t>
-                                        <t t-else="">Au réel</t>
-                                    </strong>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Liste des périodes -->
-                    <t t-if="not periodes">
-                        <div class="alert alert-info" role="alert">
-                            <p class="mb-0">Aucune période de facturation trouvée pour cette souscription.</p>
-                        </div>
-                    </t>
-                    
-                    <t t-else="">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Période</th>
-                                        <th>Type</th>
-                                        <t t-if="souscription.type_tarif == 'base'">
-                                            <th class="text-end">Énergie Base (kWh)</th>
-                                        </t>
-                                        <t t-else="">
-                                            <th class="text-end">Énergie HP (kWh)</th>
-                                            <th class="text-end">Énergie HC (kWh)</th>
-                                        </t>
-                                        <th class="text-end">TURPE Fixe (€)</th>
-                                        <th class="text-end">TURPE Variable (€)</th>
-                                        <th class="text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <t t-foreach="periodes" t-as="periode">
-                                        <tr>
-                                            <td>
-                                                <strong>
-                                                    <t t-esc="periode.date_debut.strftime('%m/%Y') if periode.date_debut else '-'"/>
-                                                </strong>
-                                                <br/>
-                                                <small class="text-muted">
-                                                    <t t-esc="periode.date_debut.strftime('%d/%m/%Y') if periode.date_debut else ''"/> - 
-                                                    <t t-esc="periode.date_fin.strftime('%d/%m/%Y') if periode.date_fin else ''"/>
-                                                </small>
-                                            </td>
-                                            <td>
-                                                <span class="badge rounded-pill text-bg-secondary">
-                                                    <t t-esc="dict(periode._fields['type_periode'].selection).get(periode.type_periode, periode.type_periode)"/>
-                                                </span>
-                                            </td>
-                                            <t t-if="souscription.type_tarif == 'base'">
-                                                <td class="text-end">
-                                                    <strong><t t-esc="periode.energie_base_kwh or 0"/></strong>
-                                                    <t t-if="periode.provision_base_kwh">
-                                                        <br/><small class="text-muted">Prov: <t t-esc="periode.provision_base_kwh"/></small>
-                                                    </t>
-                                                </td>
-                                            </t>
-                                            <t t-else="">
-                                                <td class="text-end">
-                                                    <strong><t t-esc="periode.energie_hp_kwh or 0"/></strong>
-                                                    <t t-if="periode.provision_hp_kwh">
-                                                        <br/><small class="text-muted">Prov: <t t-esc="periode.provision_hp_kwh"/></small>
-                                                    </t>
-                                                </td>
-                                                <td class="text-end">
-                                                    <strong><t t-esc="periode.energie_hc_kwh or 0"/></strong>
-                                                    <t t-if="periode.provision_hc_kwh">
-                                                        <br/><small class="text-muted">Prov: <t t-esc="periode.provision_hc_kwh"/></small>
-                                                    </t>
-                                                </td>
-                                            </t>
-                                            <td class="text-end">
-                                                <t t-esc="'%.2f' % (periode.turpe_fixe or 0)"/>
-                                            </td>
-                                            <td class="text-end">
-                                                <t t-esc="'%.2f' % (periode.turpe_variable or 0)"/>
-                                            </td>
-                                            <td class="text-center">
-                                                <t t-if="periode.facture_id">
-                                                    <a t-attf-href="/my/invoices/#{periode.facture_id.id}" 
-                                                       class="btn btn-sm btn-outline-primary"
-                                                       title="Voir la facture" target="_blank">
-                                                        <i class="fa fa-file-text"/> Facture
-                                                    </a>
-                                                </t>
-                                                <t t-else="">
-                                                    <span class="text-muted">-</span>
-                                                </t>
-                                            </td>
-                                        </tr>
-                                    </t>
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <!-- Informations complémentaires -->
-                        <div class="row mt-4">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">
-                                            <i class="fa fa-info-circle"/> Informations
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <p class="mb-2">
-                                            <strong>TURPE</strong> : Tarif d'Utilisation des Réseaux Publics d'Électricité
-                                        </p>
-                                        <p class="mb-2">
-                                            <strong>HP/HC</strong> : Heures Pleines / Heures Creuses
-                                        </p>
-                                        <t t-if="souscription.lisse">
-                                            <p class="mb-0">
-                                                <strong>Facturation lissée</strong> : Les écarts entre provision et consommation réelle sont régularisés périodiquement.
-                                            </p>
-                                        </t>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h6 class="mb-0">
-                                            <i class="fa fa-chart-line"/> Totaux
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <t t-set="total_kwh" t-value="0"/>
-                                        <t t-set="total_turpe" t-value="0"/>
-                                        <t t-foreach="periodes" t-as="p">
-                                            <t t-if="souscription.type_tarif == 'base'">
-                                                <t t-set="total_kwh" t-value="total_kwh + (p.energie_base_kwh or 0)"/>
-                                            </t>
-                                            <t t-else="">
-                                                <t t-set="total_kwh" t-value="total_kwh + (p.energie_hp_kwh or 0) + (p.energie_hc_kwh or 0)"/>
-                                            </t>
-                                            <t t-set="total_turpe" t-value="total_turpe + (p.turpe_fixe or 0) + (p.turpe_variable or 0)"/>
-                                        </t>
-                                        
-                                        <p class="mb-2">
-                                            <strong>Consommation totale :</strong> <t t-esc="'%.0f' % total_kwh"/> kWh
-                                        </p>
-                                        <p class="mb-2">
-                                            <strong>TURPE total :</strong> <t t-esc="'%.2f' % total_turpe"/> €
-                                        </p>
-                                        <p class="mb-0">
-                                            <strong>Nombre de périodes :</strong> <t t-esc="len(periodes)"/>
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </t>
-                </div>
-            </div>
-        </t>
-    </template>
 </odoo>

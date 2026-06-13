@@ -46,34 +46,22 @@ class SouscriptionPortal(CustomerPortal):
     def portal_my_souscription(self, souscription_id=None, **kw):
         partner = request.env.user.partner_id
         souscription = request.env['souscription.souscription'].browse(souscription_id)
-        
-        # Vérifier que la souscription appartient bien au partenaire
-        if not souscription.exists() or souscription.partner_id != partner:
-            return request.redirect('/my')
-            
-        values = {
-            'souscription': souscription,
-            'page_name': 'souscription',
-        }
-        
-        return request.render("souscriptions_odoo.portal_souscription_page", values)
 
-    @http.route(['/my/souscription/<int:souscription_id>/periodes'], type='http', auth="user", website=True)
-    def portal_souscription_periodes(self, souscription_id=None, **kw):
-        partner = request.env.user.partner_id
-        souscription = request.env['souscription.souscription'].browse(souscription_id)
-        
         # Vérifier que la souscription appartient bien au partenaire
         if not souscription.exists() or souscription.partner_id != partner:
             return request.redirect('/my')
-            
-        # Récupérer les périodes triées par date
-        periodes = souscription.periode_ids.sorted('date_debut', reverse=True)
-        
+
+        # Historique des consommations intégré à la page : uniquement les périodes
+        # dont la facture est émise (postée) — un brouillon ne fuite pas côté usager
+        # (ADR 0004). Plus récente en premier.
+        periodes = souscription.periode_ids.filtered(
+            lambda p: p.facture_id and p.facture_id.state == 'posted'
+        ).sorted('date_debut', reverse=True)
+
         values = {
             'souscription': souscription,
             'periodes': periodes,
-            'page_name': 'souscription_periodes',
+            'page_name': 'souscription',
         }
-        
-        return request.render("souscriptions_odoo.portal_souscription_periodes", values)
+
+        return request.render("souscriptions_odoo.portal_souscription_page", values)

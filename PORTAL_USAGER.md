@@ -25,8 +25,11 @@ Le portal usager·ère utilise le framework Portal standard d'Odoo pour permettr
 ### Détail d'une souscription (`/my/souscription/<id>`)
 - Informations complètes du contrat
 - État de facturation
-- Historique des 10 dernières factures
-- Liens vers les PDF de factures
+- Historique des consommations **intégré à la page** (plus de page séparée) :
+  périodes dont la facture est **émise (postée)**, énergie par cadran, TURPE,
+  montant TTC, état de paiement et lien vers le PDF de la facture
+- 12 périodes affichées (plus récente en haut), bouton « Voir plus » pour le reste
+- Totaux (conso, TURPE, total facturé, nombre de périodes) + glossaire
 - Informations de dépannage
 
 ## Architecture technique

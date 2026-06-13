@@ -1,9 +1,9 @@
 """
-Tests unitaires pour le portal usager·ère du module souscriptions.
+Tests du portail usager·ère (#24) : l'historique des consommations est intégré
+directement dans la page de détail d'une souscription. Seules les périodes dont
+la facture est émise (postée) sont visibles ; il n'y a plus de page /periodes.
 """
 
-import json
-from unittest.mock import patch
 from odoo.tests.common import HttpCase, tagged
 from odoo.addons.souscriptions_odoo.tests.common import SouscriptionsTestMixin
 from datetime import date
@@ -11,316 +11,215 @@ from datetime import date
 
 @tagged('post_install', '-at_install', 'portal')
 class PortalTestCase(SouscriptionsTestMixin, HttpCase):
-    """Tests du portal usager·ère pour les souscriptions."""
+    """Tests du portail usager·ère pour les souscriptions."""
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         cls.setUpSouscriptionsData()
-        
-        # Créer un utilisateur portal pour les tests
+
         cls.portal_user = cls.env['res.users'].create({
             'name': 'Portal Test User',
             'login': 'portal_test',
             'email': 'portal@test.com',
             'group_ids': [(6, 0, [cls.env.ref('base.group_portal').id])],
         })
-        
-        # Associer le partner de test à l'utilisateur portal
         cls.partner_test.user_ids = [(6, 0, [cls.portal_user.id])]
-        
-        # Créer des périodes et factures de test pour la souscription
-        cls._create_test_periods_and_invoices()
+
+        cls._create_periods_and_posted_invoices()
 
     @classmethod
-    def _create_test_periods_and_invoices(cls):
-        """Créer des données de test complètes pour le portal."""
-        # Période janvier 2024
+    def _create_periods_and_posted_invoices(cls):
+        """Deux périodes facturées et POSTÉES (donc visibles côté portail)."""
         cls.periode_jan = cls.env['souscription.periode'].create({
             'souscription_id': cls.souscription_base.id,
-            'date_debut': date(2024, 1, 1),
-            'date_fin': date(2024, 1, 31),
+            'date_debut': date(2024, 1, 1), 'date_fin': date(2024, 1, 31),
             'type_periode': 'mensuelle',
-            'energie_base_kwh': 280.0,
-            'provision_base_kwh': 300.0,
-            'turpe_fixe': 8.50,
-            'turpe_variable': 12.30,
+            'energie_base_kwh': 280.0, 'provision_base_kwh': 300.0,
+            'turpe_fixe': 8.50, 'turpe_variable': 12.30,
         })
-        
-        # Période février 2024
         cls.periode_feb = cls.env['souscription.periode'].create({
             'souscription_id': cls.souscription_base.id,
-            'date_debut': date(2024, 2, 1),
-            'date_fin': date(2024, 2, 29),
+            'date_debut': date(2024, 2, 1), 'date_fin': date(2024, 2, 29),
             'type_periode': 'mensuelle',
-            'energie_base_kwh': 320.0,
-            'provision_base_kwh': 300.0,
-            'turpe_fixe': 8.50,
-            'turpe_variable': 14.20,
+            'energie_base_kwh': 320.0, 'provision_base_kwh': 300.0,
+            'turpe_fixe': 8.50, 'turpe_variable': 14.20,
         })
-        
-        # Créer des factures associées via le système de souscription.
-        # facture_id se déduit de account.move.periode_id (ADR 0004) : pas
-        # d'assignation manuelle, les factures portent periode_id.
-        try:
-            cls.facture_jan = cls.souscription_base._creer_facture_periode(cls.periode_jan)
-        except:
-            # Fallback - créer une facture simple avec un nom
-            cls.facture_jan = cls.env['account.move'].create({
-                'move_type': 'out_invoice',
-                'partner_id': cls.partner_test.id,
-                'invoice_date': date(2024, 2, 5),
-                'periode_id': cls.periode_jan.id,
-                'name': 'FACT/2024/0001',
-            })
+        cls.facture_jan = cls.souscription_base._creer_facture_periode(cls.periode_jan)
+        cls.facture_feb = cls.souscription_base._creer_facture_periode(cls.periode_feb)
+        (cls.facture_jan | cls.facture_feb).action_post()
 
-        try:
-            cls.facture_feb = cls.souscription_base._creer_facture_periode(cls.periode_feb)
-        except:
-            # Fallback - créer une facture simple avec un nom
-            cls.facture_feb = cls.env['account.move'].create({
-                'move_type': 'out_invoice',
-                'partner_id': cls.partner_test.id,
-                'invoice_date': date(2024, 3, 5),
-                'periode_id': cls.periode_feb.id,
-                'name': 'FACT/2024/0002',
-            })
+    @classmethod
+    def _facture_postee_simple(cls, souscription, periode, invoice_date):
+        """Facture postée minimale (sans dépendre d'une grille de prix)."""
+        produit = cls.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
+        move = cls.env['account.move'].create({
+            'move_type': 'out_invoice',
+            'partner_id': souscription.partner_id.id,
+            'invoice_date': invoice_date,
+            'periode_id': periode.id,
+            'invoice_line_ids': [(0, 0, {
+                'product_id': produit.id, 'quantity': 1, 'price_unit': 10.0,
+            })],
+        })
+        move.action_post()
+        return move
 
-    def test_portal_access_redirect_unauthenticated(self):
-        """Test que l'accès non authentifié redirige vers login."""
-        # Test liste des souscriptions
+    def _detail_url(self, souscription=None):
+        souscription = souscription or self.souscription_base
+        return f'/my/souscription/{souscription.id}'
+
+    # --- Accès ---
+
+    def test_acces_non_authentifie_redirige_login(self):
+        """Accès non authentifié à la liste et au détail : redirection login."""
+        for url in ('/my/souscriptions', self._detail_url()):
+            response = self.url_open(url)
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('login', response.url)
+
+    def test_liste_souscriptions_authentifie(self):
+        """La liste des souscriptions montre la souscription de l'usager."""
+        self.authenticate(self.portal_user.login, self.portal_user.login)
         response = self.url_open('/my/souscriptions')
         self.assertEqual(response.status_code, 200)
-        # Vérifier qu'on est sur la page de login
-        self.assertIn('login', response.url)
-        
-        # Test détail souscription
-        response = self.url_open(f'/my/souscription/{self.souscription_base.id}')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('login', response.url)
-        
-        # Test vue périodes
-        response = self.url_open(f'/my/souscription/{self.souscription_base.id}/periodes')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('login', response.url)
-
-    def test_portal_souscriptions_list_authenticated(self):
-        """Test de la liste des souscriptions avec utilisateur authentifié."""
-        # Se connecter comme utilisateur portal
-        self.authenticate(self.portal_user.login, self.portal_user.login)
-        
-        # Accéder à la liste des souscriptions
-        response = self.url_open('/my/souscriptions')
-        self.assertEqual(response.status_code, 200)
-        
-        # Vérifier que la souscription apparaît
         self.assertIn(self.souscription_base.name, response.text)
         self.assertIn(self.souscription_base.pdl, response.text)
-        
-        # Vérifier les éléments de l'interface
-        self.assertIn('Base', response.text)  # Type de tarif
-        self.assertIn('Active', response.text)  # État
-        # Le titre peut être dans la searchbar, l'important est que les souscriptions soient listées
-        self.assertTrue('souscription' in response.text.lower() or 'S0001' in response.text)
 
-    def test_portal_souscription_detail_authenticated(self):
-        """Test de la vue détail d'une souscription."""
+    # --- Historique intégré ---
+
+    def test_detail_affiche_historique_inline_sans_bouton(self):
+        """L'historique est dans la page ; l'ancien bouton de navigation a disparu."""
         self.authenticate(self.portal_user.login, self.portal_user.login)
-        
-        response = self.url_open(f'/my/souscription/{self.souscription_base.id}')
+        response = self.url_open(self._detail_url())
         self.assertEqual(response.status_code, 200)
-        
-        # Vérifier les informations de la souscription
-        self.assertIn(self.souscription_base.name, response.text)
+
         self.assertIn(self.souscription_base.pdl, response.text)
-        self.assertIn(str(self.souscription_base.puissance_souscrite), response.text)
-        
-        # Vérifier les liens vers les fonctionnalités
-        self.assertIn('Voir l\'historique des consommations', response.text)
-        self.assertIn('Factures récentes', response.text)
-
-    def test_portal_periods_view_authenticated(self):
-        """Test de la vue des périodes de facturation."""
-        self.authenticate(self.portal_user.login, self.portal_user.login)
-        
-        # Vérifier d'abord que la souscription a des périodes
-        self.assertTrue(len(self.periode_jan) > 0, "Période janvier doit exister")
-        self.assertTrue(len(self.periode_feb) > 0, "Période février doit exister")
-        
-        response = self.url_open(f'/my/souscription/{self.souscription_base.id}/periodes')
-        self.assertEqual(response.status_code, 200)
-        
-        # La page se charge : on s'appuie sur le code HTTP (200) ci-dessus, qui
-        # est le contrôle fiable « ce n'est pas une page d'erreur ». On ne fait
-        # PAS de recherche de sous-chaîne '404'/'500' dans le HTML : ces motifs
-        # apparaissent par hasard dans des valeurs aléatoires (registry_hash,
-        # csrf_token, URLs d'assets), ce qui rendait ce test instable.
         self.assertIn('Historique des consommations', response.text)
+        # le bouton vers l'ancienne page séparée n'existe plus
+        self.assertNotIn("Voir l'historique des consommations", response.text)
+        # les périodes facturées (postées) sont listées, avec leur facture
+        self.assertIn(self.facture_jan.name, response.text)
+        self.assertIn(self.facture_feb.name, response.text)
 
-    def test_portal_security_other_user_data(self):
-        """Test que l'utilisateur ne peut pas voir les données d'autres utilisateurs."""
-        # Créer un autre utilisateur et souscription
-        other_partner = self.env['res.partner'].create({
-            'name': 'Other User',
-            'email': 'other@test.com',
+    def test_seules_periodes_facture_postee_visibles(self):
+        """Une période dont la facture est en brouillon n'apparaît pas."""
+        periode_draft = self.env['souscription.periode'].create({
+            'souscription_id': self.souscription_base.id,
+            'date_debut': date(2024, 3, 1), 'date_fin': date(2024, 3, 31),
+            'type_periode': 'mensuelle',
+            'energie_base_kwh': 999.0, 'turpe_fixe': 1.0, 'turpe_variable': 1.0,
         })
-        
-        other_user = self.env['res.users'].create({
-            'name': 'Other Portal User',
-            'login': 'other_portal',
-            'email': 'other_portal@test.com',
-            'group_ids': [(6, 0, [self.env.ref('base.group_portal').id])],
-        })
-        other_partner.user_ids = [(6, 0, [other_user.id])]
-        
-        other_souscription = self.env['souscription.souscription'].create({
-            'partner_id': other_partner.id,
-            'pdl': 'PDL_OTHER_USER',
-            'puissance_souscrite': '3',
-            'type_tarif': 'base',
-            'etat_facturation_id': self.etat_facturation.id,
-        })
-        
-        # Se connecter comme premier utilisateur
-        self.authenticate(self.portal_user.login, self.portal_user.login)
-        
-        # Tenter d'accéder aux données de l'autre utilisateur
-        response = self.url_open(f'/my/souscription/{other_souscription.id}')
-        # Doit retourner 403 (accès refusé) grâce aux règles de sécurité
-        self.assertEqual(response.status_code, 403)
+        facture_draft = self.souscription_base._creer_facture_periode(periode_draft)
+        self.assertEqual(facture_draft.state, 'draft')
 
-    def test_portal_invoice_links(self):
-        """Test que les liens vers les factures fonctionnent."""
         self.authenticate(self.portal_user.login, self.portal_user.login)
-        
-        # D'abord tester la vue détail de souscription
-        response = self.url_open(f'/my/souscription/{self.souscription_base.id}')
+        response = self.url_open(self._detail_url())
         self.assertEqual(response.status_code, 200)
-        
-        # Vérifier que les factures apparaissent
-        if hasattr(self.facture_jan, 'name') and self.facture_jan.name:
-            self.assertIn(str(self.facture_jan.name), response.text)
-        if hasattr(self.facture_feb, 'name') and self.facture_feb.name:
-            self.assertIn(str(self.facture_feb.name), response.text)
-        
-        # Fallback - au moins vérifier qu'il y a des références de factures
-        self.assertIn('facture', response.text.lower())
+        # l'énergie spécifique de la période en brouillon ne doit pas fuiter
+        self.assertNotIn('999', response.text)
 
-    def test_portal_responsive_display_base_vs_hphc(self):
-        """Test que l'affichage s'adapte selon le type de tarif."""
-        # Test avec souscription Base
+    def test_route_periodes_supprimee(self):
+        """L'ancienne page /periodes n'existe plus (404)."""
         self.authenticate(self.portal_user.login, self.portal_user.login)
-        
-        response = self.url_open(f'/my/souscription/{self.souscription_base.id}/periodes')
-        self.assertEqual(response.status_code, 200)
-        
-        # Doit afficher les colonnes Base
+        response = self.url_open(self._detail_url() + '/periodes')
+        self.assertEqual(response.status_code, 404)
+
+    def test_colonnes_energie_selon_type_tarif(self):
+        """Les colonnes énergie s'adaptent au type de tarif (Base vs HP/HC)."""
+        self.authenticate(self.portal_user.login, self.portal_user.login)
+
+        # Base
+        response = self.url_open(self._detail_url())
         self.assertIn('Énergie Base (kWh)', response.text)
         self.assertNotIn('Énergie HP (kWh)', response.text)
-        
-        # Test avec souscription HP/HC
-        # Créer des périodes pour la souscription HP/HC
+
+        # HP/HC
+        self.souscription_hphc.partner_id = self.partner_test.id
         periode_hphc = self.env['souscription.periode'].create({
             'souscription_id': self.souscription_hphc.id,
-            'date_debut': date(2024, 1, 1),
-            'date_fin': date(2024, 1, 31),
+            'date_debut': date(2024, 1, 1), 'date_fin': date(2024, 1, 31),
             'type_periode': 'mensuelle',
-            'energie_hp_kwh': 200.0,
-            'energie_hc_kwh': 120.0,
-            'provision_hp_kwh': 210.0,
-            'provision_hc_kwh': 130.0,
-            'turpe_fixe': 12.80,
-            'turpe_variable': 18.50,
+            'energie_hph_kwh': 120.0, 'energie_hpb_kwh': 80.0,
+            'energie_hch_kwh': 70.0, 'energie_hcb_kwh': 50.0,
+            'turpe_fixe': 12.80, 'turpe_variable': 18.50,
         })
-        
-        # Associer la souscription HP/HC au même partner pour le test
-        self.souscription_hphc.partner_id = self.partner_test.id
-        
-        response = self.url_open(f'/my/souscription/{self.souscription_hphc.id}/periodes')
+        self.souscription_hphc._creer_facture_periode(periode_hphc).action_post()
+
+        response = self.url_open(self._detail_url(self.souscription_hphc))
         self.assertEqual(response.status_code, 200)
-        
-        # Doit afficher les colonnes HP/HC
         self.assertIn('Énergie HP (kWh)', response.text)
         self.assertIn('Énergie HC (kWh)', response.text)
         self.assertNotIn('Énergie Base (kWh)', response.text)
 
-    def test_portal_data_completeness(self):
-        """Test que toutes les données importantes sont affichées."""
+    def test_totaux_affiches(self):
+        """La carte Totaux est présente et somme les périodes facturées."""
         self.authenticate(self.portal_user.login, self.portal_user.login)
-        
-        # Test page détail souscription
-        response = self.url_open(f'/my/souscription/{self.souscription_base.id}')
+        response = self.url_open(self._detail_url())
         self.assertEqual(response.status_code, 200)
-        
-        # Vérifier les informations techniques
-        self.assertIn(self.souscription_base.pdl, response.text)
-        self.assertIn(str(self.souscription_base.puissance_souscrite), response.text)
-        self.assertIn('Base', response.text)  # Type de tarif
-        
-        # Vérifier les informations de facturation
-        if self.souscription_base.lisse:
-            self.assertIn('Facturation lissée', response.text)
-            self.assertIn(str(self.souscription_base.provision_mensuelle_kwh), response.text)
 
-    def test_portal_breadcrumb_navigation(self):
-        """Test que la navigation breadcrumb fonctionne."""
-        self.authenticate(self.portal_user.login, self.portal_user.login)
-        
-        # Test sur la vue des périodes
-        response = self.url_open(f'/my/souscription/{self.souscription_base.id}/periodes')
-        self.assertEqual(response.status_code, 200)
-        
-        # Vérifier les éléments de navigation
-        self.assertIn('Mes Souscriptions', response.text)
-        self.assertIn(self.souscription_base.name, response.text)
-        self.assertIn('Périodes de facturation', response.text)
-        
-        # Vérifier les liens
-        self.assertIn('/my/souscriptions', response.text)
-        self.assertIn(f'/my/souscription/{self.souscription_base.id}', response.text)
+        self.assertIn('Consommation totale', response.text)
+        self.assertIn('TURPE total', response.text)
+        self.assertIn('Total facturé', response.text)
 
-    def test_portal_calculations_accuracy(self):
-        """Test que les calculs de totaux sont corrects."""
-        self.authenticate(self.portal_user.login, self.portal_user.login)
-        
-        response = self.url_open(f'/my/souscription/{self.souscription_base.id}/periodes')
-        self.assertEqual(response.status_code, 200)
-        
-        # Calculer les totaux attendus
-        expected_total_kwh = self.periode_jan.energie_base_kwh + self.periode_feb.energie_base_kwh
-        expected_total_turpe = (
-            (self.periode_jan.turpe_fixe + self.periode_jan.turpe_variable) +
-            (self.periode_feb.turpe_fixe + self.periode_feb.turpe_variable)
-        )
-        
-        # Vérifier que les totaux calculés apparaissent
-        self.assertIn(f'{expected_total_kwh:.0f}', response.text)
-        self.assertIn(f'{expected_total_turpe:.2f}', response.text)
+        total_kwh = self.periode_jan.energie_base_kwh + self.periode_feb.energie_base_kwh
+        self.assertIn(f'{total_kwh:.0f}', response.text)
 
-    def test_portal_empty_data_handling(self):
-        """Test la gestion des cas où il n'y a pas de données."""
-        # Créer une souscription sans périodes
-        empty_souscription = self.env['souscription.souscription'].create({
+    def test_etat_vide_sans_facture_postee(self):
+        """Une souscription sans période facturée affiche un état vide propre."""
+        empty = self.env['souscription.souscription'].create({
             'partner_id': self.partner_test.id,
-            'pdl': 'PDL_EMPTY_TEST',
-            'puissance_souscrite': '6',
-            'type_tarif': 'base',
+            'pdl': 'PDL_EMPTY_TEST', 'puissance_souscrite': '6',
+            'type_tarif': 'base', 'etat_facturation_id': self.etat_facturation.id,
+        })
+        self.authenticate(self.portal_user.login, self.portal_user.login)
+        response = self.url_open(self._detail_url(empty))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Aucune période facturée', response.text)
+
+    def test_voir_plus_au_dela_de_douze(self):
+        """Au-delà de 12 périodes facturées, un bouton « Voir plus » apparaît."""
+        for mois in range(1, 12):  # 11 périodes supplémentaires -> 13 au total
+            periode = self.env['souscription.periode'].create({
+                'souscription_id': self.souscription_base.id,
+                'date_debut': date(2023, mois, 1),
+                'date_fin': date(2023, mois, 28),
+                'type_periode': 'mensuelle',
+                'energie_base_kwh': 100.0 + mois,
+                'turpe_fixe': 5.0, 'turpe_variable': 2.0,
+            })
+            self._facture_postee_simple(
+                self.souscription_base, periode, date(2023, mois, 28))
+
+        self.authenticate(self.portal_user.login, self.portal_user.login)
+        response = self.url_open(self._detail_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Voir plus', response.text)
+
+    def test_securite_autre_usager(self):
+        """Un usager ne peut pas voir la souscription d'un autre (403)."""
+        other_partner = self.env['res.partner'].create({
+            'name': 'Other User', 'email': 'other@test.com'})
+        other_user = self.env['res.users'].create({
+            'name': 'Other Portal User', 'login': 'other_portal',
+            'email': 'other_portal@test.com',
+            'group_ids': [(6, 0, [self.env.ref('base.group_portal').id])],
+        })
+        other_partner.user_ids = [(6, 0, [other_user.id])]
+        other_souscription = self.env['souscription.souscription'].create({
+            'partner_id': other_partner.id, 'pdl': 'PDL_OTHER_USER',
+            'puissance_souscrite': '3', 'type_tarif': 'base',
             'etat_facturation_id': self.etat_facturation.id,
         })
-        
+
         self.authenticate(self.portal_user.login, self.portal_user.login)
-        
-        # Test vue des périodes sans données
-        response = self.url_open(f'/my/souscription/{empty_souscription.id}/periodes')
-        self.assertEqual(response.status_code, 200)
-        
-        # Vérifier le message d'absence de données
-        self.assertIn('Aucune période de facturation trouvée', response.text)
+        response = self.url_open(self._detail_url(other_souscription))
+        self.assertEqual(response.status_code, 403)
 
 
 @tagged('post_install', '-at_install', 'portal_integration')
 class PortalIntegrationTestCase(SouscriptionsTestMixin, HttpCase):
-    """Tests d'intégration du portal avec le reste du système."""
+    """Tests d'intégration du portail avec le reste du système."""
 
     @classmethod
     def setUpClass(cls):
@@ -328,94 +227,47 @@ class PortalIntegrationTestCase(SouscriptionsTestMixin, HttpCase):
         cls.setUpSouscriptionsData()
 
     def test_portal_menu_integration(self):
-        """Test que le menu portal s'intègre correctement."""
-        # Vérifier que l'entrée portal existe dans les données
-        portal_menu = self.env.ref('souscriptions_odoo.portal_my_home_souscriptions', raise_if_not_found=False)
+        """L'entrée du portail (tuile d'accueil) existe."""
+        portal_menu = self.env.ref(
+            'souscriptions_odoo.portal_my_home_souscriptions', raise_if_not_found=False)
         self.assertTrue(portal_menu, "Le menu portal doit exister")
 
-    def test_portal_with_real_invoice_data(self):
-        """Test avec des factures réelles générées par le système."""
-        # Créer une période et générer une vraie facture
+    def test_facture_postee_apparait_dans_historique(self):
+        """Une facture réelle postée apparaît dans l'historique intégré."""
         periode, facture = self.create_test_invoice(self.souscription_base)
-        
-        # Associer au partner de test
+        facture.action_post()
         self.souscription_base.partner_id = self.partner_test.id
-        
-        # Créer utilisateur portal
+
         portal_user = self.env['res.users'].create({
-            'name': 'Integration Test User',
-            'login': 'integration_test',
+            'name': 'Integration Test User', 'login': 'integration_test',
             'email': 'integration@test.com',
             'group_ids': [(6, 0, [self.env.ref('base.group_portal').id])],
         })
         self.partner_test.user_ids = [(6, 0, [portal_user.id])]
-        
         self.authenticate(portal_user.login, portal_user.login)
-        
-        # Test accès aux factures depuis le portal
+
         response = self.url_open(f'/my/souscription/{self.souscription_base.id}')
         self.assertEqual(response.status_code, 200)
-        
-        # Vérifier que la facture apparaît
-        if hasattr(facture, 'name') and facture.name:
-            self.assertIn(facture.name, response.text)
-        else:
-            # Fallback - just check that there's a facture reference
-            self.assertIn('facture', response.text.lower())
+        self.assertIn(facture.name, response.text)
 
     def test_portal_permissions_consistency(self):
-        """Test que les permissions portal sont cohérentes."""
-        # Vérifier les droits d'accès des modèles
+        """Les droits portail (lecture seule) sont cohérents."""
         portal_group = self.env.ref('base.group_portal')
-        
-        # Souscription
+
         access = self.env['ir.model.access'].search([
             ('model_id.model', '=', 'souscription.souscription'),
-            ('group_id', '=', portal_group.id)
+            ('group_id', '=', portal_group.id),
         ])
         self.assertTrue(access, "Accès portal aux souscriptions requis")
         self.assertTrue(access.perm_read, "Lecture autorisée")
         self.assertFalse(access.perm_write, "Écriture interdite")
         self.assertFalse(access.perm_create, "Création interdite")
         self.assertFalse(access.perm_unlink, "Suppression interdite")
-        
-        # Périodes
+
         access = self.env['ir.model.access'].search([
             ('model_id.model', '=', 'souscription.periode'),
-            ('group_id', '=', portal_group.id)
+            ('group_id', '=', portal_group.id),
         ])
         self.assertTrue(access, "Accès portal aux périodes requis")
         self.assertTrue(access.perm_read, "Lecture autorisée")
         self.assertFalse(access.perm_write, "Écriture interdite")
-
-
-# Compatibilité avec les anciens tests Python standalone
-class PortalCompatibilityTests:
-    """
-    Wrapper pour intégrer les anciens tests Python standalone.
-    Ces méthodes peuvent être appelées depuis les tests unitaires.
-    """
-    
-    @staticmethod
-    def test_portal_accessibility():
-        """Test basique d'accessibilité du portal (équivalent test_portal.py)."""
-        import requests
-        base_url = "http://localhost:8069"  # Port par défaut des tests
-        
-        try:
-            response = requests.get(f"{base_url}/my/souscriptions", allow_redirects=False, timeout=5)
-            return response.status_code in [302, 303, 200]
-        except:
-            return False
-    
-    @staticmethod
-    def test_periods_route_exists():
-        """Test que la route des périodes existe (équivalent test_periods_view.py)."""
-        import requests
-        base_url = "http://localhost:8069"
-        
-        try:
-            response = requests.get(f"{base_url}/my/souscription/1/periodes", allow_redirects=False, timeout=5)
-            return response.status_code in [302, 303, 200, 404]  # 404 = route existe mais pas d'ID 1
-        except:
-            return False

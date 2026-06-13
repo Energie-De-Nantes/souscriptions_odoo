@@ -24,15 +24,81 @@ tests/
 
 ## 🚀 Lancement des tests
 
-### Commande Odoo directe
+Le module cible **Odoo 19**. La méthode recommandée et reproductible (identique
+à la CI) passe par Docker : aucune installation locale d'Odoo n'est requise.
+
+### Méthode recommandée : Docker (comme la CI)
 
 ```bash
-# Tests avec tags
-odoo -d test_db --test-enable --test-tags souscriptions --stop-after-init
+cd <racine du dépôt>
 
-# Tests spécifiques
-odoo -d test_db --test-enable --test-tags TestInvoiceTemplate --stop-after-init
+# 1. Démarrer PostgreSQL sur un réseau dédié
+docker network create odoo-test
+docker run -d --name souscriptions-pg --network odoo-test \
+  -e POSTGRES_USER=odoo -e POSTGRES_PASSWORD=odoo -e POSTGRES_DB=postgres postgres:15
+
+# 2. Installer le module et lancer toute la suite (base jetable)
+docker run --rm --network odoo-test \
+  -e HOST=souscriptions-pg -e USER=odoo -e PASSWORD=odoo \
+  -v "$PWD:/mnt/extra-addons/souscriptions_odoo:ro" \
+  odoo:19 odoo \
+    --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons \
+    -d test_db -i souscriptions_odoo \
+    --test-enable --test-tags /souscriptions_odoo \
+    --stop-after-init --log-level=test
+
+# 3. Nettoyage éventuel
+docker rm -f souscriptions-pg && docker network rm odoo-test
 ```
+
+La ligne de résultat à surveiller : `X failed, Y error(s) of N tests`.
+Le code de sortie est non nul si un test échoue (utile en script/CI).
+
+> ⚠️ **Piège** : passer l'hôte de la base via la variable d'environnement
+> `HOST`, **pas** via `--db_host`. L'entrypoint de l'image officielle `odoo`
+> reconstruit `--db_host` à partir de `HOST` (valeur par défaut `db`) et l'ajoute
+> *après* la commande, écrasant tout `--db_host` fourni en ligne de commande.
+
+### Si une instance Odoo 19 est disponible localement
+
+```bash
+# Toute la suite du module
+odoo -d test_db -i souscriptions_odoo --test-enable --test-tags /souscriptions_odoo --stop-after-init
+
+# Une suite précise (par tag de classe)
+odoo -d test_db -i souscriptions_odoo --test-enable --test-tags souscriptions_facturation --stop-after-init
+
+# Une classe précise
+odoo -d test_db -u souscriptions_odoo --test-enable --test-tags :TestGrillePrix --stop-after-init
+```
+
+### Sélection des tests (`--test-tags`)
+
+| Cible | Tag |
+|---|---|
+| Tous les tests du module | `/souscriptions_odoo` |
+| Facturation | `souscriptions_facturation` |
+| Grilles de prix | `souscriptions` (classe `TestGrillePrix`) |
+| Sécurité / droits d'accès | `souscriptions_security` |
+| Portail | `portal` |
+| Une classe nommée | `:NomDeClasse` |
+
+### Intégration continue
+
+Le workflow [`.github/workflows/tests.yml`](../.github/workflows/tests.yml)
+exécute automatiquement cette suite (PostgreSQL 15 + `odoo:19`) à chaque push
+sur `main` et à chaque pull request. Le badge d'état figure dans le README.
+
+### Suites actives
+
+Les fichiers réellement exécutés sont ceux importés dans
+[`__init__.py`](__init__.py) : `test_basic`, `test_souscription`,
+`test_facturation`, `test_grille_prix`, `test_integration`, `test_portal`,
+`test_raccordement`, `test_security` (91 tests au total).
+
+Les fichiers `test_ui.py`, `test_workflow.py` et `test_invoice_template.py`
+existent mais ne sont pas encore réactivés dans `__init__.py` ; les y rebrancher
+demande d'abord de vérifier leur compatibilité avec le modèle actuel.
 
 ## 🧪 Types de tests
 
@@ -96,13 +162,19 @@ odoo -d test_db --test-enable --test-tags TestInvoiceTemplate --stop-after-init
 - Souscriptions avec différents profils
 - Périodes avec données réalistes
 
-### Utilisation des fixtures
+### Utilisation des helpers communs
 ```python
-def setUp(self):
-    super().setUp()
-    # Les fixtures sont automatiquement chargées
-    self.souscription_test = self.env.ref('souscriptions.souscription_test_base')
+from .common import SouscriptionsTestMixin, build_grille_lignes
+
+class TestX(SouscriptionsTestMixin, TransactionCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setUpSouscriptionsData()  # partenaires, état, grille tarifée, souscriptions
 ```
+
+> Les `env.ref(...)` doivent utiliser le préfixe du module technique
+> `souscriptions_odoo.` (ex. `souscriptions_odoo.souscriptions_product_energie_base`).
 
 ## 🎯 Meilleures pratiques
 
@@ -161,17 +233,17 @@ lines = records.filtered(lambda r: r.field == value)
 ### Tests actuels couvrent :
 - ✅ Modèles de base (souscription, période, grille prix)
 - ✅ Génération de factures avec TURPE
-- ✅ Template de facture personnalisé 
 - ✅ Types de tarifs (Base, HP/HC, Solidaire)
-- ✅ Calculs et montants
+- ✅ Grilles par date, prix par puissance, prorata exact
+- ✅ Sécurité / droits d'accès (groupes user/manager)
+- ✅ Portail usager·ère
 - ✅ Gestion d'erreurs
 
 ### À ajouter :
 - [ ] Tests de performance
-- [ ] Tests de migration
-- [ ] Tests d'API REST
-- [ ] Tests de sécurité
-- [ ] Tests de workflow métier complet
+- [ ] Upsert idempotent des périodes (intégration electricore)
+- [ ] Régularisation des contrats lissés
+- [ ] Réactivation de `test_ui` / `test_workflow` / `test_invoice_template`
 
 ## 🚨 Dépannage
 
@@ -183,11 +255,11 @@ lines = records.filtered(lambda r: r.field == value)
 
 ### Base de données
 ```bash
-# Recréer la base de test
-make test  # Recrée automatiquement
+# Repartir d'une base propre : supprimer la base de test
+docker exec souscriptions-pg psql -U odoo -c "DROP DATABASE IF EXISTS test_db;"
 
-# Shell de debug
-make shell
+# Inspecter la base après un run (omettre --stop-after-init pour garder l'instance)
+docker exec -it souscriptions-pg psql -U odoo -d test_db
 ```
 
 ### Problèmes courants
@@ -197,6 +269,6 @@ make shell
 
 ## 📚 Ressources
 
-- [Documentation tests Odoo](https://www.odoo.com/documentation/18.0/developer/reference/backend/testing.html)
-- [TransactionCase API](https://www.odoo.com/documentation/18.0/developer/reference/backend/testing.html#odoo.tests.common.TransactionCase)
-- [Tags de test](https://www.odoo.com/documentation/18.0/developer/reference/backend/testing.html#test-selection)
+- [Documentation tests Odoo](https://www.odoo.com/documentation/19.0/developer/reference/backend/testing.html)
+- [TransactionCase API](https://www.odoo.com/documentation/19.0/developer/reference/backend/testing.html#odoo.tests.common.TransactionCase)
+- [Tags de test](https://www.odoo.com/documentation/19.0/developer/reference/backend/testing.html#test-selection)

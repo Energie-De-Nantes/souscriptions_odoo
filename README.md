@@ -73,21 +73,17 @@ docker compose -f docker/docker-compose.demo.yml up
 ### Installation manuelle
 
 **Prérequis :**
-- Odoo 18+ installé
-- PostgreSQL qui tourne  
+- Odoo 19 installé
+- PostgreSQL qui tourne
 - Python 3.13+
-- Poetry pour gérer les dépendances
 
 ```bash
-# Installer les dépendances Python
-poetry install
-
-# Créer une base de données et installer l'addon
+# Créer une base de données et installer l'addon (nom technique : souscriptions_odoo)
 createdb votre_base_souscriptions
-odoo-bin -d votre_base_souscriptions -i souscriptions --without-demo=False
+odoo -d votre_base_souscriptions -i souscriptions_odoo
 
 # Lancer Odoo en mode développement
-odoo-bin -d votre_base_souscriptions --dev=reload,qweb,werkzeug,xml
+odoo -d votre_base_souscriptions --dev=reload,qweb,werkzeug,xml
 ```
 
 ## Comment ça marche ?
@@ -156,8 +152,8 @@ Le projet inclut des données d'exemple pour voir comment ça fonctionne :
 cd docker
 ./scripts/demo_simple.sh
 
-# Ou en manuel
-odoo-bin -d test_souscriptions -i souscriptions --without-demo=False
+# Ou en manuel (les données de démo sont chargées par défaut à l'installation)
+odoo -d test_souscriptions -i souscriptions_odoo
 ```
 
 Vous aurez alors :
@@ -166,9 +162,30 @@ Vous aurez alors :
 - Des factures générées automatiquement
 - Des demandes de raccordement en cours
 
+## Lancer les tests automatisés
+
+La suite (91 tests) tourne sur `odoo:19` + PostgreSQL via Docker, sans
+installation locale d'Odoo :
+
+```bash
+docker network create odoo-test
+docker run -d --name souscriptions-pg --network odoo-test \
+  -e POSTGRES_USER=odoo -e POSTGRES_PASSWORD=odoo -e POSTGRES_DB=postgres postgres:15
+docker run --rm --network odoo-test \
+  -e HOST=souscriptions-pg -e USER=odoo -e PASSWORD=odoo \
+  -v "$PWD:/mnt/extra-addons/souscriptions_odoo:ro" \
+  odoo:19 odoo \
+    --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons \
+    -d test_db -i souscriptions_odoo \
+    --test-enable --test-tags /souscriptions_odoo --stop-after-init
+```
+
+Procédure détaillée (sélection par tag, CI, dépannage) : [tests/README.md](tests/README.md).
+La même suite s'exécute automatiquement en CI à chaque push et PR (badge en haut).
+
 ## Compatibilité et dépendances
 
-**Version Odoo requise :** 18+
+**Version Odoo requise :** 19
 
 **Modules Odoo nécessaires :**
 - `base` (obligatoire)

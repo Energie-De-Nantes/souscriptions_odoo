@@ -1,6 +1,8 @@
 # Souscriptions Électriques pour Odoo
 
-Un addon libre pour Odoo >=18 qui aide à gérer les abonnements électriques en France. Créé par [Virgile Daugé](https://github.com/virgiledauge), partagé sous licence AGPL-3 pour permettre l'émergence d'autres communs de l'électricité.
+[![Tests](https://github.com/Energie-De-Nantes/souscriptions_odoo/actions/workflows/tests.yml/badge.svg)](https://github.com/Energie-De-Nantes/souscriptions_odoo/actions/workflows/tests.yml)
+
+Un addon libre pour Odoo 19 qui aide à gérer les abonnements électriques en France. Créé par [Virgile Daugé](https://github.com/virgiledauge), partagé sous licence AGPL-3 pour permettre l'émergence d'autres communs de l'électricité.
 
 ## Pourquoi ce projet existe ?
 

@@ -1,0 +1,46 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Odoo 19 test suite
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: postgres:15
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U odoo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install module and run tests on Odoo 19
+        run: |
+          docker run --rm --network host \
+            -v "${{ github.workspace }}:/mnt/extra-addons/souscriptions_odoo:ro" \
+            odoo:19 odoo \
+              --db_host=127.0.0.1 --db_port=5432 \
+              --db_user=odoo --db_password=odoo \
+              --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons \
+              -d ci_test -i souscriptions_odoo \
+              --test-enable --test-tags /souscriptions_odoo \
+              --stop-after-init --log-level=test

@@ -40,7 +40,8 @@
                                 <list editable="bottom">
                                     <field name="product_id"/>
                                     <field name="type_produit"/>
-                                    <field name="prix_base_3kva" invisible="type_produit != 'abonnement'"/>
+                                    <field name="puissance" invisible="type_produit != 'abonnement'"/>
+                                    <field name="prix_abonnement_annuel" invisible="type_produit != 'abonnement'"/>
                                     <field name="prix_unitaire" invisible="type_produit != 'energie'"/>
                                     <field name="unite_saisie" readonly="1"/>
                                     <field name="prix_interne" readonly="1"/>
@@ -135,7 +136,8 @@
                     <field name="type_produit"/>
                 </group>
                 <group string="Tarification abonnement" invisible="type_produit != 'abonnement'">
-                    <field name="prix_base_3kva"/>
+                    <field name="puissance"/>
+                    <field name="prix_abonnement_annuel"/>
                 </group>
                 <group string="Tarification énergie" invisible="type_produit != 'energie'">
                     <field name="prix_unitaire"/>

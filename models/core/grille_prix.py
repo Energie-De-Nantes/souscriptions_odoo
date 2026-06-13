@@ -1,9 +1,20 @@
 from odoo import models, fields, api
-from odoo.exceptions import UserError
-from datetime import timedelta
+from odoo.exceptions import UserError, ValidationError
+from datetime import date, timedelta
 import logging
 
 _logger = logging.getLogger(__name__)
+
+# Paliers de puissance souscrite (kVA). Partagé avec souscription.souscription.
+PUISSANCE_SELECTION = [
+    ('3', '3 kVA'), ('6', '6 kVA'), ('9', '9 kVA'), ('12', '12 kVA'),
+    ('15', '15 kVA'), ('18', '18 kVA'), ('24', '24 kVA'), ('30', '30 kVA'),
+    ('36', '36 kVA'),
+]
+
+# Nombre de jours servant de base au prorata journalier de l'abonnement.
+# Convention TURPE : le prix annuel est divisé par 365 quelle que soit l'année.
+JOURS_PAR_AN = 365.0
 
 class GrillePrix(models.Model):
     _name = 'grille.prix'
@@ -50,14 +61,50 @@ class GrillePrix(models.Model):
     
     @api.model
     def get_grille_active(self, date_facture=None):
-        """Récupère la grille marquée comme active"""
-        grille = self.search([('is_current', '=', True)], limit=1)
-        
+        """Récupère la grille dont la période de validité couvre la date donnée.
+
+        La sélection se fait sur la plage [date_debut, date_fin] (date_fin vide =
+        grille ouverte), et non sur le drapeau ``is_current`` : une facturation
+        rétroactive utilise ainsi la grille en vigueur à la date concernée.
+        """
+        if date_facture is None:
+            date_facture = fields.Date.today()
+
+        grille = self.search([
+            ('date_debut', '<=', date_facture),
+            '|', ('date_fin', '=', False), ('date_fin', '>=', date_facture),
+        ], order='date_debut desc', limit=1)
+
         if not grille:
-            raise UserError("Aucune grille de prix définie comme active")
-        
+            raise UserError(
+                f"Aucune grille de prix ne couvre la date {date_facture}. "
+                f"Vérifiez la couverture des grilles (trou de période ?)."
+            )
+
         return grille
-    
+
+    @api.constrains('date_debut', 'date_fin')
+    def _check_no_overlap(self):
+        """Interdit le chevauchement des périodes de validité entre grilles."""
+        for grille in self:
+            if not grille.date_debut:
+                continue
+            start_a = grille.date_debut
+            end_a = grille.date_fin or date.max
+            if start_a > end_a:
+                raise ValidationError(
+                    f"La grille '{grille.name}' a une date de fin antérieure "
+                    f"à sa date de début."
+                )
+            for other in self.search([('id', '!=', grille.id)]):
+                start_b = other.date_debut
+                end_b = other.date_fin or date.max
+                if start_a <= end_b and start_b <= end_a:
+                    raise ValidationError(
+                        f"La période de la grille '{grille.name}' chevauche "
+                        f"celle de la grille '{other.name}'."
+                    )
+
     @api.constrains('is_current')
     def _check_unique_current_grille(self):
         """S'assure qu'une seule grille est marquée comme actuelle"""
@@ -78,32 +125,44 @@ class GrillePrix(models.Model):
         return {ligne.product_id.id: ligne.prix_interne for ligne in self.ligne_ids if ligne.product_id}
     
     def get_prix_abonnement(self, puissance_kva, coeff_pro=0.0, is_solidaire=False):
-        """Calcule le prix d'abonnement dynamiquement selon la puissance et le coefficient PRO"""
+        """Retourne le prix d'abonnement journalier (€/jour) pour une puissance.
+
+        Le prix est lu directement dans la grille pour la puissance exacte
+        (chaque palier a son tarif annuel propre), puis converti en €/jour par
+        division par 365. La majoration PRO éventuelle est appliquée ensuite.
+        """
         self.ensure_one()
-        
-        # Recherche de la ligne abonnement standard ou solidaire
+
         product_ref = 'souscriptions_product_abonnement_solidaire' if is_solidaire else 'souscriptions_product_abonnement_standard'
         try:
             product = self.env.ref(f'souscriptions_odoo.{product_ref}')
-        except:
+        except ValueError:
             raise UserError(f"Produit d'abonnement non trouvé : {product_ref}")
-            
-        ligne_abo = self.ligne_ids.filtered(lambda l: l.product_id == product and l.type_produit == 'abonnement')
+
+        puissance_key = self._puissance_to_key(puissance_kva)
+        ligne_abo = self.ligne_ids.filtered(
+            lambda l: l.product_id == product
+            and l.type_produit == 'abonnement'
+            and l.puissance == puissance_key
+        )
         if not ligne_abo:
             type_abo = "solidaire" if is_solidaire else "standard"
-            raise UserError(f"Aucune ligne de prix abonnement {type_abo} dans la grille {self.name}")
-        
-        ligne = ligne_abo[0]
-        
-        # Calcul selon la formule : prix_base * (puissance/3) en €/mois
-        prix_mensuel = ligne.prix_base_3kva * (puissance_kva / 3.0)
-        
-        # Ajustement PRO avec coefficient personnalisé
+            raise UserError(
+                f"Aucun tarif d'abonnement {type_abo} pour {puissance_key} kVA "
+                f"dans la grille {self.name}."
+            )
+
+        prix_journalier = ligne_abo[0].prix_abonnement_annuel / JOURS_PAR_AN
+
         if coeff_pro > 0:
-            prix_mensuel = prix_mensuel * (1 + coeff_pro / 100.0)
-        
-        # Conversion en €/jour
-        return prix_mensuel / 30.0
+            prix_journalier = prix_journalier * (1 + coeff_pro / 100.0)
+
+        return prix_journalier
+
+    @staticmethod
+    def _puissance_to_key(puissance_kva):
+        """Convertit une puissance numérique (6.0) en clé de sélection ('6')."""
+        return str(int(round(float(puissance_kva))))
     
     def dupliquer_cette_grille(self):
         """Action pour dupliquer cette grille avec toutes ses lignes"""
@@ -117,7 +176,10 @@ class GrillePrix(models.Model):
         for ligne in self.ligne_ids:
             lignes_vals.append((0, 0, {
                 'product_id': ligne.product_id.id,
+                'type_produit': ligne.type_produit,
+                'puissance': ligne.puissance,
                 'prix_unitaire': ligne.prix_unitaire,
+                'prix_abonnement_annuel': ligne.prix_abonnement_annuel,
             }))
         
         # Créer la nouvelle grille avec ses lignes (pas active par défaut)
@@ -181,12 +243,17 @@ class GrillePrixLigne(models.Model):
         ('energie', 'Énergie (€/kWh)'),
         ('autre', 'Autre (€)')
     ], string="Type", required=True, default='energie')
-    
-    # Pour les abonnements : prix de base 3kVA
-    prix_base_3kva = fields.Float("Prix base 3 kVA (€/mois)", digits=(16, 6),
-                                 help="Prix de base pour 3 kVA, utilisé pour calculer les autres puissances")
-    
-    # Pour les énergies : prix unitaire classique  
+
+    # Pour les abonnements : palier de puissance et prix annuel propre
+    puissance = fields.Selection(
+        PUISSANCE_SELECTION, string="Puissance",
+        help="Palier de puissance (kVA) concerné par ce tarif d'abonnement.")
+    prix_abonnement_annuel = fields.Float(
+        "Prix abonnement (€/an)", digits=(16, 6),
+        help="Prix annuel de l'abonnement pour cette puissance, proratisé au "
+             "jour (÷365) lors de la facturation.")
+
+    # Pour les énergies : prix unitaire classique
     prix_unitaire = fields.Float("Prix unitaire (€/kWh)", digits=(16, 6),
                                  help="Prix unitaire pour les énergies")
     
@@ -203,7 +270,7 @@ class GrillePrixLigne(models.Model):
     def _compute_unites(self):
         for ligne in self:
             if ligne.type_produit == 'abonnement':
-                ligne.unite_saisie = "€/mois (base 3kVA)"
+                ligne.unite_saisie = "€/an"
                 ligne.unite_calcul = "€/jour"
             elif ligne.type_produit == 'energie':
                 ligne.unite_saisie = "€/kWh"
@@ -211,18 +278,26 @@ class GrillePrixLigne(models.Model):
             else:
                 ligne.unite_saisie = "€"
                 ligne.unite_calcul = "€"
-    
-    @api.depends('type_produit', 'prix_unitaire', 'prix_base_3kva')
+
+    @api.depends('type_produit', 'prix_unitaire', 'prix_abonnement_annuel')
     def _compute_prix_interne(self):
         for ligne in self:
             if ligne.type_produit == 'abonnement':
-                # Pour les abonnements, on stocke le prix base 3kVA en €/jour
-                ligne.prix_interne = ligne.prix_base_3kva / 30.0 if ligne.prix_base_3kva else 0.0
+                # Prix abonnement stocké en €/an, exposé en €/jour
+                ligne.prix_interne = (ligne.prix_abonnement_annuel / JOURS_PAR_AN
+                                      if ligne.prix_abonnement_annuel else 0.0)
             else:
                 # Pour énergies et autres : prix interne = prix saisi
                 ligne.prix_interne = ligne.prix_unitaire or 0.0
-    
+
+    @api.constrains('type_produit', 'puissance')
+    def _check_abonnement_puissance(self):
+        for ligne in self:
+            if ligne.type_produit == 'abonnement' and not ligne.puissance:
+                raise ValidationError(
+                    "Une ligne d'abonnement doit préciser une puissance.")
+
     _unique_produit_grille = models.Constraint(
-        'UNIQUE(grille_id, product_id)',
-        "Un produit ne peut apparaître qu'une seule fois par grille.",
+        'UNIQUE(grille_id, product_id, puissance)',
+        "Un produit ne peut apparaître qu'une seule fois par grille et par puissance.",
     )

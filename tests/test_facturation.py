@@ -2,6 +2,8 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.exceptions import UserError
 from datetime import date, timedelta
 
+from .common import build_grille_lignes, ABO_ANNUEL_STD
+
 
 @tagged('souscriptions', 'souscriptions_facturation', 'post_install', '-at_install')
 class TestFacturation(TransactionCase):
@@ -30,49 +32,11 @@ class TestFacturation(TransactionCase):
             'is_current': True,  # Marquer comme grille active
         })
         
-        # Récupérer les produits d'énergie et d'abonnement
-        produit_base = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
-        produit_hp = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hp')
-        produit_hc = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hc')
-        produit_abo_standard = self.env.ref('souscriptions_odoo.souscriptions_product_abonnement_standard')
-        produit_abo_solidaire = self.env.ref('souscriptions_odoo.souscriptions_product_abonnement_solidaire')
-        
-        # Créer les lignes de prix
-        self.env['grille.prix.ligne'].create([
-            # Ligne abonnement standard
-            {
-                'grille_id': self.grille_prix.id,
-                'product_id': produit_abo_standard.id,
-                'type_produit': 'abonnement',
-                'prix_base_3kva': 12.00,  # 12€/mois pour 3kVA
-            },
-            # Ligne abonnement solidaire
-            {
-                'grille_id': self.grille_prix.id,
-                'product_id': produit_abo_solidaire.id,
-                'type_produit': 'abonnement',
-                'prix_base_3kva': 8.00,  # 8€/mois pour 3kVA solidaire
-            },
-            # Lignes énergie
-            {
-                'grille_id': self.grille_prix.id,
-                'product_id': produit_base.id,
-                'type_produit': 'energie',
-                'prix_unitaire': 0.15,  # 15 centimes/kWh
-            },
-            {
-                'grille_id': self.grille_prix.id,
-                'product_id': produit_hp.id,
-                'type_produit': 'energie',
-                'prix_unitaire': 0.18,  # 18 centimes/kWh HP
-            },
-            {
-                'grille_id': self.grille_prix.id,
-                'product_id': produit_hc.id,
-                'type_produit': 'energie',
-                'prix_unitaire': 0.12,  # 12 centimes/kWh HC
-            },
-        ])
+        # Lignes de prix : abonnement par puissance (€/an) + énergies (€/kWh)
+        build_grille_lignes(
+            self.env, self.grille_prix,
+            prix_base=0.15, prix_hp=0.18, prix_hc=0.12,
+        )
         
         self.souscription = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
@@ -84,6 +48,46 @@ class TestFacturation(TransactionCase):
             'provision_mensuelle_kwh': 300.0,
         })
     
+    def test_abonnement_prorata_jours_exact(self):
+        """L'abonnement est proratisé au nombre de jours réel de la période."""
+        prix_journalier = ABO_ANNUEL_STD['6'] / 365.0
+
+        # Période de 31 jours (1er janvier -> 1er février)
+        periode_31 = self.env['souscription.periode'].create({
+            'souscription_id': self.souscription.id,
+            'date_debut': date(2024, 1, 1),
+            'date_fin': date(2024, 2, 1),
+            'type_periode': 'mensuelle',
+            'provision_base_kwh': 100.0,
+        })
+        # Période de 28 jours (1er février -> 29 février)
+        periode_28 = self.env['souscription.periode'].create({
+            'souscription_id': self.souscription.id,
+            'date_debut': date(2024, 2, 1),
+            'date_fin': date(2024, 2, 29),
+            'type_periode': 'mensuelle',
+            'provision_base_kwh': 100.0,
+        })
+        self.assertEqual(periode_31.jours, 31)
+        self.assertEqual(periode_28.jours, 28)
+
+        facture_31 = self.souscription._creer_facture_periode(periode_31)
+        facture_28 = self.souscription._creer_facture_periode(periode_28)
+
+        abo_31 = facture_31.invoice_line_ids.filtered(
+            lambda l: l.product_id and 'Abonnement' in l.product_id.name)
+        abo_28 = facture_28.invoice_line_ids.filtered(
+            lambda l: l.product_id and 'Abonnement' in l.product_id.name)
+
+        self.assertAlmostEqual(abo_31.price_unit, prix_journalier, places=4)
+        self.assertEqual(abo_31.quantity, 31)
+        self.assertEqual(abo_28.quantity, 28)
+        # Montants proratisés exacts (pas de forfait mensuel)
+        self.assertAlmostEqual(abo_31.price_unit * abo_31.quantity,
+                               prix_journalier * 31, places=4)
+        self.assertAlmostEqual(abo_28.price_unit * abo_28.quantity,
+                               prix_journalier * 28, places=4)
+
     def test_creation_periode_mensuelle(self):
         """Test création d'une période de facturation"""
         periode = self.env['souscription.periode'].create({

@@ -2,6 +2,8 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.exceptions import UserError
 from datetime import date
 
+from .common import build_grille_lignes, ABO_ANNUEL_SOL
+
 
 @tagged('souscriptions', 'post_install', '-at_install')
 class TestIntegration(TransactionCase):
@@ -31,48 +33,11 @@ class TestIntegration(TransactionCase):
             'is_current': True,
         })
         
-        # Récupérer les produits
-        produit_base = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
-        produit_hp = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hp')
-        produit_hc = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hc')
-        produit_abo_standard = self.env.ref('souscriptions_odoo.souscriptions_product_abonnement_standard')
-        produit_abo_solidaire = self.env.ref('souscriptions_odoo.souscriptions_product_abonnement_solidaire')
-        
-        # Créer les lignes de prix
-        self.env['grille.prix.ligne'].create([
-            # Lignes abonnement
-            {
-                'grille_id': self.grille.id,
-                'product_id': produit_abo_standard.id,
-                'type_produit': 'abonnement',
-                'prix_base_3kva': 12.00,  # 12€/mois pour 3kVA
-            },
-            {
-                'grille_id': self.grille.id,
-                'product_id': produit_abo_solidaire.id,
-                'type_produit': 'abonnement',
-                'prix_base_3kva': 8.00,  # 8€/mois pour 3kVA solidaire
-            },
-            # Lignes énergie
-            {
-                'grille_id': self.grille.id,
-                'product_id': produit_base.id,
-                'type_produit': 'energie',
-                'prix_unitaire': 0.2276,  # 22.76 centimes/kWh
-            },
-            {
-                'grille_id': self.grille.id,
-                'product_id': produit_hp.id,
-                'type_produit': 'energie',
-                'prix_unitaire': 0.2516,  # 25.16 centimes/kWh HP
-            },
-            {
-                'grille_id': self.grille.id,
-                'product_id': produit_hc.id,
-                'type_produit': 'energie',
-                'prix_unitaire': 0.2032,  # 20.32 centimes/kWh HC
-            },
-        ])
+        # Lignes de prix : abonnement par puissance (€/an) + énergies (€/kWh)
+        build_grille_lignes(
+            self.env, self.grille,
+            prix_base=0.2276, prix_hp=0.2516, prix_hc=0.2032,
+        )
     
     def test_workflow_complet_base(self):
         """Test workflow complet : souscription BASE -> période -> facture"""
@@ -195,10 +160,10 @@ class TestIntegration(TransactionCase):
         facture = periode.facture_id
         ligne_abo = facture.invoice_line_ids.filtered(lambda l: l.product_id and 'Abonnement' in l.product_id.name)
         
-        # Le prix doit être celui du tarif solidaire
-        # Pour 6kVA : (8€/mois base 3kVA * 2) / 30 jours = 0.533€/jour
-        prix_journalier_attendu = (8.00 * 2) / 30
-        self.assertAlmostEqual(ligne_abo.price_unit, prix_journalier_attendu, places=2)
+        # Le prix doit être celui du tarif solidaire 6 kVA, proratisé au jour
+        # (prix annuel / 365).
+        prix_journalier_attendu = ABO_ANNUEL_SOL['6'] / 365.0
+        self.assertAlmostEqual(ligne_abo.price_unit, prix_journalier_attendu, places=4)
     
     def test_facturation_multiple_souscriptions(self):
         """Test facturation simultanée de plusieurs souscriptions"""
@@ -238,10 +203,11 @@ class TestIntegration(TransactionCase):
             self.assertEqual(periode.facture_id.partner_id, sous.partner_id)
     
     def test_erreur_grille_manquante(self):
-        """Test gestion erreur : pas de grille de prix active"""
-        # Désactiver la grille
-        self.grille.is_current = False
-        
+        """Test gestion erreur : aucune grille ne couvre la période facturée"""
+        # Retirer la grille couvrant 2024 : la période ci-dessous tombe alors
+        # dans un trou de couverture.
+        self.grille.unlink()
+
         souscription = self.env['souscription.souscription'].create({
             'partner_id': self.partner.id,
             'pdl': 'PDL_ERREUR',

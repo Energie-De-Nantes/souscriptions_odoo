@@ -108,8 +108,6 @@ class Souscription(models.Model):
     ref_compteur = fields.Char(string="Référence compteur")
     numero_depannage = fields.Char(string="Numéro de dépannage")
 
-    # Computed fields métier déplacés vers souscription_metier_mixin.py
-    # pour découplage des dépendances métier
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -122,8 +120,6 @@ class Souscription(models.Model):
         for sous in self:
             sous.facture_ids = sous.periode_ids.mapped('facture_id')
 
-    # Computed fields métier déplacés vers souscription_metier_mixin.py
-    
     def creer_factures(self):
         """
         Crée les factures à partir des périodes de facturation.

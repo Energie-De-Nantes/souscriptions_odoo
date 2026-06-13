@@ -4,15 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## About This Codebase
 
-This is an **exploratory phase** Odoo addon for managing electricity subscriptions ("Souscriptions") for French energy providers. The codebase is designed for **Odoo >=18** and takes into account OWL framework changes in this version.
+This is an Odoo addon for managing electricity subscriptions ("Souscriptions") for French energy providers. The codebase targets **Odoo 19**.
 
-**Important**: This project is in exploratory phase. Final functionalities are not yet determined, so avoid making assumptions about specific features or identifying key functions as definitive.
+The rebuild is guided by `AUDIT_REFONTE.md` and tracked in the GitHub milestone "Refonte Odoo 19" (issues #10–#22). **Division of responsibility**: all domain/métier logic (Enedis flux ingestion, périmètre, energy by cadran, TURPE, accise) lives in [electricore](https://github.com/Energie-De-Nantes/electricore), deployed with a REST API. This Odoo module keeps only legal accounting, price grids, invoicing, the customer portal, and the raccordement workflow. electricore feeds the billing periods via its API.
 
 ## Module Architecture
 
-The addon is structured in two main functional modules:
-
-### 1. Souscriptions Module
+### Souscriptions Module
 **Purpose**: Replacement for Odoo's standard subscription module (`abonnement`), which is not adapted for electricity supply management
 
 **Why Replace Odoo's Subscription Module**:
@@ -21,44 +19,31 @@ The addon is structured in two main functional modules:
 - Cannot handle time-varying prices with historical price billing
 - Lacks support for smoothed/monthly billing contract regularization with retroactive pricing
 
-**Current Implementation**: Contract management with billing periods, pricing configuration, and invoice generation
+**Implementation**: Contract management (`souscription.souscription`), billing periods (`souscription.periode`), price grids (`grille.prix`), invoice integration via an extended `account.move`, customer portal, and a kanban raccordement workflow.
 
-### 2. Métier Module  
-**Purpose**: Represents Enedis (French electricity network operator) data within Odoo
-- **Data Integration**: Import and manage historical data from Enedis
-- **Data Sources**: Parquet files containing perimeter history, service billing, consumption indexes
-- **Architecture**: Readonly business data with dedicated importer models
-
-## Technical Architecture
-
-### Core Models Structure
-- **Souscription Module**: Mutable billing configuration and contract management
-- **Métier Module**: Immutable Enedis data with import-only access
-- **Integration**: Invoice system through extended `account.move` model
-
-### Data Import System
-Métier models use dedicated importers that handle:
-- Parquet file imports with pandas/fastparquet
-- Column name sanitization and accent handling
-- Data validation and bulk import capabilities
+> The former in-Odoo "Métier" module (readonly Enedis mirrors + Parquet importers using pandas/fastparquet) was removed in favor of electricore. Do not reintroduce pandas/parquet imports here — consume electricore's API instead.
 
 ## Development Environment
 
 ### Odoo Version Requirements
-**Odoo >=18** - Built specifically for Odoo 18+ with updated OWL framework considerations
+**Odoo 19** — the module is validated against the `odoo:19.0` Docker image.
 
 ### Standard Development Commands
 ```bash
-# Install/upgrade addon
-odoo-bin -d your_database -i souscriptions
-odoo-bin -d your_database -u souscriptions
+# Install/upgrade addon (module technical name: souscriptions_odoo)
+odoo -d your_database -i souscriptions_odoo
+odoo -d your_database -u souscriptions_odoo
 
 # Development mode with OWL debugging
-odoo-bin -d your_database --dev=reload,qweb,werkzeug,xml
+odoo -d your_database --dev=reload,qweb,werkzeug,xml
 ```
 
 ### Testing
-No formal test suite exists. Manual testing through Odoo interface required.
+The suite lives in `tests/` (TransactionCase + HttpCase). Run it against Odoo 19:
+
+```bash
+odoo -d test_db -i souscriptions_odoo --test-enable --test-tags /souscriptions_odoo --stop-after-init
+```
 
 ## Key Technical Considerations
 
@@ -83,12 +68,14 @@ Unlike standard subscriptions, electricity supply requires:
 - Maintain clear separation between subscription management and Enedis data integration
 
 ### File Organization
-- `models/`: Core business logic split between subscription management and Métier data
-- `views/`: XML view definitions with separate interfaces for each module
-- `data/`: Default configuration data
-- `security/`: Access control with different permissions for subscription vs Métier data
+- `models/core/`: subscription, billing periods, price grids, account.move extension
+- `models/raccordement/`: connection-request kanban workflow
+- `controllers/`: customer portal routes
+- `views/`, `reports/`: XML view and QWeb report definitions
+- `data/`: default configuration data; `demo/`: demo-only data
+- `security/`: access control rules
 
 ## Dependencies
-- **Odoo Core**: base, mail, contacts, account (version >=18)
-- **Python Libraries**: pandas, fastparquet (for Enedis data imports)
+- **Odoo Core**: base, mail, contacts, account, portal (Odoo 19)
 - **Localization**: babel.dates for French date formatting
+- **External service**: electricore REST API for all métier calculations

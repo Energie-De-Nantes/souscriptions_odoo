@@ -2,23 +2,17 @@ FROM odoo:19.0
 
 USER root
 
-# Installer les dépendances Python et PostgreSQL client
+# Installer les dépendances système
 RUN apt-get update && apt-get install -y \
-    python3-pandas \
     python3-watchdog \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer les packages non disponibles via pip
-RUN pip3 install --no-cache-dir --break-system-packages \
-    pyarrow \
-    fastparquet
-
 # Copier le module souscriptions
-COPY . /mnt/extra-addons/souscriptions
+COPY . /mnt/extra-addons/souscriptions_odoo
 
 # S'assurer que les permissions sont correctes
-RUN chown -R odoo:odoo /mnt/extra-addons/souscriptions
+RUN chown -R odoo:odoo /mnt/extra-addons/souscriptions_odoo
 
 USER odoo
 

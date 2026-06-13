@@ -12,17 +12,16 @@
         Remplace le module abonnement standard d'Odoo qui n'est pas adapté 
         aux spécificités de la fourniture d'électricité.
         
-        Fonctionnalités Core :
+        Fonctionnalités :
         - Gestion des contrats de souscription avec cadrans énergétiques
         - Périodes de facturation mensuelles avec support lissage
         - Intégration avec la facturation Odoo
         - Support facturation HP/HC et Base
         - Régularisation des contrats lissés
-        
-        Fonctionnalités Métier (Phase 2) :
-        - Import de données Enedis (périmètre, prestations, index)
-        - Intégration avec données métier externes
-        - Rapports étendus avec historique complet
+
+        Les calculs métier et l'ingestion des données Enedis (périmètre,
+        prestations, index, TURPE, accise) sont délégués à electricore, qui
+        alimente les périodes de facturation via son API.
     """,
     "installable": True,
     "application": True,
@@ -47,12 +46,6 @@
         "views/portal_templates.xml",
         "views/raccordement/raccordement_demande_views.xml",
         "views/raccordement/raccordement_menu.xml",
-        
-        # Phase 2 - Métier (à décommenter lors de l'activation)
-        # "security/ir.model.access.metier.csv",
-        # "views/metier/metier_perimetre.xml",
-        # "views/metier/metier_prestation.xml",
-        # "views/metier/metier_mesure_index.xml",
     ],
     
     "demo": [

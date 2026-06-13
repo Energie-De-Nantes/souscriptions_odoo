@@ -1,68 +1,58 @@
-# Architecture Modulaire - Module Souscriptions
+# Architecture — Module Souscriptions
 
 ## Vue d'ensemble
 
-Le module `souscriptions` utilise une architecture modulaire qui permet un déploiement progressif :
-- **Phase 1** : Module Core uniquement (gestion des souscriptions)
-- **Phase 2** : Module Core + Métier (intégration données Enedis)
+`souscriptions_odoo` est un addon **Odoo 19** de gestion des contrats de fourniture
+d'électricité. Il remplace le module d'abonnement standard d'Odoo, inadapté aux
+spécificités de l'électricité (changements de prix en cours de contrat, facturation
+au prix historique, lissage avec régularisation).
+
+## Répartition des responsabilités
+
+Les calculs métier sont délégués à
+[electricore](https://github.com/Energie-De-Nantes/electricore) (API REST déployée) :
+
+| Responsabilité | Système |
+|---|---|
+| Ingestion des flux Enedis (C15, R151, F15…) | electricore |
+| Calculs métier : périmètre, énergies par cadran, TURPE, accise | electricore |
+| Archivage des périodes de facturation raffinées | Odoo |
+| Règles tarifaires (grilles de prix) | Odoo |
+| Facturation, taxes, comptabilité légale, paiements | Odoo |
+| Portail usager·ère, workflow de raccordement | Odoo |
+
+electricore alimente les périodes de facturation via son API ; Odoo ne contient
+aucun import de données Enedis (l'ancien module « Métier » à base de Parquet /
+pandas a été retiré).
 
 ## Structure
 
 ```
-souscriptions/
+souscriptions_odoo/
 ├── models/
-│   ├── core/              # Phase 1 - Modèles principaux
-│   │   ├── souscription.py
-│   │   ├── souscription_periode.py
-│   │   ├── grille_prix.py
-│   │   └── account_move.py
-│   └── metier/            # Phase 2 - Données métier
-│       ├── models/        # Modèles de données Enedis
-│       ├── importers/     # Import depuis fichiers Parquet
-│       └── mixins/        # Extension du modèle souscription
-├── views/
-│   ├── core/              # Vues Phase 1
-│   └── metier/            # Vues Phase 2
-└── toggle_metier.sh       # Script d'activation/désactivation
+│   ├── core/              # souscription, période, grille de prix, account.move
+│   └── raccordement/      # workflow kanban de demande de raccordement
+├── controllers/           # portail usager·ère
+├── views/, reports/       # vues XML et rapports QWeb
+├── data/                  # données de configuration (prod)
+├── demo/                  # données de démonstration uniquement
+├── security/              # droits d'accès et règles
+└── tests/                 # suite de tests (TransactionCase / HttpCase)
 ```
 
-## Utilisation
+## Installation
 
-### Phase 1 : Installation Core uniquement
 ```bash
-# État par défaut - Métier désactivé
-odoo-bin -d votre_base -i souscriptions
+odoo -d votre_base -i souscriptions_odoo
 ```
 
-### Phase 2 : Activation du module Métier
+## Tests
+
 ```bash
-# Activer le module métier
-./toggle_metier.sh enable
-
-# Redémarrer Odoo et mettre à jour
-odoo-bin -d votre_base -u souscriptions
+odoo -d test_db -i souscriptions_odoo --test-enable --test-tags /souscriptions_odoo --stop-after-init
 ```
 
-### Vérifier le statut
-```bash
-./toggle_metier.sh status
-```
+## Suite de la refonte
 
-### Désactiver le module Métier
-```bash
-./toggle_metier.sh disable
-odoo-bin -d votre_base -u souscriptions
-```
-
-## Avantages
-
-1. **Déploiement progressif** : Permet de mettre en production le core avant le métier
-2. **Un seul module** : Simplicité de maintenance et de déploiement
-3. **Séparation claire** : Code organisé par domaine fonctionnel
-4. **Performance** : Chargement uniquement des composants nécessaires
-
-## Notes importantes
-
-- Les données métier restent dans la base même si le module est désactivé
-- L'activation/désactivation nécessite un redémarrage d'Odoo
-- Les tests sont organisés pour fonctionner dans les deux modes
+Le plan complet est dans `AUDIT_REFONTE.md` et suivi dans le jalon GitHub
+« Refonte Odoo 19 » (issues #10–#22).

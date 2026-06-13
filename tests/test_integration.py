@@ -224,6 +224,10 @@ class TestIntegration(TransactionCase):
             'provision_base_kwh': 100.0,
         })
         
-        # Doit lever une erreur
-        with self.assertRaises(UserError):
+        # Doit lever une erreur. creer_factures journalise l'échec en ERROR
+        # avant de relancer : on attend cet échec, donc on coupe ce logger
+        # pour ne pas polluer la sortie.
+        from odoo.tools import mute_logger
+        with self.assertRaises(UserError), \
+                mute_logger('odoo.addons.souscriptions_odoo.models.core.souscription'):
             souscription.creer_factures()

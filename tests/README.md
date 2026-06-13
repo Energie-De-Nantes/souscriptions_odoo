@@ -27,7 +27,21 @@ tests/
 Le module cible **Odoo 19**. La méthode recommandée et reproductible (identique
 à la CI) passe par Docker : aucune installation locale d'Odoo n'est requise.
 
-### Méthode recommandée : Docker (comme la CI)
+### Le plus simple : le script fourni
+
+```bash
+./scripts/run-tests.sh
+# Variantes : TEST_TAGS=souscriptions_facturation ./scripts/run-tests.sh
+#             LOG_LEVEL=info ./scripts/run-tests.sh
+```
+
+Le script démarre PostgreSQL, installe le module sur `odoo:19`, lance la suite,
+nettoie les conteneurs, et **préserve le code de sortie** (un test en échec fait
+échouer le script). Il masque uniquement les lignes de bruit docutils
+`<string>:N: (ERROR/3) ...` émises par la description du module *core* `mail`
+d'Odoo (hors de notre contrôle) ; aucune vraie erreur n'est masquée.
+
+### Méthode manuelle : Docker (comme la CI)
 
 ```bash
 cd <racine du dépôt>

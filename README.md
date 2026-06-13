@@ -165,22 +165,15 @@ Vous aurez alors :
 ## Lancer les tests automatisés
 
 La suite (91 tests) tourne sur `odoo:19` + PostgreSQL via Docker, sans
-installation locale d'Odoo :
+installation locale d'Odoo. Le plus simple :
 
 ```bash
-docker network create odoo-test
-docker run -d --name souscriptions-pg --network odoo-test \
-  -e POSTGRES_USER=odoo -e POSTGRES_PASSWORD=odoo -e POSTGRES_DB=postgres postgres:15
-docker run --rm --network odoo-test \
-  -e HOST=souscriptions-pg -e USER=odoo -e PASSWORD=odoo \
-  -v "$PWD:/mnt/extra-addons/souscriptions_odoo:ro" \
-  odoo:19 odoo \
-    --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons \
-    -d test_db -i souscriptions_odoo \
-    --test-enable --test-tags /souscriptions_odoo --stop-after-init
+./scripts/run-tests.sh
 ```
 
-Procédure détaillée (sélection par tag, CI, dépannage) : [tests/README.md](tests/README.md).
+Le script démarre PostgreSQL, installe le module, lance la suite, nettoie les
+conteneurs et renvoie le bon code de sortie. Pour la commande Docker manuelle,
+la sélection par tag, la CI et le dépannage : [tests/README.md](tests/README.md).
 La même suite s'exécute automatiquement en CI à chaque push et PR (badge en haut).
 
 ## Compatibilité et dépendances

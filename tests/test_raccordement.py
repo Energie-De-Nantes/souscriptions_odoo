@@ -693,9 +693,13 @@ class TestRaccordementSecurity(SouscriptionsTestMixin, TransactionCase):
     def test_required_fields_validation(self):
         """Test que les champs requis sont validés"""
         from psycopg2 import IntegrityError
-        
-        with self.assertRaises(IntegrityError):
-            # PDL manquant
+        from odoo.tools import mute_logger
+
+        # PDL manquant -> violation de contrainte NOT NULL attendue.
+        # mute_logger + savepoint : on attend cet échec SQL, on évite donc
+        # qu'il pollue la sortie avec une ligne ERROR et on garde la
+        # transaction utilisable.
+        with self.assertRaises(IntegrityError), mute_logger('odoo.sql_db'), self.cr.savepoint():
             self.env['raccordement.demande'].create({
                 'date_debut_souhaitee': date.today() + timedelta(days=30),
                 'puissance_souscrite': '6',
@@ -705,12 +709,14 @@ class TestRaccordementSecurity(SouscriptionsTestMixin, TransactionCase):
                 'contact_zip': '12345',
                 'contact_city': 'Test City',
             })
-    
+
     def test_email_validation(self):
         """Test que l'email est requis"""
         from psycopg2 import IntegrityError
-        
-        with self.assertRaises(IntegrityError):
+        from odoo.tools import mute_logger
+
+        # Email manquant -> violation de contrainte NOT NULL attendue.
+        with self.assertRaises(IntegrityError), mute_logger('odoo.sql_db'), self.cr.savepoint():
             self.env['raccordement.demande'].create({
                 'pdl': 'TEST123456789',
                 'date_debut_souhaitee': date.today() + timedelta(days=30),

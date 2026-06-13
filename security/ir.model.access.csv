@@ -1,12 +1,19 @@
 id,name,model_id/id,group_id/id,perm_read,perm_write,perm_create,perm_unlink
-access_souscription_user,souscription.souscription,model_souscription_souscription,base.group_user,1,1,1,1
-access_souscription_periode_user,souscription.periode,model_souscription_periode,base.group_user,1,1,1,1
-access_souscription_etat_user,souscription.etat,model_souscription_etat,base.group_user,1,1,1,1
-access_grille_prix_user,grille.prix,model_grille_prix,base.group_user,1,1,1,1
-access_grille_prix_ligne_user,grille.prix.ligne,model_grille_prix_ligne,base.group_user,1,1,1,1
+access_souscription_user,souscription.souscription user,model_souscription_souscription,group_souscriptions_user,1,1,1,0
+access_souscription_manager,souscription.souscription manager,model_souscription_souscription,group_souscriptions_manager,1,1,1,1
+access_souscription_periode_user,souscription.periode user,model_souscription_periode,group_souscriptions_user,1,1,1,0
+access_souscription_periode_manager,souscription.periode manager,model_souscription_periode,group_souscriptions_manager,1,1,1,1
+access_souscription_etat_user,souscription.etat user,model_souscription_etat,group_souscriptions_user,1,0,0,0
+access_souscription_etat_manager,souscription.etat manager,model_souscription_etat,group_souscriptions_manager,1,1,1,1
+access_grille_prix_user,grille.prix user,model_grille_prix,group_souscriptions_user,1,0,0,0
+access_grille_prix_manager,grille.prix manager,model_grille_prix,group_souscriptions_manager,1,1,1,1
+access_grille_prix_ligne_user,grille.prix.ligne user,model_grille_prix_ligne,group_souscriptions_user,1,0,0,0
+access_grille_prix_ligne_manager,grille.prix.ligne manager,model_grille_prix_ligne,group_souscriptions_manager,1,1,1,1
+access_raccordement_demande_user,raccordement.demande user,model_raccordement_demande,group_souscriptions_user,1,1,1,0
+access_raccordement_demande_manager,raccordement.demande manager,model_raccordement_demande,group_souscriptions_manager,1,1,1,1
+access_raccordement_stage_user,raccordement.stage user,model_raccordement_stage,group_souscriptions_user,1,0,0,0
+access_raccordement_stage_manager,raccordement.stage manager,model_raccordement_stage,group_souscriptions_manager,1,1,1,1
 access_souscription_portal,souscription.souscription portal,model_souscription_souscription,base.group_portal,1,0,0,0
 access_souscription_periode_portal,souscription.periode portal,model_souscription_periode,base.group_portal,1,0,0,0
 access_souscription_etat_portal,souscription.etat portal,model_souscription_etat,base.group_portal,1,0,0,0
 access_account_move_portal,account.move portal,account.model_account_move,base.group_portal,1,0,0,0
-access_raccordement_demande_user,raccordement.demande,model_raccordement_demande,base.group_user,1,1,1,1
-access_raccordement_stage_user,raccordement.stage,model_raccordement_stage,base.group_user,1,1,1,1

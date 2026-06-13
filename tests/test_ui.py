@@ -29,7 +29,7 @@ class TestSouscriptionsUI(SouscriptionsTestMixin, HttpCase):
             'email': 'test@souscriptions.com',
             'group_ids': [(6, 0, [
                 cls.env.ref('base.group_user').id,
-                # Ajouter d'autres groupes selon les besoins
+                cls.env.ref('souscriptions_odoo.group_souscriptions_user').id,
             ])]
         })
     

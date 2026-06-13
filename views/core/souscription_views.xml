@@ -143,5 +143,6 @@
         id="menu_souscription_root"
         name="Souscriptions"
         action="action_souscription"
+        groups="souscriptions_odoo.group_souscriptions_user"
         sequence="10" />
 </odoo>

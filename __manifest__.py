@@ -29,6 +29,7 @@
 
     "data": [
         # Phase 1 - Core (toujours actif)
+        "security/souscriptions_groups.xml",
         "security/ir.model.access.csv",
         "security/security_rules.xml",
         "data/souscription_sequence.xml",

@@ -120,6 +120,7 @@
         name="Grilles de Prix"
         parent="menu_souscription_root"
         action="action_grille_prix"
+        groups="souscriptions_odoo.group_souscriptions_manager"
         sequence="20"/>
         
     <!-- Ligne de prix (vue formulaire dédiée) -->

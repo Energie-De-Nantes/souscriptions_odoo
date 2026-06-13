@@ -4,6 +4,7 @@
     <menuitem id="menu_raccordement_root"
               name="Raccordements"
               sequence="5"
+              groups="souscriptions_odoo.group_souscriptions_user"
               web_icon="souscriptions,static/description/icon.png"/>
     
     <!-- Sous-menu Demandes -->
@@ -17,6 +18,7 @@
     <menuitem id="menu_raccordement_config"
               name="Configuration"
               parent="menu_raccordement_root"
+              groups="souscriptions_odoo.group_souscriptions_manager"
               sequence="100"/>
     
     <!-- Sous-menu Étapes -->

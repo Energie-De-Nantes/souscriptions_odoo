@@ -34,12 +34,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install module and run tests on Odoo 19
+        # The official odoo image entrypoint builds the --db_* flags from the
+        # HOST/PORT/USER/PASSWORD env vars and appends them after the command,
+        # so the DB connection must be configured through these vars.
         run: |
           docker run --rm --network host \
+            -e HOST=127.0.0.1 -e PORT=5432 -e USER=odoo -e PASSWORD=odoo \
             -v "${{ github.workspace }}:/mnt/extra-addons/souscriptions_odoo:ro" \
             odoo:19 odoo \
-              --db_host=127.0.0.1 --db_port=5432 \
-              --db_user=odoo --db_password=odoo \
               --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons \
               -d ci_test -i souscriptions_odoo \
               --test-enable --test-tags /souscriptions_odoo \

@@ -229,11 +229,9 @@ class TestFacturation(TransactionCase):
         turpe_notes = [n for n in note_names if 'turpe' in n.lower()]
         self.assertTrue(len(turpe_notes) >= 2)
         
-        # Assigner manuellement la facture à la période (l'assignation automatique n'est pas implémentée)
-        periode.facture_id = facture
-        
-        # Vérifier que la période est marquée comme facturée
-        self.assertTrue(periode.facture_id.id == facture.id)
+        # facture_id est dérivé de account.move.periode_id (ADR 0004) : la facture
+        # porte déjà periode_id, le lien vers la période est donc automatique.
+        self.assertEqual(periode.facture_id, facture)
     
     def test_generation_facture_hp_hc(self):
         """Test génération facture pour souscription HP/HC"""

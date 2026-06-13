@@ -399,6 +399,11 @@
             <field name="quantity">1</field>
             <field name="price_unit">12.60</field>
         </record>
-        
+
+        <!-- Comptabilisation des factures admin : côté portail, seules les
+             factures postées sont visibles de l'usager·ère (ADR 0004, issue #23). -->
+        <function model="account.move" name="action_post"
+                  eval="[[ref('demo_facture_janvier_admin'), ref('demo_facture_fevrier_admin'), ref('demo_facture_mars_admin')]]"/>
+
     </data>
 </odoo>

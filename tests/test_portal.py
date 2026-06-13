@@ -59,10 +59,11 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
             'turpe_variable': 14.20,
         })
         
-        # Créer des factures associées via le système de souscription
+        # Créer des factures associées via le système de souscription.
+        # facture_id se déduit de account.move.periode_id (ADR 0004) : pas
+        # d'assignation manuelle, les factures portent periode_id.
         try:
             cls.facture_jan = cls.souscription_base._creer_facture_periode(cls.periode_jan)
-            cls.periode_jan.facture_id = cls.facture_jan
         except:
             # Fallback - créer une facture simple avec un nom
             cls.facture_jan = cls.env['account.move'].create({
@@ -72,11 +73,9 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
                 'periode_id': cls.periode_jan.id,
                 'name': 'FACT/2024/0001',
             })
-            cls.periode_jan.facture_id = cls.facture_jan
-        
+
         try:
             cls.facture_feb = cls.souscription_base._creer_facture_periode(cls.periode_feb)
-            cls.periode_feb.facture_id = cls.facture_feb
         except:
             # Fallback - créer une facture simple avec un nom
             cls.facture_feb = cls.env['account.move'].create({
@@ -86,7 +85,6 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
                 'periode_id': cls.periode_feb.id,
                 'name': 'FACT/2024/0002',
             })
-            cls.periode_feb.facture_id = cls.facture_feb
 
     def test_portal_access_redirect_unauthenticated(self):
         """Test que l'accès non authentifié redirige vers login."""

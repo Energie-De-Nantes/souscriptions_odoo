@@ -52,6 +52,14 @@ par cadran facturé. Sélectionnée par les dates d'une *Période*, ce qui perme
 *régularisation* aux prix historiques.
 _Éviter_ : tarif (collision avec la FTA / tarif d'acheminement réseau), barème.
 
+**Facture** :
+Le document comptable légal (`account.move`, *facture d'énergie*) émis à partir d'une *Période*
+qu'il référence (`periode_id`). Une *Période* est dite **facturée** dès qu'une *Facture* la
+référence ; elle est **émise** (finalisée, opposable) à un état ultérieur. Seules les *Périodes*
+dont la *Facture* est **émise** sont visibles du·de la *souscripteur·rice* au *Portail* — un
+brouillon de facture ne fuite jamais côté usager.
+_Éviter_ : confondre « facturée » (une facture existe) et « émise » (facture finalisée).
+
 **Configuration Enedis** :
 La configuration *réseau* d'un PDL — FTA, calendrier distributeur, puissance réseau, cadrans
 réseau — propriété d'electricore (source : C15). Détermine le coût d'acheminement (TURPE).
@@ -76,5 +84,7 @@ Rôle métier qui conduit la facturation mensuelle depuis Odoo et **vérifie les
 
 **Portail** :
 Espace en ligne en lecture du·de la *souscripteur·rice* (contrats, factures, infos utiles),
-pensé dans une logique de commun (évolutif).
+pensé dans une logique de commun (évolutif). L'historique des consommations (les *Périodes*
+dont la *Facture* est **émise**) est présenté **directement** dans la page de détail d'une
+*Souscription*, sans page dédiée.
 _Éviter_ : espace client.

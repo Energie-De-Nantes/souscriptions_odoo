@@ -152,15 +152,12 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
         response = self.url_open(f'/my/souscription/{self.souscription_base.id}/periodes')
         self.assertEqual(response.status_code, 200)
         
-        # Test plus basique - vérifier que la page se charge
-        # Vérifier les éléments de navigation
-        if 'Historique des consommations' in response.text:
-            self.assertIn('Historique des consommations', response.text)
-        
-        # Vérifier que ce n'est pas une page d'erreur
-        self.assertNotIn('Not Found', response.text)
-        self.assertNotIn('404', response.text)
-        self.assertNotIn('500', response.text)
+        # La page se charge : on s'appuie sur le code HTTP (200) ci-dessus, qui
+        # est le contrôle fiable « ce n'est pas une page d'erreur ». On ne fait
+        # PAS de recherche de sous-chaîne '404'/'500' dans le HTML : ces motifs
+        # apparaissent par hasard dans des valeurs aléatoires (registry_hash,
+        # csrf_token, URLs d'assets), ce qui rendait ce test instable.
+        self.assertIn('Historique des consommations', response.text)
 
     def test_portal_security_other_user_data(self):
         """Test que l'utilisateur ne peut pas voir les données d'autres utilisateurs."""

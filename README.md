@@ -143,24 +143,29 @@ souscriptions_odoo/
 └── reports/          # Templates de factures et rapports
 ```
 
-## Tester avec les données d'exemple
+## Explorer l'interface (instance vivante)
 
-Le projet inclut des données d'exemple pour voir comment ça fonctionne :
+Pour lancer une instance Odoo 19 complète avec des données d'exemple et cliquer
+dans l'interface :
 
 ```bash
-# Avec Docker
-cd docker
-./scripts/demo_simple.sh
-
-# Ou en manuel (les données de démo sont chargées par défaut à l'installation)
-odoo -d test_souscriptions -i souscriptions_odoo
+./scripts/run-app.sh
+# puis ouvrir http://localhost:8069   (identifiants : admin / admin)
 ```
 
-Vous aurez alors :
-- Des contrats d'exemple avec différentes configurations
-- Des grilles de prix réalistes
-- Des factures générées automatiquement
-- Des demandes de raccordement en cours
+Le script démarre PostgreSQL, installe le module **avec les données de démo**
+(`--with-demo` ; sous Odoo 19 la démo n'est plus chargée par défaut), puis sert
+l'application. La base est persistée : les modifications faites dans l'UI sont
+conservées entre deux lancements. `Ctrl-C` arrête le serveur ;
+`./scripts/run-app.sh --reset` repart d'une base vierge.
+
+Vous y trouverez :
+- **Souscriptions** (menu principal) : 5 contrats d'exemple (Base, HP/HC, solidaire, pro)
+- **Souscriptions → Grilles de Prix** : grille tarifaire avec un prix par puissance
+- **Raccordements** : tableau kanban de demandes de raccordement à différentes étapes
+- Le **portail client** sur `/my` : pour le tester, donnez un accès portail à un
+  contact de démo (Contacts → sélectionner un client → *Action → Accorder l'accès au portail*),
+  définissez-lui un mot de passe, puis connectez-vous avec ce compte.
 
 ## Lancer les tests automatisés
 

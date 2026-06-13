@@ -30,7 +30,7 @@ services:
       - PASSWORD=odoo
     volumes:
       - odoo-web-data:/var/lib/odoo
-      - ../:/mnt/extra-addons/souscriptions:ro
+      - ../:/mnt/extra-addons/souscriptions_odoo:ro
       - ./config/odoo.conf:/etc/odoo/odoo.conf:ro
     command: >
       odoo
@@ -55,7 +55,7 @@ services:
       - PASSWORD=odoo
     volumes:
       - odoo-web-data:/var/lib/odoo
-      - ../:/mnt/extra-addons/souscriptions:rw
+      - ../:/mnt/extra-addons/souscriptions_odoo:rw
     command: >
       odoo
       --db_host=db

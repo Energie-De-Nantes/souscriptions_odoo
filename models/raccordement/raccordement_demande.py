@@ -354,8 +354,7 @@ class RaccordementDemande(models.Model):
             partner_vals = {
                 'name': self.contact_nom,  # Nom de la société
                 'email': self.contact_email,
-                'phone': self.contact_telephone,
-                'mobile': self.contact_mobile,
+                'phone': self.contact_telephone or self.contact_mobile,
                 'street': self.contact_street,
                 'street2': self.contact_street2,
                 'zip': self.contact_zip,
@@ -375,8 +374,7 @@ class RaccordementDemande(models.Model):
             partner_vals = {
                 'name': f"{self.contact_prenom} {self.contact_nom}" if self.contact_prenom else self.contact_nom,
                 'email': self.contact_email,
-                'phone': self.contact_telephone,
-                'mobile': self.contact_mobile,
+                'phone': self.contact_telephone or self.contact_mobile,
                 'street': self.contact_street,
                 'street2': self.contact_street2,
                 'zip': self.contact_zip,

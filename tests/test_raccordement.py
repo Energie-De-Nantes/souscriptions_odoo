@@ -343,8 +343,8 @@ class TestRaccordementIban(SouscriptionsTestMixin, TransactionCase):
         demande = self.create_base_demande()
         self.assertFalse(demande.pro)
         
-        # Test modification du champ PRO
-        demande.pro = True
+        # Test modification du champ PRO (avec SIRET, requis par la contrainte)
+        demande.write({'pro': True, 'siret': '12345678901234'})
         self.assertTrue(demande.pro)
         
         # Test création avec PRO=True
@@ -434,10 +434,15 @@ class TestRaccordementSiret(SouscriptionsTestMixin, TransactionCase):
     def test_siret_format_cleaning(self):
         """Test que les espaces sont nettoyés dans la validation SIRET"""
         from odoo.exceptions import ValidationError
-        
-        # SIRET avec espaces (devrait échouer car nettoyage ne s'applique que pour validation)
+
+        # SIRET avec espaces : accepté car la validation nettoie les
+        # caractères non numériques avant de compter les 14 chiffres
+        demande = self.create_base_demande(pro=True, siret="123 456 789 012 34")
+        self.assertEqual(demande.siret, "123 456 789 012 34")
+
+        # SIRET trop court même après nettoyage : refusé
         with self.assertRaises(ValidationError) as cm:
-            self.create_base_demande(pro=True, siret="123 456 789 012 34")
+            self.create_base_demande(pro=True, siret="123 456 789 01")
         self.assertIn("14 chiffres", str(cm.exception))
     
     def test_siret_change_pro_status(self):
@@ -473,9 +478,9 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
     def setUpRaccordementData(cls):
         """Setup des données spécifiques aux tests de raccordement"""
         # Utiliser les vraies étapes du module
-        cls.stage_received = cls.env.ref('souscriptions.stage_demande_recue')
-        cls.stage_validated = cls.env.ref('souscriptions.stage_iban_valide')
-        cls.stage_final = cls.env.ref('souscriptions.stage_souscrit')
+        cls.stage_received = cls.env.ref('souscriptions_odoo.stage_demande_recue')
+        cls.stage_validated = cls.env.ref('souscriptions_odoo.stage_iban_valide')
+        cls.stage_final = cls.env.ref('souscriptions_odoo.stage_souscrit')
     
     def create_complete_demande(self, **kwargs):
         """Helper pour créer une demande complète"""
@@ -732,7 +737,7 @@ class TestRaccordementSecurity(SouscriptionsTestMixin, TransactionCase):
         })
         
         # Essayer de passer à l'étape IBAN validé avec un IBAN invalide
-        stage_iban = self.env.ref('souscriptions.stage_iban_valide')
+        stage_iban = self.env.ref('souscriptions_odoo.stage_iban_valide')
         
         # L'onchange devrait générer un warning (pas d'exception)
         # On vérifie juste que l'IBAN est invalide

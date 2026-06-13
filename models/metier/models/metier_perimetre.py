@@ -3,13 +3,11 @@ from odoo import models, fields
 class MetierPerimetre(models.Model):
     _name = "metier.perimetre"
     _description = "Historique de périmètre (extrait synthétique)"
-    _sql_constraints = [
-        (
-            'uniq_ref_situation_date',
-            'UNIQUE(ref_situation_contractuelle, date_evenement)',
-            'Un enregistrement avec cette référence contractuelle et cette date existe déjà.'
-        )
-    ]
+
+    _uniq_ref_situation_date = models.Constraint(
+        'UNIQUE(ref_situation_contractuelle, date_evenement)',
+        'Un enregistrement avec cette référence contractuelle et cette date existe déjà.',
+    )
 
     # Identifiants
     pdl = fields.Char(string="PDL", readonly=True)

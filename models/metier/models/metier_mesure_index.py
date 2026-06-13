@@ -33,7 +33,3 @@ class MesureIndex(models.Model):
             "Utiliser 'Non valide' pour ignorer cet index dans les calculs automatiques."
         ),
     )
-
-    # _sql_constraints = [
-    #     ('uniq_pdl_date_source', 'unique(pdl, date, source, validite)', "Un relevé par pdl, date et source.")
-    # ]

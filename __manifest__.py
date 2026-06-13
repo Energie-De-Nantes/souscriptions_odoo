@@ -1,6 +1,6 @@
 {
     "name": "Souscriptions Électricité",
-    "version": "1.0.0",
+    "version": "19.0.1.0.0",
     "depends": ["base", "mail", "contacts", "account", "portal"],
     "author": "Virgile Daugé",
     "category": "Energy",
@@ -36,7 +36,6 @@
         "data/souscription_etat_data.xml",
         "data/produits_abonnement_simple.xml",
         "data/produits_energie.xml",
-        "data/grille_prix_demo.xml",
         "data/raccordement_sequence.xml",
         "data/raccordement_stages.xml",
         "reports/souscription_contrat_report.xml",
@@ -57,6 +56,7 @@
     ],
     
     "demo": [
+        "demo/grille_prix_demo.xml",
         "demo/souscriptions_demo.xml",
         "demo/raccordement_demo.xml",
     ],

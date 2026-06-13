@@ -21,11 +21,11 @@ class TestGrillePrix(TransactionCase):
         })
         
         # Récupérer les produits
-        produit_base = self.env.ref('souscriptions.souscriptions_product_energie_base')
-        produit_hp = self.env.ref('souscriptions.souscriptions_product_energie_hp')
-        produit_hc = self.env.ref('souscriptions.souscriptions_product_energie_hc')
-        produit_abo_standard = self.env.ref('souscriptions.souscriptions_product_abonnement_standard')
-        produit_abo_solidaire = self.env.ref('souscriptions.souscriptions_product_abonnement_solidaire')
+        produit_base = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
+        produit_hp = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hp')
+        produit_hc = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hc')
+        produit_abo_standard = self.env.ref('souscriptions_odoo.souscriptions_product_abonnement_standard')
+        produit_abo_solidaire = self.env.ref('souscriptions_odoo.souscriptions_product_abonnement_solidaire')
         
         # Créer les lignes de prix
         self.env['grille.prix.ligne'].create([
@@ -83,9 +83,9 @@ class TestGrillePrix(TransactionCase):
         """Test récupération dictionnaire des prix"""
         prix_dict = self.grille.get_prix_dict()
         
-        produit_base = self.env.ref('souscriptions.souscriptions_product_energie_base')
-        produit_hp = self.env.ref('souscriptions.souscriptions_product_energie_hp')
-        produit_hc = self.env.ref('souscriptions.souscriptions_product_energie_hc')
+        produit_base = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
+        produit_hp = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hp')
+        produit_hc = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hc')
         
         # Vérifier que les prix énergie sont présents
         self.assertEqual(prix_dict[produit_base.id], 0.2276)

@@ -222,8 +222,7 @@ class GrillePrixLigne(models.Model):
                 # Pour énergies et autres : prix interne = prix saisi
                 ligne.prix_interne = ligne.prix_unitaire or 0.0
     
-    _sql_constraints = [
-        ('unique_produit_grille', 
-         'UNIQUE(grille_id, product_id)',
-         'Un produit ne peut apparaître qu\'une seule fois par grille.')
-    ]
+    _unique_produit_grille = models.Constraint(
+        'UNIQUE(grille_id, product_id)',
+        "Un produit ne peut apparaître qu'une seule fois par grille.",
+    )

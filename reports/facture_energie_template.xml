@@ -153,7 +153,7 @@
         <field name="print_report_name">'Facture_Energie_%s' % (object.name)</field>
         <field name="binding_model_id" ref="account.model_account_move"/>
         <field name="binding_type">report</field>
-        <field name="groups_id" eval="[(4, ref('base.group_user'))]"/>
+        <field name="group_ids" eval="[(4, ref('base.group_user'))]"/>
     </record>
 
 </odoo>

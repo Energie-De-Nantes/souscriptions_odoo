@@ -226,7 +226,7 @@
                     domain="[('souscription_id', '!=', False)]" />
                 <separator />
                 <filter string="Archivé" name="inactive" domain="[('active', '=', False)]" />
-                <group expand="0" string="Grouper par">
+                <group>
                     <filter name="stage" string="Étape" context="{'group_by': 'stage_id'}" />
                     <filter name="month" string="Mois de début"
                         context="{'group_by': 'date_debut_souhaitee:month'}" />

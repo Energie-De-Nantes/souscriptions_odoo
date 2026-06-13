@@ -27,7 +27,7 @@ class TestSouscriptionsUI(SouscriptionsTestMixin, HttpCase):
             'name': 'Utilisateur Test Souscriptions',
             'login': 'test_souscriptions',
             'email': 'test@souscriptions.com',
-            'groups_id': [(6, 0, [
+            'group_ids': [(6, 0, [
                 cls.env.ref('base.group_user').id,
                 # Ajouter d'autres groupes selon les besoins
             ])]

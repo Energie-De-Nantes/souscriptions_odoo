@@ -42,13 +42,53 @@ class SouscriptionsTestMixin:
             'sequence': 10,
         })
         
-        # Grille de prix
+        # Grille de prix active avec lignes, pour que la facturation
+        # fonctionne sans dépendre des données de démo
+        cls.env['grille.prix'].search([('is_current', '=', True)]).write({'is_current': False})
         cls.grille_prix = cls.env['grille.prix'].create({
             'name': 'Grille Test',
             'date_debut': date(2024, 1, 1),
             'date_fin': date(2024, 12, 31),
             'active': True,
+            'is_current': True,
         })
+        produit_base = cls.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
+        produit_hp = cls.env.ref('souscriptions_odoo.souscriptions_product_energie_hp')
+        produit_hc = cls.env.ref('souscriptions_odoo.souscriptions_product_energie_hc')
+        produit_abo_standard = cls.env.ref('souscriptions_odoo.souscriptions_product_abonnement_standard')
+        produit_abo_solidaire = cls.env.ref('souscriptions_odoo.souscriptions_product_abonnement_solidaire')
+        cls.env['grille.prix.ligne'].create([
+            {
+                'grille_id': cls.grille_prix.id,
+                'product_id': produit_abo_standard.id,
+                'type_produit': 'abonnement',
+                'prix_base_3kva': 12.00,
+            },
+            {
+                'grille_id': cls.grille_prix.id,
+                'product_id': produit_abo_solidaire.id,
+                'type_produit': 'abonnement',
+                'prix_base_3kva': 8.00,
+            },
+            {
+                'grille_id': cls.grille_prix.id,
+                'product_id': produit_base.id,
+                'type_produit': 'energie',
+                'prix_unitaire': 0.15,
+            },
+            {
+                'grille_id': cls.grille_prix.id,
+                'product_id': produit_hp.id,
+                'type_produit': 'energie',
+                'prix_unitaire': 0.18,
+            },
+            {
+                'grille_id': cls.grille_prix.id,
+                'product_id': produit_hc.id,
+                'type_produit': 'energie',
+                'prix_unitaire': 0.12,
+            },
+        ])
         
         # Souscription Base standard
         cls.souscription_base = cls.env['souscription.souscription'].create({

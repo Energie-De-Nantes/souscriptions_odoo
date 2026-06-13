@@ -31,11 +31,11 @@ class TestFacturation(TransactionCase):
         })
         
         # Récupérer les produits d'énergie et d'abonnement
-        produit_base = self.env.ref('souscriptions.souscriptions_product_energie_base')
-        produit_hp = self.env.ref('souscriptions.souscriptions_product_energie_hp')
-        produit_hc = self.env.ref('souscriptions.souscriptions_product_energie_hc')
-        produit_abo_standard = self.env.ref('souscriptions.souscriptions_product_abonnement_standard')
-        produit_abo_solidaire = self.env.ref('souscriptions.souscriptions_product_abonnement_solidaire')
+        produit_base = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
+        produit_hp = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hp')
+        produit_hc = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hc')
+        produit_abo_standard = self.env.ref('souscriptions_odoo.souscriptions_product_abonnement_standard')
+        produit_abo_solidaire = self.env.ref('souscriptions_odoo.souscriptions_product_abonnement_solidaire')
         
         # Créer les lignes de prix
         self.env['grille.prix.ligne'].create([

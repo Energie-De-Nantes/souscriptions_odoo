@@ -5,7 +5,7 @@ Tests unitaires pour le portal usager·ère du module souscriptions.
 import json
 from unittest.mock import patch
 from odoo.tests.common import HttpCase, tagged
-from odoo.addons.souscriptions.tests.common import SouscriptionsTestMixin
+from odoo.addons.souscriptions_odoo.tests.common import SouscriptionsTestMixin
 from datetime import date
 
 
@@ -23,7 +23,7 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
             'name': 'Portal Test User',
             'login': 'portal_test',
             'email': 'portal@test.com',
-            'groups_id': [(6, 0, [cls.env.ref('base.group_portal').id])],
+            'group_ids': [(6, 0, [cls.env.ref('base.group_portal').id])],
         })
         
         # Associer le partner de test à l'utilisateur portal
@@ -72,6 +72,7 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
                 'periode_id': cls.periode_jan.id,
                 'name': 'FACT/2024/0001',
             })
+            cls.periode_jan.facture_id = cls.facture_jan
         
         try:
             cls.facture_feb = cls.souscription_base._creer_facture_periode(cls.periode_feb)
@@ -85,6 +86,7 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
                 'periode_id': cls.periode_feb.id,
                 'name': 'FACT/2024/0002',
             })
+            cls.periode_feb.facture_id = cls.facture_feb
 
     def test_portal_access_redirect_unauthenticated(self):
         """Test que l'accès non authentifié redirige vers login."""
@@ -172,7 +174,7 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
             'name': 'Other Portal User',
             'login': 'other_portal',
             'email': 'other_portal@test.com',
-            'groups_id': [(6, 0, [self.env.ref('base.group_portal').id])],
+            'group_ids': [(6, 0, [self.env.ref('base.group_portal').id])],
         })
         other_partner.user_ids = [(6, 0, [other_user.id])]
         
@@ -333,7 +335,7 @@ class PortalIntegrationTestCase(SouscriptionsTestMixin, HttpCase):
     def test_portal_menu_integration(self):
         """Test que le menu portal s'intègre correctement."""
         # Vérifier que l'entrée portal existe dans les données
-        portal_menu = self.env.ref('souscriptions.portal_my_home_souscriptions', raise_if_not_found=False)
+        portal_menu = self.env.ref('souscriptions_odoo.portal_my_home_souscriptions', raise_if_not_found=False)
         self.assertTrue(portal_menu, "Le menu portal doit exister")
 
     def test_portal_with_real_invoice_data(self):
@@ -349,7 +351,7 @@ class PortalIntegrationTestCase(SouscriptionsTestMixin, HttpCase):
             'name': 'Integration Test User',
             'login': 'integration_test',
             'email': 'integration@test.com',
-            'groups_id': [(6, 0, [self.env.ref('base.group_portal').id])],
+            'group_ids': [(6, 0, [self.env.ref('base.group_portal').id])],
         })
         self.partner_test.user_ids = [(6, 0, [portal_user.id])]
         

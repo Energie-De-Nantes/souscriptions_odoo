@@ -39,3 +39,4 @@ odoo-server.log
 # Code analysis tools
 .codanna/
 .fastembed_cache/
+.env

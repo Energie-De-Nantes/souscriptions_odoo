@@ -1,11 +1,11 @@
 {
-    "name": "Souscriptions Électricité",
-    "version": "19.0.1.2.0",
-    "depends": ["base", "mail", "contacts", "account", "portal"],
-    "author": "Virgile Daugé",
-    "category": "Energy",
-    "license": "AGPL-3",
-    "description": """
+    'name': 'Souscriptions Électricité',
+    'version': '19.0.1.2.0',
+    'depends': ['base', 'mail', 'contacts', 'account', 'portal'],
+    'author': 'Virgile Daugé',
+    'category': 'Energy',
+    'license': 'AGPL-3',
+    'description': """
 Gestion des souscriptions électriques
 
 Module principal pour la gestion des contrats de fourniture d'électricité.
@@ -24,35 +24,33 @@ Les calculs métier et l'ingestion des données Enedis (périmètre, prestations
 index, TURPE, accise) sont délégués à electricore, qui alimente les périodes
 de facturation via son API.
 """,
-    "installable": True,
-    "application": True,
-    "auto_install": False, 
-
-    "data": [
+    'installable': True,
+    'application': True,
+    'auto_install': False,
+    'data': [
         # Phase 1 - Core (toujours actif)
-        "security/souscriptions_groups.xml",
-        "security/ir.model.access.csv",
-        "security/security_rules.xml",
-        "data/souscription_sequence.xml",
-        "data/souscription_etat_data.xml",
-        "data/produits_abonnement_simple.xml",
-        "data/produits_energie.xml",
-        "data/raccordement_sequence.xml",
-        "data/raccordement_stages.xml",
-        "reports/souscription_contrat_report.xml",
-        "reports/facture_energie_template.xml",
-        "views/core/souscription_views.xml",
-        "views/core/grille_prix_views.xml",
-        "views/core/souscriptions_periode_views.xml",
-        "views/core/souscription_portal_menu.xml",
-        "views/portal_templates.xml",
-        "views/raccordement/raccordement_demande_views.xml",
-        "views/raccordement/raccordement_menu.xml",
+        'security/souscriptions_groups.xml',
+        'security/ir.model.access.csv',
+        'security/security_rules.xml',
+        'data/souscription_sequence.xml',
+        'data/souscription_etat_data.xml',
+        'data/produits_abonnement_simple.xml',
+        'data/produits_energie.xml',
+        'data/raccordement_sequence.xml',
+        'data/raccordement_stages.xml',
+        'reports/souscription_contrat_report.xml',
+        'reports/facture_energie_template.xml',
+        'views/core/souscription_views.xml',
+        'views/core/grille_prix_views.xml',
+        'views/core/souscriptions_periode_views.xml',
+        'views/core/souscription_portal_menu.xml',
+        'views/portal_templates.xml',
+        'views/raccordement/raccordement_demande_views.xml',
+        'views/raccordement/raccordement_menu.xml',
     ],
-    
-    "demo": [
-        "demo/grille_prix_demo.xml",
-        "demo/souscriptions_demo.xml",
-        "demo/raccordement_demo.xml",
+    'demo': [
+        'demo/grille_prix_demo.xml',
+        'demo/souscriptions_demo.xml',
+        'demo/raccordement_demo.xml',
     ],
 }

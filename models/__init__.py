@@ -1,2 +1,1 @@
-from . import core
-from . import raccordement
+from . import core, raccordement

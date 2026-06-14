@@ -6,7 +6,7 @@ vide pour les périodes facturées uniquement via le lien côté facture) : on f
 le recalcul à partir de la source de vérité unique.
 """
 
-from odoo import api, SUPERUSER_ID
+from odoo import SUPERUSER_ID, api
 
 
 def migrate(cr, version):

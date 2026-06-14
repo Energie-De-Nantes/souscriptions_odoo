@@ -7,7 +7,7 @@ Nouveau pilote de la granularité énergie. Sur une base existante :
   computes config-aware conservent un niveau saisi directement).
 """
 
-from odoo import api, SUPERUSER_ID
+from odoo import SUPERUSER_ID, api
 
 
 def migrate(cr, version):
@@ -27,4 +27,5 @@ def migrate(cr, version):
             p.config_cadrans = 'base'
         else:
             p.config_cadrans = p.souscription_id.config_cadrans or (
-                '4_cadrans' if p.souscription_id.type_tarif == 'hphc' else 'base')
+                '4_cadrans' if p.souscription_id.type_tarif == 'hphc' else 'base'
+            )

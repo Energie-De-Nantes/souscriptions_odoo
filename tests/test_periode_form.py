@@ -5,22 +5,24 @@ La section énergie est pilotée par le calendrier de comptage (config_cadrans) 
 le niveau de saisie suit le compteur. Champs compat retirés des vues.
 """
 
-from odoo.tests.common import Form, tagged
 from datetime import date
+
+from odoo.tests.common import Form, tagged
 
 from .common import SouscriptionsTestCase
 
 
 @tagged('souscriptions', 'souscriptions_periode_form', 'post_install', '-at_install')
 class TestPeriodeForm(SouscriptionsTestCase):
-
     def _periode(self, souscription, config):
         souscription.config_cadrans = config
-        return self.env['souscription.periode'].create({
-            'souscription_id': souscription.id,
-            'date_debut': date(2024, 1, 1),
-            'date_fin': date(2024, 1, 31),
-        })
+        return self.env['souscription.periode'].create(
+            {
+                'souscription_id': souscription.id,
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 1, 31),
+            }
+        )
 
     def test_form_periode_se_charge(self):
         """Le formulaire période dédié se charge sans erreur."""

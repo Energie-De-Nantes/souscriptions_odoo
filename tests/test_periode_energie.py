@@ -5,15 +5,15 @@ Tests énergie de la période (issue #26 / ADR 0005).
 est une cascade dérivée-mais-surchargeable HPH/HPB/HCH/HCB → HP/HC → BASE.
 """
 
-from odoo.tests.common import tagged
 from datetime import date
+
+from odoo.tests.common import tagged
 
 from .common import SouscriptionsTestCase
 
 
 @tagged('souscriptions', 'souscriptions_periode_energie', 'post_install', '-at_install')
 class TestPeriodeEnergie(SouscriptionsTestCase):
-
     def _periode(self, souscription, **vals):
         base = {
             'souscription_id': souscription.id,
@@ -34,9 +34,8 @@ class TestPeriodeEnergie(SouscriptionsTestCase):
         """4_cadrans : la saisie des 4 cadrans dérive HP/HC/BASE."""
         self.souscription_base.config_cadrans = '4_cadrans'
         p = self._periode(
-            self.souscription_base,
-            energie_hph_kwh=130, energie_hpb_kwh=85,
-            energie_hch_kwh=60, energie_hcb_kwh=35)
+            self.souscription_base, energie_hph_kwh=130, energie_hpb_kwh=85, energie_hch_kwh=60, energie_hcb_kwh=35
+        )
         self.assertEqual(p.energie_hp_kwh, 215)
         self.assertEqual(p.energie_hc_kwh, 95)
         self.assertEqual(p.energie_base_kwh, 310)
@@ -76,8 +75,7 @@ class TestPeriodeEnergie(SouscriptionsTestCase):
         """Écart HP/HC = réel − provision par cadran facturé."""
         self.souscription_base.config_cadrans = 'hp_hc'
         p = self._periode(
-            self.souscription_base,
-            energie_hp_kwh=215, energie_hc_kwh=95,
-            provision_hp_kwh=224, provision_hc_kwh=96)
+            self.souscription_base, energie_hp_kwh=215, energie_hc_kwh=95, provision_hp_kwh=224, provision_hc_kwh=96
+        )
         self.assertEqual(p.ecart_hp_kwh, -9)
         self.assertEqual(p.ecart_hc_kwh, -1)

@@ -3,7 +3,9 @@ from . import test_souscription
 from . import test_facturation
 from . import test_grille_prix
 from . import test_integration
+from . import test_periode_energie
 from . import test_periode_facture
+from . import test_periode_form
 from . import test_portal
 from . import test_raccordement
 from . import test_security

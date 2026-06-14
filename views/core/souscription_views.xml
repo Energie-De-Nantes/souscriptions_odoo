@@ -24,6 +24,7 @@
                         <field name="pdl"/>
                         <field name="puissance_souscrite"/>
                         <field name="type_tarif"/>
+                        <field name="config_cadrans"/>
                         <field name="lisse"/>
                         <field name="provision_mensuelle_kwh" invisible="not lisse or type_tarif != 'base'" string="Provision mensuelle Base (kWh)"/>
                         <field name="provision_hp_kwh" invisible="not lisse or type_tarif != 'hphc'" string="Provision HP (kWh)"/>

@@ -116,8 +116,10 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
         self.authenticate(self.portal_user.login, self.portal_user.login)
         response = self.url_open(self._detail_url())
         self.assertEqual(response.status_code, 200)
-        # l'énergie spécifique de la période en brouillon ne doit pas fuiter
-        self.assertNotIn('999', response.text)
+        # la période en brouillon (sa facture) ne doit pas apparaître ; on cible
+        # le lien de sa facture (id), robuste contrairement à une sous-chaîne
+        # numérique qui peut entrer en collision avec un hash de la page.
+        self.assertNotIn(f'/my/invoices/{facture_draft.id}', response.text)
 
     def test_route_periodes_supprimee(self):
         """L'ancienne page /periodes n'existe plus (404)."""

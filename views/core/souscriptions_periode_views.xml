@@ -10,14 +10,86 @@
                 <field name="mois_annee"/>
                 <field name="date_debut"/>
                 <field name="date_fin"/>
+                <field name="config_cadrans"/>
                 <field name="lisse"/>
                 <field name="jours"/>
-                <field name="energie_kwh"/>
-                <field name="provision_kwh"/>
+                <field name="energie_base_kwh" string="Énergie (kWh)"/>
                 <field name="turpe_fixe"/>
                 <field name="turpe_variable"/>
                 <field name="facture_id"/>
             </list>
+        </field>
+    </record>
+
+    <record id="view_souscription_periode_form" model="ir.ui.view">
+        <field name="name">souscription.periode.form</field>
+        <field name="model">souscription.periode</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group string="Période">
+                            <field name="souscription_id"/>
+                            <field name="pdl"/>
+                            <field name="date_debut"/>
+                            <field name="date_fin"/>
+                            <field name="mois_annee"/>
+                            <field name="jours"/>
+                            <field name="type_periode"/>
+                        </group>
+                        <group string="Contrat (historisé)">
+                            <field name="config_cadrans"/>
+                            <field name="type_tarif" invisible="1"/>
+                            <field name="type_tarif_periode"/>
+                            <field name="puissance_souscrite_periode"/>
+                            <field name="lisse_periode"/>
+                            <field name="tarif_solidaire_periode"/>
+                            <field name="provision_mensuelle_kwh_periode"/>
+                            <field name="coeff_pro_periode"/>
+                        </group>
+                    </group>
+
+                    <!-- Énergie : niveau de saisie piloté par le calendrier de comptage
+                         (config_cadrans) ; provisions/écart pilotés par le type de tarif
+                         facturé et le lissage (ADR 0005). -->
+                    <group string="Énergie">
+                        <group string="Mesure réseau (cadrans)"
+                               invisible="config_cadrans != '4_cadrans'">
+                            <field name="energie_hph_kwh"/>
+                            <field name="energie_hpb_kwh"/>
+                            <field name="energie_hch_kwh"/>
+                            <field name="energie_hcb_kwh"/>
+                        </group>
+                        <group string="Facturé">
+                            <field name="energie_hp_kwh"
+                                   invisible="config_cadrans == 'base'"
+                                   readonly="config_cadrans != 'hp_hc'"/>
+                            <field name="energie_hc_kwh"
+                                   invisible="config_cadrans == 'base'"
+                                   readonly="config_cadrans != 'hp_hc'"/>
+                            <field name="energie_base_kwh"
+                                   string="Énergie BASE (kWh)"
+                                   readonly="config_cadrans != 'base'"/>
+                        </group>
+                        <group string="Provision &amp; écart" invisible="not lisse_periode">
+                            <field name="provision_hp_kwh" invisible="type_tarif != 'hphc'"/>
+                            <field name="ecart_hp_kwh" invisible="type_tarif != 'hphc'"/>
+                            <field name="provision_hc_kwh" invisible="type_tarif != 'hphc'"/>
+                            <field name="ecart_hc_kwh" invisible="type_tarif != 'hphc'"/>
+                            <field name="provision_base_kwh" invisible="type_tarif != 'base'"/>
+                            <field name="ecart_base_kwh" invisible="type_tarif != 'base'"/>
+                        </group>
+                        <group string="TURPE">
+                            <field name="turpe_fixe"/>
+                            <field name="turpe_variable"/>
+                        </group>
+                    </group>
+
+                    <group string="Documents">
+                        <field name="facture_id"/>
+                    </group>
+                </sheet>
+            </form>
         </field>
     </record>
 

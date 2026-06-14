@@ -64,6 +64,12 @@ _Éviter_ : confondre « facturée » (une facture existe) et « émise » (fact
 La configuration *réseau* d'un PDL — FTA, calendrier distributeur, puissance réseau, cadrans
 réseau — propriété d'electricore (source : C15). Détermine le coût d'acheminement (TURPE).
 Référencée côté Odoo, jamais recopiée comme donnée éditable.
+Les **cadrans réseau** (*calendrier de comptage* : Base mono-index, HP/HC, ou 4 cadrans
+saisonniers HPH/HPB/HCH/HCB) dépendent du **compteur** et déterminent la granularité
+**mesurée** — donc saisissable — de l'énergie. Cette granularité est **orthogonale au type de
+tarif** fournisseur (qui ne fait que *regrouper* en cadrans **facturés**) : un même
+`type_tarif` HP/HC peut correspondre à un compteur 2 registres *ou* 4 cadrans, que seul le
+calendrier de comptage distingue.
 
 **Configuration fournisseur** :
 La configuration *commerciale* portée par la *Souscription* : formule tarifaire fournisseur

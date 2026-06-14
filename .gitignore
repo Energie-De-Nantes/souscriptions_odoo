@@ -36,6 +36,9 @@ coverage
 # Odoo logs (symlink)
 odoo-server.log
 
+# Environnement virtuel géré par uv (uv sync). uv.lock, lui, est versionné.
+.venv/
+
 # Code analysis tools
 .codanna/
 .fastembed_cache/

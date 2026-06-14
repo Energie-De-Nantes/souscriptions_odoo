@@ -1,6 +1,6 @@
 # Hooks pre-commit. Installation locale :
-#   pip install pre-commit   (ou : poetry install)
-#   pre-commit install
+#   uv sync                      (installe pre-commit dans .venv)
+#   uv run pre-commit install
 # La config ruff (lint + format) vit dans pyproject.toml ([tool.ruff]).
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit

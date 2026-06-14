@@ -1,36 +1,31 @@
-[tool.poetry]
+[project]
 name = "souscriptions-odoo"
 version = "1.0.0"
 description = "Module Odoo pour gestion des souscriptions électriques"
-authors = ["Virgile Daugé"]
-readme = "README_ARCHITECTURE.md"
-package-mode = false  # Désactive le mode package, on utilise Poetry seulement pour les dépendances
+authors = [{ name = "Virgile Daugé" }]
+requires-python = ">=3.13"
+dependencies = [
+    "babel>=2.14.0,<3",          # Pour la localisation française
+    "psycopg2-binary>=2.9.0,<3", # Pour vérifier les données dans PostgreSQL
+]
 
-[tool.poetry.dependencies]
-python = "^3.13"
-babel = "^2.14.0"  # Pour la localisation française
-psycopg2-binary = "^2.9.0"  # Pour vérifier les données dans PostgreSQL
+# Dépendances de développement (PEP 735). `uv sync` les installe par défaut ;
+# pour s'en passer : `uv sync --no-dev`.
+[dependency-groups]
+dev = [
+    # Rechargement automatique du code Odoo (d'après la doc Odoo officielle)
+    "watchdog>=6.0.0,<7",   # Module watchdog pour auto-reload
+    "inotify>=0.2.10,<0.3", # Module inotify exact requis par Odoo
+    # Qualité de code (voir .pre-commit-config.yaml et .github/workflows/ci.yml)
+    "ruff>=0.15.0,<0.16",   # lint + format ; config dans [tool.ruff] ci-dessous
+    "pre-commit>=4.0.0,<5", # `pre-commit install` pour activer les hooks locaux
+]
 
-[tool.poetry.group.dev.dependencies]
-# Pour le rechargement automatique du code Odoo (d'après doc Odoo officielle)
-watchdog = "^6.0.0"  # Module watchdog pour auto-reload
-inotify = "^0.2.10"  # Module inotify exact requis par Odoo
-# Qualité de code (voir .pre-commit-config.yaml et .github/workflows/ci.yml)
-ruff = "^0.15.0"        # lint + format ; config dans [tool.ruff] ci-dessous
-pre-commit = "^4.0.0"   # `pre-commit install` pour activer les hooks locaux
-
-[tool.poetry.scripts]
-# Scripts personnalisés pour faciliter le lancement
-odoo-demo = "demo.launch_demo:main"
-odoo-dev = "demo.launch_dev:main"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry-plugin-export]
-# Permet d'exporter en requirements.txt si nécessaire pour d'autres environnements
-extras = ["dev"]
+[tool.uv]
+# Projet « virtuel » : uv gère seulement les dépendances et l'environnement, il
+# ne construit pas de paquet (équivalent de l'ancien package-mode = false de
+# Poetry). On ne déclare donc pas de [build-system].
+package = false
 
 # ---------------------------------------------------------------------------
 # Ruff — lint + format. Source de vérité unique, lue par pre-commit et la CI.

@@ -122,7 +122,7 @@ Vos abonnés peuvent se connecter sur le portail Odoo pour :
 ## Technologies utilisées
 
 - **Odoo 18+** avec le nouveau framework OWL
-- **Poetry** pour gérer proprement les dépendances Python
+- **uv** pour gérer proprement les dépendances Python
 - **Docker** pour faciliter les tests et déploiements
 - **PostgreSQL** pour stocker toutes les données
 - **Pandas/FastParquet** pour traiter les gros fichiers de données Enedis (Phase 2)

@@ -1,0 +1,28 @@
+# Hooks pre-commit. Installation locale :
+#   pip install pre-commit   (ou : poetry install)
+#   pre-commit install
+# La config ruff (lint + format) vit dans pyproject.toml ([tool.ruff]).
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.15
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: check-yaml
+        args: [--unsafe]   # tolère les tags custom des workflows GitHub Actions
+      # Valide la bonne formation des XML Odoo (vues, données, rapports, QWeb).
+      - id: check-xml

@@ -1,15 +1,32 @@
-name: Tests
+name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
-  group: tests-${{ github.ref }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # La config ruff vit dans pyproject.toml ([tool.ruff]) — même source que
+      # pre-commit. Version épinglée pour rester aligné avec le hook local.
+      - uses: astral-sh/ruff-action@v3
+        with:
+          version: "0.15.15"
+          args: "check"
+      - uses: astral-sh/ruff-action@v3
+        with:
+          version: "0.15.15"
+          args: "format --check"
+
   test:
     name: Odoo 19 test suite
     runs-on: ubuntu-latest

@@ -136,7 +136,8 @@ class Souscription(models.Model):
             for periode in souscription.periode_ids.filtered(lambda p: not p.facture_id):
                 try:
                     facture = souscription._creer_facture_periode(periode)  # Utiliser la souscription spécifique
-                    periode.facture_id = facture
+                    # facture_id est calculé depuis account.move.periode_id (ADR 0004) :
+                    # _creer_facture_periode a déjà posé periode_id sur la facture.
                     _logger.info(f"Facture {facture.name} créée pour période {periode.mois_annee}")
                 except Exception as e:
                     _logger.error(f"Erreur création facture pour période {periode.mois_annee}: {e}")

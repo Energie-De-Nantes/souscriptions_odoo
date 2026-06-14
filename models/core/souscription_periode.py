@@ -85,8 +85,23 @@ class SouscriptionPeriode(models.Model):
     provision_kwh = fields.Float(string='Énergie provisionnée (kWh)', compute='_compute_provision_kwh_compat', store=False)
     _fix_provision = fields.Boolean(default=False, readonly=True)
 
-    facture_id = fields.Many2one('account.move', string='Facture associée')
-    
+    # Lien Période ↔ Facture : `account.move.periode_id` est l'unique source de
+    # vérité (ADR 0004). `facture_id` en est dérivé — calculé/stocké, non écrit.
+    move_ids = fields.One2many(
+        'account.move', 'periode_id', string='Documents liés', readonly=True)
+    facture_id = fields.Many2one(
+        'account.move', string='Facture associée',
+        compute='_compute_facture_id', store=True,
+        help="Facture (out_invoice) rattachée à cette période, dérivée du lien "
+             "account.move.periode_id.")
+
+    @api.depends('move_ids.move_type')
+    def _compute_facture_id(self):
+        for periode in self:
+            factures = periode.move_ids.filtered(
+                lambda m: m.move_type == 'out_invoice')
+            periode.facture_id = factures[:1]
+
     _unique_periode_souscription = models.Constraint(
         'UNIQUE(souscription_id, date_debut, date_fin)',
         'Une seule période par souscription et par dates début/fin.',

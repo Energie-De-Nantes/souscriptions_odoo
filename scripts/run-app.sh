@@ -23,6 +23,11 @@ NETWORK="souscriptions-app-net"
 PG="souscriptions-app-pg"
 APP="souscriptions-app"
 PGVOL="souscriptions-app-pgdata"
+# Le filestore (pièces jointes : bundles d'assets, avatars, images) doit être
+# persisté AU MÊME TITRE que la base : sinon la base (volume PG) référence des
+# fichiers absents du conteneur applicatif éphémère (--rm) → FileNotFoundError
+# sur tous les assets/avatars, 500 sur le websocket bundle.
+DATAVOL="souscriptions-app-data"
 DB="${DB:-souscriptions_demo}"
 PORT="${PORT:-8069}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -32,7 +37,7 @@ MOUNT="$REPO_ROOT:/mnt/extra-addons/souscriptions_odoo:ro"
 if [ "${1:-}" = "--reset" ]; then
     echo "Réinitialisation : suppression des conteneurs et du volume de données..."
     docker rm -f "$APP" "$PG" >/dev/null 2>&1 || true
-    docker volume rm "$PGVOL" >/dev/null 2>&1 || true
+    docker volume rm "$PGVOL" "$DATAVOL" >/dev/null 2>&1 || true
     docker network rm "$NETWORK" >/dev/null 2>&1 || true
 fi
 
@@ -59,7 +64,7 @@ if ! docker exec "$PG" psql -U odoo -lqt | cut -d'|' -f1 | grep -qw "$DB"; then
     echo "Première installation de souscriptions_odoo (avec données de démo)..."
     # --with-demo : Odoo 19 ne charge plus les données de démo par défaut.
     docker run --rm --network "$NETWORK" -e HOST="$PG" -e USER=odoo -e PASSWORD=odoo \
-        -v "$MOUNT" odoo:19 odoo $ADDONS \
+        -v "$MOUNT" -v "$DATAVOL:/var/lib/odoo" odoo:19 odoo $ADDONS \
         -d "$DB" -i souscriptions_odoo --with-demo --load-language=fr_FR --stop-after-init \
         2>&1 | grep -vE '^<string>:[0-9]+: \((ERROR|WARNING|INFO)' || true
 fi
@@ -71,5 +76,5 @@ echo ""
 docker rm -f "$APP" >/dev/null 2>&1 || true
 exec docker run --rm --name "$APP" --network "$NETWORK" -p "${PORT}:8069" \
     -e HOST="$PG" -e USER=odoo -e PASSWORD=odoo \
-    -v "$MOUNT" odoo:19 odoo $ADDONS \
+    -v "$MOUNT" -v "$DATAVOL:/var/lib/odoo" odoo:19 odoo $ADDONS \
     -d "$DB" --db-filter="^${DB}\$"

@@ -28,6 +28,11 @@ class SouscriptionPeriode(models.Model):
          ('4_cadrans', '4 cadrans saisonniers')],
         string="Calendrier de comptage", readonly=True)
 
+    # Type de tarif facturé (vue live de la souscription) — pilote l'affichage
+    # facturé/provision, orthogonal au calendrier de comptage (ADR 0005).
+    # À basculer sur le type historisé typé quand #14 l'aura introduit.
+    type_tarif = fields.Selection(related='souscription_id.type_tarif', readonly=True)
+
     # Consommations détaillées par cadrans (pour calcul TURPE)
     energie_hph_kwh = fields.Float(string='Énergie HPH (kWh)', help="Heures Pleines saison Haute")
     energie_hpb_kwh = fields.Float(string='Énergie HPB (kWh)', help="Heures Pleines saison Basse")

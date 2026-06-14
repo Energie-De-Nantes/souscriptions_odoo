@@ -89,6 +89,18 @@ class Souscription(models.Model):
         tracking=True
     )
     tarif_solidaire = fields.Boolean(string="Tarif solidaire", default=False, tracking=True)
+
+    # Calendrier de comptage du compteur (cadrans réseau mesurés) — source
+    # Configuration Enedis / electricore. Orthogonal au type de tarif facturé
+    # (ADR 0005). Détermine le niveau de saisie de l'énergie sur les périodes.
+    config_cadrans = fields.Selection(
+        [('base', 'Base (mono-index)'),
+         ('hp_hc', 'HP/HC'),
+         ('4_cadrans', '4 cadrans saisonniers')],
+        string="Calendrier de comptage",
+        help="Cadrans réseau mesurés par le compteur (Configuration Enedis). "
+             "Détermine la granularité saisissable de l'énergie, indépendamment "
+             "du type de tarif facturé.")
     
     ## Utiles paiement 
 
@@ -113,6 +125,10 @@ class Souscription(models.Model):
         for vals in vals_list:
             if vals.get('name', 'Nouveau') == 'Nouveau':
                 vals['name'] = self.env['ir.sequence'].next_by_code('souscription.sequence') or 'Nouveau'
+            # Amorçage du calendrier de comptage tant qu'electricore ne l'alimente
+            # pas (#12) : par défaut aligné sur le type de tarif.
+            if not vals.get('config_cadrans'):
+                vals['config_cadrans'] = '4_cadrans' if vals.get('type_tarif') == 'hphc' else 'base'
         return super().create(vals_list)
     
     @api.depends('periode_ids.facture_id')

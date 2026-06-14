@@ -20,21 +20,38 @@ class SouscriptionPeriode(models.Model):
     pdl = fields.Char(string="pdl", readonly=True)
     lisse = fields.Boolean(string='Lissé', readonly=True) # related='souscription_id.lisse',  store=True)
 
+    # Calendrier de comptage figé à la création (copie de la souscription, ADR 0005).
+    # Pilote le niveau de saisie de l'énergie (voir la cascade plus bas).
+    config_cadrans = fields.Selection(
+        [('base', 'Base (mono-index)'),
+         ('hp_hc', 'HP/HC'),
+         ('4_cadrans', '4 cadrans saisonniers')],
+        string="Calendrier de comptage", readonly=True)
+
     # Consommations détaillées par cadrans (pour calcul TURPE)
     energie_hph_kwh = fields.Float(string='Énergie HPH (kWh)', help="Heures Pleines saison Haute")
     energie_hpb_kwh = fields.Float(string='Énergie HPB (kWh)', help="Heures Pleines saison Basse")
     energie_hch_kwh = fields.Float(string='Énergie HCH (kWh)', help="Heures Creuses saison Haute")
     energie_hcb_kwh = fields.Float(string='Énergie HCB (kWh)', help="Heures Creuses saison Basse")
 
-    # Consommations facturables (selon contrat)
-    energie_hp_kwh = fields.Float(string='Énergie HP (kWh)', compute='_compute_hp_hc', store=True)
-    energie_hc_kwh = fields.Float(string='Énergie HC (kWh)', compute='_compute_hp_hc', store=True)
-    energie_base_kwh = fields.Float(string='Énergie BASE (kWh)', compute='_compute_base', store=True)
+    # Consommations facturables (selon contrat) — cascade dérivée-mais-surchargeable
+    # (ADR 0005). Chaque niveau est dérivé du niveau réseau en dessous SAUF quand
+    # le calendrier de comptage en fait le niveau de saisie (alors readonly=False
+    # permet la saisie directe, conservée par les computes config-aware).
+    energie_hp_kwh = fields.Float(string='Énergie HP (kWh)', compute='_compute_hp_hc', store=True, readonly=False)
+    energie_hc_kwh = fields.Float(string='Énergie HC (kWh)', compute='_compute_hp_hc', store=True, readonly=False)
+    energie_base_kwh = fields.Float(string='Énergie BASE (kWh)', compute='_compute_base', store=True, readonly=False)
     
     # Provisions (lissage) - selon type de contrat
     provision_hp_kwh = fields.Float(string='Provision HP (kWh)')
     provision_hc_kwh = fields.Float(string='Provision HC (kWh)')
     provision_base_kwh = fields.Float(string='Provision BASE (kWh)')
+
+    # Écart facturé réel − provision, par cadran facturé (régularisation des
+    # contrats lissés — ADR 0005). Calculé, non stocké ; affiché si lissé.
+    ecart_hp_kwh = fields.Float(string='Écart HP (kWh)', compute='_compute_ecart')
+    ecart_hc_kwh = fields.Float(string='Écart HC (kWh)', compute='_compute_ecart')
+    ecart_base_kwh = fields.Float(string='Écart BASE (kWh)', compute='_compute_ecart')
     
     # TURPE (calculé sur tous les cadrans)
     turpe_fixe = fields.Float(string='TURPE Fixe (€)')
@@ -122,6 +139,8 @@ class SouscriptionPeriode(models.Model):
                 'coeff_pro_periode': sous.coeff_pro,
                 'pdl': sous.pdl,  # Copie du PDL aussi
                 'lisse': sous.lisse,  # Compatibilité ancien champ
+                'config_cadrans': sous.config_cadrans
+                    or ('4_cadrans' if sous.type_tarif == 'hphc' else 'base'),
             })
 
             # Gestion des provisions selon type de tarif
@@ -143,18 +162,35 @@ class SouscriptionPeriode(models.Model):
             else:
                 p.jours = 0
 
-    @api.depends('energie_hph_kwh', 'energie_hpb_kwh', 'energie_hch_kwh', 'energie_hcb_kwh')
+    @api.depends('energie_hph_kwh', 'energie_hpb_kwh', 'energie_hch_kwh', 'energie_hcb_kwh', 'config_cadrans')
     def _compute_hp_hc(self):
-        """Calcule les consommations HP/HC à partir des 4 cadrans"""
+        """HP/HC dérivés des 4 cadrans saisonniers en config 4_cadrans ; sinon
+        saisis directement (valeur conservée)."""
         for periode in self:
-            periode.energie_hp_kwh = periode.energie_hph_kwh + periode.energie_hpb_kwh
-            periode.energie_hc_kwh = periode.energie_hch_kwh + periode.energie_hcb_kwh
+            if periode.config_cadrans == '4_cadrans':
+                periode.energie_hp_kwh = periode.energie_hph_kwh + periode.energie_hpb_kwh
+                periode.energie_hc_kwh = periode.energie_hch_kwh + periode.energie_hcb_kwh
+            else:
+                periode.energie_hp_kwh = periode.energie_hp_kwh
+                periode.energie_hc_kwh = periode.energie_hc_kwh
 
-    @api.depends('energie_hp_kwh', 'energie_hc_kwh')  
+    @api.depends('energie_hp_kwh', 'energie_hc_kwh', 'config_cadrans')
     def _compute_base(self):
-        """Calcule la consommation BASE à partir de HP+HC"""
+        """BASE = HP+HC sauf en config base où elle est saisie directement."""
         for periode in self:
-            periode.energie_base_kwh = periode.energie_hp_kwh + periode.energie_hc_kwh
+            if periode.config_cadrans in ('4_cadrans', 'hp_hc'):
+                periode.energie_base_kwh = periode.energie_hp_kwh + periode.energie_hc_kwh
+            else:
+                periode.energie_base_kwh = periode.energie_base_kwh
+
+    @api.depends('energie_hp_kwh', 'energie_hc_kwh', 'energie_base_kwh',
+                 'provision_hp_kwh', 'provision_hc_kwh', 'provision_base_kwh')
+    def _compute_ecart(self):
+        """Écart facturé réel − provision, par cadran facturé."""
+        for periode in self:
+            periode.ecart_hp_kwh = periode.energie_hp_kwh - periode.provision_hp_kwh
+            periode.ecart_hc_kwh = periode.energie_hc_kwh - periode.provision_hc_kwh
+            periode.ecart_base_kwh = periode.energie_base_kwh - periode.provision_base_kwh
     
     @api.depends('souscription_id.type_tarif', 'souscription_id.lisse')
     def _compute_provisions(self):

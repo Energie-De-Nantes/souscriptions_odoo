@@ -2,8 +2,8 @@
 
 from datetime import date
 
-from odoo.tests.common import TransactionCase, tagged
 from odoo.exceptions import AccessError
+from odoo.tests.common import TransactionCase, tagged
 
 from .common import SouscriptionsTestMixin
 
@@ -17,32 +17,50 @@ class TestSouscriptionsSecurity(SouscriptionsTestMixin, TransactionCase):
         super().setUpClass()
         cls.setUpSouscriptionsData()
 
-        cls.user = cls.env['res.users'].create({
-            'name': 'Souscriptions User',
-            'login': 'souscriptions_user',
-            'email': 'user@souscriptions.test',
-            'group_ids': [(6, 0, [
-                cls.env.ref('souscriptions_odoo.group_souscriptions_user').id,
-            ])],
-        })
-        cls.manager = cls.env['res.users'].create({
-            'name': 'Souscriptions Manager',
-            'login': 'souscriptions_manager',
-            'email': 'manager@souscriptions.test',
-            'group_ids': [(6, 0, [
-                cls.env.ref('souscriptions_odoo.group_souscriptions_manager').id,
-            ])],
-        })
+        cls.user = cls.env['res.users'].create(
+            {
+                'name': 'Souscriptions User',
+                'login': 'souscriptions_user',
+                'email': 'user@souscriptions.test',
+                'group_ids': [
+                    (
+                        6,
+                        0,
+                        [
+                            cls.env.ref('souscriptions_odoo.group_souscriptions_user').id,
+                        ],
+                    )
+                ],
+            }
+        )
+        cls.manager = cls.env['res.users'].create(
+            {
+                'name': 'Souscriptions Manager',
+                'login': 'souscriptions_manager',
+                'email': 'manager@souscriptions.test',
+                'group_ids': [
+                    (
+                        6,
+                        0,
+                        [
+                            cls.env.ref('souscriptions_odoo.group_souscriptions_manager').id,
+                        ],
+                    )
+                ],
+            }
+        )
 
     def _new_souscription(self):
-        return self.env['souscription.souscription'].create({
-            'partner_id': self.partner_test.id,
-            'pdl': 'PDL_SEC',
-            'puissance_souscrite': '6',
-            'type_tarif': 'base',
-            'etat_facturation_id': self.etat_facturation.id,
-            'date_debut': date(2024, 1, 1),
-        })
+        return self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.partner_test.id,
+                'pdl': 'PDL_SEC',
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'etat_facturation_id': self.etat_facturation.id,
+                'date_debut': date(2024, 1, 1),
+            }
+        )
 
     # --- Utilisateur standard : lecture/écriture mais pas de suppression ---
 
@@ -69,10 +87,12 @@ class TestSouscriptionsSecurity(SouscriptionsTestMixin, TransactionCase):
 
     def test_user_cannot_create_grille(self):
         with self.assertRaises(AccessError):
-            self.env['grille.prix'].with_user(self.user).create({
-                'name': 'Grille interdite',
-                'date_debut': date(2025, 1, 1),
-            })
+            self.env['grille.prix'].with_user(self.user).create(
+                {
+                    'name': 'Grille interdite',
+                    'date_debut': date(2025, 1, 1),
+                }
+            )
 
     # --- Gestionnaire : tous les droits ---
 
@@ -86,8 +106,14 @@ class TestSouscriptionsSecurity(SouscriptionsTestMixin, TransactionCase):
         self.assertEqual(self.grille_prix.name, 'Renommée par manager')
 
     def test_manager_can_create_grille(self):
-        grille = self.env['grille.prix'].with_user(self.manager).create({
-            'name': 'Grille manager',
-            'date_debut': date(2025, 6, 1),
-        })
+        grille = (
+            self.env['grille.prix']
+            .with_user(self.manager)
+            .create(
+                {
+                    'name': 'Grille manager',
+                    'date_debut': date(2025, 6, 1),
+                }
+            )
+        )
         self.assertTrue(grille.exists())

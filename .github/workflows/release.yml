@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags:
+      # SemVer : v1.2.3
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+
+# Pas de bloc concurrency : une publication ne doit jamais être annulée en cours.
+
+permissions:
+  contents: read
+  packages: write   # push de l'image sur ghcr.io
+
+jobs:
+  docker:
+    name: Build & push image (GHCR)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # v1.2.3 -> tags 1.2.3, 1.2, latest
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          # Le Dockerfile copie tout le module (COPY . ...) : contexte = racine.
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

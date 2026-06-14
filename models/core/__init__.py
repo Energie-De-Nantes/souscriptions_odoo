@@ -1,4 +1,1 @@
-from . import grille_prix
-from . import souscription
-from . import souscription_periode
-from . import account_move
+from . import account_move, grille_prix, souscription, souscription_periode

@@ -15,10 +15,9 @@ psycopg2-binary = "^2.9.0"  # Pour vérifier les données dans PostgreSQL
 # Pour le rechargement automatique du code Odoo (d'après doc Odoo officielle)
 watchdog = "^6.0.0"  # Module watchdog pour auto-reload
 inotify = "^0.2.10"  # Module inotify exact requis par Odoo
-# Autres outils de développement (à décommenter si besoin)
-# pytest = "^7.4.0"
-# black = "^23.0.0"
-# ruff = "^0.1.0"
+# Qualité de code (voir .pre-commit-config.yaml et .github/workflows/ci.yml)
+ruff = "^0.15.0"        # lint + format ; config dans [tool.ruff] ci-dessous
+pre-commit = "^4.0.0"   # `pre-commit install` pour activer les hooks locaux
 
 [tool.poetry.scripts]
 # Scripts personnalisés pour faciliter le lancement
@@ -32,3 +31,33 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry-plugin-export]
 # Permet d'exporter en requirements.txt si nécessaire pour d'autres environnements
 extras = ["dev"]
+
+# ---------------------------------------------------------------------------
+# Ruff — lint + format. Source de vérité unique, lue par pre-commit et la CI.
+# ---------------------------------------------------------------------------
+[tool.ruff]
+# Odoo 19 tourne sur Python 3.12 (image officielle odoo:19.0).
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    "E501",  # line-too-long — longues chaînes/docstrings FR, non pertinent à reformater
+    "E741",  # ambiguous-variable-name — `l` pour « ligne » est idiomatique ici
+    "B904",  # raise-without-from dans un except — style Odoo répandu, différé
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Odoo charge ses sous-modules via `from . import x` dans les __init__.py :
+# ces imports paraissent inutilisés à ruff mais sont requis — ne jamais les
+# laisser supprimer par `--fix`.
+"**/__init__.py" = ["F401"]
+# Le manifeste Odoo est un dictionnaire littéral nu (idiome du framework).
+"**/__manifest__.py" = ["B018"]
+# Les tests vérifient parfois qu'« une » erreur est levée sans cibler un type.
+"tests/**" = ["B017"]
+
+[tool.ruff.format]
+# Odoo privilégie les guillemets simples (cohérent avec le code existant).
+quote-style = "single"

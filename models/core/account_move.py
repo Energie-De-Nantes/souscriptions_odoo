@@ -1,4 +1,5 @@
-from odoo import models, fields, api
+from odoo import api, fields, models
+
 
 class AccountMove(models.Model):
     _inherit = 'account.move'
@@ -7,16 +8,12 @@ class AccountMove(models.Model):
 
     souscription_id = fields.Many2one(
         related='periode_id.souscription_id',
-        string="Souscription",
+        string='Souscription',
         store=True,
         readonly=True,
     )
 
-    is_facture_energie = fields.Boolean(
-        string="Facture d'énergie", 
-        compute='_compute_is_facture_energie',
-        store=True
-    )
+    is_facture_energie = fields.Boolean(string="Facture d'énergie", compute='_compute_is_facture_energie', store=True)
 
     @api.depends('periode_id', 'souscription_id')
     def _compute_is_facture_energie(self):
@@ -28,5 +25,5 @@ class AccountMove(models.Model):
         """Nom de fichier personnalisé pour les factures d'énergie"""
         self.ensure_one()
         if self.is_facture_energie and self.souscription_id:
-            return f"Facture_Energie_{self.souscription_id.name}_{self.name}"
+            return f'Facture_Energie_{self.souscription_id.name}_{self.name}'
         return super()._get_report_base_filename()

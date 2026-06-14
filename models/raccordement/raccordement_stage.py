@@ -1,4 +1,5 @@
-from odoo import models, fields, api
+from odoo import fields, models
+
 
 class RaccordementStage(models.Model):
     _name = 'raccordement.stage'
@@ -10,14 +11,9 @@ class RaccordementStage(models.Model):
     fold = fields.Boolean(string='Replié dans la vue kanban', default=False)
     description = fields.Text(string='Description')
     color = fields.Integer(string='Couleur')
-    
+
     is_close = fields.Boolean(
-        string='Étape finale',
-        help="Indique si cette étape correspond à la finalisation du raccordement"
+        string='Étape finale', help='Indique si cette étape correspond à la finalisation du raccordement'
     )
-    
-    demande_ids = fields.One2many(
-        'raccordement.demande',
-        'stage_id',
-        string='Demandes'
-    )
+
+    demande_ids = fields.One2many('raccordement.demande', 'stage_id', string='Demandes')

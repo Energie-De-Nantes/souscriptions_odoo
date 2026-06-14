@@ -79,3 +79,17 @@ Unlike standard subscriptions, electricity supply requires:
 - **Odoo Core**: base, mail, contacts, account, portal (Odoo 19)
 - **Localization**: babel.dates for French date formatting
 - **External service**: electricore REST API for all métier calculations
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for `Energie-De-Nantes/souscriptions_odoo` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical role names (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`), reusing the existing `wontfix` label. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

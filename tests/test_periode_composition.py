@@ -10,7 +10,7 @@ notes TURPE, majoration PRO).
 
 from datetime import date
 
-from odoo.tests.common import tagged
+from odoo.tests.common import TransactionCase, tagged
 
 from .common import ABO_ANNUEL_STD, SouscriptionsTestCase
 
@@ -117,3 +117,41 @@ class TestPeriodeComposition(SouscriptionsTestCase):
         self.assertEqual(facture.invoice_date, periode.date_fin)
         # facture_id dérivé de account.move.periode_id (ADR 0004)
         self.assertEqual(periode.facture_id, facture)
+
+    def test_periode_surface_facture_brouillon(self):
+        """Une facture en BROUILLON liée à une période reste visible côté gestion :
+        facture_id la référence, facture_state l'expose, move_ids la contient."""
+        periode = self._periode(self.souscription_base, provision_base_kwh=100.0)
+        facture = periode._creer_facture()  # créée en brouillon (non postée)
+
+        self.assertEqual(facture.state, 'draft')
+        self.assertEqual(periode.facture_id, facture)  # liée même en brouillon
+        self.assertEqual(periode.facture_state, 'draft')  # état exposé sur la période
+        self.assertIn(facture, periode.move_ids)  # présente dans les documents liés
+
+    def test_periode_facture_state_suit_la_remise_en_brouillon(self):
+        """facture_state suit l'état réel : postée puis remise en brouillon."""
+        periode = self._periode(self.souscription_base, provision_base_kwh=100.0)
+        facture = periode._creer_facture()
+
+        facture.action_post()
+        self.assertEqual(periode.facture_state, 'posted')
+
+        facture.button_draft()
+        self.assertEqual(periode.facture_state, 'draft')
+        # toujours liée et visible après remise en brouillon
+        self.assertEqual(periode.facture_id, facture)
+
+
+@tagged('souscriptions', 'souscriptions_composition', 'post_install', '-at_install')
+class TestDemoFactures(TransactionCase):
+    """Les données de démo illustrent les deux états : postée (visible portail)
+    et brouillon (visible gestion uniquement)."""
+
+    def test_demo_a_des_factures_postee_et_brouillon(self):
+        posted = self.env.ref('souscriptions_odoo.demo_facture_janvier_admin', raise_if_not_found=False)
+        if not posted:
+            self.skipTest('Données de démo non chargées')
+        draft = self.env.ref('souscriptions_odoo.demo_facture_mars_admin')
+        self.assertEqual(posted.state, 'posted')
+        self.assertEqual(draft.state, 'draft')

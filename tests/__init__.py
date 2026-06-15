@@ -7,6 +7,7 @@ from . import (
     test_periode_energie,
     test_periode_facture,
     test_periode_form,
+    test_periode_snapshot,
     test_portal,
     test_raccordement,
     test_security,

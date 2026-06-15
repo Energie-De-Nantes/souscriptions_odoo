@@ -48,7 +48,8 @@ class TestPeriodeComposition(SouscriptionsTestCase):
         self.assertIn('Abonnement', sections)
 
     def test_composer_lignes_hphc_deux_lignes_energie(self):
-        """Tarif HP/HC : deux lignes énergie (HP, HC), pas de ligne Base."""
+        """Tarif HP/HC lissé : deux lignes énergie (HP, HC) facturées sur la
+        provision, pas de ligne Base. (souscription_hphc est lissée.)"""
         periode = self._periode(self.souscription_hphc, provision_hp_kwh=150.0, provision_hc_kwh=100.0)
         produits = [d for d in self._dicts(periode._composer_lignes(self.grille_prix)) if d.get('product_id')]
         noms = [d['name'] for d in produits]
@@ -61,6 +62,22 @@ class TestPeriodeComposition(SouscriptionsTestCase):
         hc = next(d for d in produits if d['name'] == 'Énergie HC')
         self.assertEqual(hp['quantity'], 150.0)
         self.assertEqual(hc['quantity'], 100.0)
+
+    def test_composer_lignes_non_lisse_facture_le_mesure(self):
+        """Contrat non lissé : on facture le mesuré/estimé (energie_*), pas la
+        provision (issue #14 — clarification provision vs réel)."""
+        # souscription_base est non lissée ; calendrier de comptage 'base' →
+        # energie_base_kwh est saisi directement.
+        periode = self._periode(
+            self.souscription_base,
+            energie_base_kwh=280.0,
+            provision_base_kwh=999.0,  # ne doit PAS être facturée (non lissé)
+        )
+        self.assertFalse(periode.lisse_periode)
+
+        produits = [d for d in self._dicts(periode._composer_lignes(self.grille_prix)) if d.get('product_id')]
+        base = next(d for d in produits if d['name'] == 'Énergie Base')
+        self.assertEqual(base['quantity'], 280.0)
 
     def test_composer_lignes_note_turpe_uniquement_si_positif(self):
         """Les notes TURPE n'apparaissent que si le montant est > 0."""

@@ -42,7 +42,6 @@
                         </group>
                         <group string="Contrat (historisé)">
                             <field name="config_cadrans"/>
-                            <field name="type_tarif" invisible="1"/>
                             <field name="type_tarif_periode"/>
                             <field name="puissance_souscrite_periode"/>
                             <field name="lisse_periode"/>
@@ -63,7 +62,7 @@
                             <field name="energie_hch_kwh"/>
                             <field name="energie_hcb_kwh"/>
                         </group>
-                        <group string="Facturé">
+                        <group string="Mesuré / estimé">
                             <field name="energie_hp_kwh"
                                    invisible="config_cadrans == 'base'"
                                    readonly="config_cadrans != 'hp_hc'"/>
@@ -75,12 +74,12 @@
                                    readonly="config_cadrans != 'base'"/>
                         </group>
                         <group string="Provision &amp; écart" invisible="not lisse_periode">
-                            <field name="provision_hp_kwh" invisible="type_tarif != 'hphc'"/>
-                            <field name="ecart_hp_kwh" invisible="type_tarif != 'hphc'"/>
-                            <field name="provision_hc_kwh" invisible="type_tarif != 'hphc'"/>
-                            <field name="ecart_hc_kwh" invisible="type_tarif != 'hphc'"/>
-                            <field name="provision_base_kwh" invisible="type_tarif != 'base'"/>
-                            <field name="ecart_base_kwh" invisible="type_tarif != 'base'"/>
+                            <field name="provision_hp_kwh" invisible="type_tarif_periode != 'hphc'"/>
+                            <field name="ecart_hp_kwh" invisible="type_tarif_periode != 'hphc'"/>
+                            <field name="provision_hc_kwh" invisible="type_tarif_periode != 'hphc'"/>
+                            <field name="ecart_hc_kwh" invisible="type_tarif_periode != 'hphc'"/>
+                            <field name="provision_base_kwh" invisible="type_tarif_periode != 'base'"/>
+                            <field name="ecart_base_kwh" invisible="type_tarif_periode != 'base'"/>
                         </group>
                         <group string="TURPE">
                             <field name="turpe_fixe"/>

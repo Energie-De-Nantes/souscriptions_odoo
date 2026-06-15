@@ -48,12 +48,12 @@
                                     <field name="mois_annee"/>
                                     <field name="type_periode"/>
                                     <field name="type_tarif_periode"/>
-                                    <field name="energie_base_kwh" invisible="type_tarif_periode != 'Base'"/>
-                                    <field name="provision_base_kwh" invisible="type_tarif_periode != 'Base'"/>
-                                    <field name="energie_hp_kwh" invisible="type_tarif_periode == 'Base'"/>
-                                    <field name="provision_hp_kwh" invisible="type_tarif_periode == 'Base'"/>
-                                    <field name="energie_hc_kwh" invisible="type_tarif_periode == 'Base'"/>
-                                    <field name="provision_hc_kwh" invisible="type_tarif_periode == 'Base'"/>
+                                    <field name="energie_base_kwh" invisible="type_tarif_periode != 'base'"/>
+                                    <field name="provision_base_kwh" invisible="type_tarif_periode != 'base'"/>
+                                    <field name="energie_hp_kwh" invisible="type_tarif_periode == 'base'"/>
+                                    <field name="provision_hp_kwh" invisible="type_tarif_periode == 'base'"/>
+                                    <field name="energie_hc_kwh" invisible="type_tarif_periode == 'base'"/>
+                                    <field name="provision_hc_kwh" invisible="type_tarif_periode == 'base'"/>
                                     <field name="jours"/>
                                     <field name="turpe_fixe"/>
                                     <field name="turpe_variable"/>

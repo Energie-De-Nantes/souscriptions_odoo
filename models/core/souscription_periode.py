@@ -170,10 +170,11 @@ class SouscriptionPeriode(models.Model):
 
         return super().create(vals_list)
 
-    # Champs facturables figés : une fois la facture émise, les réécrire
-    # changerait une facture opposable. Le verrou (#14) les protège ; les champs
-    # techniques/calculés (facture_id, facture_state, mois_annee, jours…) restent
-    # recalculables par l'ORM (passe par _write, pas par ce write public).
+    # Champs facturables figés : dès qu'une facture référence la période, les
+    # réécrire désaccorderait la facture de la période. Le verrou (#14) les
+    # protège ; les champs techniques/calculés (facture_id, facture_state,
+    # mois_annee, jours…) restent recalculables par l'ORM (passe par _write, pas
+    # par ce write public).
     _LOCKED_FIELDS = frozenset(
         {
             'date_debut',
@@ -204,15 +205,18 @@ class SouscriptionPeriode(models.Model):
     )
 
     def write(self, vals):
-        """Verrou de facturation (#14) : une période dont la facture est *émise*
-        (postée) est en lecture seule sur ses champs facturables, y compris via
-        RPC. La correction se fait *avant* l'émission (facture en brouillon)."""
+        """Verrou de facturation (#14) : la période est le brouillon de travail
+        éditable *avant* facturation ; dès qu'une facture la référence (facturée,
+        brouillon de facture compris), ses champs facturables sont figés et toute
+        réécriture est rejetée (UserError, y compris via RPC). Pour corriger :
+        supprimer la facture (ce qui dé-fige la période) ou émettre une
+        régularisation."""
         if self._LOCKED_FIELDS.intersection(vals):
             for periode in self:
-                if periode.facture_id.state == 'posted':
+                if periode.facture_id:
                     raise UserError(
-                        f'Période {periode.mois_annee} : facture émise, modification interdite. '
-                        'Repassez la facture en brouillon pour corriger, ou créez une régularisation.'
+                        f'Période {periode.mois_annee} : déjà facturée, modification interdite. '
+                        'Supprimez la facture pour corriger, ou créez une régularisation.'
                     )
         return super().write(vals)
 

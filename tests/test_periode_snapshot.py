@@ -63,27 +63,26 @@ class TestPeriodeSnapshotType(SouscriptionsTestCase):
         self.assertAlmostEqual(abo_price(p_janvier), ABO_ANNUEL_STD['6'] / 365.0, places=4)
         self.assertAlmostEqual(abo_price(p_fevrier), ABO_ANNUEL_STD['9'] / 365.0, places=4)
 
-    def test_periode_emise_verrouillee_en_ecriture(self):
-        """Période liée à une facture émise (postée) : toute réécriture d'une
-        valeur facturable est rejetée (UserError), y compris via RPC (#14)."""
+    def test_periode_editable_avant_facturation(self):
+        """Tant qu'aucune facture ne la référence, la période reste éditable :
+        c'est le brouillon de travail du·de la facturiste (#14)."""
         periode = self._periode(self.souscription_base, provision_base_kwh=100.0)
-        facture = periode._creer_facture()
-        facture.action_post()  # émission = validation
+
+        periode.write({'provision_base_kwh': 250.0})
+        self.assertEqual(periode.provision_base_kwh, 250.0)
+
+    def test_periode_figee_des_la_facturation(self):
+        """Dès qu'une facture référence la période (brouillon de facture compris),
+        ses champs facturables sont figés : toute réécriture est rejetée
+        (UserError), y compris via RPC (#14)."""
+        periode = self._periode(self.souscription_base, provision_base_kwh=100.0)
+        periode._creer_facture()  # facture créée (brouillon) → période figée
 
         with self.assertRaises(UserError):
             periode.write({'provision_base_kwh': 999.0})
 
         # La valeur figée n'a pas bougé.
         self.assertEqual(periode.provision_base_kwh, 100.0)
-
-    def test_periode_facture_brouillon_reste_modifiable(self):
-        """Tant que la facture est en brouillon, le·la facturiste corrige encore
-        la période : la valeur facturable reste modifiable (#14)."""
-        periode = self._periode(self.souscription_base, provision_base_kwh=100.0)
-        periode._creer_facture()  # facture créée en brouillon
-
-        periode.write({'provision_base_kwh': 250.0})
-        self.assertEqual(periode.provision_base_kwh, 250.0)
 
     def test_champs_compat_deprecies_supprimes(self):
         """Les champs de compatibilité dépréciés ont disparu du modèle (#14)."""

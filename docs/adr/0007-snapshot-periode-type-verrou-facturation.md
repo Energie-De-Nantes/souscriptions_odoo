@@ -19,11 +19,14 @@ via RPC — ce qui désaccordait silencieusement une facture opposable de son sn
    **affine** (part fixe + €/kVA) au grain 1 kVA d'Enedis ; la *Grille* reste indexée par
    palier pour l'instant (tarification affine = travail ultérieur).
 
-2. **Verrou à l'émission.** `souscription.periode.write()` **rejette** (`UserError`) toute
-   modification d'un champ **facturable** dès que la *Facture* liée est **émise**
-   (`facture_id.state == 'posted'`). Les corrections se font *avant* l'émission, sur une
-   *Facture* en **brouillon** — cohérent avec le rôle de la *Période* (« brouillon de travail
-   facturable », `CONTEXT.md`) et avec la distinction *facturée* / *émise*
+2. **Verrou à la facturation.** `souscription.periode.write()` **rejette** (`UserError`) toute
+   modification d'un champ **facturable** dès qu'une *Facture* référence la période
+   (`facture_id` truthy — **facturée**, brouillon de facture compris). La *Période* est le
+   **brouillon de travail éditable _avant_ facturation** ; à la création de la facture ses
+   valeurs sont **figées** (`CONTEXT.md` : « À la facturation, ses valeurs … sont **figées** »).
+   Pour corriger après, on **supprime la facture** (ce qui dé-fige la période) ou on émet une
+   **régularisation**. Le verrou porte sur *facturée*, pas sur *émise* : le gel suit
+   l'historisation, pas la finalisation comptable
    ([ADR-0004](0004-lien-periode-facture-source-unique.md)).
 
 3. **Suppression des champs de compatibilité** dépréciés (`energie_kwh`, `provision_kwh`,
@@ -34,8 +37,9 @@ via RPC — ce qui désaccordait silencieusement une facture opposable de son sn
 
 - **Plus de parsing à la facturation** : la justesse ne dépend plus de la langue ni du
   formatage du snapshot.
-- **Reproductibilité renforcée** : une facture émise ne peut plus dériver de son snapshot ;
-  la régularisation (période dédiée) reste le canal pour corriger après émission.
+- **Reproductibilité renforcée** : une facture ne peut plus dériver de la période qu'elle a
+  figée ; corriger après facturation passe par la suppression de la facture (dé-fige) ou par
+  une régularisation (période dédiée).
 - **Périmètre du verrou.** Seuls les champs facturables sont protégés (un `frozenset`
   `_LOCKED_FIELDS` : dates, énergies par cadran, provisions, TURPE, snapshot contractuel).
   Les champs techniques/calculés (`facture_id`, `facture_state`, `mois_annee`, `jours`)
@@ -49,14 +53,15 @@ via RPC — ce qui désaccordait silencieusement une facture opposable de son sn
 
 - **`puissance_souscrite_periode` en `Selection` de paliers** : plus contraint, mais ferme la
   porte à la tarification affine au grain 1 kVA souhaitée côté fournisseur.
-- **Verrou dès qu'une facture existe (brouillon compris)** : contredit le workflow
-  « brouillon corrigé avant émission » ; le·la facturiste doit pouvoir ajuster tant que la
-  facture n'est pas postée.
+- **Verrou seulement à l'émission (`state == 'posted'`)** : laisserait la période modifiable
+  alors qu'une facture (brouillon) la reflète déjà, désaccordant la facture de la période. Le
+  gel doit suivre l'**historisation** (à la facturation), pas la finalisation comptable.
 - **Bloquer *tous* les champs en écriture quand verrouillé** : casserait les recomputes ORM
   légitimes ; l'allowlist par `frozenset` cible exactement l'intention.
 
 ## Raison
 
 Achever la « refonte propre » du modèle Période (#14) : un snapshot **typé** supprime la
-dette de parsing, et le **verrou à l'émission** fait du couple Période/Facture un objet
-**rejouable et opposable**, sans surface d'altération a posteriori.
+dette de parsing, et le **verrou à la facturation** fait du couple Période/Facture un objet
+**rejouable**, sans surface d'altération a posteriori — la période est éditée *avant*
+facturation, puis figée par celle-ci.

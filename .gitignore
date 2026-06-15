@@ -47,3 +47,6 @@ odoo-server.log
 # Local agent state / caches (Serena MCP, Claude Code)
 .serena/
 .claude/
+
+# repo-scoped GitHub PAT for in-sandbox automation — never commit
+.gh-token

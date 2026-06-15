@@ -120,6 +120,11 @@ class SouscriptionPeriode(models.Model):
         store=True,
         help='Facture (out_invoice) rattachée à cette période, dérivée du lien account.move.periode_id.',
     )
+    # État de la facture exposé sur la période. `facture_id` inclut déjà les
+    # brouillons (le compute ne filtre pas sur l'état) ; ce champ rend l'état
+    # visible côté gestion pour distinguer brouillon / postée — notamment quand
+    # une facture est remise en brouillon par le·la facturiste.
+    facture_state = fields.Selection(related='facture_id.state', string='État facture', readonly=True)
 
     @api.depends('move_ids.move_type')
     def _compute_facture_id(self):

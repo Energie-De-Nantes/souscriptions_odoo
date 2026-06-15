@@ -17,6 +17,9 @@
                 <field name="turpe_fixe"/>
                 <field name="turpe_variable"/>
                 <field name="facture_id"/>
+                <field name="facture_state" widget="badge"
+                       decoration-success="facture_state == 'posted'"
+                       decoration-warning="facture_state == 'draft'"/>
             </list>
         </field>
     </record>
@@ -87,7 +90,21 @@
 
                     <group string="Documents">
                         <field name="facture_id"/>
+                        <field name="facture_state"/>
                     </group>
+                    <!-- Tous les documents liés (factures, avoirs…), brouillons
+                         compris : une facture remise en brouillon reste visible ici. -->
+                    <field name="move_ids" readonly="1">
+                        <list>
+                            <field name="name"/>
+                            <field name="invoice_date"/>
+                            <field name="move_type"/>
+                            <field name="state" widget="badge"
+                                   decoration-success="state == 'posted'"
+                                   decoration-warning="state == 'draft'"/>
+                            <field name="amount_total"/>
+                        </list>
+                    </field>
                 </sheet>
             </form>
         </field>

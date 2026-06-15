@@ -303,6 +303,27 @@ class SouscriptionPeriode(models.Model):
             raise UserError(f"Produit d'énergie {type_energie} non trouvé")
         return produit
 
+    def _quantite_facturee(self, cadran):
+        """Quantité d'énergie à facturer pour un cadran facturé ('base'/'hp'/'hc').
+
+        Contrat **lissé** : la *provision* contractuelle (``provision_*_kwh``) ;
+        l'écart avec le mesuré est soldé plus tard en régularisation.
+        Contrat **non lissé** : le *mesuré / estimé* (``energie_*_kwh``) directement.
+        Le choix s'appuie sur le snapshot figé ``lisse_periode`` (ADR 0006).
+        """
+        self.ensure_one()
+        provision = {
+            'base': self.provision_base_kwh,
+            'hp': self.provision_hp_kwh,
+            'hc': self.provision_hc_kwh,
+        }
+        mesure = {
+            'base': self.energie_base_kwh,
+            'hp': self.energie_hp_kwh,
+            'hc': self.energie_hc_kwh,
+        }
+        return provision[cadran] if self.lisse_periode else mesure[cadran]
+
     def _composer_lignes(self, grille):
         """Compose les lignes de facture (``[(0, 0, vals)]``) de cette période.
 
@@ -371,7 +392,7 @@ class SouscriptionPeriode(models.Model):
                     {
                         'product_id': produit_base.id,
                         'name': produit_base.name,
-                        'quantity': self.provision_base_kwh,
+                        'quantity': self._quantite_facturee('base'),
                         'price_unit': prix_base,
                     },
                 )
@@ -388,7 +409,7 @@ class SouscriptionPeriode(models.Model):
                     {
                         'product_id': produit_hp.id,
                         'name': produit_hp.name,
-                        'quantity': self.provision_hp_kwh,
+                        'quantity': self._quantite_facturee('hp'),
                         'price_unit': prix_hp,
                     },
                 )
@@ -405,7 +426,7 @@ class SouscriptionPeriode(models.Model):
                     {
                         'product_id': produit_hc.id,
                         'name': produit_hc.name,
-                        'quantity': self.provision_hc_kwh,
+                        'quantity': self._quantite_facturee('hc'),
                         'price_unit': prix_hc,
                     },
                 )

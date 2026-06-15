@@ -27,11 +27,6 @@ class SouscriptionPeriode(models.Model):
         readonly=True,
     )
 
-    # Type de tarif facturé (vue live de la souscription) — pilote l'affichage
-    # facturé/provision, orthogonal au calendrier de comptage (ADR 0005).
-    # À basculer sur le type historisé typé quand #14 l'aura introduit.
-    type_tarif = fields.Selection(related='souscription_id.type_tarif', readonly=True)
-
     # Consommations détaillées par cadrans (pour calcul TURPE)
     energie_hph_kwh = fields.Float(string='Énergie HPH (kWh)', help='Heures Pleines saison Haute')
     energie_hpb_kwh = fields.Float(string='Énergie HPB (kWh)', help='Heures Pleines saison Basse')
@@ -46,10 +41,17 @@ class SouscriptionPeriode(models.Model):
     energie_hc_kwh = fields.Float(string='Énergie HC (kWh)', compute='_compute_hp_hc', store=True, readonly=False)
     energie_base_kwh = fields.Float(string='Énergie BASE (kWh)', compute='_compute_base', store=True, readonly=False)
 
-    # Provisions (lissage) - selon type de contrat
-    provision_hp_kwh = fields.Float(string='Provision HP (kWh)')
-    provision_hc_kwh = fields.Float(string='Provision HC (kWh)')
-    provision_base_kwh = fields.Float(string='Provision BASE (kWh)')
+    # Quantité d'énergie *facturée* sur la période, par cadran facturé (#14).
+    # Sémantique unifiée lissé / non-lissé : c'est TOUJOURS cette valeur qui est
+    # portée sur la facture (voir _composer_lignes), jamais energie_*_kwh.
+    #  - Contrat lissé : provision contractuelle (peuplée à la création depuis la
+    #    souscription) ; l'écart avec le réel mesuré (energie_*_kwh) est suivi par
+    #    ecart_*_kwh et soldé en régularisation (ADR 0005).
+    #  - Contrat non lissé : on facture le réel ; la provision vaut alors la
+    #    consommation mesurée (alignée par electricore / le·la facturiste).
+    provision_hp_kwh = fields.Float(string='Énergie facturée HP (kWh)')
+    provision_hc_kwh = fields.Float(string='Énergie facturée HC (kWh)')
+    provision_base_kwh = fields.Float(string='Énergie facturée BASE (kWh)')
 
     # Écart facturé réel − provision, par cadran facturé (régularisation des
     # contrats lissés — ADR 0005). Calculé, non stocké ; affiché si lissé.
@@ -69,10 +71,15 @@ class SouscriptionPeriode(models.Model):
     )
     jours = fields.Integer(compute='_compute_jours', store=True)
 
-    # État de la souscription au moment de la création de la période
-    # (copie en texte pour historisation - ces valeurs peuvent changer dans la souscription)
-    type_tarif_periode = fields.Char(
-        string='Type tarif (période)', readonly=True, help='Type de tarif au moment de la création de cette période'
+    # Snapshot contractuel figé à la création (historisation typée — #14).
+    # Ces valeurs peuvent changer dans la souscription ; la période garde celles
+    # du moment, sous une forme *typée* (clé de sélection / nombre) que la
+    # facturation lit sans parsing.
+    type_tarif_periode = fields.Selection(
+        [('base', 'Base'), ('hphc', 'Heures Pleines / Heures Creuses')],
+        string='Type tarif (période)',
+        readonly=True,
+        help='Type de tarif au moment de la création de cette période',
     )
 
     tarif_solidaire_periode = fields.Boolean(
@@ -85,10 +92,10 @@ class SouscriptionPeriode(models.Model):
         string='Lissé (période)', readonly=True, help='État du lissage au moment de la création de cette période'
     )
 
-    puissance_souscrite_periode = fields.Char(
-        string='Puissance souscrite (période)',
+    puissance_souscrite_periode = fields.Float(
+        string='Puissance souscrite (période, kVA)',
         readonly=True,
-        help='Puissance souscrite au moment de la création de cette période',
+        help='Puissance souscrite (kVA) au moment de la création de cette période',
     )
 
     provision_mensuelle_kwh_periode = fields.Float(
@@ -102,13 +109,6 @@ class SouscriptionPeriode(models.Model):
         readonly=True,
         help='Coefficient PRO au moment de la création de cette période',
     )
-
-    # Compatibilité (deprecated - à supprimer plus tard)
-    energie_kwh = fields.Float(string='Énergie consommée (kWh)', compute='_compute_energie_kwh_compat', store=False)
-    provision_kwh = fields.Float(
-        string='Énergie provisionnée (kWh)', compute='_compute_provision_kwh_compat', store=False
-    )
-    _fix_provision = fields.Boolean(default=False, readonly=True)
 
     # Lien Période ↔ Facture : `account.move.periode_id` est l'unique source de
     # vérité (ADR 0004). `facture_id` en est dérivé — calculé/stocké, non écrit.
@@ -142,17 +142,15 @@ class SouscriptionPeriode(models.Model):
         for vals in vals_list:
             sous = self.env['souscription.souscription'].browse(vals['souscription_id'])
 
-            # Copie de l'état de la souscription au moment de la création
+            # Snapshot typé de l'état de la souscription au moment de la création
+            # (#14) : la clé de tarif (pas le libellé) et la puissance en kVA (pas
+            # "6 kVA") — la facturation les lit sans parsing.
             vals.update(
                 {
-                    'type_tarif_periode': dict(sous._fields['type_tarif'].selection).get(
-                        sous.type_tarif, sous.type_tarif
-                    ),
+                    'type_tarif_periode': sous.type_tarif,
                     'tarif_solidaire_periode': sous.tarif_solidaire,
                     'lisse_periode': sous.lisse,
-                    'puissance_souscrite_periode': f'{sous.puissance_souscrite} kVA'
-                    if sous.puissance_souscrite
-                    else '',
+                    'puissance_souscrite_periode': float(sous.puissance_souscrite) if sous.puissance_souscrite else 0.0,
                     'provision_mensuelle_kwh_periode': sous.provision_mensuelle_kwh,
                     'coeff_pro_periode': sous.coeff_pro,
                     'pdl': sous.pdl,  # Copie du PDL aussi
@@ -168,9 +166,54 @@ class SouscriptionPeriode(models.Model):
                 else:  # HP/HC - répartition temporaire 70% HP / 30% HC
                     vals['provision_hp_kwh'] = sous.provision_mensuelle_kwh * 0.7
                     vals['provision_hc_kwh'] = sous.provision_mensuelle_kwh * 0.3
-                vals['_fix_provision'] = True
 
         return super().create(vals_list)
+
+    # Champs facturables figés : une fois la facture émise, les réécrire
+    # changerait une facture opposable. Le verrou (#14) les protège ; les champs
+    # techniques/calculés (facture_id, facture_state, mois_annee, jours…) restent
+    # recalculables par l'ORM (passe par _write, pas par ce write public).
+    _LOCKED_FIELDS = frozenset(
+        {
+            'date_debut',
+            'date_fin',
+            'pdl',
+            'lisse',
+            'config_cadrans',
+            'type_periode',
+            'energie_hph_kwh',
+            'energie_hpb_kwh',
+            'energie_hch_kwh',
+            'energie_hcb_kwh',
+            'energie_hp_kwh',
+            'energie_hc_kwh',
+            'energie_base_kwh',
+            'provision_hp_kwh',
+            'provision_hc_kwh',
+            'provision_base_kwh',
+            'turpe_fixe',
+            'turpe_variable',
+            'type_tarif_periode',
+            'tarif_solidaire_periode',
+            'lisse_periode',
+            'puissance_souscrite_periode',
+            'provision_mensuelle_kwh_periode',
+            'coeff_pro_periode',
+        }
+    )
+
+    def write(self, vals):
+        """Verrou de facturation (#14) : une période dont la facture est *émise*
+        (postée) est en lecture seule sur ses champs facturables, y compris via
+        RPC. La correction se fait *avant* l'émission (facture en brouillon)."""
+        if self._LOCKED_FIELDS.intersection(vals):
+            for periode in self:
+                if periode.facture_id.state == 'posted':
+                    raise UserError(
+                        f'Période {periode.mois_annee} : facture émise, modification interdite. '
+                        'Repassez la facture en brouillon pour corriger, ou créez une régularisation.'
+                    )
+        return super().write(vals)
 
     @api.depends('date_debut', 'date_fin')
     def _compute_jours(self):
@@ -215,43 +258,6 @@ class SouscriptionPeriode(models.Model):
             periode.ecart_hp_kwh = periode.energie_hp_kwh - periode.provision_hp_kwh
             periode.ecart_hc_kwh = periode.energie_hc_kwh - periode.provision_hc_kwh
             periode.ecart_base_kwh = periode.energie_base_kwh - periode.provision_base_kwh
-
-    @api.depends('souscription_id.type_tarif', 'souscription_id.lisse')
-    def _compute_provisions(self):
-        """Calcule les provisions selon le type de contrat et le lissage"""
-        for periode in self:
-            if periode.souscription_id.lisse:
-                # Provisions fixes pour lissage - à implémenter selon les champs souscription
-                # TODO: ajouter provision_mensuelle_hp_kwh, provision_mensuelle_hc_kwh, etc.
-                if periode.souscription_id.type_tarif == 'base':
-                    periode.provision_base_kwh = periode.souscription_id.provision_mensuelle_kwh or 0
-                else:  # HP/HC - répartition à définir
-                    total_provision = periode.souscription_id.provision_mensuelle_kwh or 0
-                    # Répartition temporaire 70% HP / 30% HC
-                    periode.provision_hp_kwh = total_provision * 0.7
-                    periode.provision_hc_kwh = total_provision * 0.3
-            else:
-                # Provisions = consommations réelles
-                periode.provision_hp_kwh = periode.energie_hp_kwh
-                periode.provision_hc_kwh = periode.energie_hc_kwh
-                periode.provision_base_kwh = periode.energie_base_kwh
-
-    # === COMPATIBILITÉ (deprecated) ===
-
-    @api.depends('energie_base_kwh')
-    def _compute_energie_kwh_compat(self):
-        """Compatibilité avec ancien champ energie_kwh"""
-        for periode in self:
-            periode.energie_kwh = periode.energie_base_kwh
-
-    @api.depends('provision_base_kwh', 'provision_hp_kwh', 'provision_hc_kwh', 'souscription_id.type_tarif')
-    def _compute_provision_kwh_compat(self):
-        """Compatibilité avec ancien champ provision_kwh"""
-        for periode in self:
-            if periode.souscription_id.type_tarif == 'base':
-                periode.provision_kwh = periode.provision_base_kwh
-            else:
-                periode.provision_kwh = periode.provision_hp_kwh + periode.provision_hc_kwh
 
     @api.depends('date_debut')
     def _compute_mois_annee(self):
@@ -306,19 +312,14 @@ class SouscriptionPeriode(models.Model):
         self.ensure_one()
         prix_dict = grille.get_prix_dict()
 
-        # Snapshot figé — ADR 0006 (pas de repli sur la souscription live)
-        puissance_str = self.puissance_souscrite_periode
+        # Snapshot figé typé — ADR 0006 (pas de repli sur la souscription live)
+        # et #14 (valeurs typées : aucun parsing à la facturation).
+        puissance_kva = self.puissance_souscrite_periode
         tarif_solidaire = self.tarif_solidaire_periode
         type_tarif = self.type_tarif_periode
 
-        if not puissance_str:
+        if not puissance_kva:
             raise UserError(f'Aucune puissance définie pour la période {self.mois_annee}')
-
-        # Extraction de la puissance numérique (ex: "6 kVA" -> 6.0)
-        try:
-            puissance_kva = float(puissance_str.replace(' kVA', '').replace(',', '.'))
-        except Exception:
-            raise UserError(f'Format de puissance invalide : {puissance_str}')
 
         lines_vals = []
 
@@ -354,9 +355,8 @@ class SouscriptionPeriode(models.Model):
         # Section Énergie
         lines_vals.append((0, 0, {'display_type': 'line_section', 'name': 'Énergie'}))
 
-        # Le type_tarif historisé peut être la clé ('base') ou le libellé ('Base').
-        # Sniffing conservé tel quel ; son nettoyage relève du snapshot typé (#14).
-        is_base_tarif = type_tarif == 'base' or type_tarif == 'Base' or 'Base' in str(type_tarif)
+        # type_tarif historisé typé (#14) : clé de sélection, comparaison directe.
+        is_base_tarif = type_tarif == 'base'
 
         if is_base_tarif:
             produit_base = self._get_produit_energie('base')

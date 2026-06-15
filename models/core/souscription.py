@@ -137,9 +137,12 @@ class Souscription(models.Model):
             sous.facture_ids = sous.periode_ids.mapped('facture_id')
 
     def creer_factures(self):
-        """
-        Crée les factures à partir des périodes de facturation.
-        Utilise les données historisées de chaque période pour générer les bonnes lignes.
+        """Émet les factures des périodes non encore facturées.
+
+        Orchestrateur : pour chaque souscription, boucle sur ses périodes sans
+        facture (garde anti-doublon) et délègue l'émission à la période
+        (``periode._creer_facture``). La composition des lignes et la création du
+        ``account.move`` vivent désormais sur la Période (ADR 0006).
         """
         _logger.info(f'Créer factures appelé pour {len(self)} souscriptions')
 
@@ -148,224 +151,13 @@ class Souscription(models.Model):
                 _logger.warning(f'Souscription {souscription.name} sans partenaire, ignorée')
                 continue
 
-            # Pour chaque période sans facture
             for periode in souscription.periode_ids.filtered(lambda p: not p.facture_id):
                 try:
-                    facture = souscription._creer_facture_periode(periode)  # Utiliser la souscription spécifique
-                    # facture_id est calculé depuis account.move.periode_id (ADR 0004) :
-                    # _creer_facture_periode a déjà posé periode_id sur la facture.
+                    facture = periode._creer_facture()
                     _logger.info(f'Facture {facture.name} créée pour période {periode.mois_annee}')
                 except Exception as e:
                     _logger.error(f'Erreur création facture pour période {periode.mois_annee}: {e}')
                     raise UserError(f'Erreur création facture pour {periode.mois_annee}: {e}')
-
-    def _get_produit_abonnement(self, tarif_solidaire):
-        """Trouve le produit d'abonnement selon le type"""
-        product_ref = (
-            'souscriptions_product_abonnement_solidaire'
-            if tarif_solidaire
-            else 'souscriptions_product_abonnement_standard'
-        )
-
-        try:
-            return self.env.ref(f'souscriptions_odoo.{product_ref}')
-        except Exception:
-            type_abo = 'solidaire' if tarif_solidaire else 'standard'
-            raise UserError(f"Produit d'abonnement {type_abo} non trouvé")
-
-    def _get_produit_energie(self, type_energie):
-        """Trouve le produit d'énergie correspondant au type (base, hp, hc)"""
-        xmlid_map = {
-            'base': 'souscriptions_odoo.souscriptions_product_energie_base',
-            'hp': 'souscriptions_odoo.souscriptions_product_energie_hp',
-            'hc': 'souscriptions_odoo.souscriptions_product_energie_hc',
-        }
-
-        xmlid = xmlid_map.get(type_energie.lower())
-        if not xmlid:
-            raise UserError(f"Type d'énergie non reconnu : {type_energie}")
-
-        produit = self.env.ref(xmlid, raise_if_not_found=False)
-        if not produit:
-            raise UserError(f"Produit d'énergie {type_energie} non trouvé")
-
-        return produit
-
-    def _creer_facture_periode(self, periode):
-        """
-        Crée une facture pour une période donnée en utilisant les données historisées
-        et la grille de prix active avec calcul dynamique.
-        """
-        # 1. Récupération de la grille active
-        grille_active = self.env['grille.prix'].get_grille_active(periode.date_fin)
-        prix_dict = grille_active.get_prix_dict()  # {product_id: prix_interne} pour les énergies
-
-        # 2. Utilisation des données historisées de la période
-        puissance_str = periode.puissance_souscrite_periode or self.puissance_souscrite
-        tarif_solidaire = periode.tarif_solidaire_periode
-        type_tarif = periode.type_tarif_periode or dict(self._fields['type_tarif'].selection).get(
-            self.type_tarif, self.type_tarif
-        )
-
-        if not puissance_str:
-            raise UserError(f'Aucune puissance définie pour la période {periode.mois_annee}')
-
-        # Extraction de la puissance numérique (ex: "6 kVA" -> 6.0)
-        try:
-            puissance_kva = float(puissance_str.replace(' kVA', '').replace(',', '.'))
-        except Exception:
-            raise UserError(f'Format de puissance invalide : {puissance_str}')
-
-        # 3. Création des lignes de facture
-        lines_vals = []
-
-        # Section Abonnement
-        lines_vals.append(
-            (
-                0,
-                0,
-                {
-                    'display_type': 'line_section',
-                    'name': 'Abonnement',
-                },
-            )
-        )
-
-        # Ligne abonnement avec calcul dynamique (utilise le coefficient historisé)
-        coeff_pro_historise = periode.coeff_pro_periode if hasattr(periode, 'coeff_pro_periode') else self.coeff_pro
-        produit_abo = self._get_produit_abonnement(tarif_solidaire)
-        prix_abo_journalier = grille_active.get_prix_abonnement(
-            puissance_kva, coeff_pro=coeff_pro_historise, is_solidaire=tarif_solidaire
-        )
-
-        # Nom descriptif de la ligne
-        type_client = 'PRO' if coeff_pro_historise > 0 else 'PART'
-        puissance_desc = f'{puissance_kva:g} kVA'  # :g supprime les .0 inutiles
-
-        lines_vals.append(
-            (
-                0,
-                0,
-                {
-                    'product_id': produit_abo.id,
-                    'name': f'{produit_abo.name} {puissance_desc} {type_client}',
-                    'quantity': periode.jours,
-                    'price_unit': prix_abo_journalier,
-                },
-            )
-        )
-
-        # Note TURPE fixe sous l'abonnement
-        if periode.turpe_fixe > 0:
-            lines_vals.append(
-                (
-                    0,
-                    0,
-                    {
-                        'display_type': 'line_note',
-                        'name': f'Dont turpe fixe: {periode.turpe_fixe:.2f}€',
-                    },
-                )
-            )
-
-        # Section Énergie
-        lines_vals.append(
-            (
-                0,
-                0,
-                {
-                    'display_type': 'line_section',
-                    'name': 'Énergie',
-                },
-            )
-        )
-
-        # Lignes énergie selon type de tarif historisé
-        # Le type_tarif peut être la clé ('base', 'hphc') ou le libellé complet
-        is_base_tarif = type_tarif == 'base' or type_tarif == 'Base' or 'Base' in str(type_tarif)
-
-        if is_base_tarif:
-            # Tarif BASE : toujours afficher la ligne énergie base (même si 0)
-            produit_base = self._get_produit_energie('base')
-            prix_base = prix_dict.get(produit_base.id)
-            if prix_base is None:
-                raise UserError(f'Prix non trouvé dans la grille pour le produit : {produit_base.name}')
-
-            lines_vals.append(
-                (
-                    0,
-                    0,
-                    {
-                        'product_id': produit_base.id,
-                        'name': produit_base.name,
-                        'quantity': periode.provision_base_kwh,
-                        'price_unit': prix_base,
-                    },
-                )
-            )
-        else:  # HP/HC
-            # Tarif HP/HC : toujours afficher les deux lignes HP et HC (même si 0)
-            # Ligne HP
-            produit_hp = self._get_produit_energie('hp')
-            prix_hp = prix_dict.get(produit_hp.id)
-            if prix_hp is None:
-                raise UserError(f'Prix non trouvé dans la grille pour le produit : {produit_hp.name}')
-
-            lines_vals.append(
-                (
-                    0,
-                    0,
-                    {
-                        'product_id': produit_hp.id,
-                        'name': produit_hp.name,
-                        'quantity': periode.provision_hp_kwh,
-                        'price_unit': prix_hp,
-                    },
-                )
-            )
-
-            # Ligne HC
-            produit_hc = self._get_produit_energie('hc')
-            prix_hc = prix_dict.get(produit_hc.id)
-            if prix_hc is None:
-                raise UserError(f'Prix non trouvé dans la grille pour le produit : {produit_hc.name}')
-
-            lines_vals.append(
-                (
-                    0,
-                    0,
-                    {
-                        'product_id': produit_hc.id,
-                        'name': produit_hc.name,
-                        'quantity': periode.provision_hc_kwh,
-                        'price_unit': prix_hc,
-                    },
-                )
-            )
-
-        # Note TURPE variable sous l'énergie
-        if periode.turpe_variable > 0:
-            lines_vals.append(
-                (
-                    0,
-                    0,
-                    {
-                        'display_type': 'line_note',
-                        'name': f'Dont turpe variable: {periode.turpe_variable:.2f}€',
-                    },
-                )
-            )
-
-        # 4. Création de la facture
-        facture_vals = {
-            'move_type': 'out_invoice',
-            'partner_id': self.partner_id.id,
-            'invoice_date': periode.date_fin,
-            'periode_id': periode.id,
-            'invoice_line_ids': lines_vals,
-        }
-
-        return self.env['account.move'].create(facture_vals)
 
     @api.model
     def ajouter_periodes_mensuelles(self):

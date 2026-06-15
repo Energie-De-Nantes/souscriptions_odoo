@@ -128,7 +128,7 @@ class TestInvoiceTemplate(TransactionCase):
             }
 
         periode = self.env['souscription.periode'].create(periode_data)
-        facture = souscription._creer_facture_periode(periode)
+        facture = periode._creer_facture()
 
         return periode, facture
 

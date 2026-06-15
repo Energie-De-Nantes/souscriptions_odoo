@@ -240,7 +240,7 @@ class SouscriptionsTestMixin:
         if periode is None:
             periode = self.create_test_periode(souscription, **periode_kwargs)
 
-        facture = souscription._creer_facture_periode(periode)
+        facture = periode._creer_facture()
         return periode, facture
 
     def assert_invoice_structure(self, facture, expected_sections=None, expected_notes=None):

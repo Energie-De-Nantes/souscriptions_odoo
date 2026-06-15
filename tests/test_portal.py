@@ -58,8 +58,8 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
                 'turpe_variable': 14.20,
             }
         )
-        cls.facture_jan = cls.souscription_base._creer_facture_periode(cls.periode_jan)
-        cls.facture_feb = cls.souscription_base._creer_facture_periode(cls.periode_feb)
+        cls.facture_jan = cls.periode_jan._creer_facture()
+        cls.facture_feb = cls.periode_feb._creer_facture()
         (cls.facture_jan | cls.facture_feb).action_post()
 
     @classmethod
@@ -138,7 +138,7 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
                 'turpe_variable': 1.0,
             }
         )
-        facture_draft = self.souscription_base._creer_facture_periode(periode_draft)
+        facture_draft = periode_draft._creer_facture()
         self.assertEqual(facture_draft.state, 'draft')
 
         self.authenticate(self.portal_user.login, self.portal_user.login)
@@ -180,7 +180,7 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
                 'turpe_variable': 18.50,
             }
         )
-        self.souscription_hphc._creer_facture_periode(periode_hphc).action_post()
+        periode_hphc._creer_facture().action_post()
 
         response = self.url_open(self._detail_url(self.souscription_hphc))
         self.assertEqual(response.status_code, 200)

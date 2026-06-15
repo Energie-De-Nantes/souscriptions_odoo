@@ -33,28 +33,29 @@ class SouscriptionPeriode(models.Model):
     energie_hch_kwh = fields.Float(string='Énergie HCH (kWh)', help='Heures Creuses saison Haute')
     energie_hcb_kwh = fields.Float(string='Énergie HCB (kWh)', help='Heures Creuses saison Basse')
 
-    # Consommations facturables (selon contrat) — cascade dérivée-mais-surchargeable
-    # (ADR 0005). Chaque niveau est dérivé du niveau réseau en dessous SAUF quand
-    # le calendrier de comptage en fait le niveau de saisie (alors readonly=False
-    # permet la saisie directe, conservée par les computes config-aware).
+    # Énergie mesurée / estimée par cadran facturé (selon contrat) — cascade
+    # dérivée-mais-surchargeable (ADR 0005). Chaque niveau est dérivé du niveau
+    # réseau en dessous SAUF quand le calendrier de comptage en fait le niveau de
+    # saisie (alors readonly=False permet la saisie directe — mesure Enedis ou
+    # estimation du·de la facturiste —, conservée par les computes config-aware).
     energie_hp_kwh = fields.Float(string='Énergie HP (kWh)', compute='_compute_hp_hc', store=True, readonly=False)
     energie_hc_kwh = fields.Float(string='Énergie HC (kWh)', compute='_compute_hp_hc', store=True, readonly=False)
     energie_base_kwh = fields.Float(string='Énergie BASE (kWh)', compute='_compute_base', store=True, readonly=False)
 
-    # Quantité d'énergie *facturée* sur la période, par cadran facturé (#14).
-    # Sémantique unifiée lissé / non-lissé : c'est TOUJOURS cette valeur qui est
-    # portée sur la facture (voir _composer_lignes), jamais energie_*_kwh.
+    # Provision d'énergie par cadran facturé (#14) — distincte du mesuré/estimé
+    # (energie_*_kwh). C'est CETTE quantité qui est portée sur la facture (voir
+    # _composer_lignes) :
     #  - Contrat lissé : provision contractuelle (peuplée à la création depuis la
-    #    souscription) ; l'écart avec le réel mesuré (energie_*_kwh) est suivi par
+    #    souscription) ; l'écart avec le mesuré (energie_*_kwh) est suivi par
     #    ecart_*_kwh et soldé en régularisation (ADR 0005).
-    #  - Contrat non lissé : on facture le réel ; la provision vaut alors la
-    #    consommation mesurée (alignée par electricore / le·la facturiste).
-    provision_hp_kwh = fields.Float(string='Énergie facturée HP (kWh)')
-    provision_hc_kwh = fields.Float(string='Énergie facturée HC (kWh)')
-    provision_base_kwh = fields.Float(string='Énergie facturée BASE (kWh)')
+    #  - Contrat non lissé : la provision vaut la consommation mesurée/estimée
+    #    (alignée par electricore / le·la facturiste).
+    provision_hp_kwh = fields.Float(string='Provision HP (kWh)')
+    provision_hc_kwh = fields.Float(string='Provision HC (kWh)')
+    provision_base_kwh = fields.Float(string='Provision BASE (kWh)')
 
-    # Écart facturé réel − provision, par cadran facturé (régularisation des
-    # contrats lissés — ADR 0005). Calculé, non stocké ; affiché si lissé.
+    # Écart mesuré − provision, par cadran facturé (régularisation des contrats
+    # lissés — ADR 0005). Calculé, non stocké ; affiché si lissé.
     ecart_hp_kwh = fields.Float(string='Écart HP (kWh)', compute='_compute_ecart')
     ecart_hc_kwh = fields.Float(string='Écart HC (kWh)', compute='_compute_ecart')
     ecart_base_kwh = fields.Float(string='Écart BASE (kWh)', compute='_compute_ecart')

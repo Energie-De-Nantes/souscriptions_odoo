@@ -62,7 +62,7 @@
                             <field name="energie_hch_kwh"/>
                             <field name="energie_hcb_kwh"/>
                         </group>
-                        <group string="Facturé">
+                        <group string="Mesuré / estimé">
                             <field name="energie_hp_kwh"
                                    invisible="config_cadrans == 'base'"
                                    readonly="config_cadrans != 'hp_hc'"/>

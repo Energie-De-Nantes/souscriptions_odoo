@@ -47,3 +47,16 @@ odoo-server.log
 # Local agent state / caches (Serena MCP, Claude Code)
 .serena/
 .claude/
+.mcp.json
+
+# IDE
+.idea
+
+# Dotfiles d'environnement local (shell, git) qui traînent dans le workdir
+.bash_profile
+.bashrc
+.gitconfig
+.profile
+.ripgreprc
+.zprofile
+.zshrc

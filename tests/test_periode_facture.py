@@ -33,7 +33,7 @@ class TestPeriodeFactureLien(SouscriptionsTestCase):
     def test_facture_ids_souscription_agrege_les_periodes(self):
         """souscription.facture_ids agrège automatiquement les factures des périodes."""
         periode = self.create_test_periode(self.souscription_base)
-        facture = self.souscription_base._creer_facture_periode(periode)
+        facture = periode._creer_facture()
         self.assertIn(facture, self.souscription_base.facture_ids)
 
     def test_creer_factures_ne_double_pas(self):

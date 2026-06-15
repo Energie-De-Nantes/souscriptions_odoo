@@ -63,7 +63,7 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
         # Phase 3: Génération des factures
         factures = []
         for periode in periodes:
-            facture = souscription._creer_facture_periode(periode)
+            facture = periode._creer_facture()
             factures.append(facture)
 
             # Vérifier que la période est liée à la facture
@@ -98,7 +98,7 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
 
         # Créer période et facture en Base
         periode_base = self.create_test_periode(souscription, date_debut=date(2024, 1, 1), date_fin=date(2024, 1, 31))
-        facture_base = souscription._creer_facture_periode(periode_base)
+        facture_base = periode_base._creer_facture()
 
         # Savepoint avant migration
         self.env.cr.savepoint()
@@ -117,7 +117,7 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
         periode_hphc = self.create_test_periode(
             souscription, date_debut=date(2024, 2, 1), date_fin=date(2024, 2, 29), hp_kwh=180.0, hc_kwh=100.0
         )
-        facture_hphc = souscription._creer_facture_periode(periode_hphc)
+        facture_hphc = periode_hphc._creer_facture()
 
         # Vérifications
         self.assertEqual(souscription.type_tarif, 'hphc')
@@ -169,7 +169,7 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
         # Facturer toutes les périodes
         factures = []
         for periode in periodes:
-            facture = souscription._creer_facture_periode(periode)
+            facture = periode._creer_facture()
             factures.append(facture)
 
         # Savepoint avant régularisation
@@ -204,14 +204,14 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
         )
 
         periode = self.create_test_periode(souscription)
-        facture = souscription._creer_facture_periode(periode)
+        facture = periode._creer_facture()
 
         # Savepoint avant tentative d'erreur
         sp = self.env.cr.savepoint()
 
         try:
             # Tentative de refacturation (devrait échouer)
-            souscription._creer_facture_periode(periode)
+            periode._creer_facture()
             self.fail('Devrait lever une UserError')
         except UserError:
             # Rollback vers le savepoint
@@ -249,11 +249,11 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
         factures_creees = []
         erreurs = []
 
-        for i, (souscription, periode) in enumerate(zip(souscriptions, periodes, strict=False)):
+        for i, (_souscription, periode) in enumerate(zip(souscriptions, periodes, strict=False)):
             try:
                 # Savepoint pour chaque facturation
                 sp = self.env.cr.savepoint()
-                facture = souscription._creer_facture_periode(periode)
+                facture = periode._creer_facture()
                 factures_creees.append(facture)
                 sp.release()
             except Exception as e:

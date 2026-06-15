@@ -115,7 +115,7 @@ class TestSouscriptionsReports(SouscriptionsTestMixin, HttpCase):
                 'turpe_variable': 4.2,
             }
         )
-        cls.facture_test = cls.souscription_base._creer_facture_periode(periode)
+        cls.facture_test = periode._creer_facture()
 
     def test_facture_energie_pdf(self):
         """Test de génération du PDF de facture d'énergie."""

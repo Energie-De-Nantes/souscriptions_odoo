@@ -86,8 +86,8 @@ class TestFacturation(TransactionCase):
         self.assertEqual(periode_31.jours, 31)
         self.assertEqual(periode_28.jours, 28)
 
-        facture_31 = self.souscription._creer_facture_periode(periode_31)
-        facture_28 = self.souscription._creer_facture_periode(periode_28)
+        facture_31 = periode_31._creer_facture()
+        facture_28 = periode_28._creer_facture()
 
         abo_31 = facture_31.invoice_line_ids.filtered(lambda l: l.product_id and 'Abonnement' in l.product_id.name)
         abo_28 = facture_28.invoice_line_ids.filtered(lambda l: l.product_id and 'Abonnement' in l.product_id.name)
@@ -143,25 +143,25 @@ class TestFacturation(TransactionCase):
 
     def test_get_produit_abonnement(self):
         """Test récupération produits abonnement"""
-        produit_standard = self.souscription._get_produit_abonnement(False)
+        produit_standard = self.env['souscription.periode']._get_produit_abonnement(False)
         self.assertEqual(produit_standard.name, 'Abonnement')
 
-        produit_solidaire = self.souscription._get_produit_abonnement(True)
+        produit_solidaire = self.env['souscription.periode']._get_produit_abonnement(True)
         self.assertEqual(produit_solidaire.name, 'Abonnement solidaire')
 
     def test_get_produit_energie(self):
         """Test récupération produits énergie"""
-        produit_base = self.souscription._get_produit_energie('base')
+        produit_base = self.env['souscription.periode']._get_produit_energie('base')
         self.assertEqual(produit_base.name, 'Énergie Base')
 
-        produit_hp = self.souscription._get_produit_energie('hp')
+        produit_hp = self.env['souscription.periode']._get_produit_energie('hp')
         self.assertEqual(produit_hp.name, 'Énergie HP')
 
-        produit_hc = self.souscription._get_produit_energie('hc')
+        produit_hc = self.env['souscription.periode']._get_produit_energie('hc')
         self.assertEqual(produit_hc.name, 'Énergie HC')
 
         with self.assertRaises(UserError):
-            self.souscription._get_produit_energie('inexistant')
+            self.env['souscription.periode']._get_produit_energie('inexistant')
 
     def test_ajouter_periodes_mensuelles(self):
         """Test création automatique des périodes mensuelles"""
@@ -223,7 +223,7 @@ class TestFacturation(TransactionCase):
         )
 
         # Générer la facture
-        facture = self.souscription._creer_facture_periode(periode)
+        facture = periode._creer_facture()
 
         # Vérifications
         self.assertTrue(facture.is_facture_energie)
@@ -284,7 +284,7 @@ class TestFacturation(TransactionCase):
 
         # Générer facture
         try:
-            facture_hphc = souscription_hphc._creer_facture_periode(periode_hphc)
+            facture_hphc = periode_hphc._creer_facture()
         except Exception as e:
             print(f'DEBUG: Exception during HP/HC invoicing: {e}')
             raise
@@ -324,7 +324,7 @@ class TestFacturation(TransactionCase):
             }
         )
 
-        facture = self.souscription._creer_facture_periode(periode)
+        facture = periode._creer_facture()
 
         # Vérifier que les montants TURPE apparaissent dans les notes
         notes = facture.invoice_line_ids.filtered(lambda l: l.display_type == 'line_note')
@@ -356,13 +356,13 @@ class TestFacturation(TransactionCase):
         )
 
         # Première facturation
-        facture1 = self.souscription._creer_facture_periode(periode)
+        facture1 = periode._creer_facture()
         self.assertTrue(facture1)
 
         # Pour l'instant, pas de contrôle d'anti-doublonnage implémenté
         # On supprime ce test ou on l'adapte selon l'implémentation réelle
         # Tentative de refacturation (devrait passer pour l'instant)
-        facture2 = self.souscription._creer_facture_periode(periode)
+        facture2 = periode._creer_facture()
         self.assertTrue(facture2)  # Test que ça ne plante pas
 
     def test_filename_facture_energie(self):
@@ -377,7 +377,7 @@ class TestFacturation(TransactionCase):
             }
         )
 
-        facture = self.souscription._creer_facture_periode(periode)
+        facture = periode._creer_facture()
         filename = facture._get_report_base_filename()
 
         # Vérifier le format du nom de fichier
@@ -406,7 +406,7 @@ class TestFacturation(TransactionCase):
             }
         )
 
-        facture_energie = self.souscription._creer_facture_periode(periode)
+        facture_energie = periode._creer_facture()
 
         # Vérifier les champs computed
         self.assertTrue(facture_energie.is_facture_energie)

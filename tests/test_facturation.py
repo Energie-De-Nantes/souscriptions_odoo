@@ -1,6 +1,5 @@
 from datetime import date
 
-from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
 
 from .common import ABO_ANNUEL_STD, build_grille_lignes
@@ -140,28 +139,6 @@ class TestFacturation(TransactionCase):
 
         self.assertEqual(periode.provision_hp_kwh, 150.0)
         self.assertEqual(periode.provision_hc_kwh, 120.0)
-
-    def test_get_produit_abonnement(self):
-        """Test récupération produits abonnement"""
-        produit_standard = self.env['souscription.periode']._get_produit_abonnement(False)
-        self.assertEqual(produit_standard.name, 'Abonnement')
-
-        produit_solidaire = self.env['souscription.periode']._get_produit_abonnement(True)
-        self.assertEqual(produit_solidaire.name, 'Abonnement solidaire')
-
-    def test_get_produit_energie(self):
-        """Test récupération produits énergie"""
-        produit_base = self.env['souscription.periode']._get_produit_energie('base')
-        self.assertEqual(produit_base.name, 'Énergie Base')
-
-        produit_hp = self.env['souscription.periode']._get_produit_energie('hp')
-        self.assertEqual(produit_hp.name, 'Énergie HP')
-
-        produit_hc = self.env['souscription.periode']._get_produit_energie('hc')
-        self.assertEqual(produit_hc.name, 'Énergie HC')
-
-        with self.assertRaises(UserError):
-            self.env['souscription.periode']._get_produit_energie('inexistant')
 
     def test_ajouter_periodes_mensuelles(self):
         """Test création automatique des périodes mensuelles"""

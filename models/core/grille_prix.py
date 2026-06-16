@@ -143,15 +143,7 @@ class GrillePrix(models.Model):
         """
         self.ensure_one()
 
-        product_ref = (
-            'souscriptions_product_abonnement_solidaire'
-            if is_solidaire
-            else 'souscriptions_product_abonnement_standard'
-        )
-        try:
-            product = self.env.ref(f'souscriptions_odoo.{product_ref}')
-        except ValueError:
-            raise UserError(f"Produit d'abonnement non trouvé : {product_ref}")
+        product = self.env['souscription.produit'].produit_abonnement(is_solidaire)
 
         puissance_key = self._puissance_to_key(puissance_kva)
         ligne_abo = self.ligne_ids.filtered(

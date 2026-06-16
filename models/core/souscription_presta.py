@@ -1,5 +1,4 @@
 from odoo import api, fields, models
-from odoo.exceptions import UserError
 
 
 class SouscriptionPresta(models.Model):
@@ -83,31 +82,18 @@ class SouscriptionPresta(models.Model):
         'Une prestation existe déjà pour cette référence Enedis.',
     )
 
-    def _get_produit_prestation(self):
-        """Produit de refacturation porté par la *nature* (ADR 0009 §5) : il
-        porte le compte de produits **et la TVA** (prestation taxée vs indemnité
-        hors champ). La ligne hérite de cette TVA via le produit ; pas de taux
-        par presta, pas d'override de ligne."""
-        self.ensure_one()
-        xmlid = (
-            'souscriptions_odoo.souscriptions_product_indemnite_enedis'
-            if self.nature == 'indemnite'
-            else 'souscriptions_odoo.souscriptions_product_prestation_enedis'
-        )
-        produit = self.env.ref(xmlid, raise_if_not_found=False)
-        if not produit:
-            raise UserError('Produit générique de prestation non trouvé')
-        return produit
-
     def _composer_ligne(self):
         """Compose la ligne de facture (`(0, 0, vals)`) de cette prestation.
 
-        Surface de test des règles de refacturation : produit générique pour la
-        plomberie comptable, libellé/prix/quantité de la prestation. Ne crée
-        aucun `account.move`.
+        Le produit de refacturation vient du catalogue (`souscription.produit`),
+        choisi par la *nature* et le *tarif solidaire* de la souscription : il
+        porte le compte + la TVA (ADR 0009 §5, ADR 0013). La ligne ne surcharge
+        que libellé/prix/quantité. Ne crée aucun `account.move`.
         """
         self.ensure_one()
-        produit = self._get_produit_prestation()
+        produit = self.env['souscription.produit'].produit_refacturation(
+            self.nature, self.souscription_id.tarif_solidaire
+        )
         return (
             0,
             0,

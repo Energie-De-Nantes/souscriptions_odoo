@@ -44,6 +44,9 @@ def build_grille_lignes(env, grille, *, prix_base, prix_hp, prix_hc, abo_std=Non
     base = env.ref('souscriptions_odoo.souscriptions_product_energie_base')
     hp = env.ref('souscriptions_odoo.souscriptions_product_energie_hp')
     hc = env.ref('souscriptions_odoo.souscriptions_product_energie_hc')
+    base_sol = env.ref('souscriptions_odoo.souscriptions_product_energie_base_solidaire')
+    hp_sol = env.ref('souscriptions_odoo.souscriptions_product_energie_hp_solidaire')
+    hc_sol = env.ref('souscriptions_odoo.souscriptions_product_energie_hc_solidaire')
 
     vals = []
     for puissance, prix in abo_std.items():
@@ -70,6 +73,10 @@ def build_grille_lignes(env, grille, *, prix_base, prix_hp, prix_hc, abo_std=Non
         {'grille_id': grille.id, 'product_id': base.id, 'type_produit': 'energie', 'prix_unitaire': prix_base},
         {'grille_id': grille.id, 'product_id': hp.id, 'type_produit': 'energie', 'prix_unitaire': prix_hp},
         {'grille_id': grille.id, 'product_id': hc.id, 'type_produit': 'energie', 'prix_unitaire': prix_hc},
+        # Jumeaux solidaires (ADR 0013) : mêmes prix énergie, produits isolés.
+        {'grille_id': grille.id, 'product_id': base_sol.id, 'type_produit': 'energie', 'prix_unitaire': prix_base},
+        {'grille_id': grille.id, 'product_id': hp_sol.id, 'type_produit': 'energie', 'prix_unitaire': prix_hp},
+        {'grille_id': grille.id, 'product_id': hc_sol.id, 'type_produit': 'energie', 'prix_unitaire': prix_hc},
     ]
     return env['grille.prix.ligne'].create(vals)
 

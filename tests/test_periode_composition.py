@@ -159,6 +159,33 @@ class TestPeriodeComposition(SouscriptionsTestCase):
         # toujours liée et visible après remise en brouillon
         self.assertEqual(periode.facture_id, facture)
 
+    def test_composer_lignes_solidaire_isole_abonnement_et_energie(self):
+        """Contrat solidaire : abonnement ET énergie facturés sur les produits de
+        l'univers solidaire, jamais les produits standard (isolation, ADR 0013)."""
+        sous_sol = self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.souscription_base.partner_id.id,
+                'pdl': 'PDL_TEST_SOLIDAIRE',
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'tarif_solidaire': True,
+                'etat_facturation_id': self.souscription_base.etat_facturation_id.id,
+                'date_debut': date(2024, 1, 1),
+            }
+        )
+        periode = self._periode(
+            sous_sol, provision_base_kwh=100.0, date_debut=date(2024, 6, 1), date_fin=date(2024, 7, 1)
+        )
+
+        def ref(xmlid):
+            return self.env.ref(f'souscriptions_odoo.{xmlid}').id
+
+        produit_ids = {d['product_id'] for d in self._dicts(periode._composer_lignes(self.grille_prix)) if d.get('product_id')}
+        self.assertIn(ref('souscriptions_product_abonnement_solidaire'), produit_ids)
+        self.assertIn(ref('souscriptions_product_energie_base_solidaire'), produit_ids)
+        self.assertNotIn(ref('souscriptions_product_abonnement_standard'), produit_ids)
+        self.assertNotIn(ref('souscriptions_product_energie_base'), produit_ids)
+
 
 @tagged('souscriptions', 'souscriptions_composition', 'post_install', '-at_install')
 class TestDemoFactures(TransactionCase):

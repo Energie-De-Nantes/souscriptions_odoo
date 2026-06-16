@@ -24,7 +24,8 @@ Français, cohérent avec electricore.
 Le contrat de fourniture d'électricité conclu avec un·e *souscripteur·rice*, matérialisé par
 `souscription.souscription`. Système de référence de toutes les données métier/contractuelles
 côté fournisseur ; n'est *pas* stocké dans le module comptable. Porte la *RSC* electricore
-comme clé d'articulation (le PDL reste un attribut d'affichage/recherche).
+comme clé d'articulation — réconciliée depuis l'`id_Affaire` Enedis (amorce capturée au
+*raccordement*) — le PDL restant un attribut d'affichage/recherche.
 _Éviter_ : **abonnement** (collision triple — le module Odoo de facturation récurrente qu'on
 remplace, le terme pipeline d'electricore, la catégorie produit « Abonnements ») ; **devis**,
 **commande**, `sale.order` (explicitement non utilisés : pas de cycle de vente) ; contrat

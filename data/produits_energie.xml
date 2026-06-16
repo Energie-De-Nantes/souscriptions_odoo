@@ -35,6 +35,43 @@
         <field name="uom_id" ref="uom.product_uom_kgm"/>
     </record>
 
+    <!-- Énergie solidaire (ADR 0013 : isolation comptable standard / solidaire).
+         Produits distincts pour porter des comptes + TVA isolés du standard.
+         Livrés sans taxe (pass-through) ; le·la comptable y rattache en prod
+         la fiscalité réelle de l'univers solidaire. -->
+    <record id="souscriptions_product_energie_base_solidaire" model="product.product">
+        <field name="name">Énergie Base solidaire</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="taxes_id" eval="[(6, 0, [])]"/>
+    </record>
+
+    <record id="souscriptions_product_energie_hp_solidaire" model="product.product">
+        <field name="name">Énergie HP solidaire</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="taxes_id" eval="[(6, 0, [])]"/>
+    </record>
+
+    <record id="souscriptions_product_energie_hc_solidaire" model="product.product">
+        <field name="name">Énergie HC solidaire</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="taxes_id" eval="[(6, 0, [])]"/>
+    </record>
+
     <!-- Produits TURPE -->
     <record id="souscriptions_product_turpe_fixe" model="product.product">
         <field name="name">TURPE Fixe</field>

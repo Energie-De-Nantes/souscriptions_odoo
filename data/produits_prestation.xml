@@ -29,4 +29,28 @@
         <field name="standard_price">0.0</field>
         <field name="taxes_id" eval="[(6, 0, [])]"/>
     </record>
+
+    <!-- Jumeaux solidaires (ADR 0013 : isolation comptable standard / solidaire).
+         Produits distincts pour porter des comptes + TVA isolés du standard.
+         Livrés sans taxe (pass-through) ; le·la comptable y rattache en prod la
+         fiscalité réelle de l'univers solidaire. -->
+    <record id="souscriptions_product_prestation_enedis_solidaire" model="product.product">
+        <field name="name">Prestation Enedis solidaire</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+        <field name="taxes_id" eval="[(6, 0, [])]"/>
+    </record>
+
+    <record id="souscriptions_product_indemnite_enedis_solidaire" model="product.product">
+        <field name="name">Indemnité Enedis solidaire</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+        <field name="taxes_id" eval="[(6, 0, [])]"/>
+    </record>
 </odoo>

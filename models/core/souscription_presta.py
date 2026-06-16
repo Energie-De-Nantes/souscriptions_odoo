@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -24,6 +24,37 @@ class SouscriptionPresta(models.Model):
     libelle = fields.Char(string='Libellé', required=True)
     prix = fields.Float(string='Prix (€)', help='Prix de refacturation ; peut être négatif (avoir/pénalité).')
     quantite = fields.Float(string='Quantité', default=1.0)
+
+    # Mise en attente manuelle par le·la facturiste sur un doute (ADR 0012) :
+    # opt-out de la facturation automatique. Tant que coché et non facturée, la
+    # prestation est exclue de creer_factures() (cf. _facturer_prestations_a_refacturer).
+    en_attente = fields.Boolean(string='En attente', default=False)
+
+    # État dérivé pour le groupage/les stats de l'écran de vérification (ADR 0012).
+    # L'ordre des valeurs pilote l'ordre des groupes. `facture_id` prime : il reste
+    # l'unique source de vérité du « facturé » (ADR 0009 §4) ; `etat` ne fait que la
+    # projeter. Stocké pour pouvoir grouper/filtrer/agréger côté SQL.
+    etat = fields.Selection(
+        [
+            ('a_refacturer', 'À refacturer'),
+            ('en_attente', 'En attente'),
+            ('facturee', 'Facturée'),
+            ('emise', 'Émise'),
+        ],
+        string='État',
+        compute='_compute_etat',
+        store=True,
+    )
+
+    @api.depends('facture_id', 'facture_id.state', 'en_attente')
+    def _compute_etat(self):
+        for presta in self:
+            if presta.facture_id:
+                presta.etat = 'emise' if presta.facture_id.state == 'posted' else 'facturee'
+            elif presta.en_attente:
+                presta.etat = 'en_attente'
+            else:
+                presta.etat = 'a_refacturer'
 
     # Marqueur « facturé » et unique lien Période-libre ↔ Facture : posé quand la
     # prestation est rassemblée sur une facture (ADR 0004, lien côté « plusieurs »).

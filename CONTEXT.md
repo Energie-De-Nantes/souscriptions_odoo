@@ -94,7 +94,16 @@ ce n'est pas un fait mensuel mais un **en-cours refacturable** rattaché à un·
 qu'une *Facture* **rassemble** au moment de la facturation (plusieurs *Prestations* par *Facture*).
 Distincte du *Geste commercial* (ajustement *à la baisse* de ce qui est facturé, sans contrepartie
 réseau) : la *Prestation* est un poste **refacturé** avec une contrepartie Enedis identifiée.
-_Éviter_ : « presta » seule (ambiguë à l'écrit) ; service ; confondre avec un *Geste commercial*.
+**États** (du point de vue du·de la *facturiste*) : **à refacturer** (défaut — dans la file,
+balayée par la facturation automatique), **en attente** (retirée de la file *à la main* par le·la
+*facturiste* sur un doute, donc **exclue** de la facturation automatique jusqu'à levée du doute),
+**facturée** puis **émise** (cf. *Facture* — dès qu'une *Facture* la rassemble, resp. une fois cette
+*Facture* finalisée). L'état par défaut étant *à refacturer*, c'est la **responsabilité du·de la
+_facturiste_** de vérifier les *Prestations* (montants élevés en priorité) et de mettre en attente les
+douteuses **avant** de créer les factures : il n'y a pas de garde-fou bloquant.
+_Éviter_ : « presta » seule (ambiguë à l'écrit) ; service ; confondre avec un *Geste commercial* ;
+**« en attente » pour désigner la file par défaut** (c'est *à refacturer* ; « en attente » est
+réservé au doute posé à la main par le·la *facturiste*).
 
 **Facturiste** :
 Rôle métier qui conduit la facturation mensuelle depuis Odoo et **vérifie les données avant

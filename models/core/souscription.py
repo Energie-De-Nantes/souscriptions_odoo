@@ -166,14 +166,16 @@ class Souscription(models.Model):
             # ce run, puis les flague (ADR 0009). Le flag les retire de la file,
             # donc les périodes suivantes ne les re-facturent pas.
             if premiere_facture:
-                souscription._facturer_prestations_en_attente(premiere_facture)
+                souscription._facturer_prestations_a_refacturer(premiere_facture)
 
-    def _facturer_prestations_en_attente(self, facture):
-        """Ajoute les prestations en attente (`facture_id` NULL) comme lignes de
-        `facture` et pose leur `facture_id`. Responsabilité de la Souscription,
-        pas de la Période (ADR 0009)."""
+    def _facturer_prestations_a_refacturer(self, facture):
+        """Ajoute les prestations *à refacturer* comme lignes de `facture` et
+        pose leur `facture_id`. Responsabilité de la Souscription, pas de la
+        Période (ADR 0009). Sont *à refacturer* les prestations sans facture et
+        non mises en attente : la mise en attente est un opt-out de la
+        facturation automatique (ADR 0012)."""
         self.ensure_one()
-        prestas = self.presta_ids.filtered(lambda p: not p.facture_id)
+        prestas = self.presta_ids.filtered(lambda p: not p.facture_id and not p.en_attente)
         if not prestas:
             return
         facture.write({'invoice_line_ids': [p._composer_ligne() for p in prestas]})

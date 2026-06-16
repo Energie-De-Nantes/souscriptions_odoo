@@ -37,6 +37,7 @@ class Souscription(models.Model):
         'account.move', compute='_compute_factures_via_periodes', string='Factures', store=False
     )
     periode_ids = fields.One2many('souscription.periode', 'souscription_id', string='Périodes de facturation')
+    presta_ids = fields.One2many('souscription.presta', 'souscription_id', string='Prestations à refacturer')
     # Données métier
 
     ## Utiles facturation
@@ -151,13 +152,32 @@ class Souscription(models.Model):
                 _logger.warning(f'Souscription {souscription.name} sans partenaire, ignorée')
                 continue
 
+            premiere_facture = self.env['account.move']
             for periode in souscription.periode_ids.filtered(lambda p: not p.facture_id):
                 try:
                     facture = periode._creer_facture()
+                    premiere_facture = premiere_facture or facture
                     _logger.info(f'Facture {facture.name} créée pour période {periode.mois_annee}')
                 except Exception as e:
                     _logger.error(f'Erreur création facture pour période {periode.mois_annee}: {e}')
                     raise UserError(f'Erreur création facture pour {periode.mois_annee}: {e}')
+
+            # Rassemble les prestations en attente sur la première facture émise
+            # ce run, puis les flague (ADR 0009). Le flag les retire de la file,
+            # donc les périodes suivantes ne les re-facturent pas.
+            if premiere_facture:
+                souscription._facturer_prestations_en_attente(premiere_facture)
+
+    def _facturer_prestations_en_attente(self, facture):
+        """Ajoute les prestations en attente (`facture_id` NULL) comme lignes de
+        `facture` et pose leur `facture_id`. Responsabilité de la Souscription,
+        pas de la Période (ADR 0009)."""
+        self.ensure_one()
+        prestas = self.presta_ids.filtered(lambda p: not p.facture_id)
+        if not prestas:
+            return
+        facture.write({'invoice_line_ids': [p._composer_ligne() for p in prestas]})
+        prestas.facture_id = facture
 
     @api.model
     def ajouter_periodes_mensuelles(self):

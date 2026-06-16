@@ -5,6 +5,8 @@ access_souscription_periode_user,souscription.periode user,model_souscription_pe
 access_souscription_periode_manager,souscription.periode manager,model_souscription_periode,group_souscriptions_manager,1,1,1,1
 access_souscription_etat_user,souscription.etat user,model_souscription_etat,group_souscriptions_user,1,0,0,0
 access_souscription_etat_manager,souscription.etat manager,model_souscription_etat,group_souscriptions_manager,1,1,1,1
+access_souscription_presta_user,souscription.presta user,model_souscription_presta,group_souscriptions_user,1,1,1,0
+access_souscription_presta_manager,souscription.presta manager,model_souscription_presta,group_souscriptions_manager,1,1,1,1
 access_grille_prix_user,grille.prix user,model_grille_prix,group_souscriptions_user,1,0,0,0
 access_grille_prix_manager,grille.prix manager,model_grille_prix,group_souscriptions_manager,1,1,1,1
 access_grille_prix_ligne_user,grille.prix.ligne user,model_grille_prix_ligne,group_souscriptions_user,1,0,0,0

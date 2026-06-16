@@ -22,7 +22,9 @@ def migrate(cr, version):
     # 2. Métadonnées ORM : modèle, champs, relations, et records de ce modèle.
     cr.execute("UPDATE ir_model SET model = 'souscription.refacturation' WHERE model = 'souscription.presta'")
     cr.execute("UPDATE ir_model_fields SET model = 'souscription.refacturation' WHERE model = 'souscription.presta'")
-    cr.execute("UPDATE ir_model_fields SET relation = 'souscription.refacturation' WHERE relation = 'souscription.presta'")
+    cr.execute(
+        "UPDATE ir_model_fields SET relation = 'souscription.refacturation' WHERE relation = 'souscription.presta'"
+    )
     cr.execute("UPDATE ir_model_data SET model = 'souscription.refacturation' WHERE model = 'souscription.presta'")
 
     # 3. xmlids du module renommés en même temps que les fichiers de données,

@@ -128,7 +128,9 @@ class TestRefacturation(SouscriptionsTestCase):
         self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
 
         self.souscription_base.creer_factures()
-        facture = self.souscription_base.refacturation_ids.filtered(lambda p: p.reference_enedis == 'F15-TVA').facture_id
+        facture = self.souscription_base.refacturation_ids.filtered(
+            lambda p: p.reference_enedis == 'F15-TVA'
+        ).facture_id
         facture.action_post()
 
         self.assertEqual(facture.state, 'posted', 'la facture avec lignes prestation + indemnité se pose')

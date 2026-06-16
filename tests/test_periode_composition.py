@@ -180,7 +180,9 @@ class TestPeriodeComposition(SouscriptionsTestCase):
         def ref(xmlid):
             return self.env.ref(f'souscriptions_odoo.{xmlid}').id
 
-        produit_ids = {d['product_id'] for d in self._dicts(periode._composer_lignes(self.grille_prix)) if d.get('product_id')}
+        produit_ids = {
+            d['product_id'] for d in self._dicts(periode._composer_lignes(self.grille_prix)) if d.get('product_id')
+        }
         self.assertIn(ref('souscriptions_product_abonnement_solidaire'), produit_ids)
         self.assertIn(ref('souscriptions_product_energie_base_solidaire'), produit_ids)
         self.assertNotIn(ref('souscriptions_product_abonnement_standard'), produit_ids)

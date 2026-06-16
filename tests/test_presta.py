@@ -29,17 +29,60 @@ class TestPresta(SouscriptionsTestCase):
         base.update(vals)
         return self.env['souscription.presta'].create(base)
 
-    def test_presta_en_attente_ramassee_et_flaggee(self):
-        """Tracer bullet : une presta en attente atterrit sur la facture
-        mensuelle et reçoit son facture_id quand creer_factures() tourne."""
+    def test_presta_a_refacturer_ramassee_et_flaggee(self):
+        """Tracer bullet : une presta à refacturer (non mise en attente) atterrit
+        sur la facture mensuelle et reçoit son facture_id quand creer_factures()
+        tourne."""
         presta = self._presta(self.souscription_base)
         self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
-        self.assertFalse(presta.facture_id, 'en attente avant facturation')
+        self.assertFalse(presta.facture_id, 'à refacturer avant facturation')
 
         self.souscription_base.creer_factures()
 
         self.assertTrue(presta.facture_id, 'flaggée après facturation')
         self.assertIn('Déplacement technicien', presta.facture_id.invoice_line_ids.mapped('name'))
+
+    def test_presta_en_attente_exclue_de_la_facturation_auto(self):
+        """Opt-out (ADR 0012) : une prestation mise en attente par le·la
+        facturiste n'est PAS ramassée par creer_factures() — elle reste dans
+        la file, facture_id NULL."""
+        presta = self._presta(self.souscription_base, reference_enedis='F15-HOLD', en_attente=True)
+        self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+
+        self.souscription_base.creer_factures()
+
+        self.assertFalse(presta.facture_id, 'la presta en attente reste hors facture')
+
+    def test_etat_a_refacturer_par_defaut(self):
+        """Sans facture ni mise en attente, l'état dérivé est « à refacturer »."""
+        presta = self._presta(self.souscription_base, reference_enedis='F15-ETAT-AR')
+        self.assertEqual(presta.etat, 'a_refacturer')
+
+    def test_etat_en_attente_quand_mise_en_attente(self):
+        """Mise en attente par le·la facturiste, pas encore facturée → « en attente »."""
+        presta = self._presta(self.souscription_base, reference_enedis='F15-ETAT-EA', en_attente=True)
+        self.assertEqual(presta.etat, 'en_attente')
+
+    def test_etat_facturee_sur_facture_brouillon(self):
+        """Ramassée sur une facture encore en brouillon → « facturée »."""
+        presta = self._presta(self.souscription_base, reference_enedis='F15-ETAT-FACT')
+        self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        self.souscription_base.creer_factures()
+        self.assertEqual(presta.facture_id.state, 'draft')
+        self.assertEqual(presta.etat, 'facturee')
+
+    def test_etat_emise_apres_emission_facture(self):
+        """Émission de la facture (brouillon → posted) : l'état dérivé passe
+        « facturée » → « émise » automatiquement (recalcul, pas de cron)."""
+        presta = self._presta(self.souscription_base, reference_enedis='F15-ETAT-EMISE')
+        self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        self.souscription_base.creer_factures()
+        self.assertEqual(presta.etat, 'facturee')
+
+        presta.facture_id.action_post()
+
+        self.assertEqual(presta.facture_id.state, 'posted')
+        self.assertEqual(presta.etat, 'emise')
 
     def test_composer_ligne_porte_libelle_prix_quantite(self):
         """La ligne composée porte libellé/prix/quantité de la presta et le
@@ -90,10 +133,12 @@ class TestPresta(SouscriptionsTestCase):
         self.souscription_base.creer_factures()
         facture = presta.facture_id
         self.assertTrue(facture)
+        self.assertEqual(presta.etat, 'facturee')
 
         facture.unlink()  # brouillon → suppression autorisée
 
         self.assertFalse(presta.facture_id, 'remise dans la file après suppression de la facture')
+        self.assertEqual(presta.etat, 'a_refacturer', 'état dérivé recalculé : de retour dans la file')
 
     @mute_logger('odoo.sql_db')
     def test_reference_enedis_unique(self):
@@ -108,15 +153,15 @@ class TestPresta(SouscriptionsTestCase):
 @tagged('souscriptions', 'souscriptions_presta', 'post_install', '-at_install')
 class TestDemoPrestas(TransactionCase):
     """Les prestations de démonstration illustrent la file « à refacturer » :
-    en attente (positive et négative) et déjà facturée."""
+    à refacturer (positive et négative) et déjà facturée."""
 
     def test_demo_prestas_etats_file_et_facturee(self):
-        en_attente = self.env.ref('souscriptions_odoo.demo_presta_mise_en_service', raise_if_not_found=False)
-        if not en_attente:
+        a_refacturer = self.env.ref('souscriptions_odoo.demo_presta_mise_en_service', raise_if_not_found=False)
+        if not a_refacturer:
             self.skipTest('Données de démo non chargées')
 
-        # En attente : pas de facture (dans la file)
-        self.assertFalse(en_attente.facture_id)
+        # À refacturer : pas de facture (dans la file)
+        self.assertFalse(a_refacturer.facture_id)
 
         # Montant négatif : pénalité de coupure
         negative = self.env.ref('souscriptions_odoo.demo_presta_penalite_coupure')

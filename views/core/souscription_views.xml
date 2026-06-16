@@ -69,7 +69,11 @@
                                     <field name="libelle"/>
                                     <field name="quantite"/>
                                     <field name="prix"/>
+                                    <field name="en_attente" widget="boolean_toggle" readonly="facture_id != False"/>
                                     <field name="facture_id" readonly="1"/>
+                                    <field name="etat" widget="badge"
+                                           decoration-warning="etat == 'en_attente'"
+                                           decoration-success="etat == 'emise'"/>
                                 </list>
                             </field>
                         </page>

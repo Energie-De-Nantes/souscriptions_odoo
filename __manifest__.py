@@ -44,6 +44,7 @@ de facturation via son API.
         'views/core/souscription_views.xml',
         'views/core/grille_prix_views.xml',
         'views/core/souscriptions_periode_views.xml',
+        'views/core/souscription_presta_views.xml',
         'views/core/souscription_portal_menu.xml',
         'views/portal_templates.xml',
         'views/raccordement/raccordement_demande_views.xml',

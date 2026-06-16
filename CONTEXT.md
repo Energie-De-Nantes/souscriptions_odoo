@@ -84,6 +84,17 @@ Ajustement par le·la *facturiste* de ce qui est **facturé** à un·e souscript
 commerciale (ex. : RES oubliée non encore traitée par Enedis → jours facturés réduits), assumé
 comme distinct de la réalité *physique* mesurée par electricore.
 
+**Prestation (à refacturer)** :
+Poste de facturation ponctuel d'origine **Enedis** (mise en service, déplacement, changement de
+puissance, pénalité de coupure…) que le fournisseur **refacture** au·à la *souscripteur·rice*.
+Porte un *Code Enedis*, un libellé, un prix et une quantité. Son montant peut être **négatif** (au
+bénéfice de l'usager·ère, ex. pénalité de coupure due par Enedis). **Indépendante de la _Période_** :
+ce n'est pas un fait mensuel mais un **en-cours refacturable** rattaché à un·e *souscripteur·rice*,
+qu'une *Facture* **rassemble** au moment de la facturation (plusieurs *Prestations* par *Facture*).
+Distincte du *Geste commercial* (ajustement *à la baisse* de ce qui est facturé, sans contrepartie
+réseau) : la *Prestation* est un poste **refacturé** avec une contrepartie Enedis identifiée.
+_Éviter_ : « presta » seule (ambiguë à l'écrit) ; service ; confondre avec un *Geste commercial*.
+
 **Facturiste** :
 Rôle métier qui conduit la facturation mensuelle depuis Odoo et **vérifie les données avant
 émission** des factures. Public cible de l'interface de vérification.

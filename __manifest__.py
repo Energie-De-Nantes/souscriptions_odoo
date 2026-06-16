@@ -36,6 +36,7 @@ de facturation via son API.
         'data/souscription_etat_data.xml',
         'data/produits_abonnement_simple.xml',
         'data/produits_energie.xml',
+        'data/produits_prestation.xml',
         'data/raccordement_sequence.xml',
         'data/raccordement_stages.xml',
         'reports/souscription_contrat_report.xml',

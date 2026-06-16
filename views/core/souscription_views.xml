@@ -61,8 +61,18 @@
                                 </list>
                             </field>
                         </page>
-                        <!-- Onglets métier supprimés pour version minimale -->
-                        <!-- Historique et Prestations disponibles via module souscriptions_bridge -->
+                        <page string="Prestations à refacturer">
+                            <field name="presta_ids">
+                                <list editable="bottom">
+                                    <field name="reference_enedis"/>
+                                    <field name="code_enedis"/>
+                                    <field name="libelle"/>
+                                    <field name="quantite"/>
+                                    <field name="prix"/>
+                                    <field name="facture_id" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
                     </notebook>
                 </sheet>
                 <chatter open_attachments="True"/>

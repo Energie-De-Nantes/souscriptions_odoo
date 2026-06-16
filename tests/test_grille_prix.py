@@ -31,10 +31,10 @@ class TestGrillePrix(TransactionCase):
         )
 
     def test_grille_creation(self):
-        """9 abonnements standard + 9 solidaires + 3 énergies = 21 lignes."""
+        """9 abo standard + 9 abo solidaires + 3 énergies std + 3 énergies solidaires = 24 lignes."""
         self.assertEqual(self.grille.name, 'Grille Test 2024')
         self.assertTrue(self.grille.active)
-        self.assertEqual(len(self.grille.ligne_ids), 21)
+        self.assertEqual(len(self.grille.ligne_ids), 24)
 
     def test_get_grille_active_par_date(self):
         """La grille est sélectionnée selon la date, pas le drapeau is_current."""

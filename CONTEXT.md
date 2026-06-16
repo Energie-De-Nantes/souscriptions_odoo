@@ -53,6 +53,16 @@ par cadran facturé. Sélectionnée par les dates d'une *Période*, ce qui perme
 *régularisation* aux prix historiques.
 _Éviter_ : tarif (collision avec la FTA / tarif d'acheminement réseau), barème.
 
+**Produit de facturation** :
+Le `product.product` Odoo porté sur une ligne de *Facture*, choisi par son **rôle de facturation**
+(*abonnement* ; *énergie* par cadran facturé ; *Refacturation* par nature) **et** par le *tarif
+solidaire*. Il porte le **compte de produits et la TVA** : la ligne hérite de la fiscalité de son
+produit (positions fiscales comprises), jamais d'un taux saisi sur la ligne (ADR 0009 §5). Le
+**catalogue** — un mappage *rôle → produit*, sans donnée propre — est l'unique endroit qui résout ce
+choix. Le solidaire impose **deux exemplaires parallèles** de chaque produit (standard / solidaire),
+comptablement **isolés** (cf. *Tarif solidaire*, ADR 0013).
+_Éviter_ : *article* ; confondre avec la *Grille de prix* (qui porte le **prix**, pas le compte/la TVA).
+
 **Facture** :
 Le document comptable légal (`account.move`, *facture d'énergie*) émis à partir d'une *Période*
 qu'il référence (`periode_id`). Une *Période* est dite **facturée** dès qu'une *Facture* la
@@ -80,30 +90,41 @@ La configuration *commerciale* portée par la *Souscription* : formule tarifaire
 selon la formule fournisseur.
 _Éviter_ : FTA (c'est l'acheminement réseau, côté Enedis), option tarifaire.
 
+**Tarif solidaire** :
+Régime tarifaire social porté par la *Souscription* (`tarif_solidaire`). Au-delà du prix, il impose
+une **isolation comptable complète** vis-à-vis du standard (exigence **légale**) : tout flux solidaire
+atterrit sur des comptes **séparés**, jamais mêlés au standard. Conséquence : chaque *Produit de
+facturation* existe en deux exemplaires parallèles — standard et solidaire — et le catalogue
+sélectionne le bon selon ce drapeau (ADR 0013).
+_Éviter_ : réduire le solidaire à une **remise** (ce n'est pas qu'un prix : c'est une comptabilité isolée).
+
 **Geste commercial** :
 Ajustement par le·la *facturiste* de ce qui est **facturé** à un·e souscripteur·rice pour raison
 commerciale (ex. : RES oubliée non encore traitée par Enedis → jours facturés réduits), assumé
 comme distinct de la réalité *physique* mesurée par electricore.
 
-**Prestation (à refacturer)** :
-Poste de facturation ponctuel d'origine **Enedis** (mise en service, déplacement, changement de
-puissance, pénalité de coupure…) que le fournisseur **refacture** au·à la *souscripteur·rice*.
-Porte un *Code Enedis*, un libellé, un prix et une quantité. Son montant peut être **négatif** (au
-bénéfice de l'usager·ère, ex. pénalité de coupure due par Enedis). **Indépendante de la _Période_** :
-ce n'est pas un fait mensuel mais un **en-cours refacturable** rattaché à un·e *souscripteur·rice*,
-qu'une *Facture* **rassemble** au moment de la facturation (plusieurs *Prestations* par *Facture*).
-Distincte du *Geste commercial* (ajustement *à la baisse* de ce qui est facturé, sans contrepartie
-réseau) : la *Prestation* est un poste **refacturé** avec une contrepartie Enedis identifiée.
-**États** (du point de vue du·de la *facturiste*) : **à refacturer** (défaut — dans la file,
-balayée par la facturation automatique), **en attente** (retirée de la file *à la main* par le·la
-*facturiste* sur un doute, donc **exclue** de la facturation automatique jusqu'à levée du doute),
-**facturée** puis **émise** (cf. *Facture* — dès qu'une *Facture* la rassemble, resp. une fois cette
-*Facture* finalisée). L'état par défaut étant *à refacturer*, c'est la **responsabilité du·de la
-_facturiste_** de vérifier les *Prestations* (montants élevés en priorité) et de mettre en attente les
-douteuses **avant** de créer les factures : il n'y a pas de garde-fou bloquant.
-_Éviter_ : « presta » seule (ambiguë à l'écrit) ; service ; confondre avec un *Geste commercial* ;
-**« en attente » pour désigner la file par défaut** (c'est *à refacturer* ; « en attente » est
-réservé au doute posé à la main par le·la *facturiste*).
+**Refacturation (Enedis)** :
+En-cours refacturable d'origine **Enedis** que le fournisseur **refacture** au·à la
+*souscripteur·rice* (`souscription.refacturation`). Porte un *Code Enedis*, un libellé, un prix et une
+quantité. **Indépendante de la _Période_** : ce n'est pas un fait mensuel mais un en-cours rattaché à
+un·e *souscripteur·rice*, qu'une *Facture* **rassemble** au moment de la facturation (plusieurs
+*Refacturations* par *Facture*).
+Deux **natures** :
+- **prestation** — service **taxé** (mise en service, déplacement, changement de puissance…) ;
+- **indemnité** — pénalité due par Enedis (p. ex. coupure), **hors champ TVA**, au **bénéfice** de
+  l'usager·ère (montant pouvant être négatif).
+La *nature* (et le *tarif solidaire*) choisit le *Produit de facturation*, qui porte le compte et la
+TVA (la TVA suit le produit, ADR 0009 §5). Distincte du *Geste commercial* (ajustement *à la baisse*
+sans contrepartie réseau) : une *Refacturation* a une contrepartie Enedis identifiée.
+**États** (du point de vue du·de la *facturiste*) : **à refacturer** (défaut — dans la file, balayée
+par la facturation automatique), **en attente** (retirée de la file *à la main* sur un doute, donc
+**exclue** de la facturation automatique jusqu'à levée), **facturée** puis **émise** (cf. *Facture* —
+dès qu'une *Facture* la rassemble, resp. une fois finalisée). C'est la **responsabilité du·de la
+_facturiste_** de vérifier les *Refacturations* (montants élevés en priorité) **avant** de créer les
+factures : il n'y a pas de garde-fou bloquant.
+_Éviter_ : **« prestation » pour désigner l'ensemble** (c'est une *nature*, pas l'umbrella — dire
+*Refacturation*) ; « presta » seule ; *service* ; confondre avec un *Geste commercial* ; **« en attente »
+pour la file par défaut** (c'est *à refacturer*).
 
 **Facturiste** :
 Rôle métier qui conduit la facturation mensuelle depuis Odoo et **vérifie les données avant

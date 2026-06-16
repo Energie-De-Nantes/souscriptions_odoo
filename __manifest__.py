@@ -1,6 +1,6 @@
 {
     'name': 'Souscriptions Électricité',
-    'version': '19.0.1.2.0',
+    'version': '19.0.1.3.0',
     'depends': ['base', 'mail', 'contacts', 'account', 'portal'],
     'author': 'Virgile Daugé',
     'category': 'Energy',
@@ -44,7 +44,7 @@ de facturation via son API.
         'views/core/souscription_views.xml',
         'views/core/grille_prix_views.xml',
         'views/core/souscriptions_periode_views.xml',
-        'views/core/souscription_presta_views.xml',
+        'views/core/souscription_refacturation_views.xml',
         'views/core/souscription_portal_menu.xml',
         'views/portal_templates.xml',
         'views/raccordement/raccordement_demande_views.xml',

@@ -1,5 +1,6 @@
 from . import (
     test_basic,
+    test_catalogue,
     test_facturation,
     test_grille_prix,
     test_integration,
@@ -9,8 +10,8 @@ from . import (
     test_periode_form,
     test_periode_snapshot,
     test_portal,
-    test_presta,
     test_raccordement,
+    test_refacturation,
     test_security,
     test_souscription,
 )

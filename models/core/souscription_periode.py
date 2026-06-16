@@ -279,34 +279,6 @@ class SouscriptionPeriode(models.Model):
     # fait autorité (ADR 0006). Les prix restent l'affaire de la grille (ADR 0002,
     # « référencer, pas recopier »).
 
-    def _get_produit_abonnement(self, tarif_solidaire):
-        """Produit d'abonnement (standard ou solidaire)."""
-        product_ref = (
-            'souscriptions_product_abonnement_solidaire'
-            if tarif_solidaire
-            else 'souscriptions_product_abonnement_standard'
-        )
-        try:
-            return self.env.ref(f'souscriptions_odoo.{product_ref}')
-        except Exception:
-            type_abo = 'solidaire' if tarif_solidaire else 'standard'
-            raise UserError(f"Produit d'abonnement {type_abo} non trouvé")
-
-    def _get_produit_energie(self, type_energie):
-        """Produit d'énergie correspondant au cadran facturé (base, hp, hc)."""
-        xmlid_map = {
-            'base': 'souscriptions_odoo.souscriptions_product_energie_base',
-            'hp': 'souscriptions_odoo.souscriptions_product_energie_hp',
-            'hc': 'souscriptions_odoo.souscriptions_product_energie_hc',
-        }
-        xmlid = xmlid_map.get(type_energie.lower())
-        if not xmlid:
-            raise UserError(f"Type d'énergie non reconnu : {type_energie}")
-        produit = self.env.ref(xmlid, raise_if_not_found=False)
-        if not produit:
-            raise UserError(f"Produit d'énergie {type_energie} non trouvé")
-        return produit
-
     def _quantite_facturee(self, cadran):
         """Quantité d'énergie à facturer pour un cadran facturé ('base'/'hp'/'hc').
 
@@ -353,7 +325,7 @@ class SouscriptionPeriode(models.Model):
         lines_vals.append((0, 0, {'display_type': 'line_section', 'name': 'Abonnement'}))
 
         coeff_pro_historise = self.coeff_pro_periode
-        produit_abo = self._get_produit_abonnement(tarif_solidaire)
+        produit_abo = self.env['souscription.produit'].produit_abonnement(tarif_solidaire)
         prix_abo_journalier = grille.get_prix_abonnement(
             puissance_kva, coeff_pro=coeff_pro_historise, is_solidaire=tarif_solidaire
         )
@@ -385,7 +357,7 @@ class SouscriptionPeriode(models.Model):
         is_base_tarif = type_tarif == 'base'
 
         if is_base_tarif:
-            produit_base = self._get_produit_energie('base')
+            produit_base = self.env['souscription.produit'].produit_energie('base', tarif_solidaire)
             prix_base = prix_dict.get(produit_base.id)
             if prix_base is None:
                 raise UserError(f'Prix non trouvé dans la grille pour le produit : {produit_base.name}')
@@ -402,7 +374,7 @@ class SouscriptionPeriode(models.Model):
                 )
             )
         else:  # HP/HC : toujours les deux lignes (même à 0)
-            produit_hp = self._get_produit_energie('hp')
+            produit_hp = self.env['souscription.produit'].produit_energie('hp', tarif_solidaire)
             prix_hp = prix_dict.get(produit_hp.id)
             if prix_hp is None:
                 raise UserError(f'Prix non trouvé dans la grille pour le produit : {produit_hp.name}')
@@ -419,7 +391,7 @@ class SouscriptionPeriode(models.Model):
                 )
             )
 
-            produit_hc = self._get_produit_energie('hc')
+            produit_hc = self.env['souscription.produit'].produit_energie('hc', tarif_solidaire)
             prix_hc = prix_dict.get(produit_hc.id)
             if prix_hc is None:
                 raise UserError(f'Prix non trouvé dans la grille pour le produit : {produit_hc.name}')

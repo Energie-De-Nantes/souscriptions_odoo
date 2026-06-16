@@ -10,7 +10,7 @@
              la facture mars laissée en brouillon, avec sa ligne sur la facture). -->
 
         <!-- En attente, positive : mise en service non encore facturée -->
-        <record id="demo_presta_mise_en_service" model="souscription.presta">
+        <record id="demo_presta_mise_en_service" model="souscription.refacturation">
             <field name="souscription_id" ref="demo_souscription_admin"/>
             <field name="pdl">PDL22516914099999</field>
             <field name="reference_enedis">F15-DEMO-0001</field>
@@ -21,7 +21,7 @@
         </record>
 
         <!-- En attente, négative : pénalité de coupure due par Enedis (avoir) -->
-        <record id="demo_presta_penalite_coupure" model="souscription.presta">
+        <record id="demo_presta_penalite_coupure" model="souscription.refacturation">
             <field name="souscription_id" ref="demo_souscription_admin"/>
             <field name="pdl">PDL22516914099999</field>
             <field name="reference_enedis">F15-DEMO-0002</field>
@@ -34,7 +34,7 @@
         </record>
 
         <!-- Déjà facturée : rattachée à la facture mars (brouillon, éditable) -->
-        <record id="demo_presta_deplacement" model="souscription.presta">
+        <record id="demo_presta_deplacement" model="souscription.refacturation">
             <field name="souscription_id" ref="demo_souscription_admin"/>
             <field name="pdl">PDL22516914099999</field>
             <field name="reference_enedis">F15-DEMO-0003</field>

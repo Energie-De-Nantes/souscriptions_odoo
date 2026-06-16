@@ -4,11 +4,11 @@
          état, triée par prix décroissant, le prix sommé par groupe servant de
          stats. Le·la facturiste met en attente (toggle) les prestations
          douteuses avant de créer les factures. -->
-    <record id="view_souscription_presta_list" model="ir.ui.view">
-        <field name="name">souscription.presta.list</field>
-        <field name="model">souscription.presta</field>
+    <record id="view_souscription_refacturation_list" model="ir.ui.view">
+        <field name="name">souscription.refacturation.list</field>
+        <field name="model">souscription.refacturation</field>
         <field name="arch" type="xml">
-            <list string="Prestations" default_order="prix desc">
+            <list string="Refacturations" default_order="prix desc">
                 <field name="souscription_id"/>
                 <field name="pdl"/>
                 <field name="reference_enedis"/>
@@ -28,9 +28,9 @@
         </field>
     </record>
 
-    <record id="view_souscription_presta_form" model="ir.ui.view">
-        <field name="name">souscription.presta.form</field>
-        <field name="model">souscription.presta</field>
+    <record id="view_souscription_refacturation_form" model="ir.ui.view">
+        <field name="name">souscription.refacturation.form</field>
+        <field name="model">souscription.refacturation</field>
         <field name="arch" type="xml">
             <form>
                 <sheet>
@@ -56,9 +56,9 @@
         </field>
     </record>
 
-    <record id="view_souscription_presta_search" model="ir.ui.view">
-        <field name="name">souscription.presta.search</field>
-        <field name="model">souscription.presta</field>
+    <record id="view_souscription_refacturation_search" model="ir.ui.view">
+        <field name="name">souscription.refacturation.search</field>
+        <field name="model">souscription.refacturation</field>
         <field name="arch" type="xml">
             <search>
                 <field name="reference_enedis"/>
@@ -81,18 +81,18 @@
         </field>
     </record>
 
-    <record id="action_souscription_presta" model="ir.actions.act_window">
-        <field name="name">Prestations</field>
-        <field name="res_model">souscription.presta</field>
+    <record id="action_souscription_refacturation" model="ir.actions.act_window">
+        <field name="name">Refacturations</field>
+        <field name="res_model">souscription.refacturation</field>
         <field name="view_mode">list,form</field>
-        <field name="search_view_id" ref="view_souscription_presta_search"/>
+        <field name="search_view_id" ref="view_souscription_refacturation_search"/>
         <field name="context">{'search_default_group_etat': 1}</field>
     </record>
 
     <menuitem
-        id="menu_souscription_presta"
-        name="Prestations"
+        id="menu_souscription_refacturation"
+        name="Refacturations"
         parent="menu_souscription_root"
-        action="action_souscription_presta"
+        action="action_souscription_refacturation"
         sequence="30"/>
 </odoo>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+        <!-- ================================ -->
+        <!-- PRESTATIONS À REFACTURER (#8)    -->
+        <!-- ================================ -->
+        <!-- Illustre les trois cas de la file « à refacturer » (ADR 0009) sur la
+             souscription admin : en attente positive, en attente négative
+             (pénalité de coupure due par Enedis), et déjà facturée (rattachée à
+             la facture mars laissée en brouillon, avec sa ligne sur la facture). -->
+
+        <!-- En attente, positive : mise en service non encore facturée -->
+        <record id="demo_presta_mise_en_service" model="souscription.presta">
+            <field name="souscription_id" ref="demo_souscription_admin"/>
+            <field name="pdl">PDL22516914099999</field>
+            <field name="reference_enedis">F15-DEMO-0001</field>
+            <field name="code_enedis">MES</field>
+            <field name="libelle">Mise en service</field>
+            <field name="prix">45.85</field>
+            <field name="quantite">1</field>
+        </record>
+
+        <!-- En attente, négative : pénalité de coupure due par Enedis (avoir) -->
+        <record id="demo_presta_penalite_coupure" model="souscription.presta">
+            <field name="souscription_id" ref="demo_souscription_admin"/>
+            <field name="pdl">PDL22516914099999</field>
+            <field name="reference_enedis">F15-DEMO-0002</field>
+            <field name="code_enedis">PENA</field>
+            <field name="libelle">Pénalité de coupure (due par Enedis)</field>
+            <field name="prix">-30.00</field>
+            <field name="quantite">1</field>
+        </record>
+
+        <!-- Déjà facturée : rattachée à la facture mars (brouillon, éditable) -->
+        <record id="demo_presta_deplacement" model="souscription.presta">
+            <field name="souscription_id" ref="demo_souscription_admin"/>
+            <field name="pdl">PDL22516914099999</field>
+            <field name="reference_enedis">F15-DEMO-0003</field>
+            <field name="code_enedis">DEPL</field>
+            <field name="libelle">Déplacement</field>
+            <field name="prix">19.66</field>
+            <field name="quantite">1</field>
+            <field name="facture_id" ref="demo_facture_mars_admin"/>
+        </record>
+
+        <!-- Ligne correspondante sur la facture mars (brouillon) : c'est ce que
+             le sweep de creer_factures() poserait — ici figé en démo. -->
+        <record id="demo_facture_mars_admin_line_presta" model="account.move.line">
+            <field name="move_id" ref="demo_facture_mars_admin"/>
+            <field name="product_id" ref="souscriptions_product_prestation_enedis"/>
+            <field name="name">Déplacement</field>
+            <field name="quantity">1</field>
+            <field name="price_unit">19.66</field>
+        </record>
+    </data>
+</odoo>

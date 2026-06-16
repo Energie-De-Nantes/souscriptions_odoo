@@ -52,6 +52,7 @@ de facturation via son API.
     'demo': [
         'demo/grille_prix_demo.xml',
         'demo/souscriptions_demo.xml',
+        'demo/prestations_demo.xml',
         'demo/raccordement_demo.xml',
     ],
 }

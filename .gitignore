@@ -48,5 +48,3 @@ odoo-server.log
 .serena/
 .claude/
 
-# repo-scoped GitHub PAT for in-sandbox automation — never commit
-.gh-token

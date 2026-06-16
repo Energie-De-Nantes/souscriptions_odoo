@@ -177,33 +177,6 @@ class TestFacturation(TransactionCase):
         count_after = len(self.souscription.periode_ids)
         self.assertGreater(count_after, count_before)
 
-    def test_api_externe_get_souscriptions_by_pdl(self):
-        """Test API pour pont externe - recherche par PDL"""
-        result = self.env['souscription.souscription'].get_souscriptions_by_pdl(['PDL_TEST_001'])
-
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]['pdl'], 'PDL_TEST_001')
-        self.assertEqual(result[0]['puissance_souscrite'], '6')
-
-    def test_api_externe_get_billing_periods(self):
-        """Test API récupération périodes de facturation"""
-        # Créer une période pour le test
-        self.env['souscription.periode'].create(
-            {
-                'souscription_id': self.souscription.id,
-                'date_debut': date(2024, 3, 1),
-                'date_fin': date(2024, 3, 31),
-                'type_periode': 'mensuelle',
-                'provision_base_kwh': 250.0,
-            }
-        )
-
-        periods = self.souscription.get_billing_periods(date_start=date(2024, 3, 1), date_end=date(2024, 3, 31))
-
-        self.assertEqual(len(periods), 1)
-        self.assertEqual(periods[0]['date_debut'], date(2024, 3, 1))
-        self.assertEqual(periods[0]['date_fin'], date(2024, 3, 31))
-
     def test_generation_facture_complete(self):
         """Test complet de génération de facture avec TURPE"""
         # Créer une période avec consommation

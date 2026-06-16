@@ -117,14 +117,6 @@
             records.ajouter_periodes_mensuelles()
         </field>
     </record>
-    <record id="action_generer_lot_prelevement" model="ir.actions.server">
-        <field name="name">Générer lot prélèvement</field>
-        <field name="model_id" ref="model_souscription_souscription"/>
-        <field name="binding_model_id" ref="model_souscription_souscription"/>
-        <field name="binding_view_types">list</field>
-        <field name="state">code</field>
-        <field name="code">env['souscription.souscription'].generer_lot_prelevement_mensuel()</field>
-    </record>
     <record id="view_souscription_kanban" model="ir.ui.view">
         <field name="name">souscription.kanban</field>
         <field name="model">souscription.souscription</field>

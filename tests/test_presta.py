@@ -9,7 +9,7 @@ Souscription **rassemble** sur la facture de la période au moment de
 
 from datetime import date
 
-from odoo.tests.common import tagged
+from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
 from psycopg2 import IntegrityError
 
@@ -103,3 +103,26 @@ class TestPresta(SouscriptionsTestCase):
         with self.assertRaises(IntegrityError), self.env.cr.savepoint():
             self._presta(self.souscription_base, reference_enedis='F15-DUP')
             self.env.flush_all()
+
+
+@tagged('souscriptions', 'souscriptions_presta', 'post_install', '-at_install')
+class TestDemoPrestas(TransactionCase):
+    """Les prestations de démonstration illustrent la file « à refacturer » :
+    en attente (positive et négative) et déjà facturée."""
+
+    def test_demo_prestas_etats_file_et_facturee(self):
+        en_attente = self.env.ref('souscriptions_odoo.demo_presta_mise_en_service', raise_if_not_found=False)
+        if not en_attente:
+            self.skipTest('Données de démo non chargées')
+
+        # En attente : pas de facture (dans la file)
+        self.assertFalse(en_attente.facture_id)
+
+        # Montant négatif : pénalité de coupure
+        negative = self.env.ref('souscriptions_odoo.demo_presta_penalite_coupure')
+        self.assertLess(negative.prix, 0)
+        self.assertFalse(negative.facture_id)
+
+        # Déjà facturée : rattachée à la facture mars (brouillon)
+        facturee = self.env.ref('souscriptions_odoo.demo_presta_deplacement')
+        self.assertEqual(facturee.facture_id, self.env.ref('souscriptions_odoo.demo_facture_mars_admin'))

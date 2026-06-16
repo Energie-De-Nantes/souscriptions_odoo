@@ -11,5 +11,22 @@
         <field name="purchase_ok" eval="False"/>
         <field name="list_price">0.0</field>
         <field name="standard_price">0.0</field>
+        <field name="taxes_id" eval="[(6, 0, [])]"/>
+    </record>
+
+    <!-- Indemnité Enedis (#38 / ADR 0009 §5) : nature « indemnité » des prestations
+         (pénalité de coupure due par Enedis…), hors champ TVA. Produit distinct du
+         précédent uniquement pour porter un régime de TVA différent : la TVA suit le
+         produit, jamais un override de ligne. Le module livre les deux produits sans
+         taxe (pass-through) ; le·la comptable y rattache en prod la TVA réelle (0 % /
+         exonéré pour l'indemnité, afin que la base atterrisse dans la bonne case CA3). -->
+    <record id="souscriptions_product_indemnite_enedis" model="product.product">
+        <field name="name">Indemnité Enedis</field>
+        <field name="type">service</field>
+        <field name="sale_ok" eval="True"/>
+        <field name="purchase_ok" eval="False"/>
+        <field name="list_price">0.0</field>
+        <field name="standard_price">0.0</field>
+        <field name="taxes_id" eval="[(6, 0, [])]"/>
     </record>
 </odoo>

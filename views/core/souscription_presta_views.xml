@@ -14,6 +14,7 @@
                 <field name="reference_enedis"/>
                 <field name="code_enedis"/>
                 <field name="libelle"/>
+                <field name="nature"/>
                 <field name="quantite"/>
                 <field name="prix" sum="Total"/>
                 <!-- Toggle de mise en attente, verrouillé une fois la prestation
@@ -42,6 +43,7 @@
                             <field name="libelle"/>
                         </group>
                         <group string="Refacturation">
+                            <field name="nature"/>
                             <field name="quantite"/>
                             <field name="prix"/>
                             <field name="etat"/>
@@ -69,8 +71,10 @@
                 <filter string="Émise" name="etat_emise" domain="[('etat', '=', 'emise')]"/>
                 <separator/>
                 <filter string="Avoirs (montant négatif)" name="avoirs" domain="[('prix', '&lt;', 0)]"/>
+                <filter string="Indemnités (hors TVA)" name="nature_indemnite" domain="[('nature', '=', 'indemnite')]"/>
                 <group>
                     <filter name="group_etat" string="État" context="{'group_by': 'etat'}"/>
+                    <filter name="group_nature" string="Nature" context="{'group_by': 'nature'}"/>
                     <filter name="group_souscription" string="Souscription" context="{'group_by': 'souscription_id'}"/>
                 </group>
             </search>

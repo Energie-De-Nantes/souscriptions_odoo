@@ -96,6 +96,47 @@ class TestPresta(SouscriptionsTestCase):
         produit = self.env.ref('souscriptions_odoo.souscriptions_product_prestation_enedis')
         self.assertEqual(vals['product_id'], produit.id)
 
+    def test_composer_ligne_indemnite_utilise_produit_sans_tva(self):
+        """Une presta de nature « indemnité » (pénalité hors champ TVA) compose
+        sa ligne avec le produit Indemnité dédié, pas le produit Prestation
+        (TVA). La TVA suit le produit choisi par la nature (ADR 0009), jamais un
+        override de ligne."""
+        presta = self._presta(self.souscription_base, reference_enedis='F15-IND', nature='indemnite')
+        _cmd, _id, vals = presta._composer_ligne()
+
+        produit_indemnite = self.env.ref('souscriptions_odoo.souscriptions_product_indemnite_enedis')
+        self.assertEqual(vals['product_id'], produit_indemnite.id)
+
+    def test_facture_postee_porte_la_tva_du_produit_par_nature(self):
+        """Sur une facture posée : la ligne d'une presta « prestation » hérite de
+        la TVA configurée sur le produit Prestation ; la ligne d'une « indemnité »
+        n'en porte aucune (hors champ). La TVA vient du produit (ADR 0009 §5),
+        jamais d'un override de ligne — et la facture se pose proprement."""
+        tva = self.env['account.tax'].create(
+            {'name': 'TVA F15 20%', 'amount': 20.0, 'amount_type': 'percent', 'type_tax_use': 'sale'}
+        )
+        self.env.ref('souscriptions_odoo.souscriptions_product_prestation_enedis').taxes_id = tva
+
+        self._presta(self.souscription_base, reference_enedis='F15-TVA', libelle='Déplacement', prix=50.0)
+        self._presta(
+            self.souscription_base,
+            reference_enedis='F15-IND2',
+            libelle='Pénalité coupure',
+            prix=-30.0,
+            nature='indemnite',
+        )
+        self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+
+        self.souscription_base.creer_factures()
+        facture = self.souscription_base.presta_ids.filtered(lambda p: p.reference_enedis == 'F15-TVA').facture_id
+        facture.action_post()
+
+        self.assertEqual(facture.state, 'posted', 'la facture avec lignes prestation + indemnité se pose')
+        ligne_presta = facture.invoice_line_ids.filtered(lambda l: l.name == 'Déplacement')
+        ligne_indemnite = facture.invoice_line_ids.filtered(lambda l: l.name == 'Pénalité coupure')
+        self.assertEqual(ligne_presta.tax_ids, tva, 'la prestation hérite de la TVA du produit')
+        self.assertFalse(ligne_indemnite.tax_ids, "l'indemnité reste hors champ TVA")
+
     def test_presta_negative_se_nette_dans_la_facture(self):
         """Une prestation négative (pénalité de coupure due par Enedis) atterrit
         comme ligne négative sur la facture mensuelle."""

@@ -11,8 +11,8 @@ fait mensuel mais un **en-cours refacturable** à cadence Enedis.
 **Décision.**
 
 1. **Modèle indépendant de la Période.** `souscription.presta` porte `code_enedis`, `libelle`,
-   `prix`, `quantite`, le taux de **TVA issu du F15**, un `souscription_id` (M2o) et un
-   `facture_id` (M2o). Aucun lien vers `souscription.periode`.
+   `prix`, `quantite`, sa **nature** (`prestation` taxée / `indemnite` hors champ TVA, cf. §5),
+   un `souscription_id` (M2o) et un `facture_id` (M2o). Aucun lien vers `souscription.periode`.
 
 2. **Alimenté par electricore, dédupliqué par référence Enedis.** Les prestations sont
    **tirées en totalité** d'un endpoint electricore dédié (le volume est faible — ~une par PDL),
@@ -36,10 +36,14 @@ fait mensuel mais un **en-cours refacturable** à cadence Enedis.
    supprimer une facture (échappatoire de correction de l'[ADR-0007](0007-snapshot-periode-type-verrou-facturation.md))
    **re-met les prestations dans la file**.
 
-5. **Plomberie comptable minimale.** Un **produit générique unique**
-   (`souscriptions_product_prestation_enedis`) porte le compte de produits ; la **TVA vient du
-   F15** par presta (pas du défaut produit) ; la ligne **surcharge** name/price_unit/quantity
-   depuis la presta. Pas de catalogue produit par code Enedis.
+5. **Plomberie comptable minimale, la TVA suit le produit choisi par la nature** (amendée par
+   #38, cf. ci-dessous). Deux **produits génériques** portent le compte de produits **et le régime
+   de TVA** : `souscriptions_product_prestation_enedis` (prestation taxée) et
+   `souscriptions_product_indemnite_enedis` (indemnité hors champ TVA — pénalité de coupure…). La
+   `nature` de la presta choisit le produit ; la **ligne hérite de la TVA du produit** via le
+   mécanisme Odoo standard (`_compute_tax_ids` + position fiscale), **sans override de `tax_ids`**.
+   La ligne **surcharge** seulement name/price_unit/quantity depuis la presta. Pas de catalogue
+   produit par code Enedis, pas de taux de TVA par presta.
 
 6. **Refacturation à prix coûtant, une seule source de prix.** `prix` = prix de refacturation,
    par défaut le prix F15 (pass-through, marge nulle — « on n'est pas des voleurs »). **Pas** de
@@ -74,3 +78,26 @@ porté comme **ligne signée** qui se nette dans la facture mensuelle.
   du·de la *facturiste* dans l'instant. À retracker en issue dédiée.
 - **PDL orphelins** (prestation pour un PDL sans souscription active) : ignorés au sync en v1 ;
   les rendre visibles « à rattacher » est une évolution.
+
+## Amendement (#38) — la TVA suit le produit, par *nature* (pas un taux par presta)
+
+La décision initiale (#8) prévoyait un **taux de TVA par presta, issu du F15**, appliqué en
+surchargeant `tax_ids` sur la ligne. En préparant l'implémentation, deux problèmes :
+
+1. **Impédance taux → enregistrement.** Le F15 donne un *taux* (un nombre) ; Odoo facture avec un
+   `account.tax` *configuré par le·la comptable* (bons comptes de taxe, bonnes grilles CA3).
+   Résoudre « 20 % » → « la bonne taxe » par le montant est fragile (plusieurs taxes au même taux).
+2. **Court-circuit des positions fiscales.** Forcer `tax_ids` sur la ligne contourne
+   `_compute_tax_ids → fiscal_position.map_tax` (clients exonérés / DOM-TOM / autoliquidation).
+
+**Résolution.** La TVA n'est plus un champ de la presta : elle vient du **produit**, comme pour les
+lignes d'énergie (qui ne posent déjà aucun `tax_ids`). Le sync ne résout plus un taux mais classe la
+presta dans une **nature** (`prestation` / `indemnite`), qui choisit le produit ; chaque produit
+porte la taxe que le·la comptable a configurée. Un produit unique ne suffit pas car les
+**indemnités** (pénalités de coupure dues par Enedis) sont **hors champ TVA**, régime distinct des
+prestations taxées — d'où deux produits. Le module les livre tous deux **sans taxe** (pass-through,
+`taxes_id = []`) ; le·la comptable y rattache en prod la TVA réelle (p. ex. 20 % sur la prestation,
+0 %/exonéré sur l'indemnité pour que la base atterrisse dans la bonne case CA3).
+
+Bénéfices : plus de mapping taux→enregistrement, positions fiscales respectées, et la « TVA pas
+depuis le défaut produit » d'origine devient « TVA *depuis* le bon produit, choisi par nature ».

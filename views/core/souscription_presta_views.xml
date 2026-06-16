@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Écran de vérification des prestations (ADR 0012) : liste groupée par
+         état, triée par prix décroissant, le prix sommé par groupe servant de
+         stats. Le·la facturiste met en attente (toggle) les prestations
+         douteuses avant de créer les factures. -->
+    <record id="view_souscription_presta_list" model="ir.ui.view">
+        <field name="name">souscription.presta.list</field>
+        <field name="model">souscription.presta</field>
+        <field name="arch" type="xml">
+            <list string="Prestations" default_order="prix desc">
+                <field name="souscription_id"/>
+                <field name="pdl"/>
+                <field name="reference_enedis"/>
+                <field name="code_enedis"/>
+                <field name="libelle"/>
+                <field name="quantite"/>
+                <field name="prix" sum="Total"/>
+                <!-- Toggle de mise en attente, verrouillé une fois la prestation
+                     sur une facture (l'état prime alors, ADR 0012). -->
+                <field name="en_attente" widget="boolean_toggle" readonly="facture_id != False"/>
+                <field name="facture_id"/>
+                <field name="etat" widget="badge"
+                       decoration-warning="etat == 'en_attente'"
+                       decoration-success="etat == 'emise'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_souscription_presta_form" model="ir.ui.view">
+        <field name="name">souscription.presta.form</field>
+        <field name="model">souscription.presta</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <group string="Prestation">
+                            <field name="souscription_id"/>
+                            <field name="pdl"/>
+                            <field name="reference_enedis"/>
+                            <field name="code_enedis"/>
+                            <field name="libelle"/>
+                        </group>
+                        <group string="Refacturation">
+                            <field name="quantite"/>
+                            <field name="prix"/>
+                            <field name="etat"/>
+                            <field name="en_attente" widget="boolean_toggle" readonly="facture_id != False"/>
+                            <field name="facture_id"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_souscription_presta_search" model="ir.ui.view">
+        <field name="name">souscription.presta.search</field>
+        <field name="model">souscription.presta</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="reference_enedis"/>
+                <field name="libelle"/>
+                <field name="souscription_id"/>
+                <field name="pdl"/>
+                <filter string="À refacturer" name="etat_a_refacturer" domain="[('etat', '=', 'a_refacturer')]"/>
+                <filter string="En attente" name="etat_en_attente" domain="[('etat', '=', 'en_attente')]"/>
+                <filter string="Facturée" name="etat_facturee" domain="[('etat', '=', 'facturee')]"/>
+                <filter string="Émise" name="etat_emise" domain="[('etat', '=', 'emise')]"/>
+                <separator/>
+                <filter string="Avoirs (montant négatif)" name="avoirs" domain="[('prix', '&lt;', 0)]"/>
+                <group>
+                    <filter name="group_etat" string="État" context="{'group_by': 'etat'}"/>
+                    <filter name="group_souscription" string="Souscription" context="{'group_by': 'souscription_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_souscription_presta" model="ir.actions.act_window">
+        <field name="name">Prestations</field>
+        <field name="res_model">souscription.presta</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_souscription_presta_search"/>
+        <field name="context">{'search_default_group_etat': 1}</field>
+    </record>
+
+    <menuitem
+        id="menu_souscription_presta"
+        name="Prestations"
+        parent="menu_souscription_root"
+        action="action_souscription_presta"
+        sequence="30"/>
+</odoo>

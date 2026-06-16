@@ -140,6 +140,19 @@ class TestPresta(SouscriptionsTestCase):
         self.assertFalse(presta.facture_id, 'remise dans la file après suppression de la facture')
         self.assertEqual(presta.etat, 'a_refacturer', 'état dérivé recalculé : de retour dans la file')
 
+    def test_action_prestations_groupe_par_etat(self):
+        """L'écran de vérification : une action Prestations existe, sur le bon
+        modèle, et s'ouvre groupée par état (stats par groupe)."""
+        action = self.env.ref('souscriptions_odoo.action_souscription_presta')
+        self.assertEqual(action.res_model, 'souscription.presta')
+        self.assertIn('list', action.view_mode)
+        self.assertIn('search_default_group_etat', action.context or '')
+
+    def test_menu_prestations_sous_souscriptions(self):
+        """Le menu « Prestations » est rangé sous la racine Souscriptions."""
+        menu = self.env.ref('souscriptions_odoo.menu_souscription_presta')
+        self.assertEqual(menu.parent_id, self.env.ref('souscriptions_odoo.menu_souscription_root'))
+
     @mute_logger('odoo.sql_db')
     def test_reference_enedis_unique(self):
         """Deux prestations ne peuvent partager la même référence Enedis : c'est

@@ -1,7 +1,7 @@
 """
 Tests des Prestations à refacturer (#8 / ADR 0009).
 
-Une `souscription.presta` est un poste Enedis refacturable, indépendant de la
+Une `souscription.refacturation` est un poste Enedis refacturable, indépendant de la
 Période : c'est un en-cours (`facture_id` NULL = file « à refacturer ») que la
 Souscription **rassemble** sur la facture de la période au moment de
 `creer_factures()`, puis flague (`facture_id`).
@@ -16,8 +16,8 @@ from psycopg2 import IntegrityError
 from .common import SouscriptionsTestCase
 
 
-@tagged('souscriptions', 'souscriptions_presta', 'post_install', '-at_install')
-class TestPresta(SouscriptionsTestCase):
+@tagged('souscriptions', 'souscriptions_refacturation', 'post_install', '-at_install')
+class TestRefacturation(SouscriptionsTestCase):
     def _presta(self, souscription, **vals):
         base = {
             'souscription_id': souscription.id,
@@ -27,7 +27,7 @@ class TestPresta(SouscriptionsTestCase):
             'quantite': 1.0,
         }
         base.update(vals)
-        return self.env['souscription.presta'].create(base)
+        return self.env['souscription.refacturation'].create(base)
 
     def test_presta_a_refacturer_ramassee_et_flaggee(self):
         """Tracer bullet : une presta à refacturer (non mise en attente) atterrit
@@ -128,7 +128,7 @@ class TestPresta(SouscriptionsTestCase):
         self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
 
         self.souscription_base.creer_factures()
-        facture = self.souscription_base.presta_ids.filtered(lambda p: p.reference_enedis == 'F15-TVA').facture_id
+        facture = self.souscription_base.refacturation_ids.filtered(lambda p: p.reference_enedis == 'F15-TVA').facture_id
         facture.action_post()
 
         self.assertEqual(facture.state, 'posted', 'la facture avec lignes prestation + indemnité se pose')
@@ -184,14 +184,14 @@ class TestPresta(SouscriptionsTestCase):
     def test_action_prestations_groupe_par_etat(self):
         """L'écran de vérification : une action Prestations existe, sur le bon
         modèle, et s'ouvre groupée par état (stats par groupe)."""
-        action = self.env.ref('souscriptions_odoo.action_souscription_presta')
-        self.assertEqual(action.res_model, 'souscription.presta')
+        action = self.env.ref('souscriptions_odoo.action_souscription_refacturation')
+        self.assertEqual(action.res_model, 'souscription.refacturation')
         self.assertIn('list', action.view_mode)
         self.assertIn('search_default_group_etat', action.context or '')
 
     def test_menu_prestations_sous_souscriptions(self):
         """Le menu « Prestations » est rangé sous la racine Souscriptions."""
-        menu = self.env.ref('souscriptions_odoo.menu_souscription_presta')
+        menu = self.env.ref('souscriptions_odoo.menu_souscription_refacturation')
         self.assertEqual(menu.parent_id, self.env.ref('souscriptions_odoo.menu_souscription_root'))
 
     @mute_logger('odoo.sql_db')
@@ -204,8 +204,8 @@ class TestPresta(SouscriptionsTestCase):
             self.env.flush_all()
 
 
-@tagged('souscriptions', 'souscriptions_presta', 'post_install', '-at_install')
-class TestDemoPrestas(TransactionCase):
+@tagged('souscriptions', 'souscriptions_refacturation', 'post_install', '-at_install')
+class TestDemoRefacturations(TransactionCase):
     """Les prestations de démonstration illustrent la file « à refacturer » :
     à refacturer (positive et négative) et déjà facturée."""
 

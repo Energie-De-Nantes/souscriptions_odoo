@@ -2,7 +2,7 @@
 <odoo noupdate="1">
     <!-- Produit générique de refacturation des prestations Enedis (#8 / ADR 0009).
          Porte la plomberie comptable ; chaque ligne de prestation surcharge
-         name/price_unit/quantity depuis la souscription.presta. Pas de catalogue
+         name/price_unit/quantity depuis la souscription.refacturation. Pas de catalogue
          par code Enedis. -->
     <record id="souscriptions_product_prestation_enedis" model="product.product">
         <field name="name">Prestation Enedis</field>

@@ -37,7 +37,7 @@ class Souscription(models.Model):
         'account.move', compute='_compute_factures_via_periodes', string='Factures', store=False
     )
     periode_ids = fields.One2many('souscription.periode', 'souscription_id', string='Périodes de facturation')
-    presta_ids = fields.One2many('souscription.presta', 'souscription_id', string='Prestations à refacturer')
+    refacturation_ids = fields.One2many('souscription.refacturation', 'souscription_id', string='Refacturations')
     # Données métier
 
     ## Utiles facturation
@@ -166,16 +166,16 @@ class Souscription(models.Model):
             # ce run, puis les flague (ADR 0009). Le flag les retire de la file,
             # donc les périodes suivantes ne les re-facturent pas.
             if premiere_facture:
-                souscription._facturer_prestations_a_refacturer(premiere_facture)
+                souscription._facturer_refacturations(premiere_facture)
 
-    def _facturer_prestations_a_refacturer(self, facture):
+    def _facturer_refacturations(self, facture):
         """Ajoute les prestations *à refacturer* comme lignes de `facture` et
         pose leur `facture_id`. Responsabilité de la Souscription, pas de la
         Période (ADR 0009). Sont *à refacturer* les prestations sans facture et
         non mises en attente : la mise en attente est un opt-out de la
         facturation automatique (ADR 0012)."""
         self.ensure_one()
-        prestas = self.presta_ids.filtered(lambda p: not p.facture_id and not p.en_attente)
+        prestas = self.refacturation_ids.filtered(lambda p: not p.facture_id and not p.en_attente)
         if not prestas:
             return
         facture.write({'invoice_line_ids': [p._composer_ligne() for p in prestas]})

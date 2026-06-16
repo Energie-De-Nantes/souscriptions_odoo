@@ -61,8 +61,8 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Prestations à refacturer">
-                            <field name="presta_ids">
+                        <page string="Refacturations">
+                            <field name="refacturation_ids">
                                 <list editable="bottom">
                                     <field name="reference_enedis"/>
                                     <field name="code_enedis"/>

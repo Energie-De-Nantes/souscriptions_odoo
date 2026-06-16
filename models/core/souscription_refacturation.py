@@ -1,18 +1,18 @@
 from odoo import api, fields, models
 
 
-class SouscriptionPresta(models.Model):
-    """Prestation Enedis à refacturer (#8 / ADR 0009).
+class SouscriptionRefacturation(models.Model):
+    """Refacturation Enedis (#8 / ADR 0009 ; renommée #38 — cf. CONTEXT.md).
 
-    Poste de facturation ponctuel d'origine Enedis (mise en service, déplacement,
-    pénalité de coupure…) que le fournisseur refacture au·à la souscripteur·rice.
-    Indépendante de la Période : c'est un en-cours refacturable rattaché à une
-    Souscription. `facture_id` NULL = file « à refacturer » ; il est posé quand
-    une Facture rassemble la prestation (lien côté presta, ADR 0004).
+    En-cours refacturable d'origine Enedis que le fournisseur refacture au·à la
+    souscripteur·rice. Deux *natures* (prestation taxée / indemnité hors champ TVA)
+    qui, avec le tarif solidaire, choisissent le *Produit de facturation* (ADR 0013).
+    Indépendante de la Période : `facture_id` NULL = file « à refacturer » ; il est
+    posé quand une Facture la rassemble (lien côté refacturation, ADR 0004).
     """
 
-    _name = 'souscription.presta'
-    _description = 'Prestation Enedis à refacturer'
+    _name = 'souscription.refacturation'
+    _description = 'Refacturation Enedis'
 
     souscription_id = fields.Many2one(
         'souscription.souscription', required=True, ondelete='cascade', string='Souscription'
@@ -41,7 +41,7 @@ class SouscriptionPresta(models.Model):
 
     # Mise en attente manuelle par le·la facturiste sur un doute (ADR 0012) :
     # opt-out de la facturation automatique. Tant que coché et non facturée, la
-    # prestation est exclue de creer_factures() (cf. _facturer_prestations_a_refacturer).
+    # prestation est exclue de creer_factures() (cf. _facturer_refacturations).
     en_attente = fields.Boolean(string='En attente', default=False)
 
     # État dérivé pour le groupage/les stats de l'écran de vérification (ADR 0012).

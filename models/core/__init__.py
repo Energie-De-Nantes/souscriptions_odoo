@@ -3,6 +3,6 @@ from . import (
     grille_prix,
     souscription,
     souscription_periode,
-    souscription_presta,
+    souscription_refacturation,
     souscription_produit,
 )

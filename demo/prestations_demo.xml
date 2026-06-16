@@ -29,6 +29,8 @@
             <field name="libelle">Pénalité de coupure (due par Enedis)</field>
             <field name="prix">-30.00</field>
             <field name="quantite">1</field>
+            <!-- Indemnité : hors champ TVA (#38 / ADR 0009 §5) → produit Indemnité -->
+            <field name="nature">indemnite</field>
         </record>
 
         <!-- Déjà facturée : rattachée à la facture mars (brouillon, éditable) -->

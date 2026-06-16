@@ -25,6 +25,21 @@ class SouscriptionPresta(models.Model):
     prix = fields.Float(string='Prix (€)', help='Prix de refacturation ; peut être négatif (avoir/pénalité).')
     quantite = fields.Float(string='Quantité', default=1.0)
 
+    # Régime de TVA porté par la *nature*, pas par un taux par presta (ADR 0009 §5).
+    # La nature choisit le produit de refacturation ; la TVA suit le produit
+    # (configuré par le·la comptable), jamais un override de ligne — on ne
+    # contourne donc pas les positions fiscales. Les `indemnité` (pénalités de
+    # coupure dues par Enedis) sont hors champ TVA. Alimenté par le sync F15 (#37).
+    nature = fields.Selection(
+        [
+            ('prestation', 'Prestation (TVA)'),
+            ('indemnite', 'Indemnité (sans TVA)'),
+        ],
+        string='Nature',
+        default='prestation',
+        required=True,
+    )
+
     # Mise en attente manuelle par le·la facturiste sur un doute (ADR 0012) :
     # opt-out de la facturation automatique. Tant que coché et non facturée, la
     # prestation est exclue de creer_factures() (cf. _facturer_prestations_a_refacturer).
@@ -69,7 +84,17 @@ class SouscriptionPresta(models.Model):
     )
 
     def _get_produit_prestation(self):
-        produit = self.env.ref('souscriptions_odoo.souscriptions_product_prestation_enedis', raise_if_not_found=False)
+        """Produit de refacturation porté par la *nature* (ADR 0009 §5) : il
+        porte le compte de produits **et la TVA** (prestation taxée vs indemnité
+        hors champ). La ligne hérite de cette TVA via le produit ; pas de taux
+        par presta, pas d'override de ligne."""
+        self.ensure_one()
+        xmlid = (
+            'souscriptions_odoo.souscriptions_product_indemnite_enedis'
+            if self.nature == 'indemnite'
+            else 'souscriptions_odoo.souscriptions_product_prestation_enedis'
+        )
+        produit = self.env.ref(xmlid, raise_if_not_found=False)
         if not produit:
             raise UserError('Produit générique de prestation non trouvé')
         return produit

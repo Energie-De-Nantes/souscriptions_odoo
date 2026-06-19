@@ -15,18 +15,18 @@
     <template id="portal_my_souscriptions" name="Mes Souscriptions">
         <t t-call="portal.portal_layout">
             <t t-set="breadcrumbs_searchbar" t-value="True"/>
-            
+
             <t t-call="portal.portal_searchbar">
                 <t t-set="title">Mes Souscriptions Électriques</t>
             </t>
-            
+
             <t t-if="not souscriptions">
                 <div class="alert alert-warning mt8" role="alert">
                     <p class="mb-0">Aucune souscription électrique trouvée.</p>
                     <p class="mb-0">Contactez votre fournisseur pour plus d'informations.</p>
                 </div>
             </t>
-            
+
             <t t-else="">
                 <div class="table-responsive">
                     <table class="table table-striped">
@@ -45,11 +45,11 @@
                                 <tr>
                                     <td>
                                         <a t-attf-href="/my/souscription/#{souscription.id}">
-                                            <t t-esc="souscription.name"/>
+                                            <t t-out="souscription.name"/>
                                         </a>
                                     </td>
-                                    <td><t t-esc="souscription.pdl or '-'"/></td>
-                                    <td><t t-esc="souscription.puissance_souscrite"/></td>
+                                    <td><t t-out="souscription.pdl or '-'"/></td>
+                                    <td><t t-out="souscription.puissance_souscrite"/></td>
                                     <td>
                                         <t t-if="souscription.type_tarif == 'base'">Base</t>
                                         <t t-else="">HP/HC</t>
@@ -59,7 +59,7 @@
                                     </td>
                                     <td>
                                         <span t-attf-class="badge rounded-pill text-bg-#{souscription.active and 'success' or 'secondary'}">
-                                            <t t-esc="souscription.active and 'Active' or 'Inactive'"/>
+                                            <t t-out="souscription.active and 'Active' or 'Inactive'"/>
                                         </span>
                                     </td>
                                     <td class="text-end">
@@ -72,7 +72,7 @@
                         </tbody>
                     </table>
                 </div>
-                
+
                 <div t-if="pager" class="o_portal_pager text-center">
                     <t t-call="portal.pager"/>
                 </div>
@@ -84,7 +84,7 @@
     <template id="portal_souscription_page" name="Détail Souscription">
         <t t-call="portal.portal_layout">
             <t t-set="breadcrumbs_searchbar" t-value="True"/>
-            
+
             <div class="row mt16">
                 <!-- Sidebar -->
                 <div class="col-lg-3 d-print-none">
@@ -95,25 +95,25 @@
                         <div class="card-body">
                             <div class="mb-3">
                                 <small class="text-muted d-block">Période contractuelle</small>
-                                <span t-esc="souscription.date_debut.strftime('%d/%m/%Y') if souscription.date_debut else '-'"/>
+                                <span t-out="souscription.date_debut.strftime('%d/%m/%Y') if souscription.date_debut else '-'"/>
                                 <t t-if="souscription.date_fin">
                                     <span> - </span>
-                                    <span t-esc="souscription.date_fin.strftime('%d/%m/%Y') if souscription.date_fin else '-'"/>
+                                    <span t-out="souscription.date_fin.strftime('%d/%m/%Y') if souscription.date_fin else '-'"/>
                                 </t>
                                 <t t-else="">
                                     <span class="text-muted"> - En cours</span>
                                 </t>
                             </div>
-                            
+
                             <div class="mb-3">
                                 <small class="text-muted d-block">État de facturation</small>
-                                <span t-esc="souscription.etat_facturation_id.name" class="badge rounded-pill text-bg-primary"/>
+                                <span t-out="souscription.etat_facturation_id.name" class="badge rounded-pill text-bg-primary"/>
                             </div>
-                            
+
                             <div>
                                 <small class="text-muted d-block">Mode de paiement</small>
                                 <t t-if="souscription.mode_paiement">
-                                    <span t-esc="dict(souscription._fields['mode_paiement'].selection).get(souscription.mode_paiement, souscription.mode_paiement) if souscription.mode_paiement else 'Non défini'"/>
+                                    <span t-out="dict(souscription._fields['mode_paiement'].selection).get(souscription.mode_paiement, souscription.mode_paiement) if souscription.mode_paiement else 'Non défini'"/>
                                 </t>
                                 <t t-else="">
                                     <span class="text-muted">Non défini</span>
@@ -130,12 +130,12 @@
                             <div class="row">
                                 <div class="col">
                                     <h4 class="mb-0">
-                                        Souscription <span t-esc="souscription.name"/>
+                                        Souscription <span t-out="souscription.name"/>
                                     </h4>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="card-body">
                             <!-- Informations techniques -->
                             <div class="row mb-4">
@@ -144,11 +144,11 @@
                                     <table class="table table-sm">
                                         <tr>
                                             <td class="text-muted">PDL</td>
-                                            <td class="fw-bold"><t t-esc="souscription.pdl or '-'"/></td>
+                                            <td class="fw-bold"><t t-out="souscription.pdl or '-'"/></td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">Puissance souscrite</td>
-                                            <td class="fw-bold"><t t-esc="souscription.puissance_souscrite"/></td>
+                                            <td class="fw-bold"><t t-out="souscription.puissance_souscrite"/></td>
                                         </tr>
                                         <tr>
                                             <td class="text-muted">Type de tarif</td>
@@ -170,7 +170,7 @@
                                         </tr>
                                     </table>
                                 </div>
-                                
+
                                 <div class="col-md-6">
                                     <h5>Facturation</h5>
                                     <t t-if="souscription.lisse">
@@ -179,19 +179,19 @@
                                                 <i class="fa fa-info-circle"/> Facturation lissée
                                             </h6>
                                             <p class="mb-0">
-                                                Provision mensuelle : <strong><t t-esc="souscription.provision_mensuelle_kwh"/> kWh</strong>
+                                                Provision mensuelle : <strong><t t-out="souscription.provision_mensuelle_kwh"/> kWh</strong>
                                             </p>
                                         </div>
                                     </t>
                                     <t t-else="">
                                         <p class="text-muted">Facturation au réel</p>
                                     </t>
-                                    
+
                                     <t t-if="souscription.coeff_pro > 0">
                                         <div class="alert alert-warning">
                                             <p class="mb-0">
                                                 <i class="fa fa-building"/> Usager·ère professionnel·le
-                                                <br/>Majoration : <strong><t t-esc="souscription.coeff_pro"/>%</strong>
+                                                <br/>Majoration : <strong><t t-out="souscription.coeff_pro"/>%</strong>
                                             </p>
                                         </div>
                                     </t>
@@ -228,44 +228,44 @@
                                             <t t-foreach="periodes" t-as="periode">
                                                 <tr t-attf-class="#{'collapse periode-extra' if periode_index &gt;= 12 else ''}">
                                                     <td>
-                                                        <strong t-esc="periode.date_debut.strftime('%m/%Y') if periode.date_debut else '-'"/>
+                                                        <strong t-out="periode.date_debut.strftime('%m/%Y') if periode.date_debut else '-'"/>
                                                         <br/>
                                                         <small class="text-muted">
-                                                            <t t-esc="periode.date_debut.strftime('%d/%m/%Y') if periode.date_debut else ''"/> -
-                                                            <t t-esc="periode.date_fin.strftime('%d/%m/%Y') if periode.date_fin else ''"/>
+                                                            <t t-out="periode.date_debut.strftime('%d/%m/%Y') if periode.date_debut else ''"/> -
+                                                            <t t-out="periode.date_fin.strftime('%d/%m/%Y') if periode.date_fin else ''"/>
                                                         </small>
                                                     </td>
                                                     <td>
                                                         <span class="badge rounded-pill text-bg-secondary">
-                                                            <t t-esc="dict(periode._fields['type_periode'].selection).get(periode.type_periode, periode.type_periode)"/>
+                                                            <t t-out="dict(periode._fields['type_periode'].selection).get(periode.type_periode, periode.type_periode)"/>
                                                         </span>
                                                     </td>
                                                     <t t-if="souscription.type_tarif == 'base'">
                                                         <td class="text-end">
-                                                            <strong><t t-esc="periode.energie_base_kwh or 0"/></strong>
+                                                            <strong><t t-out="periode.energie_base_kwh or 0"/></strong>
                                                             <t t-if="periode.provision_base_kwh">
-                                                                <br/><small class="text-muted">Prov: <t t-esc="periode.provision_base_kwh"/></small>
+                                                                <br/><small class="text-muted">Prov: <t t-out="periode.provision_base_kwh"/></small>
                                                             </t>
                                                         </td>
                                                     </t>
                                                     <t t-else="">
                                                         <td class="text-end">
-                                                            <strong><t t-esc="periode.energie_hp_kwh or 0"/></strong>
+                                                            <strong><t t-out="periode.energie_hp_kwh or 0"/></strong>
                                                             <t t-if="periode.provision_hp_kwh">
-                                                                <br/><small class="text-muted">Prov: <t t-esc="periode.provision_hp_kwh"/></small>
+                                                                <br/><small class="text-muted">Prov: <t t-out="periode.provision_hp_kwh"/></small>
                                                             </t>
                                                         </td>
                                                         <td class="text-end">
-                                                            <strong><t t-esc="periode.energie_hc_kwh or 0"/></strong>
+                                                            <strong><t t-out="periode.energie_hc_kwh or 0"/></strong>
                                                             <t t-if="periode.provision_hc_kwh">
-                                                                <br/><small class="text-muted">Prov: <t t-esc="periode.provision_hc_kwh"/></small>
+                                                                <br/><small class="text-muted">Prov: <t t-out="periode.provision_hc_kwh"/></small>
                                                             </t>
                                                         </td>
                                                     </t>
-                                                    <td class="text-end"><t t-esc="'%.2f' % (periode.turpe_fixe or 0)"/></td>
-                                                    <td class="text-end"><t t-esc="'%.2f' % (periode.turpe_variable or 0)"/></td>
+                                                    <td class="text-end"><t t-out="'%.2f' % (periode.turpe_fixe or 0)"/></td>
+                                                    <td class="text-end"><t t-out="'%.2f' % (periode.turpe_variable or 0)"/></td>
                                                     <td class="text-end">
-                                                        <strong><t t-esc="'%.2f' % (periode.facture_id.amount_total or 0)"/> €</strong>
+                                                        <strong><t t-out="'%.2f' % (periode.facture_id.amount_total or 0)"/> €</strong>
                                                     </td>
                                                     <td class="text-center">
                                                         <t t-if="periode.facture_id.payment_state == 'paid'">
@@ -281,7 +281,7 @@
                                                     <td class="text-center">
                                                         <a t-attf-href="/my/invoices/#{periode.facture_id.id}"
                                                            class="btn btn-sm btn-outline-primary" title="Voir la facture">
-                                                            <i class="fa fa-file-text-o"/> <t t-esc="periode.facture_id.name"/>
+                                                            <i class="fa fa-file-text-o"/> <t t-out="periode.facture_id.name"/>
                                                         </a>
                                                     </td>
                                                 </tr>
@@ -331,10 +331,10 @@
                                         <div class="card h-100">
                                             <div class="card-header py-2"><h6 class="mb-0"><i class="fa fa-calculator"/> Totaux</h6></div>
                                             <div class="card-body py-2">
-                                                <p class="mb-1"><strong>Consommation totale :</strong> <t t-esc="'%.0f' % total_kwh"/> kWh</p>
-                                                <p class="mb-1"><strong>TURPE total :</strong> <t t-esc="'%.2f' % total_turpe"/> €</p>
-                                                <p class="mb-1"><strong>Total facturé :</strong> <t t-esc="'%.2f' % total_facture"/> €</p>
-                                                <p class="mb-0"><strong>Nombre de périodes :</strong> <t t-esc="len(periodes)"/></p>
+                                                <p class="mb-1"><strong>Consommation totale :</strong> <t t-out="'%.0f' % total_kwh"/> kWh</p>
+                                                <p class="mb-1"><strong>TURPE total :</strong> <t t-out="'%.2f' % total_turpe"/> €</p>
+                                                <p class="mb-1"><strong>Total facturé :</strong> <t t-out="'%.2f' % total_facture"/> €</p>
+                                                <p class="mb-0"><strong>Nombre de périodes :</strong> <t t-out="len(periodes)"/></p>
                                             </div>
                                         </div>
                                     </div>
@@ -346,11 +346,11 @@
                                 <div class="row">
                                     <div class="col-md-6">
                                         <p class="text-muted mb-1">Référence compteur</p>
-                                        <p class="fw-bold"><t t-esc="souscription.ref_compteur or '-'"/></p>
+                                        <p class="fw-bold"><t t-out="souscription.ref_compteur or '-'"/></p>
                                     </div>
                                     <div class="col-md-6">
                                         <p class="text-muted mb-1">Numéro de dépannage</p>
-                                        <p class="fw-bold"><t t-esc="souscription.numero_depannage or '09 726 750 XX'"/></p>
+                                        <p class="fw-bold"><t t-out="souscription.numero_depannage or '09 726 750 XX'"/></p>
                                     </div>
                                 </div>
                             </div>

@@ -116,11 +116,11 @@
                             <t t-set="grille_active" t-value="request.env['grille.prix'].get_grille_active(souscription.date_debut or datetime.date.today())"/>
                             <div t-if="grille_active">
                                 <p><strong>Grille de prix:</strong> <span t-field="grille_active.name"/></p>
-                                <p><strong>Période de validité:</strong> 
+                                <p><strong>Période de validité:</strong>
                                    Du <span t-field="grille_active.date_debut" t-options="{'widget': 'date'}"/>
                                    au <span t-field="grille_active.date_fin" t-options="{'widget': 'date'}"/>
                                 </p>
-                                
+
                                 <!-- Tarifs selon la grille de prix -->
                                 <h6>Tarifs appliqués</h6>
                                 <table class="table table-sm table-striped">
@@ -140,7 +140,7 @@
                                                 <span t-if="ligne.type_produit == 'energie'">Énergie</span>
                                                 <span t-if="ligne.type_produit == 'autre'">Autre</span>
                                             </td>
-                                            <td><span t-esc="'%.4f' % ligne.prix_unitaire"/></td>
+                                            <td><span t-out="'%.4f' % ligne.prix_unitaire"/></td>
                                             <td><span t-field="ligne.unite_saisie"/></td>
                                         </tr>
                                     </tbody>

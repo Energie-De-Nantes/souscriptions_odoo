@@ -1,151 +1,243 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Template de facture personnalisé pour l'électricité -->
+    <!-- Facture d'électricité — design moderne aux couleurs EDN (teal + accent jaune),
+         adapté aux modèles du module (souscription.souscription, souscription.periode)
+         au lieu des champs Studio x_* / sale.order de la prod.
+
+         Reprend tout le contenu métier de la facture de prod (dépannage, PDL/compteur,
+         mix énergétique, période de facturation, TURPE / mensualisation, mentions
+         légales) et AJOUTE le justificatif des relevés d'index, projeté depuis la
+         Période (ADR 0015) — jamais matérialisé en account.move.line (ADR 0014). -->
     <template id="report_facture_energie">
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="o">
                 <t t-if="o.is_facture_energie">
+                    <t t-set="lang" t-value="o.partner_id.lang or env.lang"/>
+                    <t t-set="o" t-value="o.with_context(lang=lang)"/>
+                    <t t-set="souscription" t-value="o.souscription_id"/>
+                    <t t-set="periode" t-value="o.periode_id"/>
                     <t t-call="web.external_layout">
-                        <div class="page">
-                            <!-- En-tête énergie -->
-                            <div class="row mb-3">
-                                <div class="col-12">
-                                    <div style="background-color: #2E7D32; color: white; padding: 10px; text-align: center; border-radius: 5px;">
-                                        <h3 class="mb-0">
-                                            ⚡ Facture d'Électricité
-                                        </h3>
-                                    </div>
-                                </div>
+                        <!-- Adresse client rendue par le letterhead standard. -->
+                        <t t-set="address">
+                            <address class="mb-0" t-field="o.partner_id"
+                                     t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/>
+                            <div t-if="o.partner_id.vat" id="partner_vat">
+                                <t t-if="o.company_id.account_fiscal_country_id.vat_label"
+                                   t-out="o.company_id.account_fiscal_country_id.vat_label"/>
+                                <t t-else="">N° TVA</t>: <span t-field="o.partner_id.vat"/>
                             </div>
+                        </t>
 
-                            <!-- Informations souscription -->
-                            <div t-if="o.souscription_id" class="row mb-4">
-                                <div class="col-12">
-                                    <div style="background-color: #E8F5E8; padding: 15px; border-radius: 5px; border-left: 4px solid #2E7D32;">
-                                        <h5 style="color: #2E7D32; margin-bottom: 10px;">
-                                            Informations Souscription
-                                        </h5>
-                                        <div class="row">
-                                            <div class="col-6">
-                                                <strong>Référence contrat:</strong> <span t-field="o.souscription_id.name"/><br/>
-                                                <strong>Point de livraison (PDL):</strong> <span t-field="o.souscription_id.pdl"/><br/>
-                                                <strong>Puissance souscrite:</strong> <span t-field="o.souscription_id.puissance_souscrite"/> kVA
-                                            </div>
-                                            <div class="col-6">
-                                                <strong>Type de tarif:</strong>
-                                                <span t-if="o.souscription_id.type_tarif == 'base'">Base</span>
-                                                <span t-elif="o.souscription_id.type_tarif == 'hphc'">Heures Pleines / Heures Creuses</span>
-                                                <span t-else="" t-field="o.souscription_id.type_tarif"/><br/>
-                                                <strong>Période facturée:</strong> <span t-field="o.periode_id.mois_annee"/><br/>
-                                                <strong>Référence compteur:</strong> <span t-field="o.souscription_id.ref_compteur"/>
+                        <div class="page fe_wrap">
+                            <style>
+                                .fe_wrap { color:#2b2b2b; font-size:13px; line-height:1.45; }
+                                .fe_wrap h1,.fe_wrap h2,.fe_wrap h3,.fe_wrap h4 { margin:0; }
+                                .fe_eyebrow { text-transform:uppercase; letter-spacing:.14em; font-size:10.5px; font-weight:700; color:#1a6e62; }
+                                .fe_invoice_no { font-size:25px; font-weight:700; color:#1a6e62; line-height:1.1; }
+                                .fe_sub { font-size:12px; color:#6b7280; }
+                                .fe_pill { display:inline-block; padding:1px 10px; border-radius:999px; font-size:10.5px; font-weight:700; background:#fbf3d6; color:#7a5d00; vertical-align:middle; }
+                                .fe_hero { background:#fbf3d6; border-left:4px solid #efc631; border-radius:8px; padding:12px 16px; }
+                                .fe_hero_label { text-transform:uppercase; letter-spacing:.08em; font-size:10.5px; font-weight:700; color:#7a5d00; }
+                                .fe_hero_amount { font-size:27px; font-weight:700; color:#1a6e62; line-height:1.1; }
+                                .fe_card { border:1px solid #e6e8eb; border-radius:8px; padding:11px 13px; min-height:96px; }
+                                .fe_card h3 { font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:#1a6e62; font-weight:700; margin-bottom:6px; }
+                                .fe_kv { font-size:12px; }
+                                .fe_kv .k { color:#6b7280; }
+                                .fe_kv .v { font-weight:600; }
+                                .fe_phone { font-size:17px; font-weight:700; color:#caa116; letter-spacing:.02em; }
+                                .fe_section { font-size:14px; font-weight:700; color:#1a6e62; margin:20px 0 8px; padding-left:9px; border-left:3px solid #efc631; }
+                                .fe_table { width:100%; border-collapse:collapse; }
+                                /* Neutralise tout bordage imposé par le style de tableau du layout société
+                                   (o_table_boxed/bordered/…) : contour ::before + bordures de cellules. */
+                                .fe_table::before, .fe_totals::before { content:none !important; border:0 !important; }
+                                /* Reset large : élément table + thead/tbody/tr (pas seulement td/th),
+                                   pour neutraliser toute bordure venant du bundle de rapport. */
+                                .fe_wrap table, .fe_wrap thead, .fe_wrap tbody, .fe_wrap tfoot, .fe_wrap tr { border:0 !important; }
+                                .fe_table th, .fe_table td, .fe_totals th, .fe_totals td { border:0 !important; }
+                                .fe_table thead th { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:#6b7280; font-weight:700; border-bottom:2px solid #1a6e62 !important; padding:6px 8px; }
+                                .fe_table tbody td { padding:7px 8px; border-bottom:1px solid #eef0f2 !important; vertical-align:top; }
+                                .fe_table .num { text-align:right; white-space:nowrap; }
+                                .fe_sec_row td { background:#eef6f3 !important; font-weight:700; color:#1a6e62; border-bottom:1px solid #dcebe6 !important; }
+                                .fe_note_row td { font-style:italic; color:#6b7280; border-bottom:1px solid #eef0f2; }
+                                .fe_totals { width:100%; font-size:13px; }
+                                .fe_totals td { padding:5px 8px; }
+                                .fe_totals .lbl { color:#4b5563; }
+                                .fe_totals .ttc td { border-top:2px solid #1a6e62 !important; font-weight:700; color:#1a6e62; font-size:15px; padding-top:8px; }
+                                .fe_callout { background:#eef6f3; border-radius:8px; padding:10px 13px; font-size:11.5px; color:#374151; }
+                                .fe_badge { display:inline-block; padding:1px 9px; border-radius:999px; font-size:10px; font-weight:700; }
+                                .fe_badge_reel { background:#1a6e62; color:#ffffff; }
+                                .fe_badge_est { background:#efc631; color:#3a2f00; }
+                                .fe_legal { font-size:10px; color:#6b7280; margin:0; padding-left:16px; }
+                                .fe_legal li { margin-bottom:2px; }
+                                .fe_legal a { color:#1a6e62; }
+                                .fe_muted { color:#6b7280; }
+                                /* Colonnes via tables : robuste dans wkhtmltopdf, indépendant du flex Bootstrap
+                                   et du style de tableau du layout société. */
+                                .fe_layout { width:100%; border-collapse:collapse; table-layout:fixed; }
+                                .fe_layout::before { content:none !important; border:0 !important; }
+                                .fe_layout > tbody > tr > td, .fe_layout > tr > td { border:0 !important; vertical-align:top; }
+                            </style>
+
+                            <!-- ===== Hero : n° facture + montant ===== -->
+                            <table class="fe_layout o_ignore_layout_styling" style="margin-bottom:4px;">
+                                <tr>
+                                    <td style="width:58%; padding-right:14px;">
+                                        <div class="fe_eyebrow">
+                                            <span t-if="o.move_type == 'out_refund'">Avoir</span>
+                                            <span t-else="">Facture</span>
+                                            <span t-if="periode.lisse" class="fe_pill">Mensualisée</span>
+                                            <span t-if="o.state == 'draft'" class="fe_pill">Brouillon</span>
+                                            <span t-if="o.state == 'cancel'" class="fe_pill">Annulée</span>
+                                        </div>
+                                        <div class="fe_invoice_no" t-out="o.name if o.name != '/' else ''"/>
+                                        <div class="fe_sub">
+                                            <t t-if="souscription">Contrat <span t-field="souscription.name"/></t>
+                                            <t t-if="periode.date_debut and periode.date_fin">
+                                                · Période du <span t-out="periode.date_debut.strftime('%d/%m/%Y')"/>
+                                                au <span t-out="periode.date_fin.strftime('%d/%m/%Y')"/>
+                                            </t>
+                                        </div>
+                                    </td>
+                                    <td style="width:42%;">
+                                        <div class="fe_hero">
+                                            <div class="fe_hero_label">Total TTC</div>
+                                            <div class="fe_hero_amount"><span t-field="o.amount_total"/></div>
+                                            <div class="fe_sub">
+                                                <t t-if="o.invoice_date">Émise le <span t-field="o.invoice_date"/></t>
+                                                <t t-if="o.invoice_date_due"> · échéance <span t-field="o.invoice_date_due"/></t>
                                             </div>
                                         </div>
-                                        <div t-if="o.souscription_id.tarif_solidaire" class="mt-2">
-                                            <span class="badge" style="background-color: #2E7D32; color: white;">
-                                                ♥ Tarif Solidaire
-                                            </span>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- ===== Cartes d'information ===== -->
+                            <table class="fe_layout o_ignore_layout_styling" style="margin-top:10px;">
+                                <tr>
+                                    <td style="width:33.33%; padding-right:8px;">
+                                        <div class="fe_card">
+                                            <h3>Contrat</h3>
+                                            <div class="fe_kv">
+                                                <div><span class="v">
+                                                    <t t-if="souscription.type_tarif == 'hphc'">HP/HC</t><t t-else="">Base</t>
+                                                    · <span t-field="souscription.puissance_souscrite"/>
+                                                </span></div>
+                                                <div t-if="souscription.tarif_solidaire"><span class="fe_pill">Tarif solidaire</span></div>
+                                                <div><span class="k">Réf. usager·ère </span><span class="v" t-out="o.partner_id.id"/></div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
+                                    </td>
+                                    <td style="width:33.34%; padding:0 4px;">
+                                        <div class="fe_card">
+                                            <h3>Point de livraison</h3>
+                                            <div class="fe_kv">
+                                                <div><span class="k">PDL </span><span class="v" t-field="souscription.pdl"/></div>
+                                                <div t-if="souscription.ref_compteur"><span class="k">Réf. compteur </span><span class="v" t-field="souscription.ref_compteur"/></div>
+                                                <div class="fe_muted">Mix : hydro-électricité et éolien</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td style="width:33.33%; padding-left:8px;">
+                                        <div class="fe_card">
+                                            <h3>Dépannage</h3>
+                                            <div class="fe_kv fe_muted" style="margin-bottom:2px;">Gestionnaire du réseau de distribution</div>
+                                            <div class="fe_phone" t-out="souscription.numero_depannage or '09 72 67 50 44'"/>
+                                            <div class="fe_kv fe_muted" style="margin-top:4px;">
+                                                <span t-if="o.company_id.email" t-field="o.company_id.email"/>
+                                                <t t-if="o.company_id.phone"><br/><span t-field="o.company_id.phone"/></t>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
 
-
-                            <!-- Informations client et facture -->
-                            <div class="row">
-                                <div class="col-6">
-                                    <strong>Client:</strong>
-                                    <div t-field="o.partner_id" t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/>
-                                </div>
-                                <div class="col-6">
-                                    <strong>Numéro de facture:</strong> <span t-field="o.name"/><br/>
-                                    <strong>Date de facture:</strong> <span t-field="o.invoice_date"/><br/>
-                                    <strong>Date d'échéance:</strong> <span t-field="o.invoice_date_due"/>
-                                </div>
-                            </div>
-
-                            <!-- Lignes de facture -->
-                            <table class="table table-sm o_main_table mt-4">
+                            <!-- ===== Détail des lignes ===== -->
+                            <div class="fe_section">Détail de la facture</div>
+                            <t t-set="display_discount" t-value="any(l.discount for l in o.invoice_line_ids)"/>
+                            <table class="fe_table o_ignore_layout_styling">
                                 <thead>
                                     <tr>
-                                        <th style="color: #2E7D32;">Description</th>
-                                        <th class="text-end">Quantité</th>
-                                        <th class="text-end">Prix unitaire</th>
-                                        <th class="text-end">Montant</th>
+                                        <th>Description</th>
+                                        <th class="num">Quantité</th>
+                                        <th class="num">Prix unitaire</th>
+                                        <th t-if="display_discount" class="num">Rem.%</th>
+                                        <th>Taxes</th>
+                                        <th class="num">Montant</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <t t-foreach="o.invoice_line_ids" t-as="line">
-                                        <tr t-if="line.display_type == 'line_section'" style="background-color: #E8F5E8;">
-                                            <td colspan="4"><strong t-field="line.name"/></td>
+                                    <t t-set="lines" t-value="o.invoice_line_ids.sorted(key=lambda l: (-l.sequence, l.date, l.move_name, -l.id), reverse=True)"/>
+                                    <t t-foreach="lines" t-as="line">
+                                        <tr t-if="line.display_type == 'line_section'" class="fe_sec_row">
+                                            <td colspan="99"><span t-field="line.name" t-options="{'widget': 'text'}"/></td>
                                         </tr>
-                                        <tr t-elif="line.display_type == 'line_note'">
-                                            <td colspan="4" class="text-muted" style="font-style: italic;">
-                                                <span t-field="line.name"/>
-                                            </td>
+                                        <tr t-elif="line.display_type == 'line_note'" class="fe_note_row">
+                                            <td colspan="99"><span t-field="line.name" t-options="{'widget': 'text'}"/></td>
                                         </tr>
                                         <tr t-else="">
-                                            <td><span t-field="line.name"/></td>
-                                            <td class="text-end"><span t-field="line.quantity"/></td>
-                                            <td class="text-end"><span t-field="line.price_unit"/></td>
-                                            <td class="text-end"><span t-field="line.price_subtotal"/></td>
+                                            <td><span t-field="line.name" t-options="{'widget': 'text'}"/></td>
+                                            <td class="num">
+                                                <span t-field="line.quantity"/>
+                                                <span t-field="line.product_uom_id" groups="uom.group_uom"/>
+                                            </td>
+                                            <td class="num" t-out="'%.4f' % line.price_unit"/>
+                                            <td t-if="display_discount" class="num"><span t-field="line.discount"/></td>
+                                            <td><span t-out="', '.join(map(lambda t: (t.invoice_label or t.name), line.tax_ids))"/></td>
+                                            <td class="num"><span t-field="line.price_subtotal"/></td>
                                         </tr>
                                     </t>
                                 </tbody>
                             </table>
 
-                            <!-- Totaux -->
-                            <div class="clearfix">
-                                <div class="row">
-                                    <div class="col-6">
-                                        <!-- Note TURPE -->
-                                        <div class="mt-3 p-3" style="background-color: #f8f9fa; border-left: 3px solid #2E7D32;">
-                                            <p class="mb-0">
-                                                <strong style="color: #2E7D32;">Information réglementaire :</strong><br/>
-                                                Les montants TURPE (Tarif d'Utilisation des Réseaux Publics d'Électricité)
-                                                correspondent aux coûts d'acheminement de l'électricité et sont indiqués à titre informatif.
-                                            </p>
+                            <!-- ===== Note (TURPE / mensualisation) + totaux ===== -->
+                            <t t-set="turpe_total" t-value="periode.turpe_fixe + periode.turpe_variable"/>
+                            <table class="fe_layout o_ignore_layout_styling" style="margin-top:12px;">
+                                <tr>
+                                    <td style="width:58%; padding-right:14px;">
+                                        <div t-if="periode.lisse" class="fe_callout">
+                                            <strong>Option mensualisée.</strong> Cette facture correspond à votre
+                                            consommation moyenne mensuelle estimée. L'écart avec votre consommation
+                                            réelle est soldé lors d'une régularisation.
                                         </div>
-                                    </div>
-                                    <div class="col-6">
-                                        <table class="table table-sm">
+                                        <div t-elif="turpe_total &gt; 0" class="fe_callout">
+                                            Dont <span t-out="turpe_total" t-options='{"widget": "monetary", "display_currency": o.currency_id}'/>
+                                            de TURPE (acheminement réseau), à titre informatif.
+                                        </div>
+                                    </td>
+                                    <td style="width:42%;">
+                                        <table class="fe_totals o_ignore_layout_styling">
                                             <tr>
-                                                <td><strong>Sous-total HT</strong></td>
-                                                <td class="text-end"><span t-field="o.amount_untaxed"/></td>
+                                                <td class="lbl">Sous-total HT</td>
+                                                <td class="num"><span t-field="o.amount_untaxed"/></td>
                                             </tr>
                                             <tr t-if="o.amount_tax">
-                                                <td>TVA</td>
-                                                <td class="text-end"><span t-field="o.amount_tax"/></td>
+                                                <td class="lbl">TVA</td>
+                                                <td class="num"><span t-field="o.amount_tax"/></td>
                                             </tr>
-                                            <tr class="border-black">
-                                                <td><strong>Total TTC</strong></td>
-                                                <td class="text-end"><strong><span t-field="o.amount_total"/></strong></td>
+                                            <tr class="ttc">
+                                                <td>Total TTC</td>
+                                                <td class="num"><span t-field="o.amount_total"/></td>
                                             </tr>
                                         </table>
-                                    </div>
-                                </div>
-                            </div>
+                                    </td>
+                                </tr>
+                            </table>
 
-                            <!-- Justificatif de calcul — relevés d'index utilisés (ADR 0015).
-                                 Rendu PAR PROJECTION depuis la Période : aucun relevé n'est une
-                                 ligne de facture (le move reste purement financier, ADR 0014).
-                                 Visiblement séparé des lignes facturées — en lissé, la conso
-                                 fin − début diffère de la provision facturée (régularisation). -->
-                            <t t-set="releves" t-value="o.periode_id.releve_ids.sorted('date')"/>
-                            <div t-if="releves" class="mt-4">
-                                <h5 style="color: #2E7D32;">Justificatif de calcul — relevés utilisés</h5>
-                                <p class="text-muted" style="font-size: 0.85em;">
+                            <!-- ===== Justificatif — relevés d'index (ADR 0015) ===== -->
+                            <t t-set="releves" t-value="periode.releve_ids.sorted('date')"/>
+                            <div t-if="releves" class="no-page-break">
+                                <div class="fe_section">Justificatif de calcul — relevés utilisés</div>
+                                <p class="fe_muted" style="font-size:11px; margin-bottom:8px;">
                                     Index ayant servi au calcul de votre consommation, par cadran de comptage.
                                     Vous pouvez les comparer aux index affichés sur votre compteur.
                                 </p>
-                                <t t-set="colonnes" t-value="o.periode_id.releve_colonnes()"/>
-                                <table class="table table-sm">
+                                <t t-set="colonnes" t-value="periode.releve_colonnes()"/>
+                                <table class="fe_table o_ignore_layout_styling">
                                     <thead>
                                         <tr>
                                             <th>Date</th>
                                             <th>Nature</th>
-                                            <th t-foreach="colonnes" t-as="col" class="text-end">
-                                                Index <span t-out="col['label']"/>
-                                            </th>
+                                            <th t-foreach="colonnes" t-as="col" class="num">Index <span t-out="col['label']"/></th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -153,28 +245,45 @@
                                             <tr>
                                                 <td t-out="releve.date.strftime('%d/%m/%Y') if releve.date else ''"/>
                                                 <td>
-                                                    <span t-if="releve.nature == 'reel'" class="badge" style="background-color: #2E7D32; color: white;">Réel</span>
-                                                    <span t-else="" class="badge" style="background-color: #9E9E9E; color: white;">Estimé</span>
+                                                    <span t-if="releve.nature == 'reel'" class="fe_badge fe_badge_reel">Réel</span>
+                                                    <span t-else="" class="fe_badge fe_badge_est">Estimé</span>
                                                 </td>
-                                                <td t-foreach="colonnes" t-as="col" class="text-end" t-out="releve[col['field']]"/>
+                                                <td t-foreach="colonnes" t-as="col" class="num" t-out="'%g' % releve[col['field']]"/>
                                             </tr>
                                         </t>
                                     </tbody>
                                 </table>
                             </div>
 
-                            <!-- Pied de page énergie -->
-                            <div class="mt-4 text-center" style="color: #2E7D32;">
-                                <small>
-                                    Service Client Énergie : 0800 XXX XXX | energie@example.com
-                                </small>
+                            <!-- ===== Paiement ===== -->
+                            <div t-if="o.move_type == 'out_invoice' and o.partner_id.bank_ids" class="no-page-break" style="margin-top:18px;">
+                                <div class="fe_callout">
+                                    <strong>Paiement.</strong> Prélèvement automatique déclenché le 10 du mois sur le
+                                    compte <span t-out="'XXXX ' * 4 + o.partner_id.bank_ids[0].acc_number[29:]"/>.
+                                    Cette facture ne vous est envoyée qu'à titre informatif, n'effectuez pas de
+                                    règlement manuel.
+                                </div>
                             </div>
 
+                            <!-- ===== Mentions légales ===== -->
+                            <div t-if="o.move_type == 'out_invoice'" class="no-page-break" style="margin-top:18px;">
+                                <div class="fe_section">S'informer</div>
+                                <ul class="fe_legal">
+                                    <li>Grille tarifaire : <a href="https://energie-de-nantes.fr/souscrire/">energie-de-nantes.fr/souscrire</a>. Nos tarifs ne sont pas réglementés, mais décidés collectivement.</li>
+                                    <li>CGV : souscription d'un an renouvelable par tacite reconduction (art. 2.3) ; résiliation de plein droit quand vous voulez (art. 3.2).</li>
+                                    <li>Sans compteur Linky, transmettez vos index la veille du 1er du mois pour qu'ils soient pris en compte.</li>
+                                    <li>Vos droits et démarches : <a href="http://www.energie-info.fr">energie-info.fr</a>. En cas de litige non résolu sous deux mois : <a href="http://www.energie-mediateur.fr">energie-mediateur.fr</a> — Médiateur national de l'énergie, Libre réponse n° 59252, 75443 Paris cedex 09, n° vert 0800 112 212.</li>
+                                </ul>
+                            </div>
+
+                            <div class="fe_muted" t-if="o.narration" style="margin-top:12px; font-size:11px;">
+                                <span t-field="o.narration"/>
+                            </div>
                         </div>
                     </t>
                 </t>
                 <t t-else="">
-                    <!-- Utiliser le template standard pour les autres factures -->
+                    <!-- Factures non énergie : template standard Odoo -->
                     <t t-call="account.report_invoice_document"/>
                 </t>
             </t>

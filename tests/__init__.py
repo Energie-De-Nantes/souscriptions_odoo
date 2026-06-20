@@ -1,6 +1,7 @@
 from . import (
     test_basic,
     test_catalogue,
+    test_contrat_report,
     test_facturation,
     test_grille_prix,
     test_integration,

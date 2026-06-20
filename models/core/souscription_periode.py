@@ -111,6 +111,11 @@ class SouscriptionPeriode(models.Model):
         help='Coefficient PRO au moment de la création de cette période',
     )
 
+    # Relevés d'index utilisés pour le calcul d'énergie (ADR 0015). Justificatif
+    # légal, figé avec le snapshot et verrouillé après facturation (#56). Saisi à
+    # la main par le·la facturiste tant que le pull electricore manque (#12).
+    releve_ids = fields.One2many('souscription.releve', 'periode_id', string="Relevés d'index utilisés")
+
     # Lien Période ↔ Facture : `account.move.periode_id` est l'unique source de
     # vérité (ADR 0004). `facture_id` en est dérivé — calculé/stocké, non écrit.
     move_ids = fields.One2many('account.move', 'periode_id', string='Documents liés', readonly=True)
@@ -219,6 +224,28 @@ class SouscriptionPeriode(models.Model):
                         'Supprimez la facture pour corriger, ou créez une régularisation.'
                     )
         return super().write(vals)
+
+    # Mapping cadran réseau → colonne d'index, source unique pour le justificatif
+    # PDF (#55) et portail (#57) — ADR 0015. Suit le calendrier de comptage
+    # (ADR 0005) ; point d'extension nommé pour Tempo/EJP (hors périmètre).
+    _RELEVE_COLONNES = {
+        'base': [{'label': 'Base', 'field': 'index_base'}],
+        'hp_hc': [{'label': 'HP', 'field': 'index_hp'}, {'label': 'HC', 'field': 'index_hc'}],
+        '4_cadrans': [
+            {'label': 'HPH', 'field': 'index_hph'},
+            {'label': 'HPB', 'field': 'index_hpb'},
+            {'label': 'HCH', 'field': 'index_hch'},
+            {'label': 'HCB', 'field': 'index_hcb'},
+        ],
+    }
+
+    def releve_colonnes(self):
+        """Colonnes d'index réseau (`label`, `field`) à afficher pour le
+        justificatif des relevés de cette Période, selon son calendrier de
+        comptage. Itérées par les rendus PDF et portail — un seul endroit où vit
+        le mapping cadran→colonne (ADR 0015)."""
+        self.ensure_one()
+        return self._RELEVE_COLONNES.get(self.config_cadrans, [])
 
     @api.depends('date_debut', 'date_fin')
     def _compute_jours(self):

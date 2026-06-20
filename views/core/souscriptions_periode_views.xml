@@ -87,6 +87,34 @@
                         </group>
                     </group>
 
+                    <!-- Relevés d'index utilisés (ADR 0015) : justificatif légal du
+                         calcul d'énergie, saisi à la main par le·la facturiste.
+                         Forme large par cadran réseau ; les colonnes d'index
+                         suivent le calendrier de comptage (config_cadrans). -->
+                    <group string="Relevés d'index utilisés">
+                        <field name="releve_ids" nolabel="1" colspan="2">
+                            <list editable="bottom">
+                                <field name="config_cadrans" column_invisible="1"/>
+                                <field name="date"/>
+                                <field name="nature"/>
+                                <field name="index_base"
+                                       column_invisible="parent.config_cadrans != 'base'"/>
+                                <field name="index_hp"
+                                       column_invisible="parent.config_cadrans != 'hp_hc'"/>
+                                <field name="index_hc"
+                                       column_invisible="parent.config_cadrans != 'hp_hc'"/>
+                                <field name="index_hph"
+                                       column_invisible="parent.config_cadrans != '4_cadrans'"/>
+                                <field name="index_hpb"
+                                       column_invisible="parent.config_cadrans != '4_cadrans'"/>
+                                <field name="index_hch"
+                                       column_invisible="parent.config_cadrans != '4_cadrans'"/>
+                                <field name="index_hcb"
+                                       column_invisible="parent.config_cadrans != '4_cadrans'"/>
+                            </list>
+                        </field>
+                    </group>
+
                     <group string="Documents">
                         <field name="facture_id"/>
                         <field name="facture_state"/>

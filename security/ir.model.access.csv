@@ -3,6 +3,8 @@ access_souscription_user,souscription.souscription user,model_souscription_sousc
 access_souscription_manager,souscription.souscription manager,model_souscription_souscription,group_souscriptions_manager,1,1,1,1
 access_souscription_periode_user,souscription.periode user,model_souscription_periode,group_souscriptions_user,1,1,1,0
 access_souscription_periode_manager,souscription.periode manager,model_souscription_periode,group_souscriptions_manager,1,1,1,1
+access_souscription_releve_user,souscription.releve user,model_souscription_releve,group_souscriptions_user,1,1,1,0
+access_souscription_releve_manager,souscription.releve manager,model_souscription_releve,group_souscriptions_manager,1,1,1,1
 access_souscription_etat_user,souscription.etat user,model_souscription_etat,group_souscriptions_user,1,0,0,0
 access_souscription_etat_manager,souscription.etat manager,model_souscription_etat,group_souscriptions_manager,1,1,1,1
 access_souscription_refacturation_user,souscription.refacturation user,model_souscription_refacturation,group_souscriptions_user,1,1,1,0
@@ -17,5 +19,6 @@ access_raccordement_stage_user,raccordement.stage user,model_raccordement_stage,
 access_raccordement_stage_manager,raccordement.stage manager,model_raccordement_stage,group_souscriptions_manager,1,1,1,1
 access_souscription_portal,souscription.souscription portal,model_souscription_souscription,base.group_portal,1,0,0,0
 access_souscription_periode_portal,souscription.periode portal,model_souscription_periode,base.group_portal,1,0,0,0
+access_souscription_releve_portal,souscription.releve portal,model_souscription_releve,base.group_portal,1,0,0,0
 access_souscription_etat_portal,souscription.etat portal,model_souscription_etat,base.group_portal,1,0,0,0
 access_account_move_portal,account.move portal,account.model_account_move,base.group_portal,1,0,0,0

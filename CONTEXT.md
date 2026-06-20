@@ -43,9 +43,29 @@ travail facturable** : amorcé par les quantités calculées par electricore (m�
 le flux Enedis manque, *gestes commerciaux*, ajustements. À la facturation, ses valeurs (quantités
 par cadran, jours, puissance, taxes) sont **figées** (historisation) et liées à la facture. Porte
 ce qui est **facturé** — pas une copie du coût réseau ; la marge se calcule à la demande côté
-analytique en rejouant electricore.
+analytique en rejouant electricore. Elle est la **source analytique** typée : ses champs se lisent
+et s'agrègent **directement**, jamais reconstruits depuis les lignes de facture (`ligne → produit →
+catégorie`) ; la *Facture* en est une **projection** (dérive manuelle bornée tolérée, ADR 0014).
 _Éviter_ : méta-période (concept amont, côté electricore), mois ; « instantané fidèle » (la Période
 est un brouillon facturable, pas une copie figée d'electricore).
+
+**Relevé (d'index)** :
+Événement de lecture **daté** du compteur, enfant d'une *Période* (`souscription.releve`,
+`periode_id`). Porte un **index** (compteur cumulé) **par cadran réseau** — même axe *mesuré* que
+les `energie_*` (registres physiques : HPH/HPB/HCH/HCB, ou HP/HC, ou Base selon le *calendrier de
+comptage*), jamais par cadran **facturé**. Consigne **tous les index qu'electricore a utilisés**
+pour le calcul d'énergie de la Période — **obligation légale** sur la *Facture* et support de
+**vérification** par le·la *souscripteur·rice*. Chaque relevé déclare sa **nature** : *réel*
+(mesure Enedis) ou *estimé* (estimation electricore ou *facturiste*), étiquetée sur la facture.
+**Figé** avec le snapshot de la Période et verrouillé après facturation (ADR 0006/0014) ; le relevé
+**frontière** est dupliqué entre deux Périodes consécutives — assumé : chaque facture est
+auto-portante. Source : electricore (pull, ADR 0011), saisi à la main par le·la *facturiste* tant
+que l'intégration manque (#12). C'est un **justificatif**, pas la quantité facturée : l'énergie
+facturée reste pilotée par `energie_*`/provision (un contrat *lissé* facture la provision, pas
+`fin − début`).
+_Éviter_ : confondre **index** (la valeur cumulée d'un registre) et **relevé** (l'événement daté qui
+en porte plusieurs) ; confondre avec `energie_*` (la *consommation* dérivée des relevés) ; cadran
+facturé.
 
 **Grille de prix** :
 Barème **fournisseur** daté (`grille.prix`) : prix d'abonnement par puissance, prix de l'énergie

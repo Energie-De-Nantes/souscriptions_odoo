@@ -300,6 +300,50 @@
                                     </div>
                                 </t>
 
+                                <!-- Justificatif — relevés d'index utilisés (#57 / ADR 0015).
+                                     Même source que le PDF (periode_id.releve_ids). `periodes`
+                                     est déjà filtré aux factures ÉMISES (postées) par le
+                                     contrôleur : aucun brouillon ne fuite côté usager. -->
+                                <t t-set="periodes_avec_releves" t-value="periodes.filtered(lambda p: p.releve_ids)"/>
+                                <t t-if="periodes_avec_releves">
+                                    <h5 class="mt-4">Justificatif — relevés d'index utilisés</h5>
+                                    <p class="text-muted" style="font-size: 0.9em;">
+                                        Index ayant servi au calcul de votre consommation, par cadran de comptage.
+                                        Vous pouvez les comparer aux index affichés sur votre compteur.
+                                    </p>
+                                    <t t-foreach="periodes_avec_releves" t-as="periode">
+                                        <t t-set="colonnes" t-value="periode.releve_colonnes()"/>
+                                        <div class="mb-3">
+                                            <strong t-out="periode.mois_annee"/>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-striped align-middle">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Date</th>
+                                                            <th>Nature</th>
+                                                            <th t-foreach="colonnes" t-as="col" class="text-end">
+                                                                Index <span t-out="col['label']"/>
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <t t-foreach="periode.releve_ids.sorted('date')" t-as="releve">
+                                                            <tr>
+                                                                <td t-out="releve.date.strftime('%d/%m/%Y') if releve.date else ''"/>
+                                                                <td>
+                                                                    <span t-if="releve.nature == 'reel'" class="badge rounded-pill text-bg-success">Réel</span>
+                                                                    <span t-else="" class="badge rounded-pill text-bg-secondary">Estimé</span>
+                                                                </td>
+                                                                <td t-foreach="colonnes" t-as="col" class="text-end" t-out="releve[col['field']]"/>
+                                                            </tr>
+                                                        </t>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </t>
+
                                 <!-- Totaux (sur toutes les périodes facturées) + glossaire -->
                                 <t t-set="total_kwh" t-value="0"/>
                                 <t t-set="total_turpe" t-value="0"/>

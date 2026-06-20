@@ -325,3 +325,85 @@ class PortalIntegrationTestCase(SouscriptionsTestMixin, HttpCase):
         self.assertTrue(access, 'Accès portal aux périodes requis')
         self.assertTrue(access.perm_read, 'Lecture autorisée')
         self.assertFalse(access.perm_write, 'Écriture interdite')
+
+
+@tagged('post_install', '-at_install', 'portal', 'souscriptions_releve')
+class PortalReleveTestCase(SouscriptionsTestMixin, HttpCase):
+    """Bloc justificatif des relevés dans le détail souscription du portail
+    (#57 / ADR 0015) : visible pour les périodes dont la facture est ÉMISE
+    (postée) uniquement — un brouillon ne fuite jamais côté usager."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setUpSouscriptionsData()
+
+        cls.portal_user = cls.env['res.users'].create(
+            {
+                'name': 'Portal Releve User',
+                'login': 'portal_releve',
+                'email': 'portal_releve@test.com',
+                'group_ids': [(6, 0, [cls.env.ref('base.group_portal').id])],
+            }
+        )
+        cls.partner_test.user_ids = [(6, 0, [cls.portal_user.id])]
+
+        # Période ÉMISE (postée) avec relevés saisis avant facturation.
+        cls.periode_postee = cls.env['souscription.periode'].create(
+            {
+                'souscription_id': cls.souscription_base.id,
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 1, 31),
+                'type_periode': 'mensuelle',
+                'energie_base_kwh': 280.0,
+                'turpe_fixe': 8.50,
+                'turpe_variable': 12.30,
+            }
+        )
+        cls.env['souscription.releve'].create(
+            {'periode_id': cls.periode_postee.id, 'date': date(2024, 1, 1), 'nature': 'reel', 'index_base': 71000.0}
+        )
+        cls.env['souscription.releve'].create(
+            {'periode_id': cls.periode_postee.id, 'date': date(2024, 1, 31), 'nature': 'estime', 'index_base': 71280.0}
+        )
+        cls.periode_postee._creer_facture().action_post()
+
+        # Période en BROUILLON (facture non postée) avec un relevé : ne doit pas fuiter.
+        cls.periode_brouillon = cls.env['souscription.periode'].create(
+            {
+                'souscription_id': cls.souscription_base.id,
+                'date_debut': date(2024, 2, 1),
+                'date_fin': date(2024, 2, 29),
+                'type_periode': 'mensuelle',
+                'energie_base_kwh': 300.0,
+                'turpe_fixe': 8.50,
+                'turpe_variable': 14.0,
+            }
+        )
+        cls.env['souscription.releve'].create(
+            {'periode_id': cls.periode_brouillon.id, 'date': date(2024, 2, 1), 'nature': 'reel', 'index_base': 99999.0}
+        )
+        cls.facture_brouillon = cls.periode_brouillon._creer_facture()  # reste draft
+
+    def _detail_url(self):
+        return f'/my/souscription/{self.souscription_base.id}'
+
+    def test_releves_periode_emise_visibles(self):
+        """Les relevés (date, nature, index) d'une période émise sont visibles."""
+        self.authenticate(self.portal_user.login, self.portal_user.login)
+        response = self.url_open(self._detail_url())
+        self.assertEqual(response.status_code, 200)
+
+        self.assertIn('71000', response.text)
+        self.assertIn('71280', response.text)
+        self.assertIn('Réel', response.text)
+        self.assertIn('Estimé', response.text)
+
+    def test_releves_periode_brouillon_ne_fuitent_pas(self):
+        """Aucun relevé d'une période non émise (facture brouillon) n'apparaît."""
+        self.assertEqual(self.facture_brouillon.state, 'draft')
+        self.authenticate(self.portal_user.login, self.portal_user.login)
+        response = self.url_open(self._detail_url())
+        self.assertEqual(response.status_code, 200)
+
+        self.assertNotIn('99999', response.text)

@@ -4,7 +4,7 @@
         <!-- ================================ -->
         <!-- CLIENTS DE DÉMONSTRATION        -->
         <!-- ================================ -->
-        
+
         <!-- Client particulier BASE -->
         <record id="demo_client_particulier_base" model="res.partner">
             <field name="name">Marie Dupont</field>
@@ -16,7 +16,7 @@
             <field name="email">marie.dupont@email.fr</field>
             <field name="phone">02.99.12.34.56</field>
         </record>
-        
+
         <!-- Client particulier HP/HC -->
         <record id="demo_client_particulier_hphc" model="res.partner">
             <field name="name">Jean Martin</field>
@@ -28,7 +28,7 @@
             <field name="email">jean.martin@email.fr</field>
             <field name="phone">02.40.78.90.12</field>
         </record>
-        
+
         <!-- Client PRO -->
         <record id="demo_client_pro" model="res.partner">
             <field name="name">Boulangerie Bio du Coin</field>
@@ -40,7 +40,7 @@
             <field name="email">contact@boulangerie-bio.fr</field>
             <field name="phone">02.99.56.78.90</field>
         </record>
-        
+
         <!-- Client solidaire -->
         <record id="demo_client_solidaire" model="res.partner">
             <field name="name">Sophie Leroy</field>
@@ -52,11 +52,11 @@
             <field name="email">sophie.leroy@email.fr</field>
             <field name="phone">02.97.34.56.78</field>
         </record>
-        
+
         <!-- ================================ -->
         <!-- SOUSCRIPTIONS DE DÉMONSTRATION  -->
         <!-- ================================ -->
-        
+
         <!-- Souscription particulier BASE 6 kVA -->
         <record id="demo_souscription_particulier_base" model="souscription.souscription">
             <field name="partner_id" ref="demo_client_particulier_base"/>
@@ -70,7 +70,7 @@
             <field name="etat_facturation_id" ref="etat_a_facturer"/>
             <field name="ref_compteur">85234567</field>
         </record>
-        
+
         <!-- Souscription particulier HP/HC 9 kVA -->
         <record id="demo_souscription_particulier_hphc" model="souscription.souscription">
             <field name="partner_id" ref="demo_client_particulier_hphc"/>
@@ -84,7 +84,7 @@
             <field name="etat_facturation_id" ref="etat_a_facturer"/>
             <field name="ref_compteur">85987654</field>
         </record>
-        
+
         <!-- Souscription PRO avec majoration -->
         <record id="demo_souscription_pro" model="souscription.souscription">
             <field name="partner_id" ref="demo_client_pro"/>
@@ -99,7 +99,7 @@
             <field name="etat_facturation_id" ref="etat_a_facturer"/>
             <field name="ref_compteur">85123456</field>
         </record>
-        
+
         <!-- Souscription solidaire -->
         <record id="demo_souscription_solidaire" model="souscription.souscription">
             <field name="partner_id" ref="demo_client_solidaire"/>
@@ -114,7 +114,7 @@
             <field name="etat_facturation_id" ref="etat_a_facturer"/>
             <field name="ref_compteur">85111222</field>
         </record>
-        
+
         <!-- Souscription pour l'administrateur (portal testing) -->
         <record id="demo_souscription_admin" model="souscription.souscription">
             <field name="partner_id" ref="base.partner_admin"/>
@@ -129,11 +129,11 @@
             <field name="ref_compteur">85999888</field>
             <field name="numero_depannage">09 726 750 35</field>
         </record>
-        
+
         <!-- ================================ -->
         <!-- PÉRIODES DE DÉMONSTRATION       -->
         <!-- ================================ -->
-        
+
         <!-- Période janvier 2024 - Particulier BASE -->
         <record id="demo_periode_janvier_base" model="souscription.periode">
             <field name="souscription_id" ref="demo_souscription_particulier_base"/>
@@ -145,7 +145,7 @@
             <field name="turpe_fixe">8.50</field>
             <field name="turpe_variable">12.30</field>
         </record>
-        
+
         <!-- Période février 2024 - Particulier BASE -->
         <record id="demo_periode_fevrier_base" model="souscription.periode">
             <field name="souscription_id" ref="demo_souscription_particulier_base"/>
@@ -157,7 +157,7 @@
             <field name="turpe_fixe">8.50</field>
             <field name="turpe_variable">13.75</field>
         </record>
-        
+
         <!-- Période mars 2024 - Particulier HP/HC -->
         <record id="demo_periode_mars_hphc" model="souscription.periode">
             <field name="souscription_id" ref="demo_souscription_particulier_hphc"/>
@@ -175,7 +175,7 @@
             <field name="turpe_fixe">12.75</field>
             <field name="turpe_variable">18.20</field>
         </record>
-        
+
         <!-- Période février 2024 - PRO -->
         <record id="demo_periode_fevrier_pro" model="souscription.periode">
             <field name="souscription_id" ref="demo_souscription_pro"/>
@@ -186,7 +186,7 @@
             <field name="turpe_fixe">18.90</field>
             <field name="turpe_variable">32.50</field>
         </record>
-        
+
         <!-- Période avril 2024 - Solidaire -->
         <record id="demo_periode_avril_solidaire" model="souscription.periode">
             <field name="souscription_id" ref="demo_souscription_solidaire"/>
@@ -198,11 +198,11 @@
             <field name="turpe_fixe">4.25</field>
             <field name="turpe_variable">6.80</field>
         </record>
-        
+
         <!-- ================================ -->
         <!-- PÉRIODES ADMIN (PORTAL TESTING) -->
         <!-- ================================ -->
-        
+
         <!-- Période janvier 2024 - Admin -->
         <record id="demo_periode_janvier_admin" model="souscription.periode">
             <field name="souscription_id" ref="demo_souscription_admin"/>
@@ -220,7 +220,7 @@
             <field name="turpe_fixe">8.50</field>
             <field name="turpe_variable">14.20</field>
         </record>
-        
+
         <!-- Période février 2024 - Admin -->
         <record id="demo_periode_fevrier_admin" model="souscription.periode">
             <field name="souscription_id" ref="demo_souscription_admin"/>
@@ -238,7 +238,7 @@
             <field name="turpe_fixe">8.50</field>
             <field name="turpe_variable">16.10</field>
         </record>
-        
+
         <!-- Période mars 2024 - Admin -->
         <record id="demo_periode_mars_admin" model="souscription.periode">
             <field name="souscription_id" ref="demo_souscription_admin"/>
@@ -256,11 +256,123 @@
             <field name="turpe_fixe">8.50</field>
             <field name="turpe_variable">13.90</field>
         </record>
-        
+
+        <!-- ================================ -->
+        <!-- RELEVÉS D'INDEX (ADR 0015)      -->
+        <!-- ================================ -->
+        <!-- ORDRE DE CHARGEMENT CRITIQUE : ces relevés sont définis AVANT les
+             factures admin (plus bas). Le verrou #56 rejette tout relevé créé /
+             modifié sur une Période DÉJÀ facturée ; les relevés des périodes
+             facturées doivent donc être chargés tant que ces périodes sont encore
+             libres. Déplacer ce bloc après les factures casserait l'install démo. -->
+
+        <!-- Période NON facturée — Base, cas normal (2 relevés début/fin) ;
+             restent éditables (aucune facture ne les référence). Conso = 10265−10000 = 265. -->
+        <record id="demo_releve_janvier_base_debut" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_janvier_base"/>
+            <field name="date">2024-01-01</field>
+            <field name="nature">reel</field>
+            <field name="index_base">10000</field>
+        </record>
+        <record id="demo_releve_janvier_base_fin" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_janvier_base"/>
+            <field name="date">2024-01-31</field>
+            <field name="nature">reel</field>
+            <field name="index_base">10265</field>
+        </record>
+
+        <!-- Période NON facturée — Base, CHANGEMENT DE COMPTEUR (3 relevés). Le 3e
+             index « repart » bas (nouveau compteur posé à 0) : un fin−début naïf
+             serait faux. Conso = (10425−10265) + (135−0) = 295. Le bloc liste les
+             relevés bruts, sans conso synthétique. -->
+        <record id="demo_releve_fevrier_base_1" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_fevrier_base"/>
+            <field name="date">2024-02-01</field>
+            <field name="nature">reel</field>
+            <field name="index_base">10265</field>
+        </record>
+        <record id="demo_releve_fevrier_base_2" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_fevrier_base"/>
+            <field name="date">2024-02-15</field>
+            <field name="nature">reel</field>
+            <field name="index_base">10425</field>
+        </record>
+        <record id="demo_releve_fevrier_base_3" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_fevrier_base"/>
+            <field name="date">2024-02-29</field>
+            <field name="nature">reel</field>
+            <field name="index_base">135</field>
+        </record>
+
+        <!-- Période FACTURÉE & POSTÉE — Admin janvier (4 cadrans). Visible sur le
+             PDF de facture ET au portail. Chargée AVANT demo_facture_janvier_admin. -->
+        <record id="demo_releve_janvier_admin_debut" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_janvier_admin"/>
+            <field name="date">2024-01-01</field>
+            <field name="nature">reel</field>
+            <field name="index_hph">5000</field>
+            <field name="index_hpb">3000</field>
+            <field name="index_hch">2000</field>
+            <field name="index_hcb">1000</field>
+        </record>
+        <record id="demo_releve_janvier_admin_fin" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_janvier_admin"/>
+            <field name="date">2024-01-31</field>
+            <field name="nature">reel</field>
+            <field name="index_hph">5130</field>
+            <field name="index_hpb">3085</field>
+            <field name="index_hch">2060</field>
+            <field name="index_hcb">1035</field>
+        </record>
+
+        <!-- Période FACTURÉE & POSTÉE — Admin février (4 cadrans). Le début reprend
+             le fin de janvier (relevé FRONTIÈRE dupliqué, assumé — ADR 0015) ; fin
+             ESTIMÉ (badge Estimé). Chargée AVANT demo_facture_fevrier_admin. -->
+        <record id="demo_releve_fevrier_admin_debut" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_fevrier_admin"/>
+            <field name="date">2024-02-01</field>
+            <field name="nature">reel</field>
+            <field name="index_hph">5130</field>
+            <field name="index_hpb">3085</field>
+            <field name="index_hch">2060</field>
+            <field name="index_hcb">1035</field>
+        </record>
+        <record id="demo_releve_fevrier_admin_fin" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_fevrier_admin"/>
+            <field name="date">2024-02-29</field>
+            <field name="nature">estime</field>
+            <field name="index_hph">5280</field>
+            <field name="index_hpb">3180</field>
+            <field name="index_hch">2130</field>
+            <field name="index_hcb">1070</field>
+        </record>
+
+        <!-- Période FACTURÉE mais BROUILLON — Admin mars (4 cadrans). Relevés FIGÉS
+             par le verrou (facture existe), mais ABSENTS du portail (facture non
+             émise). Chargée AVANT demo_facture_mars_admin. -->
+        <record id="demo_releve_mars_admin_debut" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_mars_admin"/>
+            <field name="date">2024-03-01</field>
+            <field name="nature">reel</field>
+            <field name="index_hph">5280</field>
+            <field name="index_hpb">3180</field>
+            <field name="index_hch">2130</field>
+            <field name="index_hcb">1070</field>
+        </record>
+        <record id="demo_releve_mars_admin_fin" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_mars_admin"/>
+            <field name="date">2024-03-31</field>
+            <field name="nature">estime</field>
+            <field name="index_hph">5415</field>
+            <field name="index_hpb">3265</field>
+            <field name="index_hch">2185</field>
+            <field name="index_hcb">1100</field>
+        </record>
+
         <!-- ================================ -->
         <!-- GRILLE DE PRIX COMPLÈTE         -->
         <!-- ================================ -->
-        
+
         <!-- Grille de prix réaliste 2024 -->
         <record id="demo_grille_prix_complete_2024" model="grille.prix">
             <field name="name">Tarifs électricité 2024 - Complets</field>
@@ -268,30 +380,30 @@
             <field name="date_fin">2024-12-31</field>
             <field name="active">True</field>
         </record>
-        
+
         <!-- Prix énergies réalistes -->
         <record id="demo_prix_energie_base_2024" model="grille.prix.ligne">
             <field name="grille_id" ref="demo_grille_prix_complete_2024"/>
             <field name="product_id" ref="souscriptions_product_energie_base"/>
             <field name="prix_interne">0.2276</field>
         </record>
-        
+
         <record id="demo_prix_energie_hp_2024" model="grille.prix.ligne">
             <field name="grille_id" ref="demo_grille_prix_complete_2024"/>
             <field name="product_id" ref="souscriptions_product_energie_hp"/>
             <field name="prix_interne">0.2516</field>
         </record>
-        
+
         <record id="demo_prix_energie_hc_2024" model="grille.prix.ligne">
             <field name="grille_id" ref="demo_grille_prix_complete_2024"/>
             <field name="product_id" ref="souscriptions_product_energie_hc"/>
             <field name="prix_interne">0.2032</field>
         </record>
-        
+
         <!-- ================================ -->
         <!-- FACTURES ADMIN (PORTAL TESTING) -->
         <!-- ================================ -->
-        
+
         <!-- Facture janvier 2024 - Admin -->
         <record id="demo_facture_janvier_admin" model="account.move">
             <field name="move_type">out_invoice</field>
@@ -300,7 +412,7 @@
             <field name="invoice_date_due">2024-02-20</field>
             <field name="periode_id" ref="demo_periode_janvier_admin"/>
         </record>
-        
+
         <!-- Ligne facture janvier - Énergie HP -->
         <record id="demo_facture_janvier_admin_line_hp" model="account.move.line">
             <field name="move_id" ref="demo_facture_janvier_admin"/>
@@ -309,7 +421,7 @@
             <field name="quantity">215</field>
             <field name="price_unit">0.2516</field>
         </record>
-        
+
         <!-- Ligne facture janvier - Énergie HC -->
         <record id="demo_facture_janvier_admin_line_hc" model="account.move.line">
             <field name="move_id" ref="demo_facture_janvier_admin"/>
@@ -318,7 +430,7 @@
             <field name="quantity">95</field>
             <field name="price_unit">0.2032</field>
         </record>
-        
+
         <!-- Ligne facture janvier - Abonnement -->
         <record id="demo_facture_janvier_admin_line_abo" model="account.move.line">
             <field name="move_id" ref="demo_facture_janvier_admin"/>
@@ -327,7 +439,7 @@
             <field name="quantity">1</field>
             <field name="price_unit">12.60</field>
         </record>
-        
+
         <!-- Facture février 2024 - Admin -->
         <record id="demo_facture_fevrier_admin" model="account.move">
             <field name="move_type">out_invoice</field>
@@ -336,7 +448,7 @@
             <field name="invoice_date_due">2024-03-20</field>
             <field name="periode_id" ref="demo_periode_fevrier_admin"/>
         </record>
-        
+
         <!-- Ligne facture février - Énergie HP -->
         <record id="demo_facture_fevrier_admin_line_hp" model="account.move.line">
             <field name="move_id" ref="demo_facture_fevrier_admin"/>
@@ -345,7 +457,7 @@
             <field name="quantity">245</field>
             <field name="price_unit">0.2516</field>
         </record>
-        
+
         <!-- Ligne facture février - Énergie HC -->
         <record id="demo_facture_fevrier_admin_line_hc" model="account.move.line">
             <field name="move_id" ref="demo_facture_fevrier_admin"/>
@@ -354,7 +466,7 @@
             <field name="quantity">105</field>
             <field name="price_unit">0.2032</field>
         </record>
-        
+
         <!-- Ligne facture février - Abonnement -->
         <record id="demo_facture_fevrier_admin_line_abo" model="account.move.line">
             <field name="move_id" ref="demo_facture_fevrier_admin"/>
@@ -363,7 +475,7 @@
             <field name="quantity">1</field>
             <field name="price_unit">12.60</field>
         </record>
-        
+
         <!-- Facture mars 2024 - Admin : laissée volontairement en BROUILLON
              (cas d'une facture en cours / remise en brouillon par le·la
              facturiste) — visible côté gestion, jamais au portail usager. -->
@@ -374,7 +486,7 @@
             <field name="invoice_date_due">2024-04-20</field>
             <field name="periode_id" ref="demo_periode_mars_admin"/>
         </record>
-        
+
         <!-- Ligne facture mars - Énergie HP -->
         <record id="demo_facture_mars_admin_line_hp" model="account.move.line">
             <field name="move_id" ref="demo_facture_mars_admin"/>
@@ -383,7 +495,7 @@
             <field name="quantity">220</field>
             <field name="price_unit">0.2516</field>
         </record>
-        
+
         <!-- Ligne facture mars - Énergie HC -->
         <record id="demo_facture_mars_admin_line_hc" model="account.move.line">
             <field name="move_id" ref="demo_facture_mars_admin"/>
@@ -392,7 +504,7 @@
             <field name="quantity">85</field>
             <field name="price_unit">0.2032</field>
         </record>
-        
+
         <!-- Ligne facture mars - Abonnement -->
         <record id="demo_facture_mars_admin_line_abo" model="account.move.line">
             <field name="move_id" ref="demo_facture_mars_admin"/>

@@ -12,6 +12,7 @@ from . import (
     test_portal,
     test_raccordement,
     test_refacturation,
+    test_releve,
     test_security,
     test_souscription,
 )

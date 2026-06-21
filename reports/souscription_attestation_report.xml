@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Attestation de fourniture — preuve COURTE destinée aux tiers (bailleur,
+         CAF, assurance) : le·la titulaire a un contrat de fourniture ACTIF.
+         Projection de la Souscription (ADR 0016 / CONTEXT.md). Ne porte NI prix,
+         NI consentement, NI signature de l'usager·ère — c'est ce qui la distingue
+         des Conditions particulières. Style : bundle de marque report_brand.scss. -->
+    <record id="action_souscription_attestation" model="ir.actions.report">
+        <field name="name">Attestation de fourniture</field>
+        <field name="model">souscription.souscription</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">souscriptions_odoo.souscription_attestation_document</field>
+        <field name="report_file">souscriptions_odoo.souscription_attestation_document</field>
+        <field name="binding_model_id" ref="model_souscription_souscription"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="souscription_attestation_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="souscription">
+                <t t-call="web.external_layout">
+                    <div class="page fe_wrap">
+                        <!-- Styles `fe_*` : bundle de marque partagé (report_brand.scss). -->
+
+                        <div class="fe_eyebrow">Énergie de Nantes — fournisseur d'électricité</div>
+                        <div class="fe_invoice_no">Attestation de fourniture</div>
+                        <div class="fe_sub">Référence contrat <span t-field="souscription.name"/></div>
+
+                        <p class="fe_kv" style="margin-top:16px;">
+                            Nous attestons que
+                            <strong><span t-field="souscription.partner_id.name"/></strong>
+                            est titulaire d'un contrat de fourniture d'électricité actif au point de
+                            livraison ci-dessous.
+                        </p>
+
+                        <div class="fe_section">Justificatif</div>
+                        <table class="fe_table o_ignore_layout_styling">
+                            <tbody>
+                                <tr>
+                                    <td>Titulaire</td>
+                                    <td class="num"><span t-field="souscription.partner_id.name"/></td>
+                                </tr>
+                                <tr>
+                                    <td>Adresse du titulaire</td>
+                                    <td class="num">
+                                        <span t-field="souscription.partner_id"
+                                              t-options="{'widget': 'contact', 'fields': ['address'], 'no_marker': True}"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Point de livraison (PDL)</td>
+                                    <td class="num"><span t-field="souscription.pdl"/></td>
+                                </tr>
+                                <tr>
+                                    <td>Puissance souscrite</td>
+                                    <td class="num"><span t-field="souscription.puissance_souscrite"/> kVA</td>
+                                </tr>
+                                <tr>
+                                    <td>Contrat actif depuis</td>
+                                    <td class="num"><span t-field="souscription.date_debut" t-options="{'widget': 'date'}"/></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <p class="fe_muted" style="font-size:10.5px; margin-top:18px;">
+                            Attestation établie par Énergie de Nantes à la demande du·de la titulaire,
+                            pour faire valoir ce que de droit.
+                        </p>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

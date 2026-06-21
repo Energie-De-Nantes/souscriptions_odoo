@@ -24,7 +24,29 @@ class Souscription(models.Model):
 
     name = fields.Char(string='Référence', required=True, copy=False, readonly=True, default='Nouveau')
     partner_id = fields.Many2one('res.partner', string='Souscripteur·trice')
+    cotitulaires = fields.Many2many(
+        'res.partner',
+        'souscription_cotitulaire_rel',
+        'souscription_id',
+        'partner_id',
+        string='Cotitulaires',
+        help='Co-titulaires du contrat, au-delà du·de la souscripteur·rice principal·e.',
+    )
     active = fields.Boolean(string='Active', default=True)
+
+    # Déclarations contractuelles captées au Raccordement puis recopiées ici à la
+    # création (ADR 0016) : la Souscription en est propriétaire, les rapports les
+    # lisent sur elle, jamais sur la demande.
+    date_validation = fields.Date(
+        string='Date de signature',
+        help="Date de l'acte d'adhésion (signature électronique) sur support durable.",
+    )
+    renonce_retractation = fields.Boolean(
+        string='Renonce au délai de rétractation',
+        default=False,
+        help='Le·la souscripteur·rice a demandé une exécution avant la fin du délai '
+        'de rétractation de 14 jours et y renonce expressément.',
+    )
 
     date_debut = fields.Date(string='Début de la souscription')
     date_fin = fields.Date(string='Fin de la souscription')
@@ -38,6 +60,7 @@ class Souscription(models.Model):
     )
     periode_ids = fields.One2many('souscription.periode', 'souscription_id', string='Périodes de facturation')
     refacturation_ids = fields.One2many('souscription.refacturation', 'souscription_id', string='Refacturations')
+    consentement_ids = fields.One2many('souscription.consentement', 'souscription_id', string='Journal de consentement')
     # Données métier
 
     ## Utiles facturation
@@ -136,6 +159,106 @@ class Souscription(models.Model):
     def _compute_factures_via_periodes(self):
         for sous in self:
             sous.facture_ids = sous.periode_ids.mapped('facture_id')
+
+    # Cadrans facturés par type de tarif : (code grille, libellé document).
+    _CADRANS_DOCUMENTS = {
+        'base': [('base', 'Base')],
+        'hphc': [('hp', 'Heures pleines'), ('hc', 'Heures creuses')],
+    }
+
+    def _prix_documents(self, a_date=None):
+        """Prix engagés à projeter sur les *Conditions particulières* (ADR 0016).
+
+        Résout les tarifs depuis la *Grille de prix* en vigueur à ``a_date``
+        (défaut : ``date_debut``) : abonnement de la puissance souscrite et
+        énergie des cadrans facturés. Rendus **TTC pour un particulier** (la TVA
+        est portée par le *Produit de facturation*), **HT pour une société** —
+        choix piloté par ``partner_id.is_company``. Pour un contrat lissé, calcule
+        la mensualité estimée. Le rapport ne fait que projeter ce dict, il ne
+        recalcule aucun prix (module profond, interface étroite).
+        """
+        self.ensure_one()
+        produit = self.env['souscription.produit']
+        a_date = a_date or self.date_debut or fields.Date.today()
+        grille = self.env['grille.prix'].get_grille_active(a_date)
+        is_company = bool(self.partner_id.is_company)
+        is_sol = self.tarif_solidaire
+        prix_grille = grille.get_prix_dict()
+
+        def affiche(product, montant_ht):
+            """HT tel quel pour une société ; TTC via la TVA du produit sinon."""
+            if is_company or not product.taxes_id:
+                return montant_ht
+            taxes = product.taxes_id.compute_all(
+                montant_ht,
+                currency=self.env.company.currency_id,
+                quantity=1.0,
+                product=product,
+                partner=self.partner_id,
+            )
+            return taxes['total_included']
+
+        # Abonnement (€/an et €/mois) pour la puissance souscrite.
+        abo_product = produit.produit_abonnement(is_sol)
+        abo_jour_ht = grille.get_prix_abonnement(self.puissance_souscrite, self.coeff_pro, is_sol)
+        abo_an = affiche(abo_product, abo_jour_ht * 365.0)
+        abo_mois = affiche(abo_product, abo_jour_ht * 365.0 / 12.0)
+
+        # Provision mensuelle par cadran facturé (utilisée pour la mensualité).
+        provisions = {
+            'base': self.provision_mensuelle_kwh,
+            'hp': self.provision_hp_kwh,
+            'hc': self.provision_hc_kwh,
+        }
+
+        energies = []
+        mensualite = abo_mois
+        for code, libelle in self._CADRANS_DOCUMENTS[self.type_tarif]:
+            energie_product = produit.produit_energie(code, is_sol)
+            prix_kwh = affiche(energie_product, prix_grille.get(energie_product.id, 0.0))
+            energies.append({'code': code, 'label': libelle, 'prix_kwh': prix_kwh})
+            mensualite += provisions.get(code, 0.0) * prix_kwh
+
+        return {
+            'grille': grille,
+            'taxe_incluse': not is_company,
+            'mention_taxe': 'HT' if is_company else 'TTC',
+            'abonnement': {
+                'puissance': self.puissance_souscrite,
+                'prix_an': abo_an,
+                'prix_mois': abo_mois,
+            },
+            'energies': energies,
+            'mensualite': mensualite if self.lisse else 0.0,
+        }
+
+    def etat_consentement(self, finalite):
+        """État courant d'une finalité de *Consentement* = état de sa **dernière**
+        ligne de journal (ADR 0017). Retourne ``'donne'`` / ``'retire'`` / ``False``
+        si la finalité n'a jamais été tracée. Source unique pour les rapports et le
+        portail (le retrait n'écrase pas, il ajoute une ligne)."""
+        self.ensure_one()
+        ligne = self.env['souscription.consentement'].search(
+            [('souscription_id', '=', self.id), ('finalite', '=', finalite)],
+            order='date_consentement desc, id desc',
+            limit=1,
+        )
+        return ligne.etat if ligne else False
+
+    def enregistrer_consentement(self, finalite, etat='donne', source=None, date_retrait=None):
+        """Ajoute une ligne au journal de consentement append-only (ne réécrit
+        jamais une ligne existante). La version du texte est figée par défaut du
+        modèle (intégrité texte ↔ preuve, ADR 0017)."""
+        self.ensure_one()
+        vals = {
+            'souscription_id': self.id,
+            'finalite': finalite,
+            'etat': etat,
+            'source': source,
+        }
+        if date_retrait:
+            vals['date_retrait'] = date_retrait
+        return self.env['souscription.consentement'].create(vals)
 
     def creer_factures(self):
         """Émet les factures des périodes non encore facturées.

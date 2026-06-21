@@ -39,7 +39,8 @@ de facturation via son API.
         'data/produits_prestation.xml',
         'data/raccordement_sequence.xml',
         'data/raccordement_stages.xml',
-        'reports/souscription_contrat_report.xml',
+        'reports/souscription_conditions_particulieres_report.xml',
+        'reports/souscription_attestation_report.xml',
         'reports/facture_energie_template.xml',
         'views/core/souscription_views.xml',
         'views/core/grille_prix_views.xml',
@@ -53,7 +54,15 @@ de facturation via son API.
     'demo': [
         'demo/grille_prix_demo.xml',
         'demo/souscriptions_demo.xml',
+        'demo/consentement_demo.xml',
         'demo/prestations_demo.xml',
         'demo/raccordement_demo.xml',
     ],
+    'assets': {
+        # Bundle de marque partagé par les rapports PDF (facture, conditions
+        # particulières, attestation). Injecté dans le <head> du rapport.
+        'web.report_assets_common': [
+            'souscriptions_odoo/static/src/scss/report_brand.scss',
+        ],
+    },
 }

@@ -36,6 +36,28 @@ La personne ou l'organisation titulaire d'une *Souscription*. Désigné·e *usag
 contexte du *portail*.
 _Éviter_ : client, abonné·e.
 
+**Conditions particulières** :
+Le document (PDF) qui récapitule au·à la *souscripteur·rice* les conditions **propres à sa
+*Souscription*** — *PDL*, puissance, *Configuration fournisseur*, prix engagés (*Grille de prix*),
+lissage/provisions, mode de paiement — **et porte ses déclarations/consentements** (choix EDN,
+adhésion association, acceptation CGV, courbe de charge, renonciation rétractation) **et la
+signature électronique**. Il **complète** les *conditions générales* (CGV — cadre légal générique,
+**référencées** et non reproduites), pas l'inverse. C'est une **projection** de la *Souscription*
+(les consentements et la date de signature sont **portés par la *Souscription***), jamais un
+enregistrement distinct ni un acte de vente. Lève l'ambiguïté du terme « contrat » : le cadre
+contractuel = *CGV* + *conditions particulières* ; l'enregistrement = la *Souscription*.
+_Éviter_ : « contrat » seul (préciser *conditions particulières*, *CGV* ou *Souscription*) ;
+**devis**, **offre** (pas de cycle de vente, cf. *Souscription*).
+
+**Attestation de fourniture** :
+Document **court** prouvant qu'un·e *souscripteur·rice* est titulaire d'un contrat de fourniture
+**actif** — titulaire, *PDL*, adresse, **date d'effet** (« actif depuis »), puissance —, destiné aux
+tiers (bailleur, CAF, assurance). **Attestée par le fournisseur** : ne porte **ni** prix, **ni**
+consentements, **ni** signature de l'usager·ère (à la différence des *conditions particulières*).
+Comme la CP, c'est une **projection** de la *Souscription*.
+_Éviter_ : confondre avec les *conditions particulières* (l'acte d'adhésion complet) ; « attestation
+de contrat » au sens du rapport prod (qui est en réalité la CP, pas une attestation).
+
 **Période** :
 Période mensuelle de facturation d'une *Souscription* (`souscription.periode`). **Brouillon de
 travail facturable** : amorcé par les quantités calculées par electricore (méta-période), puis
@@ -118,6 +140,21 @@ facturation* existe en deux exemplaires parallèles — standard et solidaire �
 sélectionne le bon selon ce drapeau (ADR 0013).
 _Éviter_ : réduire le solidaire à une **remise** (ce n'est pas qu'un prix : c'est une comptabilité isolée).
 
+**Consentement (données de consommation)** :
+La base légale RGPD (art. 6-1-a) par laquelle un·e *souscripteur·rice* autorise EDN à faire
+**collecter auprès d'*Enedis*** ses données de consommation **plus fines que l'index de
+facturation** (consommations quotidiennes transmises au fournisseur, courbe de charge). Distinct de
+l'**acceptation contractuelle** (CGV / *conditions particulières*) et du **mandat SEPA**. Capté par
+un **acte positif** au *raccordement* (formulaire public, cases **non** pré-cochées, **par
+finalité**), tracé dans un **journal append-only** possédé par la *Souscription* — preuve opposable
+(*accountability*, art. 7-1) à la CNIL **et** à Enedis (à qui EDN **déclare** détenir le
+consentement), retrait compris (art. 7-3). L'**index** seul, pour facturer, relève de l'**exécution
+du contrat** (art. 6-1-b) et **ne requiert pas** de consentement.
+_Éviter_ : le confondre avec l'acceptation des CGV (contractuel) ou avec une « signature » (il n'y
+en a pas, cf. *conditions particulières*) ; le réduire à un **booléen** (la preuve exige horodatage
++ version du texte + retrait) ; « consentement » pour l'index de facturation (c'est l'exécution du
+contrat).
+
 **Geste commercial** :
 Ajustement par le·la *facturiste* de ce qui est **facturé** à un·e souscripteur·rice pour raison
 commerciale (ex. : RES oubliée non encore traitée par Enedis → jours facturés réduits), assumé
@@ -149,6 +186,17 @@ pour la file par défaut** (c'est *à refacturer*).
 **Facturiste** :
 Rôle métier qui conduit la facturation mensuelle depuis Odoo et **vérifie les données avant
 émission** des factures. Public cible de l'interface de vérification.
+
+**Raccordement** :
+Le workflow d'**entrée** (kanban `raccordement.demande`) qui instruit une demande de fourniture,
+de la demande jusqu'à l'étape **« Souscrit »** ; à sa clôture il **crée** le·la
+*souscripteur·rice*, le compte bancaire et la *Souscription*. C'est le point de **capture** des
+données saisies à l'adhésion — **dont les consentements et la signature** (équivalent du *LSD* de
+prod) —, **recopiées** sur la *Souscription* qui en devient **propriétaire** (système de
+référence) ; la *demande* reste un intake transitoire. Les *conditions particulières* lisent ces
+données sur la *Souscription*, jamais sur la demande.
+_Éviter_ : confondre la **demande de raccordement** (intake) et la *Souscription* (l'enregistrement
+qu'elle engendre) ; « raccordement » au sens réseau Enedis (mise en service physique du PDL).
 
 **Portail** :
 Espace en ligne en lecture du·de la *souscripteur·rice* (contrats, factures, infos utiles),

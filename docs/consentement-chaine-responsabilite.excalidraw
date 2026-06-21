@@ -1,0 +1,514 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://excalidraw.com",
+  "elements": [
+    {
+      "type": "text", "id": "title", "x": 60, "y": 28, "width": 1320, "height": 40,
+      "text": "Consentement aux données de consommation — chaîne de responsabilité (RGPD / CNIL)",
+      "originalText": "Consentement aux données de consommation — chaîne de responsabilité (RGPD / CNIL)",
+      "fontSize": 28, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#1e40af", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100001, "version": 1, "versionNonce": 100002, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "text", "id": "subtitle", "x": 60, "y": 76, "width": 1320, "height": 22,
+      "text": "Souscrire en ligne = pas de signature.",
+      "originalText": "Souscrire en ligne = pas de signature.",
+      "fontSize": 15, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#64748b", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100003, "version": 1, "versionNonce": 100004, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+
+    {
+      "type": "ellipse", "id": "souscripteur", "x": 60, "y": 212, "width": 175, "height": 108,
+      "strokeColor": "#c2410c", "backgroundColor": "#fed7aa", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100010, "version": 1, "versionNonce": 100011, "isDeleted": false, "groupIds": [],
+      "boundElements": [{"id": "souscripteur_t", "type": "text"}], "link": null, "locked": false
+    },
+    {
+      "type": "text", "id": "souscripteur_t", "x": 70, "y": 244, "width": 155, "height": 44,
+      "text": "Souscripteur·rice\n(personne concernée)",
+      "originalText": "Souscripteur·rice\n(personne concernée)",
+      "fontSize": 14, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#374151", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100012, "version": 1, "versionNonce": 100013, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": "souscripteur", "lineHeight": 1.25
+    },
+
+    {
+      "type": "rectangle", "id": "edn_zone", "x": 300, "y": 168, "width": 772, "height": 198,
+      "strokeColor": "#1e40af", "backgroundColor": "#dbeafe", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "dashed", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100020, "version": 1, "versionNonce": 100021, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "roundness": {"type": 3}
+    },
+    {
+      "type": "text", "id": "edn_zone_t", "x": 318, "y": 178, "width": 400, "height": 22,
+      "text": "EDN — responsable de traitement",
+      "originalText": "EDN — responsable de traitement",
+      "fontSize": 16, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#1e40af", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100022, "version": 1, "versionNonce": 100023, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+
+    {
+      "type": "rectangle", "id": "form", "x": 322, "y": 240, "width": 196, "height": 104,
+      "strokeColor": "#1e3a5f", "backgroundColor": "#3b82f6", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100030, "version": 1, "versionNonce": 100031, "isDeleted": false, "groupIds": [],
+      "boundElements": [{"id": "form_t", "type": "text"}], "link": null, "locked": false, "roundness": {"type": 3}
+    },
+    {
+      "type": "text", "id": "form_t", "x": 330, "y": 262, "width": 180, "height": 60,
+      "text": "Formulaire public\n(raccordement)\ncapture de l'acte positif",
+      "originalText": "Formulaire public\n(raccordement)\ncapture de l'acte positif",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#ffffff", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100032, "version": 1, "versionNonce": 100033, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": "form", "lineHeight": 1.25
+    },
+
+    {
+      "type": "rectangle", "id": "souscription", "x": 556, "y": 240, "width": 216, "height": 104,
+      "strokeColor": "#1e3a5f", "backgroundColor": "#3b82f6", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100040, "version": 1, "versionNonce": 100041, "isDeleted": false, "groupIds": [],
+      "boundElements": [{"id": "souscription_t", "type": "text"}], "link": null, "locked": false, "roundness": {"type": 3}
+    },
+    {
+      "type": "text", "id": "souscription_t", "x": 564, "y": 262, "width": 200, "height": 60,
+      "text": "Souscription\n+ journal consentement\n(la preuve)",
+      "originalText": "Souscription\n+ journal consentement\n(la preuve)",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#ffffff", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100042, "version": 1, "versionNonce": 100043, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": "souscription", "lineHeight": 1.25
+    },
+
+    {
+      "type": "rectangle", "id": "electricore", "x": 812, "y": 240, "width": 196, "height": 104,
+      "strokeColor": "#1e3a5f", "backgroundColor": "#3b82f6", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100050, "version": 1, "versionNonce": 100051, "isDeleted": false, "groupIds": [],
+      "boundElements": [{"id": "electricore_t", "type": "text"}], "link": null, "locked": false, "roundness": {"type": 3}
+    },
+    {
+      "type": "text", "id": "electricore_t", "x": 820, "y": 270, "width": 180, "height": 44,
+      "text": "electricore\nexécute la collecte",
+      "originalText": "electricore\nexécute la collecte",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#ffffff", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100052, "version": 1, "versionNonce": 100053, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": "electricore", "lineHeight": 1.25
+    },
+
+    {
+      "type": "ellipse", "id": "enedis", "x": 1120, "y": 228, "width": 200, "height": 124,
+      "strokeColor": "#1e3a5f", "backgroundColor": "#60a5fa", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100060, "version": 1, "versionNonce": 100061, "isDeleted": false, "groupIds": [],
+      "boundElements": [{"id": "enedis_t", "type": "text"}], "link": null, "locked": false
+    },
+    {
+      "type": "text", "id": "enedis_t", "x": 1130, "y": 262, "width": 180, "height": 60,
+      "text": "Enedis (GRD)\nresponsable distinct\nsource des données",
+      "originalText": "Enedis (GRD)\nresponsable distinct\nsource des données",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#ffffff", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100062, "version": 1, "versionNonce": 100063, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": "enedis", "lineHeight": 1.25
+    },
+
+    {
+      "type": "ellipse", "id": "cnil", "x": 812, "y": 66, "width": 188, "height": 74,
+      "strokeColor": "#b45309", "backgroundColor": "#fef3c7", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100070, "version": 1, "versionNonce": 100071, "isDeleted": false, "groupIds": [],
+      "boundElements": [{"id": "cnil_t", "type": "text"}], "link": null, "locked": false
+    },
+    {
+      "type": "text", "id": "cnil_t", "x": 822, "y": 88, "width": 168, "height": 30,
+      "text": "CNIL\n(autorité de contrôle)",
+      "originalText": "CNIL\n(autorité de contrôle)",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#374151", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100072, "version": 1, "versionNonce": 100073, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": "cnil", "lineHeight": 1.25
+    },
+
+    {
+      "type": "arrow", "id": "a_sous_form", "x": 238, "y": 266, "width": 82, "height": 22,
+      "strokeColor": "#c2410c", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100080, "version": 1, "versionNonce": 100081, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [82, 22]],
+      "startBinding": {"elementId": "souscripteur", "focus": 0, "gap": 4},
+      "endBinding": {"elementId": "form", "focus": 0, "gap": 4},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "a_sous_form_t", "x": 232, "y": 222, "width": 96, "height": 18,
+      "text": "acte positif",
+      "originalText": "acte positif",
+      "fontSize": 12, "fontFamily": 3, "textAlign": "center", "verticalAlign": "top",
+      "strokeColor": "#c2410c", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100082, "version": 1, "versionNonce": 100083, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "arrow", "id": "a_form_sous", "x": 518, "y": 292, "width": 38, "height": 0,
+      "strokeColor": "#1e3a5f", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100084, "version": 1, "versionNonce": 100085, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [38, 0]],
+      "startBinding": {"elementId": "form", "focus": 0, "gap": 2},
+      "endBinding": {"elementId": "souscription", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "a_form_sous_t", "x": 510, "y": 266, "width": 54, "height": 18,
+      "text": "écrit",
+      "originalText": "écrit",
+      "fontSize": 12, "fontFamily": 3, "textAlign": "center", "verticalAlign": "top",
+      "strokeColor": "#64748b", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100086, "version": 1, "versionNonce": 100087, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "arrow", "id": "a_sous_elec", "x": 772, "y": 292, "width": 40, "height": 0,
+      "strokeColor": "#1e3a5f", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100088, "version": 1, "versionNonce": 100089, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [40, 0]],
+      "startBinding": {"elementId": "souscription", "focus": 0, "gap": 2},
+      "endBinding": {"elementId": "electricore", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "arrow", "id": "a_decl", "x": 1008, "y": 268, "width": 112, "height": 12,
+      "strokeColor": "#1e3a5f", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100090, "version": 1, "versionNonce": 100091, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [112, -12]],
+      "startBinding": {"elementId": "electricore", "focus": 0, "gap": 2},
+      "endBinding": {"elementId": "enedis", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "a_decl_t", "x": 1000, "y": 200, "width": 132, "height": 36,
+      "text": "déclare détenir\nle consentement",
+      "originalText": "déclare détenir\nle consentement",
+      "fontSize": 12, "fontFamily": 3, "textAlign": "center", "verticalAlign": "top",
+      "strokeColor": "#1e40af", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100092, "version": 1, "versionNonce": 100093, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "arrow", "id": "a_pull", "x": 1008, "y": 320, "width": 112, "height": 6,
+      "strokeColor": "#1e3a5f", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100094, "version": 1, "versionNonce": 100095, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [112, 6]],
+      "startBinding": {"elementId": "electricore", "focus": 0, "gap": 2},
+      "endBinding": {"elementId": "enedis", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "a_pull_t", "x": 1012, "y": 348, "width": 150, "height": 18,
+      "text": "pull (données consenties)",
+      "originalText": "pull (données consenties)",
+      "fontSize": 12, "fontFamily": 3, "textAlign": "center", "verticalAlign": "top",
+      "strokeColor": "#64748b", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100096, "version": 1, "versionNonce": 100097, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "arrow", "id": "a_cnil", "x": 702, "y": 240, "width": 204, "height": 108,
+      "strokeColor": "#b45309", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "dashed", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100098, "version": 1, "versionNonce": 100099, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [204, -108]],
+      "startBinding": {"elementId": "souscription", "focus": 0, "gap": 2},
+      "endBinding": {"elementId": "cnil", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "a_cnil_t", "x": 726, "y": 150, "width": 200, "height": 18,
+      "text": "doit démontrer (art. 7-1)",
+      "originalText": "doit démontrer (art. 7-1)",
+      "fontSize": 12, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#b45309", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 100100, "version": 1, "versionNonce": 100101, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+
+    {
+      "type": "text", "id": "grad_title", "x": 60, "y": 470, "width": 460, "height": 24,
+      "text": "Quelle donnée → quel régime ?",
+      "originalText": "Quelle donnée → quel régime ?",
+      "fontSize": 18, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#1e40af", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 300001, "version": 1, "versionNonce": 300002, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "rectangle", "id": "grad_index", "x": 60, "y": 504, "width": 452, "height": 56,
+      "strokeColor": "#047857", "backgroundColor": "#a7f3d0", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 300010, "version": 1, "versionNonce": 300011, "isDeleted": false, "groupIds": [],
+      "boundElements": [{"id": "grad_index_t", "type": "text"}], "link": null, "locked": false, "roundness": {"type": 3}
+    },
+    {
+      "type": "text", "id": "grad_index_t", "x": 70, "y": 514, "width": 432, "height": 38,
+      "text": "Index (relevé) → facturer\nPAS de consentement · exécution du contrat (RGPD art. 6.1.b)",
+      "originalText": "Index (relevé) → facturer\nPAS de consentement · exécution du contrat (RGPD art. 6.1.b)",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#374151", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 300012, "version": 1, "versionNonce": 300013, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": "grad_index", "lineHeight": 1.25
+    },
+    {
+      "type": "text", "id": "grad_seuil_t", "x": 130, "y": 566, "width": 300, "height": 16,
+      "text": "— seuil du consentement —",
+      "originalText": "— seuil du consentement —",
+      "fontSize": 12, "fontFamily": 3, "textAlign": "center", "verticalAlign": "top",
+      "strokeColor": "#dc2626", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 300020, "version": 1, "versionNonce": 300021, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "line", "id": "grad_seuil", "x": 60, "y": 584, "width": 452, "height": 0,
+      "strokeColor": "#dc2626", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "dashed", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 300022, "version": 1, "versionNonce": 300023, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [452, 0]]
+    },
+    {
+      "type": "rectangle", "id": "grad_quot", "x": 60, "y": 592, "width": 452, "height": 56,
+      "strokeColor": "#b45309", "backgroundColor": "#fef3c7", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 300030, "version": 1, "versionNonce": 300031, "isDeleted": false, "groupIds": [],
+      "boundElements": [{"id": "grad_quot_t", "type": "text"}], "link": null, "locked": false, "roundness": {"type": 3}
+    },
+    {
+      "type": "text", "id": "grad_quot_t", "x": 70, "y": 602, "width": 432, "height": 38,
+      "text": "Conso quotidienne (transmise au fournisseur)\nConsentement requis (RGPD art. 6.1.a)",
+      "originalText": "Conso quotidienne (transmise au fournisseur)\nConsentement requis (RGPD art. 6.1.a)",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#374151", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 300032, "version": 1, "versionNonce": 300033, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": "grad_quot", "lineHeight": 1.25
+    },
+    {
+      "type": "rectangle", "id": "grad_courbe", "x": 60, "y": 662, "width": 452, "height": 56,
+      "strokeColor": "#dc2626", "backgroundColor": "#fee2e2", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 300040, "version": 1, "versionNonce": 300041, "isDeleted": false, "groupIds": [],
+      "boundElements": [{"id": "grad_courbe_t", "type": "text"}], "link": null, "locked": false, "roundness": {"type": 3}
+    },
+    {
+      "type": "text", "id": "grad_courbe_t", "x": 70, "y": 672, "width": 432, "height": 38,
+      "text": "Courbe de charge (30 min)\nConsentement explicite",
+      "originalText": "Courbe de charge (30 min)\nConsentement explicite",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#374151", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 300042, "version": 1, "versionNonce": 300043, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": "grad_courbe", "lineHeight": 1.25
+    },
+
+    {
+      "type": "text", "id": "log_title", "x": 558, "y": 470, "width": 340, "height": 22,
+      "text": "La preuve : journal append-only",
+      "originalText": "La preuve : journal append-only",
+      "fontSize": 16, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#1e40af", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 400001, "version": 1, "versionNonce": 400002, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "rectangle", "id": "log_box", "x": 558, "y": 502, "width": 330, "height": 152,
+      "strokeColor": "#1e293b", "backgroundColor": "#1e293b", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 400010, "version": 1, "versionNonce": 400011, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "roundness": {"type": 3}
+    },
+    {
+      "type": "text", "id": "log_t", "x": 576, "y": 516, "width": 300, "height": 126,
+      "text": "souscription.consentement\n{ finalite: 'courbe_de_charge',\n  date, version_texte,\n  source, ip,\n  etat: 'donne' | 'retire',\n  date_retrait }",
+      "originalText": "souscription.consentement\n{ finalite: 'courbe_de_charge',\n  date, version_texte,\n  source, ip,\n  etat: 'donne' | 'retire',\n  date_retrait }",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#22c55e", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 400012, "version": 1, "versionNonce": 400013, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.35
+    },
+    {
+      "type": "arrow", "id": "a_log", "x": 664, "y": 346, "width": 40, "height": 156,
+      "strokeColor": "#64748b", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "dashed", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 400020, "version": 1, "versionNonce": 400021, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [40, 156]],
+      "startBinding": {"elementId": "souscription", "focus": 0, "gap": 2},
+      "endBinding": {"elementId": "log_box", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+
+    {
+      "type": "text", "id": "form_title", "x": 920, "y": 470, "width": 430, "height": 24,
+      "text": "L'autre fil : la formation du contrat",
+      "originalText": "L'autre fil : la formation du contrat",
+      "fontSize": 16, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#1e40af", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 500001, "version": 1, "versionNonce": 500002, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "text", "id": "form_bul", "x": 920, "y": 508, "width": 432, "height": 170,
+      "text": "•  Le clic forme un contrat valide (consensualisme, art. 1172)\n•  Double-clic : vérifier / corriger / confirmer (art. 1127-2)\n•  Confirmation sur support durable avant fourniture (L221-13)\n•  Le PDF des conditions particulières = cette confirmation,\n     et non une signature\n•  Preuve = journaux + confirmation",
+      "originalText": "•  Le clic forme un contrat valide (consensualisme, art. 1172)\n•  Double-clic : vérifier / corriger / confirmer (art. 1127-2)\n•  Confirmation sur support durable avant fourniture (L221-13)\n•  Le PDF des conditions particulières = cette confirmation,\n     et non une signature\n•  Preuve = journaux + confirmation",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#374151", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 500010, "version": 1, "versionNonce": 500011, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.5
+    },
+
+    {
+      "type": "line", "id": "cmp_div", "x": 60, "y": 752, "width": 1290, "height": 0,
+      "strokeColor": "#64748b", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "dashed", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 600000, "version": 1, "versionNonce": 600001, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [1290, 0]]
+    },
+    {
+      "type": "text", "id": "cmp_title", "x": 60, "y": 770, "width": 600, "height": 22,
+      "text": "Prod vs cible — où vit la preuve ?",
+      "originalText": "Prod vs cible — où vit la preuve ?",
+      "fontSize": 16, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#1e40af", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 600010, "version": 1, "versionNonce": 600011, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "text", "id": "cmp_prod", "x": 60, "y": 804, "width": 1290, "height": 20,
+      "text": "✕  Prod : formulaire EXTERNE → LSD (Odoo) → abonnement   ·   preuve hors du système, PDF en texte statique (divergence)",
+      "originalText": "✕  Prod : formulaire EXTERNE → LSD (Odoo) → abonnement   ·   preuve hors du système, PDF en texte statique (divergence)",
+      "fontSize": 14, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#b91c1c", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 600020, "version": 1, "versionNonce": 600021, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "text", "id": "cmp_cible", "x": 60, "y": 832, "width": 1290, "height": 20,
+      "text": "✓  Cible : formulaire INTERNE (raccordement) → souscription + journal   ·   preuve co-localisée, un seul responsable",
+      "originalText": "✓  Cible : formulaire INTERNE (raccordement) → souscription + journal   ·   preuve co-localisée, un seul responsable",
+      "fontSize": 14, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#047857", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 600030, "version": 1, "versionNonce": 600031, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+
+    {
+      "type": "rectangle", "id": "doc_conf", "x": 300, "y": 386, "width": 300, "height": 60,
+      "strokeColor": "#1e40af", "backgroundColor": "#dbeafe", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 700001, "version": 1, "versionNonce": 700002, "isDeleted": false, "groupIds": [],
+      "boundElements": [{"id": "doc_conf_t", "type": "text"}], "link": null, "locked": false, "roundness": {"type": 3}
+    },
+    {
+      "type": "text", "id": "doc_conf_t", "x": 308, "y": 397, "width": 284, "height": 38,
+      "text": "Confirmation sur support durable\n= Conditions Particulières (PDF)",
+      "originalText": "Confirmation sur support durable\n= Conditions Particulières (PDF)",
+      "fontSize": 13, "fontFamily": 3, "textAlign": "center", "verticalAlign": "middle",
+      "strokeColor": "#1e40af", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 700003, "version": 1, "versionNonce": 700004, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": "doc_conf", "lineHeight": 1.25
+    },
+    {
+      "type": "arrow", "id": "a_emet", "x": 575, "y": 344, "width": 125, "height": 42,
+      "strokeColor": "#047857", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 700010, "version": 1, "versionNonce": 700011, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [-125, 42]],
+      "startBinding": {"elementId": "souscription", "focus": 0, "gap": 2},
+      "endBinding": {"elementId": "doc_conf", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "a_emet_t", "x": 470, "y": 356, "width": 110, "height": 16,
+      "text": "EDN émet",
+      "originalText": "EDN émet",
+      "fontSize": 11, "fontFamily": 3, "textAlign": "center", "verticalAlign": "top",
+      "strokeColor": "#047857", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 700012, "version": 1, "versionNonce": 700013, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.25
+    },
+    {
+      "type": "arrow", "id": "a_conf_sous", "x": 300, "y": 416, "width": 108, "height": 96,
+      "strokeColor": "#047857", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 2, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 700020, "version": 1, "versionNonce": 700021, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false,
+      "points": [[0, 0], [-108, -96]],
+      "startBinding": {"elementId": "doc_conf", "focus": 0, "gap": 2},
+      "endBinding": {"elementId": "souscripteur", "focus": 0, "gap": 2},
+      "startArrowhead": null, "endArrowhead": "arrow"
+    },
+    {
+      "type": "text", "id": "a_conf_sous_t", "x": 58, "y": 388, "width": 230, "height": 48,
+      "text": "remis au·à la souscripteur·rice\nsur support durable,\navant fourniture (L221-13 / L221-5)",
+      "originalText": "remis au·à la souscripteur·rice\nsur support durable,\navant fourniture (L221-13 / L221-5)",
+      "fontSize": 11, "fontFamily": 3, "textAlign": "left", "verticalAlign": "top",
+      "strokeColor": "#047857", "backgroundColor": "transparent", "fillStyle": "solid",
+      "strokeWidth": 1, "strokeStyle": "solid", "roughness": 0, "opacity": 100, "angle": 0,
+      "seed": 700022, "version": 1, "versionNonce": 700023, "isDeleted": false, "groupIds": [],
+      "boundElements": null, "link": null, "locked": false, "containerId": null, "lineHeight": 1.3
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": 20
+  },
+  "files": {}
+}

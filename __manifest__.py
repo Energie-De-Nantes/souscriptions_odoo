@@ -56,4 +56,11 @@ de facturation via son API.
         'demo/prestations_demo.xml',
         'demo/raccordement_demo.xml',
     ],
+    'assets': {
+        # Bundle de marque partagé par les rapports PDF (facture, conditions
+        # particulières, attestation). Injecté dans le <head> du rapport.
+        'web.report_assets_common': [
+            'souscriptions_odoo/static/src/scss/report_brand.scss',
+        ],
+    },
 }

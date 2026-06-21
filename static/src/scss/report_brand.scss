@@ -1,0 +1,65 @@
+// Bundle SCSS de marque EDN pour les rapports PDF (facture d'énergie, conditions
+// particulières, attestation de fourniture). Extrait du <style> inline de la
+// facture pour être partagé entre rapports via web.report_assets_common.
+//
+// Les classes `fe_*` (« facture énergie ») sont conservées telles quelles : ce
+// bundle compile au même CSS que l'ancien style inline (parité visuelle), tout
+// en exposant la palette de marque réutilisable par les autres rapports.
+//
+// Toutes les tables des rapports portent la classe `o_ignore_layout_styling`
+// (et les resets `!important` ci-dessous) pour neutraliser le bordage imposé par
+// le external_layout société sous wkhtmltopdf.
+
+// ===== Palette de marque EDN =====
+$edn-teal: #1a6e62; // teal principal (titres, montants, accents)
+$edn-gold: #caa116; // accent doré (téléphone dépannage)
+$edn-yellow: #efc631; // jaune accent (filets, badges estimés)
+$edn-yellow-bg: #fbf3d6; // fond jaune clair (hero, pills)
+$edn-yellow-text: #7a5d00; // texte sur fond jaune
+
+.fe_wrap { color:#2b2b2b; font-size:13px; line-height:1.45; }
+.fe_wrap h1,.fe_wrap h2,.fe_wrap h3,.fe_wrap h4 { margin:0; }
+.fe_eyebrow { text-transform:uppercase; letter-spacing:.14em; font-size:10.5px; font-weight:700; color:$edn-teal; }
+.fe_invoice_no { font-size:25px; font-weight:700; color:$edn-teal; line-height:1.1; }
+.fe_sub { font-size:12px; color:#6b7280; }
+.fe_pill { display:inline-block; padding:1px 10px; border-radius:999px; font-size:10.5px; font-weight:700; background:$edn-yellow-bg; color:$edn-yellow-text; vertical-align:middle; }
+.fe_hero { background:$edn-yellow-bg; border-left:4px solid $edn-yellow; border-radius:8px; padding:12px 16px; }
+.fe_hero_label { text-transform:uppercase; letter-spacing:.08em; font-size:10.5px; font-weight:700; color:$edn-yellow-text; }
+.fe_hero_amount { font-size:27px; font-weight:700; color:$edn-teal; line-height:1.1; }
+.fe_card { border:1px solid #e6e8eb; border-radius:8px; padding:11px 13px; min-height:96px; }
+.fe_card h3 { font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:$edn-teal; font-weight:700; margin-bottom:6px; }
+.fe_kv { font-size:12px; }
+.fe_kv .k { color:#6b7280; }
+.fe_kv .v { font-weight:600; }
+.fe_phone { font-size:17px; font-weight:700; color:$edn-gold; letter-spacing:.02em; }
+.fe_section { font-size:14px; font-weight:700; color:$edn-teal; margin:20px 0 8px; padding-left:9px; border-left:3px solid $edn-yellow; }
+.fe_table { width:100%; border-collapse:collapse; }
+/* Neutralise tout bordage imposé par le style de tableau du layout société
+   (o_table_boxed/bordered/…) : contour ::before + bordures de cellules. */
+.fe_table::before, .fe_totals::before { content:none !important; border:0 !important; }
+/* Reset large : élément table + thead/tbody/tr (pas seulement td/th),
+   pour neutraliser toute bordure venant du bundle de rapport. */
+.fe_wrap table, .fe_wrap thead, .fe_wrap tbody, .fe_wrap tfoot, .fe_wrap tr { border:0 !important; }
+.fe_table th, .fe_table td, .fe_totals th, .fe_totals td { border:0 !important; }
+.fe_table thead th { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:#6b7280; font-weight:700; border-bottom:2px solid $edn-teal !important; padding:6px 8px; }
+.fe_table tbody td { padding:7px 8px; border-bottom:1px solid #eef0f2 !important; vertical-align:top; }
+.fe_table .num { text-align:right; white-space:nowrap; }
+.fe_sec_row td { background:#eef6f3 !important; font-weight:700; color:$edn-teal; border-bottom:1px solid #dcebe6 !important; }
+.fe_note_row td { font-style:italic; color:#6b7280; border-bottom:1px solid #eef0f2; }
+.fe_totals { width:100%; font-size:13px; }
+.fe_totals td { padding:5px 8px; }
+.fe_totals .lbl { color:#4b5563; }
+.fe_totals .ttc td { border-top:2px solid $edn-teal !important; font-weight:700; color:$edn-teal; font-size:15px; padding-top:8px; }
+.fe_callout { background:#eef6f3; border-radius:8px; padding:10px 13px; font-size:11.5px; color:#374151; }
+.fe_badge { display:inline-block; padding:1px 9px; border-radius:999px; font-size:10px; font-weight:700; }
+.fe_badge_reel { background:$edn-teal; color:#ffffff; }
+.fe_badge_est { background:$edn-yellow; color:#3a2f00; }
+.fe_legal { font-size:10px; color:#6b7280; margin:0; padding-left:16px; }
+.fe_legal li { margin-bottom:2px; }
+.fe_legal a { color:$edn-teal; }
+.fe_muted { color:#6b7280; }
+/* Colonnes via tables : robuste dans wkhtmltopdf, indépendant du flex Bootstrap
+   et du style de tableau du layout société. */
+.fe_layout { width:100%; border-collapse:collapse; table-layout:fixed; }
+.fe_layout::before { content:none !important; border:0 !important; }
+.fe_layout > tbody > tr > td, .fe_layout > tr > td { border:0 !important; vertical-align:top; }

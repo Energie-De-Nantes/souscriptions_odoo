@@ -123,6 +123,39 @@ class TestPeriodeComposition(SouscriptionsTestCase):
         self.assertIn('PRO', abo['name'])
         self.assertAlmostEqual(abo['price_unit'], (ABO_ANNUEL_STD['6'] / 365.0) * 1.10, places=4)
 
+    def test_composer_lignes_coeff_pro_majore_energie_base(self):
+        """La majoration PRO s'applique aussi à l'énergie Base (#67)."""
+        self.souscription_base.coeff_pro = 10.0
+        periode = self._periode(self.souscription_base, energie_base_kwh=200.0)
+
+        base = next(
+            d for d in self._dicts(periode._composer_lignes(self.grille_prix)) if d.get('name') == 'Énergie Base'
+        )
+        # prix_base = 0.15 dans la grille de test (cf. common.setUpSouscriptionsData)
+        self.assertAlmostEqual(base['price_unit'], 0.15 * 1.10, places=6)
+
+    def test_composer_lignes_coeff_pro_majore_energie_hphc(self):
+        """La majoration PRO s'applique aux deux lignes énergie HP et HC (#67)."""
+        self.souscription_hphc.coeff_pro = 20.0
+        periode = self._periode(self.souscription_hphc, provision_hp_kwh=150.0, provision_hc_kwh=100.0)
+        produits = [d for d in self._dicts(periode._composer_lignes(self.grille_prix)) if d.get('product_id')]
+
+        hp = next(d for d in produits if d['name'] == 'Énergie HP')
+        hc = next(d for d in produits if d['name'] == 'Énergie HC')
+        # prix_hp = 0.18, prix_hc = 0.12 dans la grille de test.
+        self.assertAlmostEqual(hp['price_unit'], 0.18 * 1.20, places=6)
+        self.assertAlmostEqual(hc['price_unit'], 0.12 * 1.20, places=6)
+
+    def test_composer_lignes_sans_pro_energie_au_prix_grille(self):
+        """Sans coeff PRO, l'énergie est facturée au prix brut de la grille (pas de régression)."""
+        self.assertEqual(self.souscription_base.coeff_pro, 0.0)
+        periode = self._periode(self.souscription_base, energie_base_kwh=200.0)
+
+        base = next(
+            d for d in self._dicts(periode._composer_lignes(self.grille_prix)) if d.get('name') == 'Énergie Base'
+        )
+        self.assertAlmostEqual(base['price_unit'], 0.15, places=6)
+
     def test_creer_facture_pose_periode_id_et_partner(self):
         """La coquille _creer_facture émet le move avec periode_id et le bon partner."""
         periode = self._periode(self.souscription_base, provision_base_kwh=100.0)

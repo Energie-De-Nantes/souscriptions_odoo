@@ -352,6 +352,9 @@ class SouscriptionPeriode(models.Model):
         lines_vals.append((0, 0, {'display_type': 'line_section', 'name': 'Abonnement'}))
 
         coeff_pro_historise = self.coeff_pro_periode
+        # Majoration PRO appliquée à toute la fourniture — abonnement ET énergie
+        # (#67, ADR 0018) ; jamais à la refacturation (pur transit Enedis).
+        majoration_pro = 1 + coeff_pro_historise / 100.0
         produit_abo = self.env['souscription.produit'].produit_abonnement(tarif_solidaire)
         prix_abo_journalier = grille.get_prix_abonnement(
             puissance_kva, coeff_pro=coeff_pro_historise, is_solidaire=tarif_solidaire
@@ -396,7 +399,7 @@ class SouscriptionPeriode(models.Model):
                         'product_id': produit_base.id,
                         'name': produit_base.name,
                         'quantity': self._quantite_facturee('base'),
-                        'price_unit': prix_base,
+                        'price_unit': prix_base * majoration_pro,
                     },
                 )
             )
@@ -413,7 +416,7 @@ class SouscriptionPeriode(models.Model):
                         'product_id': produit_hp.id,
                         'name': produit_hp.name,
                         'quantity': self._quantite_facturee('hp'),
-                        'price_unit': prix_hp,
+                        'price_unit': prix_hp * majoration_pro,
                     },
                 )
             )
@@ -430,7 +433,7 @@ class SouscriptionPeriode(models.Model):
                         'product_id': produit_hc.id,
                         'name': produit_hc.name,
                         'quantity': self._quantite_facturee('hc'),
-                        'price_unit': prix_hc,
+                        'price_unit': prix_hc * majoration_pro,
                     },
                 )
             )

@@ -96,6 +96,17 @@ class TestRefacturation(SouscriptionsTestCase):
         produit = self.env.ref('souscriptions_odoo.souscriptions_product_prestation_enedis')
         self.assertEqual(vals['product_id'], produit.id)
 
+    def test_refacturation_non_majoree_par_coeff_pro(self):
+        """La majoration PRO ne touche jamais la refacturation (transit Enedis, #67).
+
+        Même sur une souscription PRO, la ligne refacturée garde son prix brut.
+        """
+        self.souscription_base.coeff_pro = 30.0
+        presta = self._presta(self.souscription_base, reference_enedis='F15-PRO', prix=45.0)
+
+        _cmd, _id, vals = presta._composer_ligne()
+        self.assertEqual(vals['price_unit'], 45.0)
+
     def test_composer_ligne_indemnite_utilise_produit_sans_tva(self):
         """Une presta de nature « indemnité » (pénalité hors champ TVA) compose
         sa ligne avec le produit Indemnité dédié, pas le produit Prestation

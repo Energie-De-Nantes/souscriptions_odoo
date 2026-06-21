@@ -7,8 +7,10 @@ création de la Souscription, puis rendus par les *Conditions particulières* et
 l'*Attestation de fourniture*.
 """
 
+import os
 from datetime import date, timedelta
 
+from lxml import etree
 from odoo.tests.common import HttpCase, TransactionCase, tagged
 
 from .common import SouscriptionsTestMixin
@@ -300,3 +302,21 @@ class TestJournalConsentement(SouscriptionsTestMixin, TransactionCase):
         souscription = demande.souscription_id
         self.assertEqual(souscription.etat_consentement('courbe_charge'), 'donne')
         self.assertFalse(souscription.etat_consentement('conso_quotidienne'))
+
+
+@tagged('souscriptions', 'souscriptions_documents', 'post_install', '-at_install')
+class TestConsentementDemoStructure(TransactionCase):
+    """Garde structurel : le journal étant append-only (write interdit), sa démo
+    DOIT être noupdate=1 — sinon un -u tenterait de réécrire les lignes et ferait
+    échouer la mise à jour. Test structurel (lit le XML, n'a pas besoin que la
+    démo soit chargée), cf. test_releve_demo.TestReleveDemoOrdre."""
+
+    def test_demo_consentement_est_noupdate(self):
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'demo', 'consentement_demo.xml')
+        root = etree.parse(path).getroot()
+        data = root.find('data')
+        noupdate = root.get('noupdate') or (data is not None and data.get('noupdate'))
+        self.assertEqual(noupdate, '1', 'demo/consentement_demo.xml doit être noupdate=1 (modèle append-only).')
+        # Toutes les lignes ciblent bien le journal de consentement.
+        models = {rec.get('model') for rec in root.iter('record')}
+        self.assertEqual(models, {'souscription.consentement'})

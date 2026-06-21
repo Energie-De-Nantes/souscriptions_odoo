@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Journal de consentement de démonstration (ADR 0017).
+     noupdate="1" est OBLIGATOIRE : le journal est append-only (write interdit),
+     donc ces lignes ne doivent jamais être réécrites lors d'un -u — Odoo les
+     crée une seule fois puis les ignore. -->
+<odoo noupdate="1">
+
+    <!-- Particulier Base : courbe de charge DONNÉE ; consommations quotidiennes
+         DONNÉES puis RETIRÉES → illustre l'historique append-only (l'état courant
+         d'une finalité = sa dernière ligne, la précédente reste intacte). -->
+    <record id="demo_consentement_base_courbe" model="souscription.consentement">
+        <field name="souscription_id" ref="demo_souscription_particulier_base"/>
+        <field name="finalite">courbe_charge</field>
+        <field name="etat">donne</field>
+        <field name="date_consentement">2024-01-15 10:32:00</field>
+        <field name="version_texte">2024-01-v1</field>
+        <field name="source">Formulaire public — IP 92.184.0.10</field>
+    </record>
+    <record id="demo_consentement_base_conso_donne" model="souscription.consentement">
+        <field name="souscription_id" ref="demo_souscription_particulier_base"/>
+        <field name="finalite">conso_quotidienne</field>
+        <field name="etat">donne</field>
+        <field name="date_consentement">2024-01-15 10:32:10</field>
+        <field name="version_texte">2024-01-v1</field>
+        <field name="source">Formulaire public — IP 92.184.0.10</field>
+    </record>
+    <record id="demo_consentement_base_conso_retire" model="souscription.consentement">
+        <field name="souscription_id" ref="demo_souscription_particulier_base"/>
+        <field name="finalite">conso_quotidienne</field>
+        <field name="etat">retire</field>
+        <field name="date_consentement">2024-06-02 18:05:00</field>
+        <field name="version_texte">2024-01-v1</field>
+        <field name="source">Portail — retrait usager·ère (art. 7-3)</field>
+        <field name="date_retrait">2024-06-02</field>
+    </record>
+
+    <!-- Admin : les deux finalités données (capture au raccordement). -->
+    <record id="demo_consentement_admin_courbe" model="souscription.consentement">
+        <field name="souscription_id" ref="demo_souscription_admin"/>
+        <field name="finalite">courbe_charge</field>
+        <field name="etat">donne</field>
+        <field name="date_consentement">2024-01-10 09:15:00</field>
+        <field name="version_texte">2024-01-v1</field>
+        <field name="source">Raccordement (back-office)</field>
+    </record>
+    <record id="demo_consentement_admin_conso" model="souscription.consentement">
+        <field name="souscription_id" ref="demo_souscription_admin"/>
+        <field name="finalite">conso_quotidienne</field>
+        <field name="etat">donne</field>
+        <field name="date_consentement">2024-01-10 09:15:05</field>
+        <field name="version_texte">2024-01-v1</field>
+        <field name="source">Raccordement (back-office)</field>
+    </record>
+
+    <!-- PRO : uniquement les consommations quotidiennes. -->
+    <record id="demo_consentement_pro_conso" model="souscription.consentement">
+        <field name="souscription_id" ref="demo_souscription_pro"/>
+        <field name="finalite">conso_quotidienne</field>
+        <field name="etat">donne</field>
+        <field name="date_consentement">2024-02-01 14:00:00</field>
+        <field name="version_texte">2024-01-v1</field>
+        <field name="source">Formulaire public — IP 92.184.0.22</field>
+    </record>
+
+</odoo>

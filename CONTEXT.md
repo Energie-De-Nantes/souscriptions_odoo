@@ -90,9 +90,10 @@ en porte plusieurs) ; confondre avec `energie_*` (la *consommation* dérivée de
 facturé.
 
 **Grille de prix** :
-Barème **fournisseur** daté (`grille.prix`) : prix d'abonnement par puissance, prix de l'énergie
-par cadran facturé. Sélectionnée par les dates d'une *Période*, ce qui permet de facturer une
-*régularisation* aux prix historiques.
+Barème **fournisseur** daté (`grille.prix`) : tarif d'abonnement **affine** (base à 3 kVA +
+coefficient par kVA, une ligne par univers — ADR 0018), prix de l'énergie par cadran facturé.
+Sélectionnée **par date** (les dates d'une *Période*), jamais par un drapeau, ce qui permet de
+facturer une *régularisation* aux prix historiques.
 _Éviter_ : tarif (collision avec la FTA / tarif d'acheminement réseau), barème.
 
 **Produit de facturation** :

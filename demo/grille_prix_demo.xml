@@ -6,137 +6,24 @@
             <field name="date_debut">2025-01-01</field>
         </record>
 
-        <!-- Tarifs abonnement standard (prix annuel par puissance) -->
-        <record id="prix_abo_std_3" model="grille.prix.ligne">
+        <!-- Abonnement affine (ADR 0018) : une ligne par univers,
+             base 3 kVA + coefficient par kVA. -->
+        <record id="prix_abo_std" model="grille.prix.ligne">
             <field name="grille_id" ref="grille_prix_2025"/>
             <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
             <field name="type_produit">abonnement</field>
-            <field name="puissance">3</field>
-            <field name="prix_abonnement_annuel">150.00</field>
+            <field name="prix_base_3kva">150.00</field>
+            <field name="coef_kva">12.00</field>
         </record>
-        <record id="prix_abo_std_6" model="grille.prix.ligne">
+        <record id="prix_abo_sol" model="grille.prix.ligne">
             <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
+            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
             <field name="type_produit">abonnement</field>
-            <field name="puissance">6</field>
-            <field name="prix_abonnement_annuel">185.00</field>
-        </record>
-        <record id="prix_abo_std_9" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">9</field>
-            <field name="prix_abonnement_annuel">225.00</field>
-        </record>
-        <record id="prix_abo_std_12" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">12</field>
-            <field name="prix_abonnement_annuel">265.00</field>
-        </record>
-        <record id="prix_abo_std_15" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">15</field>
-            <field name="prix_abonnement_annuel">305.00</field>
-        </record>
-        <record id="prix_abo_std_18" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">18</field>
-            <field name="prix_abonnement_annuel">350.00</field>
-        </record>
-        <record id="prix_abo_std_24" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">24</field>
-            <field name="prix_abonnement_annuel">440.00</field>
-        </record>
-        <record id="prix_abo_std_30" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">30</field>
-            <field name="prix_abonnement_annuel">530.00</field>
-        </record>
-        <record id="prix_abo_std_36" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">36</field>
-            <field name="prix_abonnement_annuel">620.00</field>
+            <field name="prix_base_3kva">120.00</field>
+            <field name="coef_kva">10.00</field>
         </record>
 
-        <!-- Tarifs abonnement solidaire (prix annuel par puissance) -->
-        <record id="prix_abo_sol_3" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">3</field>
-            <field name="prix_abonnement_annuel">120.00</field>
-        </record>
-        <record id="prix_abo_sol_6" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">6</field>
-            <field name="prix_abonnement_annuel">148.00</field>
-        </record>
-        <record id="prix_abo_sol_9" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">9</field>
-            <field name="prix_abonnement_annuel">180.00</field>
-        </record>
-        <record id="prix_abo_sol_12" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">12</field>
-            <field name="prix_abonnement_annuel">212.00</field>
-        </record>
-        <record id="prix_abo_sol_15" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">15</field>
-            <field name="prix_abonnement_annuel">244.00</field>
-        </record>
-        <record id="prix_abo_sol_18" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">18</field>
-            <field name="prix_abonnement_annuel">280.00</field>
-        </record>
-        <record id="prix_abo_sol_24" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">24</field>
-            <field name="prix_abonnement_annuel">352.00</field>
-        </record>
-        <record id="prix_abo_sol_30" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">30</field>
-            <field name="prix_abonnement_annuel">424.00</field>
-        </record>
-        <record id="prix_abo_sol_36" model="grille.prix.ligne">
-            <field name="grille_id" ref="grille_prix_2025"/>
-            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
-            <field name="type_produit">abonnement</field>
-            <field name="puissance">36</field>
-            <field name="prix_abonnement_annuel">496.00</field>
-        </record>
-
-        <!-- Énergies (€/kWh) -->
+        <!-- Énergies standard (€/kWh) -->
         <record id="prix_energie_base" model="grille.prix.ligne">
             <field name="grille_id" ref="grille_prix_2025"/>
             <field name="product_id" ref="souscriptions_product_energie_base"/>
@@ -152,6 +39,26 @@
         <record id="prix_energie_hc" model="grille.prix.ligne">
             <field name="grille_id" ref="grille_prix_2025"/>
             <field name="product_id" ref="souscriptions_product_energie_hc"/>
+            <field name="type_produit">energie</field>
+            <field name="prix_unitaire">0.1520</field>
+        </record>
+
+        <!-- Énergies solidaires (€/kWh) — produits isolés (ADR 0013) -->
+        <record id="prix_energie_base_sol" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2025"/>
+            <field name="product_id" ref="souscriptions_product_energie_base_solidaire"/>
+            <field name="type_produit">energie</field>
+            <field name="prix_unitaire">0.1850</field>
+        </record>
+        <record id="prix_energie_hp_sol" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2025"/>
+            <field name="product_id" ref="souscriptions_product_energie_hp_solidaire"/>
+            <field name="type_produit">energie</field>
+            <field name="prix_unitaire">0.2010</field>
+        </record>
+        <record id="prix_energie_hc_sol" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2025"/>
+            <field name="product_id" ref="souscriptions_product_energie_hc_solidaire"/>
             <field name="type_produit">energie</field>
             <field name="prix_unitaire">0.1520</field>
         </record>

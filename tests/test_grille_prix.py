@@ -10,16 +10,12 @@ from .common import ABO_ANNUEL_SOL, ABO_ANNUEL_STD, build_grille_lignes
 class TestGrillePrix(TransactionCase):
     def setUp(self):
         super().setUp()
-        # Neutraliser le drapeau is_current des grilles existantes (démo)
-        self.env['grille.prix'].search([('is_current', '=', True)]).write({'is_current': False})
-
         self.grille = self.env['grille.prix'].create(
             {
                 'name': 'Grille Test 2024',
                 'date_debut': date(2024, 1, 1),
                 'date_fin': date(2024, 12, 31),
                 'active': True,
-                'is_current': True,
             }
         )
         build_grille_lignes(

@@ -124,15 +124,14 @@ class SouscriptionsTestMixin:
         )
 
         # Grille de prix active avec lignes, pour que la facturation
-        # fonctionne sans dépendre des données de démo
-        cls.env['grille.prix'].search([('is_current', '=', True)]).write({'is_current': False})
+        # fonctionne sans dépendre des données de démo. La grille est résolue
+        # par date (get_grille_active), jamais par un drapeau (ADR 0018).
         cls.grille_prix = cls.env['grille.prix'].create(
             {
                 'name': 'Grille Test',
                 'date_debut': date(2024, 1, 1),
                 'date_fin': date(2024, 12, 31),
                 'active': True,
-                'is_current': True,
             }
         )
         build_grille_lignes(

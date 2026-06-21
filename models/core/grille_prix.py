@@ -40,7 +40,6 @@ class GrillePrix(models.Model):
 
     # Champs calculés pour info
     nb_lignes = fields.Integer('Nombre de lignes', compute='_compute_nb_lignes')
-    is_current = fields.Boolean('Grille actuelle', default=False, help='Une seule grille peut être active à la fois')
 
     @api.depends('ligne_ids')
     def _compute_nb_lignes(self):
@@ -118,17 +117,6 @@ class GrillePrix(models.Model):
                         f"La période de la grille '{grille.name}' chevauche celle de la grille '{other.name}'."
                     )
 
-    @api.constrains('is_current')
-    def _check_unique_current_grille(self):
-        """S'assure qu'une seule grille est marquée comme actuelle"""
-        for grille in self.filtered('is_current'):
-            autres_actives = self.search([('is_current', '=', True), ('id', '!=', grille.id)])
-            if autres_actives:
-                raise UserError(
-                    f'Une seule grille peut être active à la fois. '
-                    f"La grille '{autres_actives[0].name}' est déjà active."
-                )
-
     def get_prix_dict(self):
         """Retourne un dict {product_id: prix_interne} pour toute la grille"""
         self.ensure_one()
@@ -189,13 +177,12 @@ class GrillePrix(models.Model):
                 )
             )
 
-        # Créer la nouvelle grille avec ses lignes (pas active par défaut)
+        # Créer la nouvelle grille avec ses lignes
         nouvelle_grille = self.create(
             {
                 'name': f'Copie de {self.name}',
                 'date_debut': today,
                 'date_fin': False,
-                'is_current': False,  # Pas active par défaut
                 'ligne_ids': lignes_vals,
             }
         )
@@ -209,26 +196,6 @@ class GrillePrix(models.Model):
             'context': {
                 'form_view_initial_mode': 'edit',
             },
-        }
-
-    def definir_comme_grille_actuelle(self):
-        """Action pour définir cette grille comme la grille actuelle"""
-        self.ensure_one()
-
-        # Décocher toutes les autres grilles
-        autres_grilles = self.search([('is_current', '=', True), ('id', '!=', self.id)])
-
-        if autres_grilles:
-            autres_grilles.write({'is_current': False})
-            _logger.info(f'Grilles {autres_grilles.mapped("name")} désactivées')
-
-        # Activer cette grille
-        self.is_current = True
-        _logger.info(f'Grille {self.name} définie comme active')
-
-        return {
-            'type': 'ir.actions.client',
-            'tag': 'reload',
         }
 
 

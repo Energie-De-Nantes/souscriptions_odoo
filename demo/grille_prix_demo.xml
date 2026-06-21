@@ -4,7 +4,6 @@
         <record id="grille_prix_2025" model="grille.prix">
             <field name="name">Grille tarifaire 2025</field>
             <field name="date_debut">2025-01-01</field>
-            <field name="is_current" eval="True"/>
         </record>
 
         <!-- Tarifs abonnement standard (prix annuel par puissance) -->

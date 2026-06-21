@@ -58,6 +58,24 @@
                             </group>
                         </page>
 
+                        <page string="Adhésion &amp; consentement" name="adhesion">
+                            <group>
+                                <group string="Signature">
+                                    <field name="date_validation" />
+                                    <field name="renonce_retractation" />
+                                </group>
+                                <group string="Cotitulaires">
+                                    <field name="cotitulaires" widget="many2many_tags"
+                                           options="{'no_create': True}" nolabel="1" />
+                                </group>
+                            </group>
+                            <group string="Consentement données de consommation (RGPD)"
+                                   help="Cases non pré-cochées. Saisie back-office = preuve faible ; l'acte réel viendra du formulaire public (#62).">
+                                <field name="consent_conso_quotidienne" />
+                                <field name="consent_courbe_charge" />
+                            </group>
+                        </page>
+
                         <page string="Contact" name="contact">
                             <group>
                                 <group>

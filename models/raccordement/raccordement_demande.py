@@ -83,6 +83,45 @@ class RaccordementDemande(models.Model):
         tracking=True,
     )
 
+    # Déclarations contractuelles captées à l'adhésion (équivalent LSD prod),
+    # recopiées sur la Souscription à la clôture (ADR 0016).
+    cotitulaires = fields.Many2many(
+        'res.partner',
+        'raccordement_cotitulaire_rel',
+        'demande_id',
+        'partner_id',
+        string='Cotitulaires',
+        tracking=True,
+        help='Co-titulaires du contrat, au-delà du contact principal.',
+    )
+    date_validation = fields.Date(
+        string='Date de signature',
+        tracking=True,
+        help="Date de l'acte d'adhésion (signature électronique) sur support durable.",
+    )
+    renonce_retractation = fields.Boolean(
+        string='Renonce au délai de rétractation',
+        default=False,
+        tracking=True,
+        help='Le·la souscripteur·rice demande une exécution avant la fin du délai '
+        'de rétractation de 14 jours et y renonce expressément.',
+    )
+
+    # Consentement RGPD à la collecte de données fines chez Enedis, par finalité
+    # (cases NON pré-cochées, ADR 0017). Saisie back-office = preuve faible :
+    # l'acte réel viendra du formulaire public (#62). Une finalité cochée crée une
+    # ligne 'donné' dans le journal à la création de la Souscription.
+    consent_conso_quotidienne = fields.Boolean(
+        string='Consentement — consommations quotidiennes',
+        default=False,
+        tracking=True,
+    )
+    consent_courbe_charge = fields.Boolean(
+        string='Consentement — courbe de charge',
+        default=False,
+        tracking=True,
+    )
+
     # Informations contact
     contact_nom = fields.Char(string='Nom', required=True, tracking=True)
     contact_prenom = fields.Char(string='Prénom', tracking=True)
@@ -375,6 +414,11 @@ class RaccordementDemande(models.Model):
             'tarif_solidaire': self.tarif_solidaire,
             'mode_paiement': self.mode_paiement,
             'lisse': True,  # Activer le lissage par défaut
+            # Déclarations contractuelles captées à l'adhésion → la Souscription
+            # en devient propriétaire (ADR 0016).
+            'date_validation': self.date_validation,
+            'renonce_retractation': self.renonce_retractation,
+            'cotitulaires': [(6, 0, self.cotitulaires.ids)],
         }
 
         # Ajouter les provisions selon le type de tarif
@@ -389,4 +433,15 @@ class RaccordementDemande(models.Model):
         if etat_initial:
             souscription_vals['etat_facturation_id'] = etat_initial.id
 
-        return self.env['souscription.souscription'].create(souscription_vals)
+        souscription = self.env['souscription.souscription'].create(souscription_vals)
+
+        # Journal de consentement (ADR 0017) : une finalité cochée = un acte
+        # 'donné'. Capture back-office (preuve faible), tracée comme telle ; l'acte
+        # réel du·de la souscripteur·rice viendra du formulaire public (#62).
+        source = f'Raccordement {self.name} (back-office)'
+        if self.consent_conso_quotidienne:
+            souscription.enregistrer_consentement('conso_quotidienne', source=source)
+        if self.consent_courbe_charge:
+            souscription.enregistrer_consentement('courbe_charge', source=source)
+
+        return souscription

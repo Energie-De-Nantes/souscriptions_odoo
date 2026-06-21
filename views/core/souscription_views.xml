@@ -6,15 +6,19 @@
         <field name="arch" type="xml">
             <form string="Souscription">
                 <header>
-                    <button name="%(action_souscription_contrat_report)d" 
-                            string="Imprimer contrat" 
-                            type="action" 
+                    <button name="%(action_souscription_conditions_particulieres)d"
+                            string="Conditions particulières"
+                            type="action"
                             class="btn-primary"/>
+                    <button name="%(action_souscription_attestation)d"
+                            string="Attestation de fourniture"
+                            type="action"/>
                 </header>
                 <sheet>
                     <group>
                         <field name="name" />
                         <field name="partner_id" />
+                        <field name="cotitulaires" widget="many2many_tags" options="{'no_create': True}"/>
                         <field name="active" />
                         <field name="etat_facturation_id"/>
                         <field name="date_debut"/>
@@ -35,12 +39,17 @@
                         <field name="mode_paiement"/>
                         <field name="coeff_pro" string="Majoration PRO (%)"/>
                     </group>
-                    
+
                     <group string="Infos">
                         <field name="ref_compteur"/>
                         <field name="numero_depannage" widget="phone"/>
                     </group>
-                    
+
+                    <group string="Adhésion (captée au raccordement)">
+                        <field name="date_validation"/>
+                        <field name="renonce_retractation"/>
+                    </group>
+
                     <notebook>
                         <page string="Périodes de facturation">
                             <field name="periode_ids">
@@ -74,6 +83,20 @@
                                     <field name="etat" widget="badge"
                                            decoration-warning="etat == 'en_attente'"
                                            decoration-success="etat == 'emise'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Journal de consentement" name="consentement">
+                            <field name="consentement_ids">
+                                <list>
+                                    <field name="date_consentement"/>
+                                    <field name="finalite"/>
+                                    <field name="etat" widget="badge"
+                                           decoration-success="etat == 'donne'"
+                                           decoration-danger="etat == 'retire'"/>
+                                    <field name="version_texte"/>
+                                    <field name="source"/>
+                                    <field name="date_retrait"/>
                                 </list>
                             </field>
                         </page>

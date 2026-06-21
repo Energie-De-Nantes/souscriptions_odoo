@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Conditions particulières — l'acte d'adhésion complet (coordonnées, lieu de
+         consommation, options, tarifs engagés, déclarations/consentements,
+         signature). Projection de la Souscription (ADR 0016), jamais un
+         enregistrement distinct. Remplace l'ancien « Contrat de souscription ».
+         Tarifs résolus depuis la Grille de prix via souscription._prix_documents
+         (TTC particulier / HT société). Style : bundle de marque report_brand.scss. -->
+    <record id="action_souscription_conditions_particulieres" model="ir.actions.report">
+        <field name="name">Conditions particulières</field>
+        <field name="model">souscription.souscription</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">souscriptions_odoo.souscription_conditions_particulieres_document</field>
+        <field name="report_file">souscriptions_odoo.souscription_conditions_particulieres_document</field>
+        <field name="binding_model_id" ref="model_souscription_souscription"/>
+        <field name="binding_type">report</field>
+    </record>
+
+    <template id="souscription_conditions_particulieres_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="souscription">
+                <t t-set="prix" t-value="souscription._prix_documents()"/>
+                <t t-call="web.external_layout">
+                    <div class="page fe_wrap">
+                        <!-- Styles `fe_*` : bundle de marque partagé (report_brand.scss). -->
+
+                        <!-- ===== En-tête ===== -->
+                        <div class="fe_eyebrow">Contrat de fourniture d'électricité</div>
+                        <div class="fe_invoice_no">Conditions particulières</div>
+                        <div class="fe_sub">Référence <span t-field="souscription.name"/></div>
+
+                        <!-- ===== Parties ===== -->
+                        <table class="fe_layout o_ignore_layout_styling" style="margin-top:12px;">
+                            <tr>
+                                <td style="width:50%; padding-right:8px;">
+                                    <div class="fe_card">
+                                        <h3>Fournisseur</h3>
+                                        <div class="fe_kv" t-field="souscription.env.company.partner_id"
+                                             t-options="{'widget': 'contact', 'fields': ['name', 'address', 'email'], 'no_marker': True}"/>
+                                    </div>
+                                </td>
+                                <td style="width:50%; padding-left:8px;">
+                                    <div class="fe_card">
+                                        <h3>Titulaire</h3>
+                                        <div class="fe_kv" t-if="souscription.partner_id"
+                                             t-field="souscription.partner_id"
+                                             t-options="{'widget': 'contact', 'fields': ['name', 'address', 'email'], 'no_marker': True}"/>
+                                        <div t-if="souscription.cotitulaires" class="fe_kv" style="margin-top:6px;">
+                                            <span class="k">Cotitulaire(s) : </span>
+                                            <span class="v" t-out="', '.join(souscription.cotitulaires.mapped('name'))"/>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- ===== Lieu de consommation ===== -->
+                        <div class="fe_section">Lieu de consommation</div>
+                        <table class="fe_table o_ignore_layout_styling">
+                            <tbody>
+                                <tr><td>Point de livraison (PDL)</td><td class="num"><span t-field="souscription.pdl"/></td></tr>
+                                <tr><td>Puissance souscrite</td><td class="num"><span t-field="souscription.puissance_souscrite"/> kVA</td></tr>
+                                <tr>
+                                    <td>Formule tarifaire</td>
+                                    <td class="num">
+                                        <t t-if="souscription.type_tarif == 'hphc'">Heures pleines / Heures creuses</t>
+                                        <t t-else="">Base</t>
+                                        <t t-if="souscription.tarif_solidaire"> · <span class="fe_pill">Tarif solidaire</span></t>
+                                    </td>
+                                </tr>
+                                <tr t-if="souscription.ref_compteur"><td>Référence compteur</td><td class="num"><span t-field="souscription.ref_compteur"/></td></tr>
+                                <tr><td>Date de début de fourniture</td><td class="num"><span t-field="souscription.date_debut" t-options="{'widget': 'date'}"/></td></tr>
+                            </tbody>
+                        </table>
+
+                        <!-- ===== Tarifs engagés (depuis la Grille de prix) ===== -->
+                        <div class="fe_section">Prix engagés (<span t-out="prix['mention_taxe']"/>)</div>
+                        <table class="fe_table o_ignore_layout_styling">
+                            <thead>
+                                <tr>
+                                    <th>Élément</th>
+                                    <th class="num">Prix <span t-out="prix['mention_taxe']"/></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Abonnement <span t-out="prix['abonnement']['puissance']"/> kVA</td>
+                                    <td class="num"><span t-out="'%.2f' % prix['abonnement']['prix_an']"/> €/an</td>
+                                </tr>
+                                <tr t-foreach="prix['energies']" t-as="energie">
+                                    <td>Énergie — <span t-out="energie['label']"/></td>
+                                    <td class="num"><span t-out="'%.4f' % energie['prix_kwh']"/> €/kWh</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div t-if="souscription.lisse" class="fe_callout" style="margin-top:10px;">
+                            <strong>Mensualité estimée :</strong>
+                            <span t-out="'%.2f' % prix['mensualite']"/> € <span t-out="prix['mention_taxe']"/> par mois.
+                            Paiement lissé sur l'année, régularisé périodiquement selon la consommation réelle.
+                        </div>
+
+                        <!-- ===== Déclarations et consentements ===== -->
+                        <div class="fe_section">Déclarations du·de la souscripteur·rice</div>
+                        <ul class="fe_legal" style="font-size:11.5px;">
+                            <li>Je choisis Énergie de Nantes comme fournisseur d'électricité pour le point de livraison ci-dessus.</li>
+                            <li>J'accepte les conditions générales de vente (CGV), qui complètent et encadrent les présentes conditions particulières.</li>
+                            <li>J'adhère à l'association Énergie de Nantes.</li>
+                            <li>
+                                Mode de paiement retenu :
+                                <strong>
+                                    <t t-if="souscription.mode_paiement == 'prelevement'">Prélèvement automatique</t>
+                                    <t t-elif="souscription.mode_paiement == 'cheque_energie'">Chèque énergie</t>
+                                    <t t-elif="souscription.mode_paiement == 'monnaie_locale'">Monnaie locale</t>
+                                    <t t-elif="souscription.mode_paiement == 'especes'">Espèces</t>
+                                    <t t-elif="souscription.mode_paiement == 'virement'">Virement</t>
+                                    <t t-elif="souscription.mode_paiement == 'cheque'">Chèque</t>
+                                    <t t-else="">à préciser</t>
+                                </strong>.
+                            </li>
+                            <li t-if="souscription.lisse">J'opte pour le paiement mensualisé (lissé), avec régularisation périodique.</li>
+                            <li t-if="souscription.renonce_retractation">
+                                Je demande l'exécution du contrat avant la fin du délai de rétractation de 14 jours
+                                et je renonce expressément à ce délai de rétractation.
+                            </li>
+                        </ul>
+
+                        <!-- ===== Consentement données de consommation (journal, ADR 0017) ===== -->
+                        <div class="fe_section">Consentement aux données de consommation</div>
+                        <p class="fe_muted" style="font-size:11px; margin-bottom:6px;">
+                            Autorisation de collecte auprès d'Enedis de données plus fines que l'index,
+                            par finalité (base légale RGPD distincte de l'index de facturation). État lu
+                            depuis le journal de consentement.
+                        </p>
+                        <table class="fe_table o_ignore_layout_styling">
+                            <tbody>
+                                <tr t-foreach="[('courbe_charge', 'Courbe de charge'), ('conso_quotidienne', 'Consommations quotidiennes')]" t-as="finalite">
+                                    <td><span t-out="finalite[1]"/></td>
+                                    <td class="num">
+                                        <t t-set="etat" t-value="souscription.etat_consentement(finalite[0])"/>
+                                        <span t-if="etat == 'donne'" class="fe_badge fe_badge_reel">Donné</span>
+                                        <span t-elif="etat == 'retire'" class="fe_badge fe_badge_est">Retiré</span>
+                                        <span t-else="" class="fe_muted">Non renseigné</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <!-- ===== Signature ===== -->
+                        <div class="fe_section">Signature</div>
+                        <div class="fe_kv">
+                            <t t-if="souscription.date_validation">
+                                Adhésion validée le <strong><span t-field="souscription.date_validation" t-options="{'widget': 'date'}"/></strong>,
+                                par signature électronique.
+                            </t>
+                            <t t-else="">Signature électronique en attente.</t>
+                        </div>
+                        <p class="fe_muted" style="font-size:10.5px; margin-top:6px;">
+                            Une confirmation de cette adhésion vous est adressée sur support durable (courriel),
+                            reprenant les présentes conditions particulières.
+                        </p>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>

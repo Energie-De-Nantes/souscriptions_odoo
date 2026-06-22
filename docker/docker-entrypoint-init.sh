@@ -1,9 +1,14 @@
 #!/bin/bash
 set -e
 
-# Entrypoint de développement : au premier lancement, crée la base, installe
-# souscriptions_odoo et charge les données de démo du *manifeste* (source unique),
-# puis lance le serveur Odoo. Aux lancements suivants, démarre directement.
+# Entrypoint de développement : garantit que la base `souscriptions_demo` existe
+# ET que le module y est installé (avec la démo), puis lance le serveur Odoo.
+#
+# Auto-réparant : la condition d'installation porte sur l'ÉTAT DU MODULE, pas sur
+# la simple existence de la base. Une base résiduelle laissée à moitié initialisée
+# (ex. créée par un ancien entrypoint cassé : base présente, module non installé)
+# est donc rattrapée au lieu d'être servie vide (sinon : modèle `grille.prix`
+# absent → 404). Plus besoin de `down -v`.
 #
 # Notes :
 # - Le module s'appelle `souscriptions_odoo` (pas `souscriptions`).
@@ -26,11 +31,21 @@ wait_for_postgres() {
 wait_for_postgres
 
 export PGPASSWORD=$PASSWORD
-if psql -h "$HOST" -U "$USER" -d postgres -lqt | cut -d \| -f 1 | grep -qw "$DB"; then
-    echo "✅ Base '$DB' déjà initialisée"
-else
-    echo "🗄️  Création de la base + installation de souscriptions_odoo..."
+
+# 1. Garantir l'existence de la base (sans rien présumer de son contenu).
+if ! psql -h "$HOST" -U "$USER" -d postgres -lqt | cut -d \| -f 1 | grep -qw "$DB"; then
+    echo "🗄️  Création de la base '$DB'..."
     createdb -h "$HOST" -U "$USER" "$DB"
+fi
+
+# 2. Le module est-il réellement installé ? (base vide => table absente => vide)
+module_state=$(psql -h "$HOST" -U "$USER" -d "$DB" -tAc \
+    "SELECT state FROM ir_module_module WHERE name='souscriptions_odoo'" 2>/dev/null || true)
+
+if [ "$module_state" = "installed" ]; then
+    echo "✅ souscriptions_odoo déjà installé dans '$DB'"
+else
+    echo "📦 souscriptions_odoo non installé (état : '${module_state:-absent}') — installation..."
     odoo --db_host="$HOST" --db_user="$USER" --db_password="$PASSWORD" \
          -d "$DB" -i souscriptions_odoo --load-language=fr_FR --stop-after-init
 

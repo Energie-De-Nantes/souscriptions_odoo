@@ -26,17 +26,13 @@ class TestIntegration(TransactionCase):
             }
         )
 
-        # Désactiver les grilles existantes et créer une grille de test
-        self.env['grille.prix'].search([('is_current', '=', True)]).write({'is_current': False})
-
-        # Grille de prix complète pour les tests (nouvelle structure)
+        # Grille de test résolue par date (get_grille_active), pas par drapeau.
         self.grille = self.env['grille.prix'].create(
             {
                 'name': 'Grille Intégration',
                 'date_debut': date(2024, 1, 1),
                 'date_fin': date(2024, 12, 31),
                 'active': True,
-                'is_current': True,
             }
         )
 

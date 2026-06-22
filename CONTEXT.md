@@ -90,10 +90,21 @@ en porte plusieurs) ; confondre avec `energie_*` (la *consommation* dérivée de
 facturé.
 
 **Grille de prix** :
-Barème **fournisseur** daté (`grille.prix`) : prix d'abonnement par puissance, prix de l'énergie
-par cadran facturé. Sélectionnée par les dates d'une *Période*, ce qui permet de facturer une
-*régularisation* aux prix historiques.
-_Éviter_ : tarif (collision avec la FTA / tarif d'acheminement réseau), barème.
+Barème **fournisseur** daté (`grille.prix`), **tout-compris** : le TURPE y est **absorbé**, jamais
+refacturé ligne à ligne (ADR 0002). Porte le prix d'abonnement **affine** — prix de base 3 kVA +
+coefficient par kVA supplémentaire (ADR 0018) — et le prix de l'énergie par cadran facturé.
+Sélectionnée par les dates d'une *Période*, ce qui permet de facturer une *régularisation* aux prix
+historiques.
+_Éviter_ : tarif (collision avec la FTA / tarif d'acheminement réseau), barème ; « prix par palier »
+(l'abonnement est **affine**, pas tabulé par puissance).
+
+**Majoration PRO** :
+Surcoût commercial (`coeff_pro`, en %) **propre à chaque *Souscription*** (négocié au cas par cas),
+appliqué à **toutes les lignes de fourniture** — *abonnement* et *énergie* — mais **jamais** à la
+*Refacturation* (transit de coût Enedis). N'est **pas** dans la *Grille de prix* (≠ prix maîtrisé,
+versionné).
+_Éviter_ : confondre avec un univers comptable (le PRO partage les comptes/TVA du standard, à la
+différence du *Tarif solidaire*).
 
 **Produit de facturation** :
 Le `product.product` Odoo porté sur une ligne de *Facture*, choisi par son **rôle de facturation**

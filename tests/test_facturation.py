@@ -23,17 +23,13 @@ class TestFacturation(TransactionCase):
             }
         )
 
-        # Désactiver les grilles existantes et créer une grille de test
-        self.env['grille.prix'].search([('is_current', '=', True)]).write({'is_current': False})
-
-        # Créer une grille de prix basique pour les tests
+        # Grille de test résolue par date (get_grille_active), pas par drapeau.
         self.grille_prix = self.env['grille.prix'].create(
             {
                 'name': 'Grille Test',
                 'date_debut': date(2024, 1, 1),
                 'date_fin': date(2024, 12, 31),
                 'active': True,
-                'is_current': True,  # Marquer comme grille active
             }
         )
 

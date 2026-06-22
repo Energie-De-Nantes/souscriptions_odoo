@@ -6,75 +6,81 @@ from datetime import date
 
 from odoo.tests.common import TransactionCase
 
-# Tarifs annuels d'abonnement par puissance (€/an) utilisés dans les tests.
-ABO_ANNUEL_STD = {
-    '3': 150.0,
-    '6': 186.0,
-    '9': 222.0,
-    '12': 258.0,
-    '15': 294.0,
-    '18': 330.0,
-    '24': 402.0,
-    '30': 474.0,
-    '36': 546.0,
-}
-ABO_ANNUEL_SOL = {
-    '3': 120.0,
-    '6': 150.0,
-    '9': 180.0,
-    '12': 210.0,
-    '15': 240.0,
-    '18': 270.0,
-    '24': 330.0,
-    '30': 390.0,
-    '36': 450.0,
-}
+# Tarif d'abonnement affine (ADR 0018) : base 3 kVA + coefficient par kVA.
+# prix_an(P) = base + coef * (P - 3)
+ABO_BASE_3KVA_STD = 150.0
+ABO_COEF_KVA_STD = 12.0
+ABO_BASE_3KVA_SOL = 120.0
+ABO_COEF_KVA_SOL = 10.0
 
 
-def build_grille_lignes(env, grille, *, prix_base, prix_hp, prix_hc, abo_std=None, abo_sol=None):
-    """Crée les lignes d'une grille : abonnement par puissance + énergies.
+def abo_annuel_std(puissance_kva):
+    """Tarif annuel standard attendu (€/an) pour une puissance, selon l'affine."""
+    return ABO_BASE_3KVA_STD + ABO_COEF_KVA_STD * (float(puissance_kva) - 3.0)
 
-    Centralise la construction des lignes pour éviter la duplication et garder
-    une source unique des tarifs attendus dans les assertions.
+
+def abo_annuel_sol(puissance_kva):
+    """Tarif annuel solidaire attendu (€/an) pour une puissance, selon l'affine."""
+    return ABO_BASE_3KVA_SOL + ABO_COEF_KVA_SOL * (float(puissance_kva) - 3.0)
+
+
+# Tarifs annuels par puissance dérivés de l'affine, pour les assertions des tests
+# qui raisonnent encore en €/an par palier (le tarif est désormais calculé, pas
+# énuméré dans la grille).
+_PUISSANCES = ('3', '6', '9', '12', '15', '18', '24', '30', '36')
+ABO_ANNUEL_STD = {p: abo_annuel_std(p) for p in _PUISSANCES}
+ABO_ANNUEL_SOL = {p: abo_annuel_sol(p) for p in _PUISSANCES}
+
+
+def build_grille_lignes(
+    env,
+    grille,
+    *,
+    prix_base,
+    prix_hp,
+    prix_hc,
+    base_std=ABO_BASE_3KVA_STD,
+    coef_std=ABO_COEF_KVA_STD,
+    base_sol=ABO_BASE_3KVA_SOL,
+    coef_sol=ABO_COEF_KVA_SOL,
+):
+    """Crée les 8 lignes d'une grille : 2 abonnement (affine) + 6 énergie.
+
+    L'abonnement est une ligne par univers (ADR 0018) portant le tarif affine
+    base 3 kVA + coefficient par kVA ; l'univers est porté par le produit du
+    catalogue (ADR 0013), jamais ré-encodé ici. Énergies inchangées.
     """
-    abo_std = ABO_ANNUEL_STD if abo_std is None else abo_std
-    abo_sol = ABO_ANNUEL_SOL if abo_sol is None else abo_sol
     std = env.ref('souscriptions_odoo.souscriptions_product_abonnement_standard')
     sol = env.ref('souscriptions_odoo.souscriptions_product_abonnement_solidaire')
     base = env.ref('souscriptions_odoo.souscriptions_product_energie_base')
     hp = env.ref('souscriptions_odoo.souscriptions_product_energie_hp')
     hc = env.ref('souscriptions_odoo.souscriptions_product_energie_hc')
-    base_sol = env.ref('souscriptions_odoo.souscriptions_product_energie_base_solidaire')
+    base_sol_prod = env.ref('souscriptions_odoo.souscriptions_product_energie_base_solidaire')
     hp_sol = env.ref('souscriptions_odoo.souscriptions_product_energie_hp_solidaire')
     hc_sol = env.ref('souscriptions_odoo.souscriptions_product_energie_hc_solidaire')
 
-    vals = []
-    for puissance, prix in abo_std.items():
-        vals.append(
-            {
-                'grille_id': grille.id,
-                'product_id': std.id,
-                'type_produit': 'abonnement',
-                'puissance': puissance,
-                'prix_abonnement_annuel': prix,
-            }
-        )
-    for puissance, prix in abo_sol.items():
-        vals.append(
-            {
-                'grille_id': grille.id,
-                'product_id': sol.id,
-                'type_produit': 'abonnement',
-                'puissance': puissance,
-                'prix_abonnement_annuel': prix,
-            }
-        )
+    vals = [
+        {
+            'grille_id': grille.id,
+            'product_id': std.id,
+            'type_produit': 'abonnement',
+            'prix_base_3kva': base_std,
+            'coef_kva': coef_std,
+        },
+        {
+            'grille_id': grille.id,
+            'product_id': sol.id,
+            'type_produit': 'abonnement',
+            'prix_base_3kva': base_sol,
+            'coef_kva': coef_sol,
+        },
+    ]
     vals += [
         {'grille_id': grille.id, 'product_id': base.id, 'type_produit': 'energie', 'prix_unitaire': prix_base},
         {'grille_id': grille.id, 'product_id': hp.id, 'type_produit': 'energie', 'prix_unitaire': prix_hp},
         {'grille_id': grille.id, 'product_id': hc.id, 'type_produit': 'energie', 'prix_unitaire': prix_hc},
         # Jumeaux solidaires (ADR 0013) : mêmes prix énergie, produits isolés.
-        {'grille_id': grille.id, 'product_id': base_sol.id, 'type_produit': 'energie', 'prix_unitaire': prix_base},
+        {'grille_id': grille.id, 'product_id': base_sol_prod.id, 'type_produit': 'energie', 'prix_unitaire': prix_base},
         {'grille_id': grille.id, 'product_id': hp_sol.id, 'type_produit': 'energie', 'prix_unitaire': prix_hp},
         {'grille_id': grille.id, 'product_id': hc_sol.id, 'type_produit': 'energie', 'prix_unitaire': prix_hc},
     ]
@@ -124,15 +130,14 @@ class SouscriptionsTestMixin:
         )
 
         # Grille de prix active avec lignes, pour que la facturation
-        # fonctionne sans dépendre des données de démo
-        cls.env['grille.prix'].search([('is_current', '=', True)]).write({'is_current': False})
+        # fonctionne sans dépendre des données de démo. La grille est résolue
+        # par date (get_grille_active), jamais par un drapeau (ADR 0018).
         cls.grille_prix = cls.env['grille.prix'].create(
             {
                 'name': 'Grille Test',
                 'date_debut': date(2024, 1, 1),
                 'date_fin': date(2024, 12, 31),
                 'active': True,
-                'is_current': True,
             }
         )
         build_grille_lignes(

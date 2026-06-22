@@ -369,36 +369,9 @@
             <field name="index_hcb">1100</field>
         </record>
 
-        <!-- ================================ -->
-        <!-- GRILLE DE PRIX COMPLÈTE         -->
-        <!-- ================================ -->
-
-        <!-- Grille de prix réaliste 2024 -->
-        <record id="demo_grille_prix_complete_2024" model="grille.prix">
-            <field name="name">Tarifs électricité 2024 - Complets</field>
-            <field name="date_debut">2024-01-01</field>
-            <field name="date_fin">2024-12-31</field>
-            <field name="active">True</field>
-        </record>
-
-        <!-- Prix énergies réalistes -->
-        <record id="demo_prix_energie_base_2024" model="grille.prix.ligne">
-            <field name="grille_id" ref="demo_grille_prix_complete_2024"/>
-            <field name="product_id" ref="souscriptions_product_energie_base"/>
-            <field name="prix_interne">0.2276</field>
-        </record>
-
-        <record id="demo_prix_energie_hp_2024" model="grille.prix.ligne">
-            <field name="grille_id" ref="demo_grille_prix_complete_2024"/>
-            <field name="product_id" ref="souscriptions_product_energie_hp"/>
-            <field name="prix_interne">0.2516</field>
-        </record>
-
-        <record id="demo_prix_energie_hc_2024" model="grille.prix.ligne">
-            <field name="grille_id" ref="demo_grille_prix_complete_2024"/>
-            <field name="product_id" ref="souscriptions_product_energie_hc"/>
-            <field name="prix_interne">0.2032</field>
-        </record>
+        <!-- Les grilles de prix de démo (2024 historique + 2025 courante) sont
+             définies dans grille_prix_demo.xml, au schéma affine (ADR 0018) :
+             une seule source, pas de doublon ni de chevauchement. -->
 
         <!-- ================================ -->
         <!-- FACTURES ADMIN (PORTAL TESTING) -->

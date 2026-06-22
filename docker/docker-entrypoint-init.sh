@@ -1,9 +1,18 @@
 #!/bin/bash
 set -e
 
-# Script d'entrée qui initialise automatiquement la démo au premier lancement
+# Entrypoint de développement : au premier lancement, crée la base, installe
+# souscriptions_odoo et charge les données de démo du *manifeste* (source unique),
+# puis lance le serveur Odoo. Aux lancements suivants, démarre directement.
+#
+# Notes :
+# - Le module s'appelle `souscriptions_odoo` (pas `souscriptions`).
+# - Dans ce harnais, `-i` ne charge PAS les fichiers `demo:` du manifeste ; on les
+#   charge explicitement via `force_demo` dans un `odoo shell`. On ne ré-écrit donc
+#   plus de données de démo à la main : tout vient de `demo/*.xml`.
 
-# Fonction pour attendre PostgreSQL
+DB=souscriptions_demo
+
 wait_for_postgres() {
     echo "Attente de PostgreSQL..."
     export PGPASSWORD=$PASSWORD
@@ -14,103 +23,32 @@ wait_for_postgres() {
     echo " PostgreSQL prêt!"
 }
 
-# Attendre que PostgreSQL soit prêt
 wait_for_postgres
 
-# Vérifier si la base de données existe déjà
 export PGPASSWORD=$PASSWORD
-if psql -h "$HOST" -U "$USER" -d postgres -lqt | cut -d \| -f 1 | grep -qw souscriptions_demo; then
-    echo "✅ Base de données déjà initialisée"
+if psql -h "$HOST" -U "$USER" -d postgres -lqt | cut -d \| -f 1 | grep -qw "$DB"; then
+    echo "✅ Base '$DB' déjà initialisée"
 else
-    echo "🗄️ Initialisation de la base de données..."
-    
-    # Créer la base
-    createdb -h "$HOST" -U "$USER" souscriptions_demo
-    
-    # Initialiser Odoo avec le module
+    echo "🗄️  Création de la base + installation de souscriptions_odoo..."
+    createdb -h "$HOST" -U "$USER" "$DB"
     odoo --db_host="$HOST" --db_user="$USER" --db_password="$PASSWORD" \
-         --database=souscriptions_demo --init=souscriptions \
-         --load-language=fr_FR --stop-after-init
-    
-    # Créer les données de démo
-    echo "📊 Création des données de démo..."
-    odoo shell --db_host="$HOST" --db_user="$USER" --db_password="$PASSWORD" -d souscriptions_demo <<'EOF'
-# Créer des partenaires de test
-partners = []
-for i, (name, is_pro) in enumerate([
-    ("Jean Dupont", False),
-    ("Marie Martin", False),
-    ("Boulangerie Artisanale SARL", True),
-    ("Restaurant Le Gourmet", True)
-]):
-    partner = env["res.partner"].create({
-        "name": name,
-        "is_company": is_pro,
-        "street": f"{i+1} rue de la Demo",
-        "city": "Paris",
-        "zip": f"7500{i+1}",
-        "country_id": env.ref("base.fr").id,
-        "phone": f"01 23 45 67 8{i}",
-        "email": f"{name.lower().replace(' ', '.')}@demo.fr"
-    })
-    partners.append(partner)
+         -d "$DB" -i souscriptions_odoo --load-language=fr_FR --stop-after-init
 
-# Créer une grille de prix
-grille = env["grille.prix"].create({
-    "name": "Grille démo 2025",
-    "date_debut": "2025-01-01",
-    "active": True
-})
-
-# Prix des produits
-for xml_id, prix in [
-    ("souscriptions_product_energie_base", 0.25),
-    ("souscriptions_product_energie_hp", 0.30),
-    ("souscriptions_product_energie_hc", 0.20)
-]:
-    product = env.ref(f"souscriptions.{xml_id}")
-    env["grille.prix.ligne"].create({
-        "grille_id": grille.id,
-        "product_id": product.id,
-        "prix_interne": prix
-    })
-
-# Créer des souscriptions
-souscriptions_data = [
-    (partners[0], "6", "base", False, 100, 0, 0),
-    (partners[1], "9", "hphc", True, 0, 120, 80),
-    (partners[2], "12", "base", True, 300, 0, 0),
-    (partners[3], "18", "hphc", False, 0, 250, 150)
-]
-
-# Récupérer l'état de facturation par défaut
-etat_a_facturer = env.ref("souscriptions.etat_a_facturer")
-
-for i, (partner, puissance, tarif, lisse, base_kwh, hp_kwh, hc_kwh) in enumerate(souscriptions_data):
-    env["souscription.souscription"].create({
-        "partner_id": partner.id,
-        "date_debut": "2025-01-01",
-        "puissance_souscrite": puissance,
-        "type_tarif": tarif,
-        "lisse": lisse,
-        "provision_mensuelle_kwh": base_kwh,
-        "provision_hp_kwh": hp_kwh,
-        "provision_hc_kwh": hc_kwh,
-        "pdl": f"0000000000{i+1}",
-        "mode_paiement": "prelevement" if i % 2 == 0 else "virement",
-        "coeff_pro": 10.0 if partner.is_company else 0.0,
-        "ref_compteur": f"COMP{i+1:04d}",
-        "numero_depannage": "09 726 750 01",
-        "etat_facturation_id": etat_a_facturer.id
-    })
-
+    echo "📊 Chargement des données de démo du manifeste (force_demo)..."
+    odoo shell --db_host="$HOST" --db_user="$USER" --db_password="$PASSWORD" -d "$DB" <<'PY'
+import odoo.modules.loading as loading
+loading.force_demo(env)
 env.cr.commit()
-print("✅ Données de démo créées avec succès!")
-EOF
-    
-    echo "✅ Base de données initialisée!"
+print("✅ Données de démo chargées (grilles, souscriptions, périodes…)")
+PY
+    echo "✅ Base '$DB' prête"
 fi
 
-# Lancer Odoo normalement avec la base de données par défaut
+# La commande compose commence historiquement par « odoo » ; on le retire car on
+# relance odoo nous-mêmes ci-dessous (sinon : « unrecognized parameters: odoo »).
+if [ "$1" = "odoo" ]; then
+    shift
+fi
+
 exec odoo --db_host="$HOST" --db_user="$USER" --db_password="$PASSWORD" \
-          --database=souscriptions_demo --db-filter=souscriptions_demo "$@"
+          -d "$DB" --db-filter="^${DB}$" "$@"

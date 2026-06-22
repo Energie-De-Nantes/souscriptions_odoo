@@ -198,6 +198,11 @@ class Souscription(models.Model):
             )
             return taxes['total_included']
 
+        # Majoration PRO appliquée à toute la fourniture — abonnement ET énergie
+        # (#67, ADR 0018) ; même facteur que la facture (souscription_periode.py),
+        # jamais à la refacturation. L'abonnement l'absorbe via get_prix_abonnement.
+        majoration_pro = 1 + self.coeff_pro / 100.0
+
         # Abonnement (€/an et €/mois) pour la puissance souscrite.
         abo_product = produit.produit_abonnement(is_sol)
         abo_jour_ht = grille.get_prix_abonnement(self.puissance_souscrite, self.coeff_pro, is_sol)
@@ -215,7 +220,7 @@ class Souscription(models.Model):
         mensualite = abo_mois
         for code, libelle in self._CADRANS_DOCUMENTS[self.type_tarif]:
             energie_product = produit.produit_energie(code, is_sol)
-            prix_kwh = affiche(energie_product, prix_grille.get(energie_product.id, 0.0))
+            prix_kwh = affiche(energie_product, prix_grille.get(energie_product.id, 0.0) * majoration_pro)
             energies.append({'code': code, 'label': libelle, 'prix_kwh': prix_kwh})
             mensualite += provisions.get(code, 0.0) * prix_kwh
 

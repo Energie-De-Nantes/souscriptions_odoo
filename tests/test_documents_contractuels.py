@@ -185,6 +185,22 @@ class TestConditionsParticulieres(SouscriptionsTestMixin, HttpCase):
         self.assertIn('Donné', html)
         self.assertIn('Non renseigné', html)
 
+    def test_projection_energie_majoree_pro(self):
+        """PRO → l'énergie projetée porte la majoration (1 + coeff_pro/100),
+        comme sur la facture (#67) : la CP et la facture montrent le même prix.
+        Société (HT) pour comparer directement au prix grille brut (0.15)."""
+        pro = self.cp_societe.copy({'coeff_pro': 10.0, 'pdl': 'PDL_CP_PRO'})
+        base = next(e for e in pro._prix_documents()['energies'] if e['code'] == 'base')
+        # 0.15 (grille) × 1.10 = 0.165, HT pour une société.
+        self.assertAlmostEqual(base['prix_kwh'], 0.15 * 1.10, places=6)
+
+    def test_projection_energie_sans_pro_egale_grille(self):
+        """Non-PRO → l'énergie projetée est le prix grille brut, sans majoration
+        (pas de régression). Société (HT) → 0.15 tel quel."""
+        self.assertEqual(self.cp_societe.coeff_pro, 0.0)
+        base = next(e for e in self.cp_societe._prix_documents()['energies'] if e['code'] == 'base')
+        self.assertAlmostEqual(base['prix_kwh'], 0.15, places=6)
+
 
 ATTESTATION_URL = '/report/html/souscriptions_odoo.souscription_attestation_document/%s'
 

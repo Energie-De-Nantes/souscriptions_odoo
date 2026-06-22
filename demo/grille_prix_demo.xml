@@ -62,5 +62,73 @@
             <field name="type_produit">energie</field>
             <field name="prix_unitaire">0.1520</field>
         </record>
+
+        <!-- ============================================================== -->
+        <!-- Grille historique 2024 : explicitement fermée (date_fin) pour  -->
+        <!-- ne pas chevaucher la grille 2025 ouverte. Démontre la sélection -->
+        <!-- par date (get_grille_active) et la régularisation aux prix      -->
+        <!-- historiques : facturer un mois 2024 utilise ces tarifs.        -->
+        <!-- ============================================================== -->
+        <record id="grille_prix_2024" model="grille.prix">
+            <field name="name">Grille tarifaire 2024</field>
+            <field name="date_debut">2024-01-01</field>
+            <field name="date_fin">2024-12-31</field>
+        </record>
+
+        <!-- Abonnement affine 2024 (tarifs plus bas qu'en 2025) -->
+        <record id="prix_abo_std_2024" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2024"/>
+            <field name="product_id" ref="souscriptions_product_abonnement_standard"/>
+            <field name="type_produit">abonnement</field>
+            <field name="prix_base_3kva">140.00</field>
+            <field name="coef_kva">11.00</field>
+        </record>
+        <record id="prix_abo_sol_2024" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2024"/>
+            <field name="product_id" ref="souscriptions_product_abonnement_solidaire"/>
+            <field name="type_produit">abonnement</field>
+            <field name="prix_base_3kva">112.00</field>
+            <field name="coef_kva">9.00</field>
+        </record>
+
+        <!-- Énergies standard 2024 (€/kWh) -->
+        <record id="prix_energie_base_2024" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2024"/>
+            <field name="product_id" ref="souscriptions_product_energie_base"/>
+            <field name="type_produit">energie</field>
+            <field name="prix_unitaire">0.1700</field>
+        </record>
+        <record id="prix_energie_hp_2024" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2024"/>
+            <field name="product_id" ref="souscriptions_product_energie_hp"/>
+            <field name="type_produit">energie</field>
+            <field name="prix_unitaire">0.1850</field>
+        </record>
+        <record id="prix_energie_hc_2024" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2024"/>
+            <field name="product_id" ref="souscriptions_product_energie_hc"/>
+            <field name="type_produit">energie</field>
+            <field name="prix_unitaire">0.1400</field>
+        </record>
+
+        <!-- Énergies solidaires 2024 (€/kWh) — produits isolés (ADR 0013) -->
+        <record id="prix_energie_base_sol_2024" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2024"/>
+            <field name="product_id" ref="souscriptions_product_energie_base_solidaire"/>
+            <field name="type_produit">energie</field>
+            <field name="prix_unitaire">0.1700</field>
+        </record>
+        <record id="prix_energie_hp_sol_2024" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2024"/>
+            <field name="product_id" ref="souscriptions_product_energie_hp_solidaire"/>
+            <field name="type_produit">energie</field>
+            <field name="prix_unitaire">0.1850</field>
+        </record>
+        <record id="prix_energie_hc_sol_2024" model="grille.prix.ligne">
+            <field name="grille_id" ref="grille_prix_2024"/>
+            <field name="product_id" ref="souscriptions_product_energie_hc_solidaire"/>
+            <field name="type_produit">energie</field>
+            <field name="prix_unitaire">0.1400</field>
+        </record>
     </data>
 </odoo>

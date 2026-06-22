@@ -60,3 +60,6 @@ odoo-server.log
 .ripgreprc
 .zprofile
 .zshrc
+
+# Rendered diagram previews (keep the .excalidraw source, not the heavy PNG)
+docs/diagrams/*.png

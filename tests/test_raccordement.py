@@ -609,24 +609,125 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
         self.assertFalse(demande.partner_bank_id, 'Compte bancaire ne devrait pas être créé')
         self.assertTrue(demande.souscription_id, 'Souscription devrait être créée')
 
-    def test_existing_partner_update(self):
-        """Test de mise à jour d'un contact existant"""
+    def test_existing_partner_reused_without_identity_overwrite(self):
+        """Un partner existant (même nature pro/particulier) est réutilisé,
+        mais ses champs d'identité (nom, adresse) ne sont pas écrasés."""
         # Créer un contact existant avec le même email
         existing_partner = self.env['res.partner'].create(
             {
                 'name': 'Ancien Nom',
                 'email': 'test@example.com',
                 'city': 'Ancienne Ville',
+                'is_company': False,
             }
         )
 
         demande = self.create_complete_demande()
         demande.stage_id = self.stage_final
 
-        # Le contact existant devrait être mis à jour
+        # Le contact existant est réutilisé (même ID), mais son identité
+        # n'est pas écrasée par les données de la demande.
         self.assertEqual(demande.partner_id.id, existing_partner.id)
-        self.assertEqual(existing_partner.name, 'Test User')  # prénom + nom
-        self.assertEqual(existing_partner.city, 'Test City')
+        self.assertEqual(existing_partner.name, 'Ancien Nom')
+        self.assertEqual(existing_partner.city, 'Ancienne Ville')
+
+        # La réutilisation est tracée au chatter de la demande.
+        messages = demande.message_ids.mapped('body')
+        self.assertTrue(
+            any('Ancien Nom' in body or 'existant' in body for body in messages),
+            'La réutilisation du partner existant devrait être tracée au chatter',
+        )
+
+    def test_pro_demande_does_not_match_particulier_partner(self):
+        """Une demande PRO avec l'email d'un particulier existant crée une
+        société, sans modifier le particulier existant."""
+        existing_particulier = self.env['res.partner'].create(
+            {
+                'name': 'Jean Dupont',
+                'email': 'test@example.com',
+                'city': 'Ancienne Ville',
+                'is_company': False,
+            }
+        )
+
+        demande = self.create_complete_demande(
+            pro=True,
+            contact_nom='SARL Test Énergie',
+            contact_prenom='',
+            siret='12345678901234',
+        )
+        demande.stage_id = self.stage_final
+
+        # Une nouvelle société est créée, distincte du particulier existant.
+        self.assertTrue(demande.partner_id)
+        self.assertNotEqual(demande.partner_id.id, existing_particulier.id)
+        self.assertTrue(demande.partner_id.is_company)
+        self.assertEqual(demande.partner_id.name, 'SARL Test Énergie')
+
+        # Le particulier existant reste intact.
+        self.assertEqual(existing_particulier.name, 'Jean Dupont')
+        self.assertFalse(existing_particulier.is_company)
+        self.assertEqual(existing_particulier.city, 'Ancienne Ville')
+
+    def test_particulier_demande_does_not_match_pro_partner(self):
+        """Une demande particulier avec l'email d'une société existante crée
+        un nouveau contact, sans modifier la société existante."""
+        existing_company = self.env['res.partner'].create(
+            {
+                'name': 'Ancienne SARL',
+                'email': 'test@example.com',
+                'city': 'Ancienne Ville',
+                'is_company': True,
+            }
+        )
+
+        demande = self.create_complete_demande(pro=False)
+        demande.stage_id = self.stage_final
+
+        self.assertTrue(demande.partner_id)
+        self.assertNotEqual(demande.partner_id.id, existing_company.id)
+        self.assertFalse(demande.partner_id.is_company)
+
+        self.assertEqual(existing_company.name, 'Ancienne SARL')
+        self.assertTrue(existing_company.is_company)
+        self.assertEqual(existing_company.city, 'Ancienne Ville')
+
+    def test_existing_partner_match_is_case_insensitive_on_email(self):
+        """La recherche par email doit ignorer la casse."""
+        existing_partner = self.env['res.partner'].create(
+            {
+                'name': 'Ancien Nom',
+                'email': 'Test@Example.com',
+                'is_company': False,
+            }
+        )
+
+        demande = self.create_complete_demande(contact_email='TEST@EXAMPLE.COM')
+        demande.stage_id = self.stage_final
+
+        self.assertEqual(demande.partner_id.id, existing_partner.id)
+        self.assertEqual(existing_partner.name, 'Ancien Nom')
+
+    def test_archived_partner_not_reused(self):
+        """Un partner archivé partageant l'email n'est pas réutilisé : une
+        demande crée un nouveau contact plutôt que de toucher un contact
+        désactivé."""
+        archived_partner = self.env['res.partner'].create(
+            {
+                'name': 'Ancien Contact Archivé',
+                'email': 'test@example.com',
+                'is_company': False,
+                'active': False,
+            }
+        )
+
+        demande = self.create_complete_demande()
+        demande.stage_id = self.stage_final
+
+        self.assertTrue(demande.partner_id)
+        self.assertNotEqual(demande.partner_id.id, archived_partner.id)
+        self.assertFalse(archived_partner.active)
+        self.assertEqual(archived_partner.name, 'Ancien Contact Archivé')
 
     def test_stage_change_no_duplicate_creation(self):
         """Test qu'on ne crée pas de doublons en changeant d'étape plusieurs fois"""

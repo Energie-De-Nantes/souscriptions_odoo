@@ -66,3 +66,21 @@ class TestPeriodeForm(SouscriptionsTestCase):
         """Le calendrier de comptage est réglable depuis la souscription."""
         with Form(self.souscription_base) as f:
             f.config_cadrans = 'hp_hc'
+
+    def test_champs_atterrissage_v3_visibles_sur_le_formulaire(self):
+        """Les champs d'identité et d'atterrissage v3 sont exposés au·à la
+        facturiste sur le formulaire Période (#76, ADR 0020 §7)."""
+        view = self.env['souscription.periode'].get_view(view_type='form')
+        arch = view['arch']
+        for champ in (
+            'mois',
+            'ref_situation_contractuelle',
+            'qualite',
+            'statut_communication',
+            'has_changement',
+            'source_hash',
+            'cta_eur',
+            'taux_accise_eur_mwh',
+            'puissance_moyenne_kva',
+        ):
+            self.assertIn(champ, arch, f'Champ {champ} absent du formulaire Période')

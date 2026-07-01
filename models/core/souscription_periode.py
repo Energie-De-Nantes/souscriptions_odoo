@@ -16,8 +16,25 @@ class SouscriptionPeriode(models.Model):
     date_fin = fields.Date(required=True, readonly=True)
     mois_annee = fields.Char(string='Mois', compute='_compute_mois_annee', store=True, readonly=True)
 
+    # Mois canonique (ADR 0020 §2) : Date au 1er du mois, dérivé stocké de
+    # `date_debut` — support local de la clé d'idempotence `(RSC, mois)` du pull
+    # electricore (ADR 0011). Distinct de `mois_annee` (libellé d'affichage
+    # français, inchangé) : la collision de nom avec le contrat v3 (qui nomme
+    # `mois_annee` sa clé « YYYY-MM ») se résout en gardant l'existant Odoo.
+    mois = fields.Date(string='Mois (canonique)', compute='_compute_mois', store=True, readonly=True)
+
     pdl = fields.Char(string='pdl', readonly=True)
     lisse = fields.Boolean(string='Lissé', readonly=True)  # related='souscription_id.lisse',  store=True)
+
+    # Identité electricore (ADR 0010, ADR 0020 §3) : la Période snapshotte la RSC
+    # de la Souscription à sa création — même logique que le snapshot des
+    # paramètres contractuels (ADR 0006).
+    ref_situation_contractuelle = fields.Char(
+        string='RSC (référence situation contractuelle)',
+        readonly=True,
+        help='RSC de la Souscription au moment de la création de cette période '
+        "(snapshot) — support de la clé d'idempotence (RSC, mois) du pull electricore.",
+    )
 
     # Calendrier de comptage figé à la création (copie de la souscription, ADR 0005).
     # Pilote le niveau de saisie de l'énergie (voir la cascade plus bas).
@@ -63,6 +80,51 @@ class SouscriptionPeriode(models.Model):
     # TURPE (calculé sur tous les cadrans)
     turpe_fixe = fields.Float(string='TURPE Fixe (€)')
     turpe_variable = fields.Float(string='TURPE Variable (€)', help='Utilise HPH+HPB+HCH+HCB')
+
+    # Atterrissage du contrat PeriodeMeta v3 electricore (ADR 0020 §4) : noms du
+    # contrat repris tels quels (single-source, ADR 0019), sauf collision. Les
+    # verdicts jumeaux qualite/statut_communication remplacent le drapeau
+    # data_complete d'ADR 0011 ; une période incalculable est créée quand même
+    # (le brouillon facturable reste la règle, CONTEXT.md).
+    qualite = fields.Selection(
+        [('reelle', 'Réelle'), ('estimee', 'Estimée'), ('incalculable', 'Incalculable')],
+        string='Qualité',
+        readonly=True,
+        help="Verdict electricore sur la qualité de l'énergie de cette période.",
+    )
+    statut_communication = fields.Selection(
+        [('communicante', 'Communicante'), ('non_communicante', 'Non communicante')],
+        string='Statut de communication',
+        readonly=True,
+        help='Verdict electricore sur la communication du compteur (Linky) sur cette période.',
+    )
+    has_changement = fields.Boolean(
+        string='Changement pendant la période',
+        readonly=True,
+        help='Un événement C15 (changement de compteur, de puissance…) a eu lieu pendant cette période.',
+    )
+    source_hash = fields.Char(
+        string='Hash source',
+        readonly=True,
+        help='Empreinte electricore des données sources ayant produit cette période (traçabilité du pull).',
+    )
+    cta_eur = fields.Float(
+        string='CTA (€)',
+        readonly=True,
+        help="Contribution Tarifaire d'Acheminement, montant servi tel quel par electricore.",
+    )
+    taux_accise_eur_mwh = fields.Float(
+        string='Taux accise (€/MWh)',
+        readonly=True,
+        help="Taux d'accise servi par electricore ; l'assiette est l'énergie facturée par Odoo "
+        '(la provision si le contrat est lissé) — le montant se calcule côté Odoo.',
+    )
+    puissance_moyenne_kva = fields.Float(
+        string='Puissance moyenne (kVA)',
+        readonly=True,
+        help='Moyenne pondérée physique (C15) de la puissance sur la période — grandeur réseau, '
+        'distincte de la puissance souscrite (paramètre contractuel snapshotté).',
+    )
 
     # Métadonnées période
     type_periode = fields.Selection(
@@ -143,6 +205,22 @@ class SouscriptionPeriode(models.Model):
         'Une seule période par souscription et par dates début/fin.',
     )
 
+    def init(self):
+        """Unicité `(souscription, mois)` scopée aux périodes **mensuelles**
+        (ADR 0020 §2) : support de la clé d'idempotence `(RSC, mois)` du pull
+        electricore, sans bloquer régularisations/ajustements (libres, plusieurs
+        par mois possibles). Un index unique partiel — hors du vocabulaire de
+        `models.Constraint`, qui ne sait pas exprimer de clause `WHERE` — est la
+        façon idiomatique Odoo d'imposer une contrainte SQL conditionnelle."""
+        self.env.cr.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS souscription_periode_mois_mensuelle_unique
+            ON souscription_periode (souscription_id, mois)
+            WHERE type_periode = 'mensuelle'
+            """
+        )
+        super().init()
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -162,6 +240,9 @@ class SouscriptionPeriode(models.Model):
                     'pdl': sous.pdl,  # Copie du PDL aussi
                     'lisse': sous.lisse,  # Compatibilité ancien champ
                     'config_cadrans': sous.config_cadrans or ('4_cadrans' if sous.type_tarif == 'hphc' else 'base'),
+                    # Snapshot de la RSC (ADR 0010, ADR 0020 §3) : même logique que
+                    # le snapshot des paramètres contractuels (ADR 0006).
+                    'ref_situation_contractuelle': sous.ref_situation_contractuelle,
                 }
             )
 
@@ -206,6 +287,16 @@ class SouscriptionPeriode(models.Model):
             'puissance_souscrite_periode',
             'provision_mensuelle_kwh_periode',
             'coeff_pro_periode',
+            # Identité et atterrissage v3 (#76, ADR 0020 §7) : figés au même titre
+            # que le reste du snapshot dès qu'une facture référence la période.
+            'ref_situation_contractuelle',
+            'qualite',
+            'statut_communication',
+            'has_changement',
+            'source_hash',
+            'cta_eur',
+            'taux_accise_eur_mwh',
+            'puissance_moyenne_kva',
         }
     )
 
@@ -308,6 +399,13 @@ class SouscriptionPeriode(models.Model):
                 rec.mois_annee = format_date(rec.date_debut, format='MMMM yyyy', locale='fr_FR').capitalize()
             else:
                 rec.mois_annee = ''
+
+    @api.depends('date_debut')
+    def _compute_mois(self):
+        """Mois canonique (ADR 0020 §2) : `date_debut` tronquée au 1er du mois —
+        support de la clé d'idempotence `(RSC, mois)` du pull electricore."""
+        for rec in self:
+            rec.mois = rec.date_debut.replace(day=1) if rec.date_debut else False
 
     # === Composition de la facture (candidate A / ADR 0006) ===
     # La Période compose ses lignes de facture à partir de son snapshot figé

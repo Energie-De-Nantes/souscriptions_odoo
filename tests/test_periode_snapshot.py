@@ -90,3 +90,21 @@ class TestPeriodeSnapshotType(SouscriptionsTestCase):
         self.assertNotIn('energie_kwh', champs)
         self.assertNotIn('provision_kwh', champs)
         self.assertNotIn('_fix_provision', champs)
+
+    def test_snapshot_rsc_fige_a_la_creation(self):
+        """La Période snapshotte la RSC de la Souscription à sa création — même
+        logique que le snapshot des paramètres contractuels (#76, ADR 0020 §3)."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC0001234'
+        periode = self._periode(self.souscription_base)
+
+        self.assertEqual(periode.ref_situation_contractuelle, 'RSC0001234')
+
+    def test_snapshot_rsc_ne_suit_pas_un_changement_ulterieur(self):
+        """Un changement de RSC sur la Souscription après coup ne modifie pas la
+        RSC déjà snapshottée sur une Période existante (historisation, ADR 0006)."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC_INITIALE'
+        periode = self._periode(self.souscription_base)
+
+        self.souscription_base.ref_situation_contractuelle = 'RSC_NOUVELLE'
+
+        self.assertEqual(periode.ref_situation_contractuelle, 'RSC_INITIALE')

@@ -50,6 +50,21 @@ class SouscriptionReleve(models.Model):
     index_hc = fields.Float(string='Index HC')
     index_base = fields.Float(string='Index Base')
 
+    # Provenance du justificatif côté electricore (#76, ADR 0020 §6) :
+    # `releve_externe_id` (← `releve_id` du contrat v3) identifie le relevé
+    # source, support de la **dédup au re-pull** ; `origine` (← `origine_releve`,
+    # précisé par `evenement` pour les relevés d'événement C15) documente sa
+    # nature (flux, événement…).
+    releve_externe_id = fields.Char(
+        string='ID relevé externe',
+        help='Identifiant du relevé côté electricore (releve_id du contrat), support de la dédup au re-pull.',
+    )
+    origine = fields.Char(
+        string='Origine',
+        help='Provenance du relevé côté electricore (origine_releve, précisée par evenement '
+        "pour les relevés d'événement C15).",
+    )
+
     # Verrou de facturation étendu à l'enfant (#56 / ADR 0014-0015). Symétrique du
     # verrou _LOCKED_FIELDS de la Période : dès qu'une Période est facturée
     # (facture_id existe, brouillon de facture compris), ses relevés sont figés —

@@ -518,7 +518,10 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
 
     def test_create_odoo_entries_complete(self):
         """Test de création des entrées Odoo avec données complètes (particulier)"""
-        demande = self.create_complete_demande()
+        # Email sans collision avec le partner fixture du setUp
+        # (test@example.com) : on teste ici la création pure d'un contact,
+        # la réutilisation d'un partner existant a ses propres tests.
+        demande = self.create_complete_demande(contact_email='creation@example.com')
 
         # Passer à l'étape finale
         demande.stage_id = self.stage_final
@@ -531,7 +534,7 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
         # Vérifier les données du contact (particulier)
         partner = demande.partner_id
         self.assertEqual(partner.name, 'Test User')  # prénom + nom
-        self.assertEqual(partner.email, 'test@example.com')
+        self.assertEqual(partner.email, 'creation@example.com')
         self.assertEqual(partner.street, 'Test Street')
         self.assertEqual(partner.city, 'Test City')
         self.assertFalse(partner.is_company)  # C'est un particulier

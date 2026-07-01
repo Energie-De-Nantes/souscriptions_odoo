@@ -258,9 +258,19 @@ class SouscriptionPeriode(models.Model):
     @api.depends('energie_hph_kwh', 'energie_hpb_kwh', 'energie_hch_kwh', 'energie_hcb_kwh', 'config_cadrans')
     def _compute_hp_hc(self):
         """HP/HC dérivés des 4 cadrans saisonniers en config 4_cadrans ; sinon
-        saisis directement (valeur conservée)."""
+        saisis directement (valeur conservée).
+
+        electricore (contrat v3, ADR 0020) sert HP/HC **déjà groupés** même en
+        config ``4_cadrans`` : à la création, si HP/HC sont fournis en vals sans
+        qu'aucun des 4 cadrans ne le soit, la cascade ne doit pas les remettre à
+        zéro. On ne dérive donc que si au moins un cadran source est non nul —
+        seule la saisie manuelle des 4 cadrans déclenche le regroupement.
+        """
         for periode in self:
-            if periode.config_cadrans == '4_cadrans':
+            cadrans_fournis = any(
+                (periode.energie_hph_kwh, periode.energie_hpb_kwh, periode.energie_hch_kwh, periode.energie_hcb_kwh)
+            )
+            if periode.config_cadrans == '4_cadrans' and cadrans_fournis:
                 periode.energie_hp_kwh = periode.energie_hph_kwh + periode.energie_hpb_kwh
                 periode.energie_hc_kwh = periode.energie_hch_kwh + periode.energie_hcb_kwh
             else:

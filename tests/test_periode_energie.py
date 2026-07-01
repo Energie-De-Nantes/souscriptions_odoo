@@ -57,6 +57,19 @@ class TestPeriodeEnergie(SouscriptionsTestCase):
         self.assertEqual(p.energie_hp_kwh, 0)
         self.assertEqual(p.energie_hc_kwh, 0)
 
+    def test_cascade_4_cadrans_ne_recrase_pas_hp_hc_fournis_a_la_creation(self):
+        """4_cadrans : HP/HC déjà groupés fournis à la création (contrat v3,
+        electricore plie HPH+HPB/HCH+HCB avant le pull) survivent — la cascade
+        locale ne sert qu'à la saisie manuelle des 4 cadrans et ne doit jamais
+        remettre HP/HC à zéro quand ils sont fournis en vals (#76, ADR 0020)."""
+        self.souscription_base.config_cadrans = '4_cadrans'
+        p = self._periode(self.souscription_base, energie_hp_kwh=215, energie_hc_kwh=95)
+        self.assertEqual(p.energie_hp_kwh, 215)
+        self.assertEqual(p.energie_hc_kwh, 95)
+        # Les 4 cadrans, non fournis, restent à 0 : aucun recalcul ne les invente.
+        self.assertEqual(p.energie_hph_kwh, 0)
+        self.assertEqual(p.energie_hpb_kwh, 0)
+
     def test_saisie_non_ecrasee_par_recompute(self):
         """Une valeur saisie n'est pas écrasée par un recalcul déclenché ailleurs."""
         self.souscription_base.config_cadrans = 'hp_hc'

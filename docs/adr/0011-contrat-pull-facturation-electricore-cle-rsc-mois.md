@@ -1,5 +1,16 @@
 # Contrat de facturation electricore → Odoo : *pull* facturiste, clé `(RSC, mois)`, payload physique
 
+*Note (juillet 2026) : le payload décrit en §4/§5 a été rattrapé par le contrat **réel**
+d'electricore — `PeriodeMeta` **v3**, qui fait foi
+([ADR-0020](0020-alignement-contrat-meta-periodes-v3.md)). Écarts : l'accise arrive en
+**taux** (`taux_accise_eur_mwh`, l'assiette restant côté Odoo) et non en montant + assiette ;
+`data_complete` n'existe plus (verdicts jumeaux `qualite`/`statut_communication`) ;
+`puissance_moyenne_kva` — grandeur **physique** C15, pas le paramètre contractuel — traverse
+le fil pour prixer l'abonnement (#78) ; les énergies arrivent **déjà regroupées** base/HP/HC
+(plus de grain `config_cadrans` sur le fil), le détail par registre survivant dans la trace
+d'index `releves_utilises`. La direction, la clé `(RSC, mois)`, le déclencheur facturiste et
+create-missing-only sont inchangés.*
+
 [ADR-0001](0001-odoo-systeme-ecriture-electricore-api-read-only.md) a tranché la **direction**
 (Odoo *tire*, electricore *calcule-et-renvoie*, n'écrit jamais le nouveau module). Cet ADR fixe
 le **contrat concret** : endpoints, clé d'idempotence, format du payload, déclencheur,

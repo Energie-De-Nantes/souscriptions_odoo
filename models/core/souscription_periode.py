@@ -306,6 +306,16 @@ class SouscriptionPeriode(models.Model):
     # fait autorité (ADR 0006). Les prix restent l'affaire de la grille (ADR 0002,
     # « référencer, pas recopier »).
 
+    # Cadrans facturés par type de tarif (snapshot `type_tarif_periode`) : pilote
+    # la boucle de composition des lignes d'énergie (#74, prefactoring en vue de
+    # l'abonnement pricé sur la puissance moyenne, #78). Même partition que
+    # `souscription._CADRANS_DOCUMENTS` (Conditions particulières) : Base = un
+    # seul cadran ; HP/HC = toujours les deux, même à 0.
+    _CADRANS_FACTURES = {
+        'base': ['base'],
+        'hphc': ['hp', 'hc'],
+    }
+
     def _quantite_facturee(self, cadran):
         """Quantité d'énergie à facturer pour un cadran facturé ('base'/'hp'/'hc').
 
@@ -384,56 +394,22 @@ class SouscriptionPeriode(models.Model):
         lines_vals.append((0, 0, {'display_type': 'line_section', 'name': 'Énergie'}))
 
         # type_tarif historisé typé (#14) : clé de sélection, comparaison directe.
-        is_base_tarif = type_tarif == 'base'
-
-        if is_base_tarif:
-            produit_base = self.env['souscription.produit'].produit_energie('base', tarif_solidaire)
-            prix_base = prix_dict.get(produit_base.id)
-            if prix_base is None:
-                raise UserError(f'Prix non trouvé dans la grille pour le produit : {produit_base.name}')
+        # Un seul bloc générique, piloté par les cadrans facturés du type de tarif
+        # (#74) — Base : un cadran ; HP/HC : toujours les deux, même à 0.
+        for cadran in self._CADRANS_FACTURES[type_tarif]:
+            produit_energie = self.env['souscription.produit'].produit_energie(cadran, tarif_solidaire)
+            prix_cadran = prix_dict.get(produit_energie.id)
+            if prix_cadran is None:
+                raise UserError(f'Prix non trouvé dans la grille pour le produit : {produit_energie.name}')
             lines_vals.append(
                 (
                     0,
                     0,
                     {
-                        'product_id': produit_base.id,
-                        'name': produit_base.name,
-                        'quantity': self._quantite_facturee('base'),
-                        'price_unit': prix_base * majoration_pro,
-                    },
-                )
-            )
-        else:  # HP/HC : toujours les deux lignes (même à 0)
-            produit_hp = self.env['souscription.produit'].produit_energie('hp', tarif_solidaire)
-            prix_hp = prix_dict.get(produit_hp.id)
-            if prix_hp is None:
-                raise UserError(f'Prix non trouvé dans la grille pour le produit : {produit_hp.name}')
-            lines_vals.append(
-                (
-                    0,
-                    0,
-                    {
-                        'product_id': produit_hp.id,
-                        'name': produit_hp.name,
-                        'quantity': self._quantite_facturee('hp'),
-                        'price_unit': prix_hp * majoration_pro,
-                    },
-                )
-            )
-
-            produit_hc = self.env['souscription.produit'].produit_energie('hc', tarif_solidaire)
-            prix_hc = prix_dict.get(produit_hc.id)
-            if prix_hc is None:
-                raise UserError(f'Prix non trouvé dans la grille pour le produit : {produit_hc.name}')
-            lines_vals.append(
-                (
-                    0,
-                    0,
-                    {
-                        'product_id': produit_hc.id,
-                        'name': produit_hc.name,
-                        'quantity': self._quantite_facturee('hc'),
-                        'price_unit': prix_hc * majoration_pro,
+                        'product_id': produit_energie.id,
+                        'name': produit_energie.name,
+                        'quantity': self._quantite_facturee(cadran),
+                        'price_unit': prix_cadran * majoration_pro,
                     },
                 )
             )

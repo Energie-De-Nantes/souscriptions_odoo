@@ -166,6 +166,25 @@ class Souscription(models.Model):
         'hphc': [('hp', 'Heures pleines'), ('hc', 'Heures creuses')],
     }
 
+    def _provisions_cadrans(self):
+        """Provision mensuelle par cadran facturé ('base'/'hp'/'hc') — source
+        unique (#73). HP/HC explicites (`provision_hp_kwh`/`provision_hc_kwh`)
+        si renseignées, tel que peuplé par le raccordement ; sinon répartition
+        70% HP / 30% HC de `provision_mensuelle_kwh`. Consommée par la création
+        de Période (snapshot figé, ADR 0006) et par la projection documents
+        (ADR 0016) : la règle de répartition ne vit qu'ici.
+        """
+        self.ensure_one()
+        if self.provision_hp_kwh or self.provision_hc_kwh:
+            hp, hc = self.provision_hp_kwh, self.provision_hc_kwh
+        else:
+            hp, hc = self.provision_mensuelle_kwh * 0.7, self.provision_mensuelle_kwh * 0.3
+        return {
+            'base': self.provision_mensuelle_kwh,
+            'hp': hp,
+            'hc': hc,
+        }
+
     def _prix_documents(self, a_date=None):
         """Prix engagés à projeter sur les *Conditions particulières* (ADR 0016).
 
@@ -209,12 +228,9 @@ class Souscription(models.Model):
         abo_an = affiche(abo_product, abo_jour_ht * 365.0)
         abo_mois = affiche(abo_product, abo_jour_ht * 365.0 / 12.0)
 
-        # Provision mensuelle par cadran facturé (utilisée pour la mensualité).
-        provisions = {
-            'base': self.provision_mensuelle_kwh,
-            'hp': self.provision_hp_kwh,
-            'hc': self.provision_hc_kwh,
-        }
+        # Provision mensuelle par cadran facturé (utilisée pour la mensualité) —
+        # source unique _provisions_cadrans() (#73).
+        provisions = self._provisions_cadrans()
 
         energies = []
         mensualite = abo_mois

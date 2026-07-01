@@ -376,12 +376,23 @@ class RaccordementDemande(models.Model):
                 'is_company': False,  # C'est un particulier
             }
 
-        # Vérifier si un contact existe déjà avec cet email
-        existing_partner = self.env['res.partner'].search([('email', '=', self.contact_email)], limit=1)
+        # Vérifier si un contact existe déjà avec cet email : recherche
+        # insensible à la casse (=ilike), restreinte aux partners actifs et de
+        # même nature (société/particulier) que la demande. Sans ce filtre sur
+        # is_company, une demande PRO pourrait retomber sur un particulier
+        # existant et écraser son identité (et inversement).
+        existing_partner = self.env['res.partner'].search(
+            [('email', '=ilike', self.contact_email), ('is_company', '=', self.pro)], limit=1
+        )
 
         if existing_partner:
-            # Mettre à jour le contact existant
-            existing_partner.write(partner_vals)
+            # Réutiliser le contact existant sans écraser son identité (nom,
+            # adresse, is_company...) : seule la demande est tracée, le
+            # contact n'est pas modifié.
+            self.message_post(
+                body=f'Contact existant réutilisé : {existing_partner.name} (ID: {existing_partner.id}), '
+                'identité non modifiée.'
+            )
             return existing_partner
         else:
             # Créer un nouveau contact

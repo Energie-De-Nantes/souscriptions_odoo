@@ -165,13 +165,19 @@ class SouscriptionPeriode(models.Model):
                 }
             )
 
-            # Gestion des provisions selon type de tarif
-            if sous.lisse and sous.provision_mensuelle_kwh:
+            # Provisions par cadran selon type de tarif — source unique
+            # souscription._provisions_cadrans() (#73) : hp/hc explicites
+            # (peuplées par le raccordement) priment, sinon répartition 70/30
+            # de la mensuelle. La répartition ne vit qu'à cet unique endroit.
+            # N'écrase jamais une provision déjà fournie explicitement à create()
+            # (saisie manuelle d'une période, tests).
+            if sous.lisse:
+                provisions = sous._provisions_cadrans()
                 if sous.type_tarif == 'base':
-                    vals['provision_base_kwh'] = sous.provision_mensuelle_kwh
-                else:  # HP/HC - répartition temporaire 70% HP / 30% HC
-                    vals['provision_hp_kwh'] = sous.provision_mensuelle_kwh * 0.7
-                    vals['provision_hc_kwh'] = sous.provision_mensuelle_kwh * 0.3
+                    vals.setdefault('provision_base_kwh', provisions['base'])
+                else:  # HP/HC
+                    vals.setdefault('provision_hp_kwh', provisions['hp'])
+                    vals.setdefault('provision_hc_kwh', provisions['hc'])
 
         return super().create(vals_list)
 

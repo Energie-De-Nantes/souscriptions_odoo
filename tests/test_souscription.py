@@ -144,3 +144,25 @@ class TestSouscription(TransactionCase):
 
         self.assertEqual(souscription.ref_situation_contractuelle, 'RSC0001234')
         self.assertEqual(souscription.id_affaire, 'AFF-56789')
+
+    def test_adresse_pdl_creation(self):
+        """Champ d'atterrissage migration (#106, ADR 0023) : l'adresse du PDL
+        se crée et se lit telle quelle, distincte de l'adresse du·de la
+        souscripteur·rice (`partner_id`)."""
+        souscription = self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.partner.id,
+                'pdl': 'PDL_ADRESSE',
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'etat_facturation_id': self.etat_actif.id,
+                'adresse_pdl': '12 rue de la Paix\n44000 Nantes',
+            }
+        )
+
+        self.assertEqual(souscription.adresse_pdl, '12 rue de la Paix\n44000 Nantes')
+
+    def test_adresse_pdl_visible_sur_le_formulaire(self):
+        """L'adresse du PDL est exposée au formulaire Souscription (#106)."""
+        view = self.env['souscription.souscription'].get_view(view_type='form')
+        self.assertIn('adresse_pdl', view['arch'])

@@ -1,0 +1,14 @@
+<odoo>
+    <!-- Champ d'atterrissage migration (#106, ADR 0023) : blaze, nom d'usage
+         choisi par le contact, distinct du nom légal. -->
+    <record id="view_partner_form_blaze" model="ir.ui.view">
+        <field name="name">res.partner.form.blaze</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <field name="category_id" position="after">
+                <field name="blaze"/>
+            </field>
+        </field>
+    </record>
+</odoo>

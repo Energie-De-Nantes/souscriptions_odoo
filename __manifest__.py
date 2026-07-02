@@ -53,6 +53,7 @@ vit dans models/wizard/ et ne lève qu'au clic sur l'action du wizard.
         'reports/souscription_attestation_report.xml',
         'reports/facture_energie_template.xml',
         'views/core/souscription_views.xml',
+        'views/core/res_partner_views.xml',
         'views/core/grille_prix_views.xml',
         'views/core/souscriptions_periode_views.xml',
         'views/core/souscription_refacturation_views.xml',

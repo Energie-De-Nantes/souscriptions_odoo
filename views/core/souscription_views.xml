@@ -51,6 +51,7 @@
                     <group string="Infos">
                         <field name="ref_compteur"/>
                         <field name="numero_depannage" widget="phone"/>
+                        <field name="adresse_pdl"/>
                     </group>
 
                     <!-- Identité electricore (ADR 0010/0020/0021) : RSC = clé d'articulation

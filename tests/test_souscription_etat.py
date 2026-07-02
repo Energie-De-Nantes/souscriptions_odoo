@@ -7,13 +7,13 @@ gestionnaire, état de cycle de vie calculé.
 from datetime import date, timedelta
 
 from odoo.exceptions import AccessError
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import tagged
 
-from .common import SouscriptionsTestMixin
+from .common import SouscriptionsTestCase
 
 
 @tagged('souscriptions', 'souscriptions_etat', 'post_install', '-at_install')
-class TestIdAffaireRaccordement(SouscriptionsTestMixin, TransactionCase):
+class TestIdAffaireRaccordement(SouscriptionsTestCase):
     """Capture et recopie de l'id_Affaire (demande -> Souscription)."""
 
     def create_complete_demande(self, **kwargs):
@@ -75,13 +75,12 @@ class TestIdAffaireRaccordement(SouscriptionsTestMixin, TransactionCase):
 
 
 @tagged('souscriptions', 'souscriptions_etat', 'post_install', '-at_install')
-class TestRscRestreinte(SouscriptionsTestMixin, TransactionCase):
+class TestRscRestreinte(SouscriptionsTestCase):
     """AC3 : écriture de la RSC réservée au groupe gestionnaire, tracée."""
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.setUpSouscriptionsData()
         cls.user = cls.env['res.users'].create(
             {
                 'name': 'Accueilliste',
@@ -109,6 +108,9 @@ class TestRscRestreinte(SouscriptionsTestMixin, TransactionCase):
 
     def test_ecriture_rsc_tracee_au_chatter(self):
         self.souscription_base.with_user(self.manager).write({'ref_situation_contractuelle': 'RSC-1'})
+        # Le tracking est différé au precommit — le forcer pour l'observer.
+        self.env.flush_all()
+        self.env.cr.precommit.run()
         tracking_messages = self.souscription_base.message_ids.filtered(lambda m: m.tracking_value_ids)
         self.assertTrue(tracking_messages, 'Le changement de RSC devrait être tracé au chatter')
 
@@ -122,7 +124,7 @@ class TestRscRestreinte(SouscriptionsTestMixin, TransactionCase):
 
 
 @tagged('souscriptions', 'souscriptions_etat', 'post_install', '-at_install')
-class TestEtatCalcule(SouscriptionsTestMixin, TransactionCase):
+class TestEtatCalcule(SouscriptionsTestCase):
     """AC4 : état de cycle de vie calculé, jamais saisi."""
 
     def test_en_instance_sans_rsc(self):
@@ -148,7 +150,7 @@ class TestEtatCalcule(SouscriptionsTestMixin, TransactionCase):
 
 
 @tagged('souscriptions', 'souscriptions_etat', 'post_install', '-at_install')
-class TestFiltresEtat(SouscriptionsTestMixin, TransactionCase):
+class TestFiltresEtat(SouscriptionsTestCase):
     """AC5 : filtres/recherche par état, RSC, id_Affaire — filtre « en
     instance sans id_Affaire »."""
 

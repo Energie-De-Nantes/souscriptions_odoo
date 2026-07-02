@@ -8,8 +8,9 @@ accise, CTA, périmètre, événements C15) est calculé par
 
 ## Vocabulaire partagé (défini ailleurs)
 
-Le vocabulaire métier neutre — **PDL, RSC, cadran, HP/HC/Base, FTA, TURPE, accise, CTA,
-méta-période, provision d'énergie, contrat lissé, facturation calendaire, régularisation** —
+Le vocabulaire métier neutre — **PDL, RSC, affaire / id_Affaire, cadran, HP/HC/Base, FTA,
+TURPE, accise, CTA, méta-période, provision d'énergie, contrat lissé, facturation calendaire,
+régularisation** —
 est défini dans le glossaire core d'electricore (`electricore/core/CONTEXT.md`). Ce fichier
 ne redéfinit aucun de ces termes ; il ne définit que les notions propres à la représentation
 Odoo et au rôle fournisseur.
@@ -25,11 +26,24 @@ Le contrat de fourniture d'électricité conclu avec un·e *souscripteur·rice*,
 `souscription.souscription`. Système de référence de toutes les données métier/contractuelles
 côté fournisseur ; n'est *pas* stocké dans le module comptable. Porte la *RSC* electricore
 comme clé d'articulation — réconciliée depuis l'`id_Affaire` Enedis (amorce capturée au
-*raccordement*) — le PDL restant un attribut d'affichage/recherche.
+*raccordement*) — le PDL restant un attribut d'affichage/recherche. Naît **en instance** au
+*raccordement*, devient **en service** — facturable — à l'acquisition de la RSC (cf. *En
+instance / En service*).
 _Éviter_ : **abonnement** (collision triple — le module Odoo de facturation récurrente qu'on
 remplace, le terme pipeline d'electricore, la catégorie produit « Abonnements ») ; **devis**,
 **commande**, `sale.order` (explicitement non utilisés : pas de cycle de vente) ; contrat
 (trop générique).
+
+**En instance / En service** :
+États de cycle de vie de la *Souscription*, **calculés depuis les faits**, jamais saisis.
+**En instance** : née au *raccordement* (signée, complète commercialement — les *conditions
+particulières* peuvent partir) mais **sans RSC** : non facturable, ignorée du pull de
+facturation. **En service** : la RSC est acquise (raccordement effectif côté Enedis) —
+facturable. La correction passe par le **fait** (la RSC), jamais par l'état. La résiliation
+est un chantier distinct.
+_Éviter_ : **brouillon** (la Souscription est conclue et signée ; « brouillon » est réservé à
+la *Période* et à la *Facture*) ; « active » (collision avec l'archivage Odoo) ;
+« raccordement effectué » comme bascule manuelle (l'état découle de la RSC, ADR 0021).
 
 **Souscripteur·rice** :
 La personne ou l'organisation titulaire d'une *Souscription*. Désigné·e *usager·ère* dans le
@@ -202,16 +216,30 @@ pour la file par défaut** (c'est *à refacturer*).
 Rôle métier qui conduit la facturation mensuelle depuis Odoo et **vérifie les données avant
 émission** des factures. Public cible de l'interface de vérification.
 
+**Accueilliste** :
+Rôle métier qui instruit les demandes de *raccordement* au quotidien : accueil des nouvelles
+demandes, demandes SGE (mise en service F120 / changement de fournisseur F130, demande de
+mesures M023), saisie de l'*id_Affaire*, suivi des affaires Enedis jusqu'à la mise en
+service. Le kanban de raccordement est son tableau de bord.
+_Éviter_ : le confondre avec le·la *facturiste* (facturation mensuelle, autre rôle).
+
 **Raccordement** :
-Le workflow d'**entrée** (kanban `raccordement.demande`) qui instruit une demande de fourniture,
-de la demande jusqu'à l'étape **« Souscrit »** ; à sa clôture il **crée** le·la
-*souscripteur·rice*, le compte bancaire et la *Souscription*. C'est le point de **capture** des
-données saisies à l'adhésion — **dont les consentements et la signature** (équivalent du *LSD* de
+Le workflow d'**entrée** (kanban `raccordement.demande`), conduit par l'*accueilliste*, qui
+instruit une demande de fourniture de l'arrivée du formulaire jusqu'à la **mise en service**
+(étape « En service ») : demande SGE selon la situation d'entrée (mise en service F120 /
+changement de fournisseur F130), saisie de l'*id_Affaire*, puis **suivi de l'affaire** Enedis —
+automatisé par la résolution périodique `id_Affaire → RSC` (ADR 0021). À la **validation de
+l'abonnement** (provisions estimées, signature captée) il **crée** le·la *souscripteur·rice*,
+le compte bancaire et la *Souscription* — née *en instance* (cf. *En instance / En service*).
+Les étapes à entrée **factuelle** (id_Affaire saisi, RSC acquise) avancent seules et ne se
+forcent pas : on corrige le fait, la carte suit. C'est le point de **capture** des données
+saisies à l'adhésion — **dont les consentements et la signature** (équivalent du *LSD* de
 prod) —, **recopiées** sur la *Souscription* qui en devient **propriétaire** (système de
 référence) ; la *demande* reste un intake transitoire. Les *conditions particulières* lisent ces
 données sur la *Souscription*, jamais sur la demande.
 _Éviter_ : confondre la **demande de raccordement** (intake) et la *Souscription* (l'enregistrement
-qu'elle engendre) ; « raccordement » au sens réseau Enedis (mise en service physique du PDL).
+qu'elle engendre) ; « raccordement » au sens réseau Enedis (mise en service physique du PDL) ;
+**« Souscrit » comme fin du workflow** (la chaîne va jusqu'à « En service »).
 
 **Portail** :
 Espace en ligne en lecture du·de la *souscripteur·rice* (contrats, factures, infos utiles),

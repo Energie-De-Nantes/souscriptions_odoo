@@ -32,6 +32,13 @@ la référence d'affaire renvoyée dès la demande de raccordement — est, elle
    **Odoo écrit son propre champ** — le read-only-vers-Odoo est préservé
    ([ADR-0001](0001-odoo-systeme-ecriture-electricore-api-read-only.md)).
 
+   > **Amendé (2026-07,
+   > [ADR-0021](0021-chaine-raccordement-pilotee-faits-naissance-instance-rsc-poll.md))** :
+   > la « bascule raccordement effectué » n'existe pas comme transition manuelle dans le
+   > modèle. La réconciliation est réalisée par un **poll quotidien** de l'endpoint de
+   > résolution, qui écrit la RSC et fait passer la *Souscription* d'*en instance* à
+   > *en service* — c'est ce flip, **calculé**, qui conditionne la facturabilité.
+
 4. **Aucun repli flou sur le flux vif.** La facturation ne démarrant qu'après « raccordement
    effectué » (⇒ MES ⇒ C15/X12 existent ⇒ RSC résoluble), la RSC est **toujours présente au
    moment de facturer**. Le couple **PDL + date** ne survit **que** comme outil de **migration

@@ -13,7 +13,7 @@ from datetime import date, timedelta
 from lxml import etree
 from odoo.tests.common import HttpCase, TransactionCase, tagged
 
-from .common import SouscriptionsTestMixin
+from .common import SouscriptionsTestMixin, build_grille_lignes
 
 
 @tagged('souscriptions', 'souscriptions_documents', 'post_install', '-at_install')
@@ -200,6 +200,24 @@ class TestConditionsParticulieres(SouscriptionsTestMixin, HttpCase):
         self.assertEqual(self.cp_societe.coeff_pro, 0.0)
         base = next(e for e in self.cp_societe._prix_documents()['energies'] if e['code'] == 'base')
         self.assertAlmostEqual(base['prix_kwh'], 0.15, places=6)
+
+    def test_projection_prix_regime_moulin(self):
+        """Régime Moulin (#105) : les Conditions particulières projettent le
+        prix de la grille Moulin, pas celui du standard — même produit, prix
+        différent (aucun produit dédié Moulin, CONTEXT.md)."""
+        grille_moulin = self.env['grille.prix'].create(
+            {
+                'name': 'Grille Moulin CP',
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 12, 31),
+                'regime_prix': 'moulin',
+            }
+        )
+        build_grille_lignes(self.env, grille_moulin, prix_base=0.30, prix_hp=0.35, prix_hc=0.25)
+
+        moulin = self.cp_societe.copy({'regime_prix': 'moulin', 'pdl': 'PDL_CP_MOULIN'})
+        base = next(e for e in moulin._prix_documents()['energies'] if e['code'] == 'base')
+        self.assertAlmostEqual(base['prix_kwh'], 0.30, places=6)
 
 
 ATTESTATION_URL = '/report/html/souscriptions_odoo.souscription_attestation_document/%s'

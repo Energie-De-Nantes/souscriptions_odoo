@@ -151,6 +151,15 @@ class SouscriptionPeriode(models.Model):
         help='État du tarif solidaire au moment de la création de cette période',
     )
 
+    regime_prix_periode = fields.Selection(
+        [('standard', 'Standard'), ('moulin', 'Moulin')],
+        string='Régime de prix (période)',
+        readonly=True,
+        help='Régime de prix de la Souscription au moment de la création de '
+        'cette période (snapshot, ADR 0006) — sélectionne la Grille de prix '
+        'par (régime, date de fin de période) lors de la facturation.',
+    )
+
     lisse_periode = fields.Boolean(
         string='Lissé (période)', readonly=True, help='État du lissage au moment de la création de cette période'
     )
@@ -233,6 +242,7 @@ class SouscriptionPeriode(models.Model):
                 {
                     'type_tarif_periode': sous.type_tarif,
                     'tarif_solidaire_periode': sous.tarif_solidaire,
+                    'regime_prix_periode': sous.regime_prix,
                     'lisse_periode': sous.lisse,
                     'puissance_souscrite_periode': float(sous.puissance_souscrite) if sous.puissance_souscrite else 0.0,
                     'provision_mensuelle_kwh_periode': sous.provision_mensuelle_kwh,
@@ -289,6 +299,7 @@ class SouscriptionPeriode(models.Model):
             'turpe_variable',
             'type_tarif_periode',
             'tarif_solidaire_periode',
+            'regime_prix_periode',
             'lisse_periode',
             'puissance_souscrite_periode',
             'provision_mensuelle_kwh_periode',
@@ -604,7 +615,7 @@ class SouscriptionPeriode(models.Model):
         (source unique du lien Période ↔ Facture, ADR 0004).
         """
         self.ensure_one()
-        grille = self.env['grille.prix'].get_grille_active(self.date_fin)
+        grille = self.env['grille.prix'].get_grille_active(self.date_fin, regime=self.regime_prix_periode)
         return self.env['account.move'].create(
             {
                 'move_type': 'out_invoice',

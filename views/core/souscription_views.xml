@@ -42,6 +42,7 @@
                         <field name="provision_hp_kwh" invisible="not lisse or type_tarif != 'hphc'" string="Provision HP (kWh)"/>
                         <field name="provision_hc_kwh" invisible="not lisse or type_tarif != 'hphc'" string="Provision HC (kWh)"/>
                         <field name="tarif_solidaire"/>
+                        <field name="regime_prix"/>
                     </group>
                     <group string="Paiement">
                         <field name="mode_paiement"/>

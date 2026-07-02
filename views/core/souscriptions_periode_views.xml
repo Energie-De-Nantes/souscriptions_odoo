@@ -48,6 +48,7 @@
                             <field name="puissance_souscrite_periode"/>
                             <field name="lisse_periode"/>
                             <field name="tarif_solidaire_periode"/>
+                            <field name="regime_prix_periode"/>
                             <field name="provision_mensuelle_kwh_periode"/>
                             <field name="coeff_pro_periode"/>
                         </group>

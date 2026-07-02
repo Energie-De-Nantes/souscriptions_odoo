@@ -8,35 +8,36 @@
             <field name="color">1</field>
             <field name="description">Nouvelle demande de raccordement à traiter</field>
         </record>
-        
+
         <record id="stage_iban_valide" model="raccordement.stage">
             <field name="name">IBAN validé</field>
             <field name="sequence">20</field>
             <field name="color">2</field>
             <field name="description">Coordonnées bancaires vérifiées et validées</field>
         </record>
-        
+
         <record id="stage_demande_sge" model="raccordement.stage">
             <field name="name">Demande SGE faite</field>
             <field name="sequence">30</field>
             <field name="color">3</field>
             <field name="description">Demande transmise au Système de Gestion des Échanges</field>
+            <field name="entree_factuelle">True</field>
         </record>
-        
+
         <record id="stage_demande_mesures" model="raccordement.stage">
             <field name="name">Demande mesures faite</field>
             <field name="sequence">40</field>
             <field name="color">4</field>
             <field name="description">Demande des données de consommation historiques</field>
         </record>
-        
+
         <record id="stage_estimation" model="raccordement.stage">
             <field name="name">Estimation mensualité</field>
             <field name="sequence">50</field>
             <field name="color">5</field>
             <field name="description">Calcul des provisions mensuelles basé sur l'historique</field>
         </record>
-        
+
         <record id="stage_souscrit" model="raccordement.stage">
             <field name="name">Souscrit</field>
             <field name="sequence">60</field>
@@ -44,6 +45,18 @@
             <field name="fold">True</field>
             <field name="is_close">True</field>
             <field name="description">Raccordement finalisé - Souscription créée</field>
+        </record>
+
+        <!-- Étape finale (#90, ADR 0021 §5-6) : atteinte seule quand la RSC de
+             la Souscription est acquise (poll ou saisie manuelle) — jamais de
+             rôle de création, celui-ci reste sur « Souscrit ». -->
+        <record id="stage_en_service" model="raccordement.stage">
+            <field name="name">En service</field>
+            <field name="sequence">70</field>
+            <field name="color">10</field>
+            <field name="fold">True</field>
+            <field name="entree_factuelle">True</field>
+            <field name="description">Raccordement effectif côté Enedis — RSC acquise (poll ou saisie manuelle)</field>
         </record>
     </data>
 </odoo>

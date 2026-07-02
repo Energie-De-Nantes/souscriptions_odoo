@@ -166,6 +166,18 @@ class RaccordementDemande(models.Model):
     date_demande_mesures = fields.Date(string='Date demande mesures', tracking=True)
     date_estimation = fields.Date(string='Date estimation', tracking=True)
 
+    # Suivi de l'affaire Enedis (#87, ADR 0021). id_affaire est la référence
+    # d'affaire SGE, connue tôt et non ambiguë (ADR 0010) ; sa date de saisie
+    # amorce le délai de grâce du poll quotidien (#89) et est recopiée sur la
+    # Souscription à la création, comme id_affaire lui-même (ADR 0016).
+    id_affaire = fields.Char(string="N° d'affaire Enedis", tracking=True, help='Référence renvoyée dès la demande SGE.')
+    id_affaire_date_saisie = fields.Date(
+        string="Date de saisie de l'id_Affaire",
+        tracking=True,
+        help="Date à laquelle l'id_Affaire a été renseigné — amorce le délai de grâce "
+        'du poll quotidien des affaires Enedis (#89).',
+    )
+
     # Champs liés après création
     partner_id = fields.Many2one('res.partner', string='Contact créé', readonly=True, tracking=True)
     partner_bank_id = fields.Many2one('res.partner.bank', string='Compte bancaire créé', readonly=True, tracking=True)
@@ -181,11 +193,16 @@ class RaccordementDemande(models.Model):
         for vals in vals_list:
             if vals.get('name', 'Nouveau') == 'Nouveau':
                 vals['name'] = self.env['ir.sequence'].next_by_code('raccordement.demande.sequence') or 'Nouveau'
+            if vals.get('id_affaire') and not vals.get('id_affaire_date_saisie'):
+                vals['id_affaire_date_saisie'] = fields.Date.context_today(self)
         records = super().create(vals_list)
         # Définir l'étape initiale si non définie
         for record in records:
             if not record.stage_id:
                 record.stage_id = self._get_default_stage_id()
+        # id_Affaire déjà renseigné à la création (rare, mais cohérent avec
+        # l'auto-move de write(), #90) : avance la carte si elle est en amont.
+        records.filtered('id_affaire')._avancer_stage_demande_sge()
         return records
 
     @api.model
@@ -297,6 +314,18 @@ class RaccordementDemande(models.Model):
 
     def write(self, vals):
         """Override write pour les actions automatiques de base"""
+        # Étapes pilotées par les faits (#90, ADR 0021 §5) : le drag-in
+        # manuel y est refusé, sauf pour les automatismes du module
+        # (contournement de contexte `raccordement_automove`).
+        if 'stage_id' in vals and not self.env.context.get('raccordement_automove'):
+            self._verifier_pas_de_drag_in_factuel(vals['stage_id'])
+
+        # id_Affaire saisi/corrigé (#87) : date de saisie auto-stampée, sauf
+        # si le vals la fixe explicitement (rattrapage de typo, tests
+        # antidatant la grâce du poll #89).
+        if vals.get('id_affaire') and 'id_affaire_date_saisie' not in vals:
+            vals = dict(vals, id_affaire_date_saisie=fields.Date.context_today(self))
+
         res = super().write(vals)
 
         # Si on change l'étape
@@ -306,7 +335,38 @@ class RaccordementDemande(models.Model):
                 if record.stage_id.is_close and not record.souscription_id:
                     record._create_odoo_entries()
 
+        # id_Affaire saisi/corrigé (#90) : la carte avance seule à « Demande
+        # SGE faite » si elle est en amont — jamais en aval (pas de recul).
+        if 'id_affaire' in vals:
+            self._avancer_stage_demande_sge()
+
         return res
+
+    def _verifier_pas_de_drag_in_factuel(self, nouveau_stage_id):
+        """Refuse le drag-in manuel vers une étape pilotée par un fait
+        (#90) : on corrige le fait, la carte suit — jamais l'inverse. Ne
+        s'applique qu'aux demandes qui *changent* réellement d'étape : une
+        ré-écriture sans changement (resync des données, module upgrade) ne
+        déclenche pas la garde."""
+        nouveau_stage = self.env['raccordement.stage'].browse(nouveau_stage_id)
+        if not nouveau_stage.entree_factuelle:
+            return
+        deplacees = self.filtered(lambda r: r.stage_id.id != nouveau_stage_id)
+        if deplacees:
+            raise UserError(
+                f'« {nouveau_stage.name} » est une étape pilotée par un fait : elle ne se force pas à la '
+                'main. Corrigez le fait (id_Affaire saisi, RSC acquise) — la carte suivra automatiquement.'
+            )
+
+    def _avancer_stage_demande_sge(self):
+        """Auto-move (#90) : id_Affaire renseigné -> « Demande SGE faite »,
+        seulement si la demande est encore en amont (jamais de recul)."""
+        stage = self.env.ref('souscriptions_odoo.stage_demande_sge', raise_if_not_found=False)
+        if not stage:
+            return
+        for record in self:
+            if record.id_affaire and record.stage_id.sequence < stage.sequence:
+                record.with_context(raccordement_automove=True).stage_id = stage.id
 
     def _create_odoo_entries(self):
         """Crée automatiquement les entrées Odoo (contact, banque, souscription)"""
@@ -430,6 +490,10 @@ class RaccordementDemande(models.Model):
             'date_validation': self.date_validation,
             'renonce_retractation': self.renonce_retractation,
             'cotitulaires': [(6, 0, self.cotitulaires.ids)],
+            # Identité electricore (ADR 0010/0021) : id_Affaire recopié comme
+            # amorce de réconciliation, avec sa date de saisie (grâce du poll #89).
+            'id_affaire': self.id_affaire,
+            'id_affaire_date_saisie': self.id_affaire_date_saisie,
         }
 
         # Ajouter les provisions selon le type de tarif

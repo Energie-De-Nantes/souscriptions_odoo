@@ -2,7 +2,7 @@ import logging
 from datetime import date, timedelta
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -20,7 +20,10 @@ class SouscriptionEtat(models.Model):
 class Souscription(models.Model):
     _name = 'souscription.souscription'
     _description = 'Souscription Électricité'
-    _inherit = ['mail.thread']
+    # mail.activity.mixin (#89) : porte l'alerte du poll quotidien des affaires
+    # Enedis quand la Souscription n'a pas de demande de raccordement liée
+    # (saisie manuelle) — sinon l'alerte est portée par la demande.
+    _inherit = ['mail.thread', 'mail.activity.mixin']
 
     name = fields.Char(string='Référence', required=True, copy=False, readonly=True, default='Nouveau')
     partner_id = fields.Many2one('res.partner', string='Souscripteur·trice')
@@ -144,37 +147,259 @@ class Souscription(models.Model):
     ref_compteur = fields.Char(string='Référence compteur')
     numero_depannage = fields.Char(string='Numéro de dépannage')
 
-    # Identité électricore (ADR 0010, ADR 0020 §3). `ref_situation_contractuelle`
+    # Identité électricore (ADR 0010, ADR 0020 §3, ADR 0021). `ref_situation_contractuelle`
     # est la clé d'articulation du pull de méta-périodes (RSC, unique par couple
     # PDL/usager·ère) ; `id_affaire` est l'amorce de réconciliation (référence
-    # d'affaire Enedis, connue tôt et non ambiguë). Peuplés à terme par le
-    # raccordement (id_Affaire capturé au raccordement, RSC résolue à la bascule
-    # « raccordement effectué » — issue dédiée) ; saisissables à la main d'ici là.
+    # d'affaire Enedis, connue tôt et non ambiguë). `id_affaire` est recopié depuis
+    # raccordement.demande à la création (#87) ; la RSC est acquise par le poll
+    # quotidien ou l'action manuelle (#88/#89) — écriture restreinte au groupe
+    # gestionnaire (ADR 0021 §5), c'est l'échappatoire quand Enedis/electricore
+    # déraille.
     ref_situation_contractuelle = fields.Char(
         string='RSC (référence situation contractuelle)',
         tracking=True,
         help="Clé d'articulation du pull de méta-périodes electricore, unique par "
-        'couple PDL/usager·ère. Non affichée dans SGE : peuplée par le raccordement '
-        "à terme (résolution id_Affaire → RSC), saisissable à la main d'ici là.",
+        'couple PDL/usager·ère. Non affichée dans SGE : acquise par le poll quotidien '
+        'des affaires Enedis, ou saisissable à la main (groupe gestionnaire) quand '
+        'le suivi automatique déraille.',
     )
     id_affaire = fields.Char(
         string="N° d'affaire Enedis",
         tracking=True,
         help="Référence d'affaire Enedis, renvoyée dès la demande de raccordement. "
         'Amorce de réconciliation (audit + ré-résolution de la RSC) — recopiée '
-        "depuis raccordement.demande à terme, saisissable à la main d'ici là.",
+        'depuis raccordement.demande à la création, corrigeable ensuite (rattrapage de typo).',
     )
+    id_affaire_date_saisie = fields.Date(
+        string="Date de saisie de l'id_Affaire",
+        help="Date de saisie de l'id_Affaire — recopiée depuis raccordement.demande à la "
+        'création, ré-amorcée à chaque correction. Amorce le délai de grâce du poll '
+        'quotidien des affaires Enedis (#89).',
+    )
+    etat = fields.Selection(
+        [('en_instance', 'En instance'), ('en_service', 'En service'), ('resiliee', 'Résiliée')],
+        string='État',
+        compute='_compute_etat',
+        store=True,
+        tracking=True,
+        help='Cycle de vie calculé depuis les faits (ADR 0021), jamais saisi : '
+        '*en instance* (RSC absente, non facturable), *en service* (RSC acquise, '
+        'facturable), *résiliée* (date de fin passée — logique minimale, chantier '
+        'dédié ultérieur). Se corrige par le fait (la RSC), jamais par ce champ.',
+    )
+    motif_resolution_rsc = fields.Char(
+        string='Motif dernière résolution RSC',
+        help='Motif renvoyé par electricore (contrat RSC) quand la dernière tentative '
+        "de résolution (poll ou manuelle, #88/#89) n'a pas renvoyé de RSC. Effacé dès "
+        'que la RSC est résolue.',
+    )
+    date_derniere_resolution_rsc = fields.Date(
+        string='Date de dernière résolution RSC',
+        help='Date de la dernière tentative de résolution RSC (#88/#89), succès ou échec.',
+    )
+
+    @api.depends('ref_situation_contractuelle', 'date_fin')
+    def _compute_etat(self):
+        today = fields.Date.context_today(self)
+        for sous in self:
+            if sous.date_fin and sous.date_fin < today:
+                sous.etat = 'resiliee'
+            elif sous.ref_situation_contractuelle:
+                sous.etat = 'en_service'
+            else:
+                sous.etat = 'en_instance'
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if vals.get('ref_situation_contractuelle') and not self._peut_ecrire_rsc():
+                raise AccessError(self._MESSAGE_RSC_RESTREINTE)
             if vals.get('name', 'Nouveau') == 'Nouveau':
                 vals['name'] = self.env['ir.sequence'].next_by_code('souscription.sequence') or 'Nouveau'
             # Amorçage du calendrier de comptage tant qu'electricore ne l'alimente
             # pas (#12) : par défaut aligné sur le type de tarif.
             if not vals.get('config_cadrans'):
                 vals['config_cadrans'] = '4_cadrans' if vals.get('type_tarif') == 'hphc' else 'base'
+            # id_Affaire saisi/corrigé (#87) : date de saisie auto-stampée, sauf
+            # si le vals la fixe explicitement (recopie depuis la demande, tests
+            # antidatant la grâce du poll #89).
+            if vals.get('id_affaire') and not vals.get('id_affaire_date_saisie'):
+                vals['id_affaire_date_saisie'] = fields.Date.context_today(self)
         return super().create(vals_list)
+
+    _MESSAGE_RSC_RESTREINTE = (
+        'La RSC (référence situation contractuelle) ne peut être modifiée que par '
+        'un·e gestionnaire Souscriptions, ou par la résolution automatique (#88/#89).'
+    )
+
+    def _peut_ecrire_rsc(self):
+        """Écriture RSC restreinte (#87, ADR 0021 §5) : gestionnaire, ou
+        résolution automatique (poll/bouton, #88/#89) via la clé de contexte
+        `rsc_automatisme` — la RSC vient alors d'electricore, pas d'une saisie
+        manuelle."""
+        return bool(self.env.context.get('rsc_automatisme')) or self.env.user.has_group(
+            'souscriptions_odoo.group_souscriptions_manager'
+        )
+
+    def write(self, vals):
+        if 'ref_situation_contractuelle' in vals and not self._peut_ecrire_rsc():
+            raise AccessError(self._MESSAGE_RSC_RESTREINTE)
+        if vals.get('id_affaire') and 'id_affaire_date_saisie' not in vals:
+            vals = dict(vals, id_affaire_date_saisie=fields.Date.context_today(self))
+
+        # RSC nouvellement acquise (#90) : la demande liée avance à « En
+        # service » — que la RSC vienne du poll (#89) ou d'une saisie
+        # manuelle (#87), l'automatisme s'accroche au fait, pas au canal.
+        rsc_avant = (
+            {s.id: s.ref_situation_contractuelle for s in self} if 'ref_situation_contractuelle' in vals else None
+        )
+
+        res = super().write(vals)
+
+        if rsc_avant is not None:
+            nouvellement_resolues = self.filtered(lambda s: s.ref_situation_contractuelle and not rsc_avant.get(s.id))
+            nouvellement_resolues._avancer_demande_en_service()
+
+        return res
+
+    def _avancer_demande_en_service(self):
+        """Auto-move (#90) : la demande liée avance à « En service »,
+        seulement si elle est encore en amont (jamais de recul), avec trace
+        au chatter de la demande."""
+        stage = self.env.ref('souscriptions_odoo.stage_en_service', raise_if_not_found=False)
+        if not stage:
+            return
+        for sous in self:
+            demande = sous._demande_liee()
+            if not demande or demande.stage_id.sequence >= stage.sequence:
+                continue
+            demande.with_context(raccordement_automove=True).stage_id = stage.id
+            demande.message_post(
+                body=f'Étape avancée automatiquement à « En service » (RSC {sous.ref_situation_contractuelle} acquise).'
+            )
+
+    def action_resoudre_rsc_maintenant(self):
+        """Bouton « résoudre la RSC maintenant » (#88) : résout la RSC des
+        Souscriptions sélectionnées via le service electricore, en un seul
+        appel batch même pour une seule Souscription. Idempotent : une
+        Souscription déjà *en service* n'est jamais re-ciblée — aucun appel
+        si le lot filtré est vide."""
+        cibles = self.filtered(lambda s: s.etat != 'en_service')
+        if not cibles:
+            return
+        sans_affaire = cibles.filtered(lambda s: not s.id_affaire)
+        if sans_affaire:
+            raise UserError(
+                f'Impossible de résoudre la RSC : id_Affaire manquant sur : {", ".join(sans_affaire.mapped("name"))}.'
+            )
+        cibles._resoudre_rsc()
+
+    def _resoudre_rsc(self):
+        """Résout `self` en un seul appel batch via le service electricore
+        (#88) et applique le mapping des motifs du contrat RSC (xor
+        `ref_situation_contractuelle`/`error`) : succès -> RSC écrite
+        (bascule *en service* + trace au chatter, #87) ; motif -> stocké
+        avec la date de tentative, visible sur la Souscription. Ne filtre
+        pas `self` : à l'appelant de ne cibler que ce qui doit l'être
+        (idempotence du bouton, ciblage du poll #89)."""
+        if not self:
+            return
+        resultats = self.env['souscription.rsc.service'].resoudre(self.mapped('id_affaire'))
+        today = fields.Date.context_today(self)
+        for sous in self:
+            resultat = resultats.get(sous.id_affaire)
+            if resultat is None:
+                continue  # ne devrait pas arriver (contrat : une réponse par entrée)
+            if resultat.ref_situation_contractuelle:
+                sous.with_context(rsc_automatisme=True).write(
+                    {'ref_situation_contractuelle': resultat.ref_situation_contractuelle}
+                )
+                sous.write({'motif_resolution_rsc': False, 'date_derniere_resolution_rsc': today})
+                sous.message_post(body=f'RSC résolue par electricore : {resultat.ref_situation_contractuelle}')
+            else:
+                sous.write({'motif_resolution_rsc': resultat.error, 'date_derniere_resolution_rsc': today})
+
+    # --- Poll quotidien des affaires Enedis (#89, ADR 0021 §3-4) ---
+
+    _DELAI_GRACE_INCONNUE_JOURS = 3
+    _ACTIVITY_SUMMARY_RSC = 'Anomalie affaire Enedis (RSC)'
+
+    @api.model
+    def _cron_poll_affaires_enedis(self):
+        """Cron quotidien : cible les Souscriptions en instance à id_Affaire
+        renseigné, non archivées — indépendamment de l'existence d'une
+        demande, donc les Souscriptions saisies à la main sont couvertes.
+        Un seul appel batch. Échec réseau/service : skip silencieux total
+        (aucun état modifié, aucune activité), nouvel essai au poll suivant."""
+        cibles = self.search([('etat', '=', 'en_instance'), ('id_affaire', '!=', False), ('active', '=', True)])
+        if not cibles:
+            return
+        try:
+            cibles._resoudre_rsc()
+        except Exception:
+            _logger.warning('Poll RSC : échec réseau/service, nouvel essai au poll suivant.', exc_info=True)
+            return
+        cibles._appliquer_alertes_rsc()
+
+    def _appliquer_alertes_rsc(self):
+        """Mapping des motifs -> alerte (#89, ADR 0021 §4) pour les
+        Souscriptions venant d'être poll-ées. *Résolue* : lève toute alerte
+        (attente silencieuse). *Connue sans C15* : attente silencieuse,
+        c'est l'état normal du suivi. *Inconnue* : tolérée
+        `_DELAI_GRACE_INCONNUE_JOURS` jours depuis la saisie de l'id_Affaire,
+        puis alerte. *Ambiguë* : alerte immédiate. Une alerte n'est jamais
+        recréée tant qu'elle persiste ; elle se lève dès que le motif
+        disparaît."""
+        today = fields.Date.context_today(self)
+        for sous in self:
+            if sous.etat == 'en_service':
+                sous._lever_alerte_rsc()
+                continue
+            motif = sous.motif_resolution_rsc or ''
+            if motif.startswith('Résolution ambiguë'):
+                sous._signaler_alerte_rsc()
+            elif motif.startswith('Affaire inconnue'):
+                saisie = sous.id_affaire_date_saisie
+                en_grace = bool(saisie) and (today - saisie).days <= sous._DELAI_GRACE_INCONNUE_JOURS
+                if en_grace:
+                    sous._lever_alerte_rsc()
+                else:
+                    sous._signaler_alerte_rsc()
+            else:  # « connue sans C15 » ou motif inattendu : attente silencieuse
+                sous._lever_alerte_rsc()
+
+    def _demande_liee(self):
+        """La demande de raccordement ayant engendré `self`, s'il y en a une
+        (les Souscriptions saisies à la main n'en ont pas)."""
+        self.ensure_one()
+        return self.env['raccordement.demande'].search([('souscription_id', '=', self.id)], limit=1)
+
+    def _signaler_alerte_rsc(self):
+        """Alerte : carte bloquée (demande liée) + une activité unique pour
+        l'accueilliste, jamais recréée tant que l'anomalie persiste.
+        Souscription sans demande liée -> activité portée par elle-même."""
+        self.ensure_one()
+        demande = self._demande_liee()
+        cible = demande or self
+        if demande and demande.kanban_state != 'blocked':
+            demande.kanban_state = 'blocked'
+        deja_signalee = cible.activity_ids.filtered(lambda a: a.summary == self._ACTIVITY_SUMMARY_RSC)
+        if not deja_signalee:
+            cible.activity_schedule(
+                'mail.mail_activity_data_todo',
+                summary=self._ACTIVITY_SUMMARY_RSC,
+                note=f"Suivi de l'affaire {self.id_affaire} bloqué : {self.motif_resolution_rsc}",
+            )
+
+    def _lever_alerte_rsc(self):
+        """Lève l'alerte #89 : débloque la carte de la demande liée et
+        retire l'activité de suivi si elles existent (no-op sinon)."""
+        self.ensure_one()
+        demande = self._demande_liee()
+        cible = demande or self
+        if demande and demande.kanban_state == 'blocked':
+            demande.kanban_state = 'normal'
+        cible.activity_ids.filtered(lambda a: a.summary == self._ACTIVITY_SUMMARY_RSC).unlink()
 
     @api.depends('periode_ids.facture_id')
     def _compute_factures_via_periodes(self):

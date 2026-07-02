@@ -41,6 +41,8 @@
                             <field name="date_demande_sge" />
                             <field name="date_demande_mesures" />
                             <field name="date_estimation" />
+                            <field name="id_affaire" />
+                            <field name="id_affaire_date_saisie" readonly="1" />
                             <field name="kanban_state" widget="state_selection" />
                         </group>
                     </group>
@@ -134,7 +136,7 @@
         <field name="name">raccordement.demande.kanban</field>
         <field name="model">raccordement.demande</field>
         <field name="arch" type="xml">
-            <kanban default_group_by="stage_id" class="o_kanban_small_column">
+            <kanban default_group_by="stage_id" class="o_kanban_small_column" highlight_color="color">
                 <field name="stage_id"
                     options='{"group_by_tooltip": {"description": "Description"}}' />
                 <field name="color" />
@@ -148,8 +150,7 @@
                 <progressbar field="kanban_state" colors='{"done": "success", "blocked": "danger"}' />
                 <templates>
                     <t t-name="card">
-                        <div
-                            t-attf-class="oe_kanban_color_#{kanban_getcolor(record.color.raw_value)} oe_kanban_card oe_kanban_global_click">
+                        <div class="oe_kanban_card oe_kanban_global_click">
                             <div class="oe_kanban_content">
                                 <div class="o_kanban_record_top mb-2">
                                     <div class="o_kanban_record_headings">
@@ -236,6 +237,7 @@
                 <field name="siret" />
                 <field name="contact_nom" />
                 <field name="contact_email" />
+                <field name="id_affaire" string="N° d'affaire Enedis" />
                 <filter string="Professionnel" name="pro" domain="[('pro', '=', True)]" />
                 <filter string="Particulier" name="particulier" domain="[('pro', '=', False)]" />
                 <separator />

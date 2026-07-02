@@ -210,7 +210,7 @@
                         domain="[('etat', '=', 'en_instance'), ('id_affaire', '=', False)]"/>
                 <separator/>
                 <filter string="Archivée" name="inactive" domain="[('active', '=', False)]"/>
-                <group string="Grouper par">
+                <group>
                     <filter string="État" name="group_etat" context="{'group_by': 'etat'}"/>
                     <filter string="État de facturation" name="group_etat_facturation" context="{'group_by': 'etat_facturation_id'}"/>
                 </group>

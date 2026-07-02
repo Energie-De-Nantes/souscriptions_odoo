@@ -18,6 +18,7 @@ from . import (
     test_refacturation,
     test_releve,
     test_releve_demo,
+    test_res_partner,
     test_rsc_service,
     test_security,
     test_souscription,

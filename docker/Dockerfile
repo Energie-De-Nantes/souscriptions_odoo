@@ -16,7 +16,11 @@ COPY . /mnt/extra-addons/souscriptions_odoo
 # Dépendances Python du module (electricore-client, #77) — épinglées dans
 # requirements.txt, absentes de external_dependencies pour ne pas bloquer
 # l'installation du module sans elles (garde d'import côté wizard).
-RUN pip install --no-cache-dir --break-system-packages --ignore-installed -r /mnt/extra-addons/souscriptions_odoo/requirements.txt
+# uv plutôt que pip : --break-system-packages reste requis (PEP 668, inhérent
+# au Python système), mais uv shadowe proprement le typing_extensions Debian
+# dans /usr/local sans le marteau --ignore-installed.
+COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
+RUN uv pip install --system --break-system-packages -r /mnt/extra-addons/souscriptions_odoo/requirements.txt
 
 # S'assurer que les permissions sont correctes
 RUN chown -R odoo:odoo /mnt/extra-addons/souscriptions_odoo

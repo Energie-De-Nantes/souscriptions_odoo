@@ -7,7 +7,4 @@
 # manifeste : l'absence du paquet ne doit pas empêcher l'installation du
 # module (garde d'import dans models/wizard/souscription_pull_meta_periodes_wizard.py,
 # UserError explicite au clic si absent).
-# Pin git (SHA sur main d'electricore) : le 0.1.0 publié sur PyPI est antérieur
-# à PreconditionNonRemplie (#424 côté electricore) dont le wizard a besoin.
-# À re-pinner en `electricore-client==0.1.1` dès qu'une version fraîche est publiée.
-electricore-client @ git+https://github.com/Energie-De-Nantes/electricore.git@76a8b3d8c26a18081f0c4ab92d6cbb09f6e50c94#subdirectory=packages/electricore-client
+electricore-client==0.2.0

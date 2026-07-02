@@ -60,7 +60,7 @@ class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
         if not ELECTRICORE_CLIENT_DISPONIBLE:
             raise UserError(
                 "Le paquet 'electricore_client' n'est pas installé sur ce serveur. "
-                'Installez-le (pip install electricore-client==0.1.0) puis réessayez.'
+                'Installez la dépendance épinglée dans requirements.txt puis réessayez.'
             )
 
         Souscription = self.env['souscription.souscription']

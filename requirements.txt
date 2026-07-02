@@ -1,0 +1,10 @@
+# Dépendances Python du module Odoo, hors dépendances du framework
+# (déjà fournies par l'image odoo:19.0). Lu automatiquement par odoo.sh ;
+# pour Docker, voir docker/Dockerfile.
+#
+# electricore-client : client fin (httpx+pydantic) vers l'API facturiste
+# electricore (#77, ADR 0019). Épinglé — pas dans `external_dependencies` du
+# manifeste : l'absence du paquet ne doit pas empêcher l'installation du
+# module (garde d'import dans models/wizard/souscription_pull_meta_periodes_wizard.py,
+# UserError explicite au clic si absent).
+electricore-client==0.1.0

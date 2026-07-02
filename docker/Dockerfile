@@ -11,6 +11,11 @@ RUN apt-get update && apt-get install -y \
 # Copier le module souscriptions
 COPY . /mnt/extra-addons/souscriptions_odoo
 
+# Dépendances Python du module (electricore-client, #77) — épinglées dans
+# requirements.txt, absentes de external_dependencies pour ne pas bloquer
+# l'installation du module sans elles (garde d'import côté wizard).
+RUN pip install --no-cache-dir -r /mnt/extra-addons/souscriptions_odoo/requirements.txt
+
 # S'assurer que les permissions sont correctes
 RUN chown -R odoo:odoo /mnt/extra-addons/souscriptions_odoo
 

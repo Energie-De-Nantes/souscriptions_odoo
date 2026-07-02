@@ -23,6 +23,15 @@ Fonctionnalités :
 Les calculs métier et l'ingestion des données Enedis (périmètre, prestations,
 index, TURPE, accise) sont délégués à electricore, qui alimente les périodes
 de facturation via son API.
+
+Le pull des méta-périodes (action facturiste « Récupérer les périodes du
+mois ») consomme le paquet PyPI épinglé ``electricore-client`` (voir
+requirements.txt). Ce paquet n'est volontairement PAS déclaré en
+``external_dependencies`` : Odoo vérifie l'importabilité de ces paquets à
+l'installation et ferait échouer le module entier sur toute instance qui ne
+l'a pas encore — alors que l'AC de l'issue #77 demande un module
+*installable* avec un message clair si le paquet manque. La garde d'import
+vit dans models/wizard/ et ne lève qu'au clic sur l'action du wizard.
 """,
     'installable': True,
     'application': True,
@@ -46,6 +55,7 @@ de facturation via son API.
         'views/core/grille_prix_views.xml',
         'views/core/souscriptions_periode_views.xml',
         'views/core/souscription_refacturation_views.xml',
+        'views/wizard/souscription_pull_meta_periodes_wizard_views.xml',
         'views/core/souscription_portal_menu.xml',
         'views/portal_templates.xml',
         'views/raccordement/raccordement_demande_views.xml',

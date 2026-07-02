@@ -25,3 +25,5 @@ access_souscription_periode_portal,souscription.periode portal,model_souscriptio
 access_souscription_releve_portal,souscription.releve portal,model_souscription_releve,base.group_portal,1,0,0,0
 access_souscription_etat_portal,souscription.etat portal,model_souscription_etat,base.group_portal,1,0,0,0
 access_account_move_portal,account.move portal,account.model_account_move,base.group_portal,1,0,0,0
+access_souscription_pull_meta_periodes_wizard_user,souscription.pull.meta.periodes.wizard user,model_souscription_pull_meta_periodes_wizard,group_souscriptions_user,1,1,1,1
+access_souscription_pull_meta_periodes_wizard_manager,souscription.pull.meta.periodes.wizard manager,model_souscription_pull_meta_periodes_wizard,group_souscriptions_manager,1,1,1,1

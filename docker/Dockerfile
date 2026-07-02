@@ -2,10 +2,8 @@ FROM odoo:19.0
 
 USER root
 
-# Installer les dépendances système (git : requis par le pin git+https de
-# requirements.txt tant qu'electricore-client n'est pas re-publié sur PyPI)
+# Installer les dépendances système
 RUN apt-get update && apt-get install -y \
-    git \
     python3-watchdog \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*

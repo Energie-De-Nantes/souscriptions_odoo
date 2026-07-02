@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Poll quotidien des affaires Enedis (#89, ADR 0021 §3-4) : remplace
+             la vérification manuelle sur le portail SGE. Calé après
+             l'ingestion des flux côté electricore (nuit). -->
+        <record id="cron_poll_affaires_enedis" model="ir.cron">
+            <field name="name">Souscriptions : poll quotidien des affaires Enedis (RSC)</field>
+            <field name="model_id" ref="model_souscription_souscription"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_poll_affaires_enedis()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+    </data>
+</odoo>

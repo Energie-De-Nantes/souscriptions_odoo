@@ -20,7 +20,10 @@ class SouscriptionEtat(models.Model):
 class Souscription(models.Model):
     _name = 'souscription.souscription'
     _description = 'Souscription Électricité'
-    _inherit = ['mail.thread']
+    # mail.activity.mixin (#89) : porte l'alerte du poll quotidien des affaires
+    # Enedis quand la Souscription n'a pas de demande de raccordement liée
+    # (saisie manuelle) — sinon l'alerte est portée par la demande.
+    _inherit = ['mail.thread', 'mail.activity.mixin']
 
     name = fields.Char(string='Référence', required=True, copy=False, readonly=True, default='Nouveau')
     partner_id = fields.Many2one('res.partner', string='Souscripteur·trice')
@@ -285,6 +288,88 @@ class Souscription(models.Model):
                 sous.message_post(body=f'RSC résolue par electricore : {resultat.ref_situation_contractuelle}')
             else:
                 sous.write({'motif_resolution_rsc': resultat.error, 'date_derniere_resolution_rsc': today})
+
+    # --- Poll quotidien des affaires Enedis (#89, ADR 0021 §3-4) ---
+
+    _DELAI_GRACE_INCONNUE_JOURS = 3
+    _ACTIVITY_SUMMARY_RSC = 'Anomalie affaire Enedis (RSC)'
+
+    @api.model
+    def _cron_poll_affaires_enedis(self):
+        """Cron quotidien : cible les Souscriptions en instance à id_Affaire
+        renseigné, non archivées — indépendamment de l'existence d'une
+        demande, donc les Souscriptions saisies à la main sont couvertes.
+        Un seul appel batch. Échec réseau/service : skip silencieux total
+        (aucun état modifié, aucune activité), nouvel essai au poll suivant."""
+        cibles = self.search([('etat', '=', 'en_instance'), ('id_affaire', '!=', False), ('active', '=', True)])
+        if not cibles:
+            return
+        try:
+            cibles._resoudre_rsc()
+        except Exception:
+            _logger.warning('Poll RSC : échec réseau/service, nouvel essai au poll suivant.', exc_info=True)
+            return
+        cibles._appliquer_alertes_rsc()
+
+    def _appliquer_alertes_rsc(self):
+        """Mapping des motifs -> alerte (#89, ADR 0021 §4) pour les
+        Souscriptions venant d'être poll-ées. *Résolue* : lève toute alerte
+        (attente silencieuse). *Connue sans C15* : attente silencieuse,
+        c'est l'état normal du suivi. *Inconnue* : tolérée
+        `_DELAI_GRACE_INCONNUE_JOURS` jours depuis la saisie de l'id_Affaire,
+        puis alerte. *Ambiguë* : alerte immédiate. Une alerte n'est jamais
+        recréée tant qu'elle persiste ; elle se lève dès que le motif
+        disparaît."""
+        today = fields.Date.context_today(self)
+        for sous in self:
+            if sous.etat == 'en_service':
+                sous._lever_alerte_rsc()
+                continue
+            motif = sous.motif_resolution_rsc or ''
+            if motif.startswith('Résolution ambiguë'):
+                sous._signaler_alerte_rsc()
+            elif motif.startswith('Affaire inconnue'):
+                saisie = sous.id_affaire_date_saisie
+                en_grace = bool(saisie) and (today - saisie).days <= sous._DELAI_GRACE_INCONNUE_JOURS
+                if en_grace:
+                    sous._lever_alerte_rsc()
+                else:
+                    sous._signaler_alerte_rsc()
+            else:  # « connue sans C15 » ou motif inattendu : attente silencieuse
+                sous._lever_alerte_rsc()
+
+    def _demande_liee(self):
+        """La demande de raccordement ayant engendré `self`, s'il y en a une
+        (les Souscriptions saisies à la main n'en ont pas)."""
+        self.ensure_one()
+        return self.env['raccordement.demande'].search([('souscription_id', '=', self.id)], limit=1)
+
+    def _signaler_alerte_rsc(self):
+        """Alerte : carte bloquée (demande liée) + une activité unique pour
+        l'accueilliste, jamais recréée tant que l'anomalie persiste.
+        Souscription sans demande liée -> activité portée par elle-même."""
+        self.ensure_one()
+        demande = self._demande_liee()
+        cible = demande or self
+        if demande and demande.kanban_state != 'blocked':
+            demande.kanban_state = 'blocked'
+        deja_signalee = cible.activity_ids.filtered(lambda a: a.summary == self._ACTIVITY_SUMMARY_RSC)
+        if not deja_signalee:
+            cible.activity_schedule(
+                'mail.mail_activity_data_todo',
+                summary=self._ACTIVITY_SUMMARY_RSC,
+                note=f"Suivi de l'affaire {self.id_affaire} bloqué : {self.motif_resolution_rsc}",
+            )
+
+    def _lever_alerte_rsc(self):
+        """Lève l'alerte #89 : débloque la carte de la demande liée et
+        retire l'activité de suivi si elles existent (no-op sinon)."""
+        self.ensure_one()
+        demande = self._demande_liee()
+        cible = demande or self
+        if demande and demande.kanban_state == 'blocked':
+            demande.kanban_state = 'normal'
+        cible.activity_ids.filtered(lambda a: a.summary == self._ACTIVITY_SUMMARY_RSC).unlink()
 
     @api.depends('periode_ids.facture_id')
     def _compute_factures_via_periodes(self):

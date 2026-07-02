@@ -1,6 +1,6 @@
 {
     'name': 'Souscriptions Électricité',
-    'version': '19.0.1.5.0',
+    'version': '19.0.1.6.0',
     'depends': ['base', 'mail', 'contacts', 'account', 'portal'],
     'author': 'Virgile Daugé',
     'category': 'Energy',
@@ -48,6 +48,7 @@ vit dans models/wizard/ et ne lève qu'au clic sur l'action du wizard.
         'data/produits_prestation.xml',
         'data/raccordement_sequence.xml',
         'data/raccordement_stages.xml',
+        'data/ir_cron_poll_affaires_enedis.xml',
         'reports/souscription_conditions_particulieres_report.xml',
         'reports/souscription_attestation_report.xml',
         'reports/facture_energie_template.xml',

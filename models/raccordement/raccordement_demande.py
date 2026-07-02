@@ -366,6 +366,11 @@ class RaccordementDemande(models.Model):
         if vals.get('id_affaire') and 'id_affaire_date_saisie' not in vals:
             vals = dict(vals, id_affaire_date_saisie=fields.Date.context_today(self))
 
+        # Stage avant écriture (#103) : seule une transition *effective* vers
+        # « Abonnement Validé » envoie le pack de bienvenue — une
+        # ré-écriture sans changement n'en envoie pas un second.
+        stage_avant = {r.id: r.stage_id.id for r in self} if 'stage_id' in vals else None
+
         res = super().write(vals)
 
         # Si on change l'étape
@@ -374,6 +379,17 @@ class RaccordementDemande(models.Model):
                 # Si on passe à l'étape finale et qu'on n'a pas encore créé les entrées
                 if record.stage_id.is_close and not record.souscription_id:
                     record._create_odoo_entries()
+
+            stage_abonnement_valide = self.env.ref(
+                'souscriptions_odoo.stage_abonnement_valide', raise_if_not_found=False
+            )
+            if stage_abonnement_valide:
+                for record in self:
+                    if (
+                        record.stage_id == stage_abonnement_valide
+                        and stage_avant.get(record.id) != stage_abonnement_valide.id
+                    ):
+                        record._envoyer_pack_bienvenue()
 
         # id_Affaire saisi ou situation_entree corrigée (#90/#100) : la carte
         # avance seule vers la branche ⏳ désignée, ou re-route latéralement
@@ -496,6 +512,33 @@ class RaccordementDemande(models.Model):
         template = self.env.ref(xmlid, raise_if_not_found=False) if xmlid else False
         if template:
             template.send_mail(self.id, force_send=False)
+
+    # Variante du pack de bienvenue (#103, ADR 0022 §6) par faits de la
+    # demande : PRO, sinon solidaire, sinon particulier.
+    _TEMPLATE_XMLID_BIENVENUE_PRO = 'souscriptions_odoo.mail_template_bienvenue_pro'
+    _TEMPLATE_XMLID_BIENVENUE_SOLIDAIRE = 'souscriptions_odoo.mail_template_bienvenue_solidaire'
+    _TEMPLATE_XMLID_BIENVENUE_PARTICULIER = 'souscriptions_odoo.mail_template_bienvenue_particulier'
+
+    def _envoyer_pack_bienvenue(self):
+        """Pack de bienvenue (#103, ADR 0022 §6) à l'entrée effective en
+        « Abonnement Validé » : conditions particulières complètes (RSC +
+        mensualités réelles) en pièce jointe (`report_template_ids` du
+        template, rendu pour la Souscription) + documents d'accueil
+        statiques configurables (`attachment_ids` du template). Variante
+        choisie par les faits de la demande ; no-op si la Souscription
+        n'existe pas (rien à joindre, rien à notifier)."""
+        self.ensure_one()
+        if not self.souscription_id:
+            return
+        if self.pro:
+            xmlid = self._TEMPLATE_XMLID_BIENVENUE_PRO
+        elif self.tarif_solidaire:
+            xmlid = self._TEMPLATE_XMLID_BIENVENUE_SOLIDAIRE
+        else:
+            xmlid = self._TEMPLATE_XMLID_BIENVENUE_PARTICULIER
+        template = self.env.ref(xmlid, raise_if_not_found=False)
+        if template:
+            template.send_mail(self.souscription_id.id, force_send=False)
 
     def _create_odoo_entries(self):
         """Crée automatiquement les entrées Odoo (contact, banque, souscription)"""

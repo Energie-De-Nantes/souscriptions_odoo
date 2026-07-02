@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Pack de bienvenue (#103, ADR 0022 §6) : envoyé automatiquement à
+             l'entrée en « Abonnement Validé » — conditions particulières
+             complètes (RSC + mensualités réelles) en pièce jointe via
+             report_template_ids (rendu par record, même report que le bouton
+             manuel de la Souscription), + documents d'accueil statiques
+             configurables (attachment_ids du template). Trois variantes
+             reprenant les contenus du pack prod « Bienvenue à EDN », choisies
+             par les faits de la demande (PRO / solidaire / particulier).
+             Wording provisoire, le définitif viendra d'EDN. -->
+
+        <record id="mail_template_bienvenue_particulier" model="mail.template">
+            <field name="name">Raccordement — pack de bienvenue (particulier)</field>
+            <field name="model_id" ref="model_souscription_souscription"/>
+            <field name="subject">Bienvenue à Énergie De Nantes !</field>
+            <field name="partner_to">{{ object.partner_id.id }}</field>
+            <field name="report_template_ids" eval="[(6, 0, [ref('action_souscription_conditions_particulieres')])]"/>
+            <field name="body_html" type="html">
+                <div style="margin: 0px; padding: 0px;">
+                    <p>Bonjour,</p>
+                    <p>
+                        Bienvenue à Énergie De Nantes ! Votre abonnement <t t-out="object.name"/> (PDL
+                        <t t-out="object.pdl"/>) est désormais validé et actif.
+                    </p>
+                    <p>
+                        Vous trouverez ci-joint vos conditions particulières complètes, ainsi que quelques
+                        documents utiles pour bien démarrer avec nous.
+                    </p>
+                    <p>L'équipe Énergie De Nantes</p>
+                </div>
+            </field>
+        </record>
+
+        <record id="mail_template_bienvenue_pro" model="mail.template">
+            <field name="name">Raccordement — pack de bienvenue (professionnel)</field>
+            <field name="model_id" ref="model_souscription_souscription"/>
+            <field name="subject">Bienvenue à Énergie De Nantes !</field>
+            <field name="partner_to">{{ object.partner_id.id }}</field>
+            <field name="report_template_ids" eval="[(6, 0, [ref('action_souscription_conditions_particulieres')])]"/>
+            <field name="body_html" type="html">
+                <div style="margin: 0px; padding: 0px;">
+                    <p>Bonjour,</p>
+                    <p>
+                        Bienvenue à Énergie De Nantes ! L'abonnement professionnel <t t-out="object.name"/>
+                        (PDL <t t-out="object.pdl"/>) est désormais validé et actif.
+                    </p>
+                    <p>
+                        Vous trouverez ci-joint vos conditions particulières complètes, ainsi que quelques
+                        documents utiles pour bien démarrer avec nous.
+                    </p>
+                    <p>L'équipe Énergie De Nantes</p>
+                </div>
+            </field>
+        </record>
+
+        <record id="mail_template_bienvenue_solidaire" model="mail.template">
+            <field name="name">Raccordement — pack de bienvenue (tarif solidaire)</field>
+            <field name="model_id" ref="model_souscription_souscription"/>
+            <field name="subject">Bienvenue à Énergie De Nantes !</field>
+            <field name="partner_to">{{ object.partner_id.id }}</field>
+            <field name="report_template_ids" eval="[(6, 0, [ref('action_souscription_conditions_particulieres')])]"/>
+            <field name="body_html" type="html">
+                <div style="margin: 0px; padding: 0px;">
+                    <p>Bonjour,</p>
+                    <p>
+                        Bienvenue à Énergie De Nantes ! Votre abonnement au tarif solidaire
+                        <t t-out="object.name"/> (PDL <t t-out="object.pdl"/>) est désormais validé et actif.
+                    </p>
+                    <p>
+                        Vous trouverez ci-joint vos conditions particulières complètes, ainsi que quelques
+                        documents utiles pour bien démarrer avec nous.
+                    </p>
+                    <p>L'équipe Énergie De Nantes</p>
+                </div>
+            </field>
+        </record>
+    </data>
+</odoo>

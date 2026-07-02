@@ -87,3 +87,114 @@ class TestMailsRassurageRaccordement(SouscriptionsTestMixin, TransactionCase):
         demande.stage_id = self.stage_nouveau
 
         self.assertFalse(self._mails(demande))
+
+
+@tagged('souscriptions', 'souscriptions_raccordement_mails', 'post_install', '-at_install')
+class TestPackBienvenueRaccordement(SouscriptionsTestMixin, TransactionCase):
+    """Tests #103 — pack de bienvenue automatique à « Abonnement Validé »
+    (ADR 0022 §6) : conditions particulières complètes en pièce jointe
+    (report_template_ids, même report que le bouton manuel de la
+    Souscription — pas de nouvelle couture), documents d'accueil statiques
+    configurables, variante par les faits, pas de doublon."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setUpSouscriptionsData()
+        cls.stage_accepte_iban_verifie = cls.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
+        cls.stage_abonnement_valide = cls.env.ref('souscriptions_odoo.stage_abonnement_valide')
+        cls.template_particulier = cls.env.ref('souscriptions_odoo.mail_template_bienvenue_particulier')
+        cls.template_pro = cls.env.ref('souscriptions_odoo.mail_template_bienvenue_pro')
+        cls.template_solidaire = cls.env.ref('souscriptions_odoo.mail_template_bienvenue_solidaire')
+
+    def create_demande(self, email, **kwargs):
+        defaults = {
+            'pdl': 'PDL_BIENVENUE_' + email,
+            'date_debut_souhaitee': date.today() + timedelta(days=30),
+            'puissance_souscrite': '6',
+            'type_tarif': 'base',
+            'provision_mensuelle_kwh': 250.0,
+            'contact_nom': 'Test',
+            'contact_email': email,
+            'contact_street': 'Test Street',
+            'contact_zip': '12345',
+            'contact_city': 'Test City',
+            'mode_paiement': 'virement',
+        }
+        defaults.update(kwargs)
+        return self.env['raccordement.demande'].create(defaults)
+
+    def _mails(self, souscription):
+        return self.env['mail.mail'].search(
+            [('res_id', '=', souscription.id), ('model', '=', 'souscription.souscription')]
+        )
+
+    def _accepter_et_valider(self, demande):
+        """Mène la demande jusqu'à « Abonnement Validé » (naissance à
+        l'acceptation, #101, puis clôture du kanban)."""
+        demande.stage_id = self.stage_accepte_iban_verifie
+        demande.stage_id = self.stage_abonnement_valide
+        return demande.souscription_id
+
+    def test_drag_en_abonnement_valide_envoie_pack_bienvenue_avec_cp_en_piece_jointe(self):
+        demande = self.create_demande('bienvenue-particulier@example.com')
+        souscription = self._accepter_et_valider(demande)
+
+        mails = self._mails(souscription)
+        self.assertEqual(len(mails), 1)
+        self.assertEqual(mails.subject, self.template_particulier.subject)
+        self.assertTrue(mails.attachment_ids, 'La CP devrait partir en pièce jointe (report_template_ids)')
+
+    def test_variante_pro(self):
+        demande = self.create_demande('bienvenue-pro@example.com', pro=True, siret='12345678901234', coeff_pro=5.0)
+        souscription = self._accepter_et_valider(demande)
+
+        mails = self._mails(souscription)
+        self.assertEqual(len(mails), 1)
+        self.assertIn('professionnel', mails.body_html)
+
+    def test_variante_solidaire(self):
+        demande = self.create_demande('bienvenue-solidaire@example.com', tarif_solidaire=True)
+        souscription = self._accepter_et_valider(demande)
+
+        mails = self._mails(souscription)
+        self.assertEqual(len(mails), 1)
+        self.assertIn('tarif solidaire', mails.body_html)
+
+    def test_variante_particulier_par_defaut(self):
+        demande = self.create_demande('bienvenue-defaut@example.com')
+        souscription = self._accepter_et_valider(demande)
+
+        mails = self._mails(souscription)
+        self.assertNotIn('professionnel', mails.body_html)
+        self.assertNotIn('tarif solidaire', mails.body_html)
+
+    def test_pas_de_doublon_si_reecriture_sans_changement(self):
+        demande = self.create_demande('bienvenue-nodup@example.com')
+        souscription = self._accepter_et_valider(demande)
+        self.assertEqual(len(self._mails(souscription)), 1)
+
+        # Ré-écriture de la même étape (resync, pas un vrai changement) :
+        # aucun second pack.
+        demande.stage_id = self.stage_abonnement_valide
+
+        self.assertEqual(len(self._mails(souscription)), 1)
+
+    def test_documents_accueil_statiques_partent_avec_le_mail(self):
+        """Les documents d'accueil statiques (attachment_ids du template)
+        sont configurables et partent avec le mail."""
+        piece_jointe = self.env['ir.attachment'].create(
+            {
+                'name': "Guide d'accueil EDN.pdf",
+                'datas': b'ZmFrZSBwZGYgY29udGVudA==',  # 'fake pdf content' en base64
+            }
+        )
+        self.template_particulier.attachment_ids = [(6, 0, [piece_jointe.id])]
+        self.addCleanup(lambda: self.template_particulier.write({'attachment_ids': [(5, 0, 0)]}))
+
+        demande = self.create_demande('bienvenue-doc@example.com')
+        souscription = self._accepter_et_valider(demande)
+
+        mails = self._mails(souscription)
+        noms = mails.attachment_ids.mapped('name')
+        self.assertIn("Guide d'accueil EDN.pdf", noms)

@@ -10,13 +10,10 @@ wizard échoue avec un message actionnable.
 
 from __future__ import annotations
 
-import logging
 from datetime import timedelta
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError
-
-_logger = logging.getLogger(__name__)
 
 # Garde d'import (#77 AC1) : `electricore_client` est un paquet PyPI épinglé
 # (requirements.txt), pas une dépendance dure Odoo — `external_dependencies`
@@ -31,7 +28,7 @@ try:
     from electricore_client.exceptions import PreconditionNonRemplie
 
     ELECTRICORE_CLIENT_DISPONIBLE = True
-except ImportError:  # pragma: no cover - exercé par test_client_manquant
+except ImportError:  # pragma: no cover - exercé par test_paquet_manquant_leve_userror_actionnable
     ELECTRICORE_CLIENT_DISPONIBLE = False
 
 

@@ -50,16 +50,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Install module and run tests on Odoo 19
-        # The official odoo image entrypoint builds the --db_* flags from the
-        # HOST/PORT/USER/PASSWORD env vars and appends them after the command,
-        # so the DB connection must be configured through these vars.
+      # On teste l'image de docker/Dockerfile (et non le stock odoo:19) : c'est
+      # elle qui installe requirements.txt (electricore-client, #77) — source
+      # unique des dépendances, pas de dérive CI/local. Le code est COPYé dans
+      # l'image, plus besoin de monter le workspace.
+      - name: Build addon image
+        run: docker build -f docker/Dockerfile -t souscriptions-test .
+
+      - name: Run tests on Odoo 19
+        # --entrypoint odoo court-circuite docker-entrypoint-init.sh (init démo) ;
+        # les flags --db_* remplacent les env vars de l'entrypoint officiel.
         run: |
-          docker run --rm --network host \
-            -e HOST=127.0.0.1 -e PORT=5432 -e USER=odoo -e PASSWORD=odoo \
-            -v "${{ github.workspace }}:/mnt/extra-addons/souscriptions_odoo:ro" \
-            odoo:19 odoo \
-              --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons \
-              -d ci_test -i souscriptions_odoo \
-              --test-enable --test-tags /souscriptions_odoo \
-              --stop-after-init --log-level=test
+          docker run --rm --network host --entrypoint odoo souscriptions-test \
+            --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons \
+            --db_host=127.0.0.1 --db_port=5432 --db_user=odoo --db_password=odoo \
+            -d ci_test -i souscriptions_odoo \
+            --test-enable --test-tags /souscriptions_odoo \
+            --stop-after-init --log-level=test

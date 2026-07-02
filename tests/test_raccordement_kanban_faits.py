@@ -63,10 +63,16 @@ class TestKanbanPiloteParLesFaits(SouscriptionsTestMixin, TransactionCase):
         self.assertTrue(self.stage_valide_sge.entree_factuelle)
 
     def test_stage_abonnement_valide_finale_repliee(self):
+        """La naissance (is_close) a migré vers « Accepté et IBAN vérifié »
+        (#101) : « Abonnement Validé » reste la terminale repliée, mais ne
+        crée plus rien."""
         self.assertGreater(self.stage_abonnement_valide.sequence, self.stage_valide_sge.sequence)
         self.assertTrue(self.stage_abonnement_valide.fold)
-        self.assertTrue(self.stage_abonnement_valide.is_close)
+        self.assertFalse(self.stage_abonnement_valide.is_close)
         self.assertFalse(self.stage_abonnement_valide.entree_factuelle)
+
+    def test_stage_accepte_iban_verifie_porte_la_naissance(self):
+        self.assertTrue(self.stage_accepte_iban_verifie.is_close)
 
     # --- Situation d'entrée requise à la saisie de l'id_Affaire ---
 
@@ -130,10 +136,12 @@ class TestKanbanPiloteParLesFaits(SouscriptionsTestMixin, TransactionCase):
         self.assertEqual(demande.stage_id, self.stage_calcul_mensualites)
 
     def test_drag_in_manuel_autorise_vers_etape_non_factuelle(self):
-        """Les étapes non pilotées par un fait restent librement draggables."""
+        """Les étapes non pilotées par un fait restent librement draggables
+        (hors « Accepté et IBAN vérifié », qui porte sa propre garde IBAN
+        depuis #101 — testée séparément plus bas)."""
         demande = self.create_demande('faits5@example.com')
-        demande.stage_id = self.stage_accepte_iban_verifie
-        self.assertEqual(demande.stage_id, self.stage_accepte_iban_verifie)
+        demande.stage_id = self.stage_calcul_mensualites
+        self.assertEqual(demande.stage_id, self.stage_calcul_mensualites)
 
     def test_contournement_de_contexte_reserve_aux_automatismes(self):
         demande = self.create_demande('faits6@example.com')
@@ -242,12 +250,80 @@ class TestKanbanPiloteParLesFaits(SouscriptionsTestMixin, TransactionCase):
         souscription.write({'ref_situation_contractuelle': 'RSC-MANUEL'})
         self.assertEqual(souscription.etat, 'en_service')
 
-    # --- Non-régression : « Abonnement Validé » garde son rôle de création ---
-    # (état intérimaire #100 — le déplacement vers « Accepté et IBAN vérifié »
-    # est la tranche #101.)
+    # --- Naissance à l'acceptation (#101, ADR 0022 §2) : la création migre
+    # de « Abonnement Validé » vers « Accepté et IBAN vérifié ». ---
 
-    def test_abonnement_valide_garde_son_role_de_creation(self):
+    def test_naissance_a_laccepte_iban_verifie(self):
         demande = self.create_demande('faits10@example.com', mode_paiement='virement')
-        demande.stage_id = self.stage_abonnement_valide
+        demande.stage_id = self.stage_accepte_iban_verifie
         self.assertTrue(demande.souscription_id)
         self.assertTrue(demande.partner_id)
+
+    def test_abonnement_valide_ne_cree_plus_rien(self):
+        """« Abonnement Validé » ne porte plus le rôle de création (#101) :
+        un drag direct vers cette étape sans être passé par l'acceptation ne
+        crée aucune entrée Odoo."""
+        demande = self.create_demande('faits10b@example.com', mode_paiement='virement')
+        demande.stage_id = self.stage_abonnement_valide
+        self.assertFalse(demande.souscription_id)
+        self.assertFalse(demande.partner_id)
+
+    # --- Garde bloquante IBAN à l'acceptation (#101) ---
+
+    def test_acceptation_refusee_si_prelevement_et_iban_invalide(self):
+        demande = self.create_demande(
+            'faits_iban1@example.com', mode_paiement='prelevement', bank_iban='FR1420041010050500013M02607'
+        )
+        self.assertFalse(demande.iban_valide)
+        with self.assertRaises(UserError) as cm:
+            demande.stage_id = self.stage_accepte_iban_verifie
+        self.assertIn('IBAN', str(cm.exception))
+        self.assertFalse(demande.souscription_id)
+
+    def test_acceptation_autorisee_si_prelevement_et_iban_valide(self):
+        demande = self.create_demande(
+            'faits_iban2@example.com', mode_paiement='prelevement', bank_iban='FR1420041010050500013M02606'
+        )
+        demande.stage_id = self.stage_accepte_iban_verifie
+        self.assertTrue(demande.souscription_id)
+
+    def test_acceptation_autorisee_hors_prelevement_meme_sans_iban(self):
+        demande = self.create_demande('faits_iban3@example.com', mode_paiement='virement', bank_iban='')
+        demande.stage_id = self.stage_accepte_iban_verifie
+        self.assertTrue(demande.souscription_id)
+
+    # --- coeff_pro recopié à la naissance (#101, ADR 0022 §7) ---
+
+    def test_coeff_pro_recopie_sur_la_souscription_nee(self):
+        demande = self.create_demande(
+            'faits_coeffpro@example.com', mode_paiement='virement', pro=True, siret='12345678901234', coeff_pro=12.5
+        )
+        demande.stage_id = self.stage_accepte_iban_verifie
+        self.assertEqual(demande.souscription_id.coeff_pro, 12.5)
+
+    # --- Write-through id_Affaire post-naissance (#101, ADR 0022 §2) ---
+
+    def test_id_affaire_saisi_apres_naissance_se_propage_a_la_souscription(self):
+        demande = self.create_demande('faits_wt1@example.com', mode_paiement='virement')
+        demande.stage_id = self.stage_accepte_iban_verifie
+        souscription = demande.souscription_id
+        self.assertFalse(souscription.id_affaire)
+
+        demande.write({'situation_entree': 'mes', 'id_affaire': 'AFF-WT-001'})
+
+        self.assertEqual(souscription.id_affaire, 'AFF-WT-001')
+        self.assertEqual(souscription.id_affaire_date_saisie, demande.id_affaire_date_saisie)
+
+    def test_id_affaire_corrige_apres_naissance_se_propage_avec_sa_date(self):
+        demande = self.create_demande(
+            'faits_wt2@example.com', mode_paiement='virement', situation_entree='mes', id_affaire='AFF-WT-002'
+        )
+        demande.stage_id = self.stage_accepte_iban_verifie
+        souscription = demande.souscription_id
+        self.assertEqual(souscription.id_affaire, 'AFF-WT-002')
+
+        hier = date.today() - timedelta(days=1)
+        demande.write({'id_affaire': 'AFF-WT-002-CORRIGE', 'id_affaire_date_saisie': hier})
+
+        self.assertEqual(souscription.id_affaire, 'AFF-WT-002-CORRIGE')
+        self.assertEqual(souscription.id_affaire_date_saisie, hier)

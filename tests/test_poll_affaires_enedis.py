@@ -44,8 +44,9 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
         return patch.object(_SERVICE, '_appeler', return_value=return_value, side_effect=side_effect)
 
     def create_demande_avec_souscription(self, id_affaire=None, email='poll-rsc@example.com'):
-        """Demande complète menée jusqu'à « Abonnement Validé » : Souscription
-        créée, liée à sa demande via souscription_id."""
+        """Demande complète menée jusqu'à « Accepté et IBAN vérifié » (#101 —
+        naissance de la Souscription) : mode virement, pas de garde IBAN à
+        contourner, hors sujet de ces tests de poll RSC."""
         vals = {
             'pdl': 'PDL_POLL_' + email,
             'date_debut_souhaitee': date.today() + timedelta(days=30),
@@ -57,12 +58,13 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
             'contact_street': 'Test Street',
             'contact_zip': '12345',
             'contact_city': 'Test City',
+            'mode_paiement': 'virement',
             'id_affaire': id_affaire,
         }
         if id_affaire:
             vals['situation_entree'] = 'mes'
         demande = self.env['raccordement.demande'].create(vals)
-        demande.stage_id = self.env.ref('souscriptions_odoo.stage_abonnement_valide')
+        demande.stage_id = self.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
         return demande
 
     # --- Ciblage du lot ---

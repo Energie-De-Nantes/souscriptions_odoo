@@ -13,7 +13,7 @@ Fixtures RSC/PDL : identifiants factices (jamais des vrais échantillons).
 
 import unittest
 from contextlib import contextmanager
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -308,6 +308,37 @@ class TestWizardPullMetaPeriodes(SouscriptionsTestCase):
         wizard = self._lancer_avec_client(_fake_client([]))
         self.assertIn('Sans RSC (ignorées) :', wizard.resultat)
         self.assertNotIn('Sans RSC (ignorées) : 0', wizard.resultat)
+
+    def test_souscription_en_instance_nee_du_raccordement_hors_pull(self):
+        """#101 AC5 : une Souscription *en instance* (née à l'acceptation,
+        sans RSC) reste hors du pull — comportement du pull clé RSC/mois
+        (AC3 ci-dessus), asserté ici sur une Souscription née du
+        Raccordement plutôt que sur une fixture directe."""
+        demande = self.env['raccordement.demande'].create(
+            {
+                'pdl': 'PDL_RACC_HORS_PULL',
+                'date_debut_souhaitee': date.today() + timedelta(days=30),
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'provision_mensuelle_kwh': 250.0,
+                'contact_nom': 'Test',
+                'contact_email': 'racc-hors-pull@example.com',
+                'contact_street': 'Test Street',
+                'contact_zip': '12345',
+                'contact_city': 'Test City',
+                'mode_paiement': 'virement',
+            }
+        )
+        demande.stage_id = self.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
+        souscription = demande.souscription_id
+        self.assertTrue(souscription, "La Souscription devrait naître à l'acceptation")
+        self.assertEqual(souscription.etat, 'en_instance')
+
+        wizard = self._lancer_avec_client(_fake_client([]))
+
+        self.assertIn(souscription.name, wizard.resultat)
+        periode = self.env['souscription.periode'].search([('souscription_id', '=', souscription.id)])
+        self.assertFalse(periode, 'Aucune période ne doit être amorcée pour une Souscription en instance')
 
     def test_releves_crees_avec_identifiant_externe_et_origine(self):
         """AC4 : relevés créés avec identifiant externe + origine."""

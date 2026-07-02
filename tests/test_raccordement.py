@@ -486,10 +486,13 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
     @classmethod
     def setUpRaccordementData(cls):
         """Setup des données spécifiques aux tests de raccordement"""
-        # Utiliser les vraies étapes du module (#100 : chaîne cible prod).
+        # Utiliser les vraies étapes du module. La naissance de la
+        # Souscription (is_close) vit sur « Accepté et IBAN vérifié » (#101,
+        # ADR 0022 §2) ; stage_validated sert d'étape intermédiaire distincte
+        # pour le test de non-duplication (bounce non-finale).
         cls.stage_received = cls.env.ref('souscriptions_odoo.stage_nouveau')
-        cls.stage_validated = cls.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
-        cls.stage_final = cls.env.ref('souscriptions_odoo.stage_abonnement_valide')
+        cls.stage_validated = cls.env.ref('souscriptions_odoo.stage_calcul_mensualites')
+        cls.stage_final = cls.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
 
     def create_complete_demande(self, **kwargs):
         """Helper pour créer une demande complète"""

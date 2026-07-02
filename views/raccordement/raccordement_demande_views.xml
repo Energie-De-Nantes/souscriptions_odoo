@@ -30,6 +30,7 @@
                         <group name="souscription_info" string="Informations Souscription">
                             <field name="pro" />
                             <field name="siret" invisible="pro == False" />
+                            <field name="coeff_pro" invisible="pro == False" />
                             <field name="pdl" />
                             <field name="date_debut_souhaitee" />
                             <field name="puissance_souscrite" />

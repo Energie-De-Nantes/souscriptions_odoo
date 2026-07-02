@@ -41,6 +41,16 @@ class RaccordementDemande(models.Model):
         help="Cocher si c'est une demande professionnelle (création d'une société)",
     )
     siret = fields.Char(string='N° SIRET', tracking=True, help="Numéro SIRET de l'entreprise (14 chiffres)")
+    # Majoration négociée par le Collège pendant « PRO à valider » (#101,
+    # ADR 0022 §7) ; recopiée sur la Souscription à la naissance.
+    coeff_pro = fields.Float(
+        string='Majoration PRO (%)',
+        default=0.0,
+        digits=(5, 2),
+        tracking=True,
+        help='Majoration en % négociée par le Collège pour cette demande PRO — recopiée sur la '
+        'Souscription à sa naissance (0% pour les particuliers).',
+    )
     pdl = fields.Char(string='PDL', required=True, tracking=True)
     date_debut_souhaitee = fields.Date(string='Date de début souhaitée', required=True, tracking=True)
     puissance_souscrite = fields.Selection(
@@ -340,6 +350,8 @@ class RaccordementDemande(models.Model):
         # (contournement de contexte `raccordement_automove`).
         if 'stage_id' in vals and not self.env.context.get('raccordement_automove'):
             self._verifier_pas_de_drag_in_factuel(vals['stage_id'])
+        if 'stage_id' in vals:
+            self._verifier_garde_iban_acceptation(vals['stage_id'])
 
         # id_Affaire saisi/corrigé : la situation d'entrée est requise (#100,
         # ADR 0022 §4) — elle route l'auto-move vers la bonne branche ⏳.
@@ -369,6 +381,21 @@ class RaccordementDemande(models.Model):
         if 'id_affaire' in vals or 'situation_entree' in vals:
             self._router_situation_entree()
 
+        # Write-through post-naissance (#101, ADR 0022 §2) : une fois la
+        # Souscription née, la saisie ou correction de l'id_Affaire sur la
+        # demande se propage à la Souscription liée, avec sa date de saisie
+        # (elle amorce la grâce du poll #89). La RSC et l'état restent portés
+        # par la Souscription — la carte ne fait que refléter.
+        if 'id_affaire' in vals:
+            for record in self:
+                if record.souscription_id and record.id_affaire:
+                    record.souscription_id.write(
+                        {
+                            'id_affaire': record.id_affaire,
+                            'id_affaire_date_saisie': record.id_affaire_date_saisie,
+                        }
+                    )
+
         return res
 
     def _verifier_pas_de_drag_in_factuel(self, nouveau_stage_id):
@@ -386,6 +413,24 @@ class RaccordementDemande(models.Model):
                 f'« {nouveau_stage.name} » est une étape pilotée par un fait : elle ne se force pas à la '
                 'main. Corrigez le fait (id_Affaire saisi, RSC acquise) — la carte suivra automatiquement.'
             )
+
+    def _verifier_garde_iban_acceptation(self, nouveau_stage_id):
+        """Garde bloquante IBAN (#101, ADR 0022 §2) : le drag vers l'étape de
+        naissance (is_close) est refusé si le mode de paiement est le
+        prélèvement et l'IBAN invalide — la colonne « IBAN vérifié » ne ment
+        jamais. Remplace l'ancien avertissement non bloquant (onchange),
+        disparu avec l'étape qui le portait (#100). Vérifiée avant l'écriture
+        (comme la garde factuelle) pour qu'un refus n'altère pas l'étape."""
+        nouveau_stage = self.env['raccordement.stage'].browse(nouveau_stage_id)
+        if not nouveau_stage.is_close:
+            return
+        cible = self.filtered(lambda r: not r.souscription_id and r.stage_id.id != nouveau_stage_id)
+        for record in cible:
+            if record.mode_paiement == 'prelevement' and not record._validate_iban(record.bank_iban):
+                raise UserError(
+                    "Impossible d'accepter la demande : le mode de paiement est le prélèvement et "
+                    "l'IBAN est invalide. Corrigez l'IBAN avant d'accepter."
+                )
 
     # Branches ⏳ ciblées par situation_entree (#100, ADR 0022 §1/§4).
     _STAGE_XMLID_PAR_SITUATION = {
@@ -556,6 +601,8 @@ class RaccordementDemande(models.Model):
             # amorce de réconciliation, avec sa date de saisie (grâce du poll #89).
             'id_affaire': self.id_affaire,
             'id_affaire_date_saisie': self.id_affaire_date_saisie,
+            # Majoration PRO négociée par le Collège (#101, ADR 0022 §7).
+            'coeff_pro': self.coeff_pro,
         }
 
         # Ajouter les provisions selon le type de tarif

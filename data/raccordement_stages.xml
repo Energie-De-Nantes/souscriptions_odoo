@@ -22,15 +22,16 @@
             <field name="description">Demande professionnelle en attente de validation du Collège (PRO + majoration tarifaire négociée)</field>
         </record>
 
-        <!-- Naissance de la Souscription (#101, ADR 0022 §2) : le drapeau
-             d'étape finale (is_close) est posé ici à partir de la tranche
-             #101 — état intérimaire #100, il reste sur « Abonnement Validé »
-             (cf. plus bas). -->
+        <!-- Naissance de la Souscription (#101, ADR 0022 §2) : is_close pose
+             ici le déclencheur de création (contact, banque, Souscription en
+             instance) — déplacé depuis « Abonnement Validé » (état
+             intérimaire #100). Garde bloquante IBAN au drag (#101). -->
         <record id="stage_accepte_iban_verifie" model="raccordement.stage">
             <field name="name">🔴 Accepté et IBAN vérifié</field>
             <field name="sequence">30</field>
             <field name="color">2</field>
-            <field name="description">Demande acceptée (collège pour les PRO) — IBAN vérifié si prélèvement</field>
+            <field name="is_close">True</field>
+            <field name="description">Demande acceptée (collège pour les PRO) — IBAN vérifié si prélèvement — Souscription née en instance</field>
         </record>
 
         <!-- Branches ⏳ : entrée factuelle (id_Affaire saisi), drag-in manuel
@@ -68,16 +69,14 @@
             <field name="description">Calcul des provisions mensuelles avant validation de l'abonnement</field>
         </record>
 
-        <!-- Terminale, repliée (#100). État intérimaire : le drapeau
-             is_close (naissance de la Souscription) reste ici — son
-             déplacement vers « Accepté et IBAN vérifié » est la tranche
-             #101. -->
+        <!-- Terminale, repliée (#100). is_close (naissance) est désormais
+             sur « Accepté et IBAN vérifié » (#101) : cette étape ne fait
+             plus que refléter l'aboutissement, elle ne crée plus rien. -->
         <record id="stage_abonnement_valide" model="raccordement.stage">
             <field name="name">✓ Abonnement Validé</field>
             <field name="sequence">70</field>
             <field name="color">10</field>
             <field name="fold">True</field>
-            <field name="is_close">True</field>
             <field name="description">Raccordement finalisé — mise en service effective, mensualités calculées</field>
         </record>
     </data>

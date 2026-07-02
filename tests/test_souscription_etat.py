@@ -30,9 +30,12 @@ class TestIdAffaireRaccordement(SouscriptionsTestCase):
             'contact_street': 'Test Street',
             'contact_zip': '12345',
             'contact_city': 'Test City',
-            # Situation d'entrée requise à la saisie de l'id_Affaire (#100),
-            # hors sujet de ces tests (capture/recopie de l'id_Affaire).
+            # Hors sujet de ces tests (capture/recopie de l'id_Affaire) :
+            # situation d'entrée posée (#100, requise à la saisie de
+            # l'id_Affaire) et mode virement (#101, pas de garde IBAN à
+            # contourner).
             'situation_entree': 'mes',
+            'mode_paiement': 'virement',
         }
         defaults.update(kwargs)
         return self.env['raccordement.demande'].create(defaults)
@@ -60,7 +63,7 @@ class TestIdAffaireRaccordement(SouscriptionsTestCase):
         hier = date.today() - timedelta(days=2)
         demande.write({'id_affaire': '38233180', 'id_affaire_date_saisie': hier})
 
-        stage_final = self.env.ref('souscriptions_odoo.stage_abonnement_valide')
+        stage_final = self.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
         demande.stage_id = stage_final
 
         souscription = demande.souscription_id

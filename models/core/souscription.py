@@ -109,6 +109,22 @@ class Souscription(models.Model):
     )
     tarif_solidaire = fields.Boolean(string='Tarif solidaire', default=False, tracking=True)
 
+    # Régime de prix (CONTEXT.md « Régime de prix », « Tarif Moulin ») : quel
+    # barème s'applique. Orthogonal au Tarif solidaire (isolation comptable) et
+    # à la Majoration PRO (surcoût %) : les trois axes se composent librement
+    # jusqu'à la ligne de facture. Le Moulin ne change QUE le prix via la
+    # Grille — fiscalité et comptes restent ceux du standard (le solidaire, lui,
+    # isole comptablement — ADR 0013).
+    regime_prix = fields.Selection(
+        [('standard', 'Standard'), ('moulin', 'Moulin')],
+        string='Régime de prix',
+        default='standard',
+        required=True,
+        tracking=True,
+        help='Barème appliqué à cette Souscription. Sélectionne la Grille de '
+        'prix par (régime, date) — aucun produit dédié : seul le prix change.',
+    )
+
     # Calendrier de comptage du compteur (cadrans réseau mesurés) — source
     # Configuration Enedis / electricore. Orthogonal au type de tarif facturé
     # (ADR 0005). Détermine le niveau de saisie de l'énergie sur les périodes.
@@ -462,7 +478,7 @@ class Souscription(models.Model):
         self.ensure_one()
         produit = self.env['souscription.produit']
         a_date = a_date or self.date_debut or fields.Date.today()
-        grille = self.env['grille.prix'].get_grille_active(a_date)
+        grille = self.env['grille.prix'].get_grille_active(a_date, regime=self.regime_prix)
         is_company = bool(self.partner_id.is_company)
         is_sol = self.tarif_solidaire
         prix_grille = grille.get_prix_dict()

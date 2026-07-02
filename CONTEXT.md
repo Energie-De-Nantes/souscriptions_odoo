@@ -109,10 +109,27 @@ facturé.
 Barème **fournisseur** daté (`grille.prix`), **tout-compris** : le TURPE y est **absorbé**, jamais
 refacturé ligne à ligne (ADR 0002). Porte le prix d'abonnement **affine** — prix de base 3 kVA +
 coefficient par kVA supplémentaire (ADR 0018) — et le prix de l'énergie par cadran facturé.
-Sélectionnée par les dates d'une *Période*, ce qui permet de facturer une *régularisation* aux prix
+Chaque grille appartient à un *régime de prix* ; elle est sélectionnée par le régime de la
+*Souscription* et les dates d'une *Période*, ce qui permet de facturer une *régularisation* aux prix
 historiques.
 _Éviter_ : tarif (collision avec la FTA / tarif d'acheminement réseau), barème ; « prix par palier »
 (l'abonnement est **affine**, pas tabulé par puissance).
+
+**Régime de prix** :
+L'axe qui désigne **quel barème** s'applique à une *Souscription* : **standard** ou **Moulin**.
+Chaque *Grille de prix* appartient à un régime, et chaque régime versionne ses grilles
+**indépendamment** (les deux barèmes ne bougent ni au même rythme ni pour les mêmes raisons).
+Orthogonal au *Tarif solidaire* (isolation comptable) et à la *Majoration PRO* (surcoût %) : les
+trois axes se composent librement.
+_Éviter_ : confondre avec le *Tarif solidaire* (comptable, pas tarifaire) ; « option » (collision
+avec l'option tarifaire réseau).
+
+**Tarif Moulin** :
+Le *régime de prix* « prix coûtant » proposé aux personnes qui s'engagent dans le commun EDN. Un
+barème à part entière, versionné par ses propres *Grilles de prix* : il évolue avec les coûts du
+commun, jamais en pourcentage du barème standard. Se compose avec le *Tarif solidaire*.
+_Éviter_ : « remise Moulin » (ce n'est pas une remise) ; produits de facturation dédiés (seul le
+**prix** change via la grille — fiscalité et comptes restent ceux du standard).
 
 **Majoration PRO** :
 Surcoût commercial (`coeff_pro`, en %) **propre à chaque *Souscription*** (négocié au cas par cas),

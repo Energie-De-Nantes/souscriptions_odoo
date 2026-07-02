@@ -12,7 +12,7 @@ from datetime import date
 
 from odoo.tests.common import TransactionCase, tagged
 
-from .common import ABO_ANNUEL_STD, SouscriptionsTestCase
+from .common import ABO_ANNUEL_STD, SouscriptionsTestCase, build_grille_lignes
 
 
 @tagged('souscriptions', 'souscriptions_composition', 'post_install', '-at_install')
@@ -219,6 +219,89 @@ class TestPeriodeComposition(SouscriptionsTestCase):
         self.assertIn(ref('souscriptions_product_abonnement_solidaire'), produit_ids)
         self.assertIn(ref('souscriptions_product_energie_base_solidaire'), produit_ids)
         self.assertNotIn(ref('souscriptions_product_abonnement_standard'), produit_ids)
+        self.assertNotIn(ref('souscriptions_product_energie_base'), produit_ids)
+
+    # === Régime de prix (standard | Moulin) — #105 ===
+
+    def _grille_moulin(self, **kwargs):
+        vals = {
+            'name': 'Grille Moulin Test',
+            'date_debut': date(2024, 1, 1),
+            'date_fin': date(2024, 12, 31),
+            'regime_prix': 'moulin',
+        }
+        vals.update(kwargs)
+        grille = self.env['grille.prix'].create(vals)
+        build_grille_lignes(self.env, grille, prix_base=0.30, prix_hp=0.35, prix_hc=0.25)
+        return grille
+
+    def test_regime_moulin_facture_au_bareme_moulin(self):
+        """Une Souscription en régime Moulin facture aux prix de la grille
+        Moulin : la sélection de grille se fait par (régime, date de la
+        Période), pas seulement par date."""
+        self._grille_moulin()
+        sous_moulin = self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.souscription_base.partner_id.id,
+                'pdl': 'PDL_TEST_MOULIN',
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'regime_prix': 'moulin',
+                'etat_facturation_id': self.souscription_base.etat_facturation_id.id,
+                'date_debut': date(2024, 1, 1),
+            }
+        )
+        periode = self._periode(sous_moulin, energie_base_kwh=200.0)
+        self.assertEqual(periode.regime_prix_periode, 'moulin')
+
+        facture = periode._creer_facture()
+        base = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie Base')
+        self.assertAlmostEqual(base.price_unit, 0.30, places=6)
+
+    def test_regime_standard_meme_periode_facture_au_bareme_standard(self):
+        """Une souscription standard, sur la même période qu'une Moulin, facture
+        au barème standard — les deux régimes sont résolus indépendamment."""
+        self._grille_moulin()
+        periode_std = self._periode(self.souscription_base, energie_base_kwh=200.0)
+        self.assertEqual(periode_std.regime_prix_periode, 'standard')
+
+        facture = periode_std._creer_facture()
+        base = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie Base')
+        # prix_base = 0.15 dans la grille standard de test (cf. common.py).
+        self.assertAlmostEqual(base.price_unit, 0.15, places=6)
+
+    def test_composition_regime_solidaire_pro_jusqu_a_la_ligne_de_facture(self):
+        """Les trois axes (régime, tarif solidaire, majoration PRO) se composent
+        librement : produit de l'univers solidaire, prix de la grille Moulin,
+        majoré PRO — sans aucun produit dédié Moulin (CONTEXT.md « Tarif
+        Moulin » : seul le prix change, fiscalité/comptes restent standard)."""
+        self._grille_moulin()
+        sous = self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.souscription_base.partner_id.id,
+                'pdl': 'PDL_TEST_MOULIN_SOL_PRO',
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'regime_prix': 'moulin',
+                'tarif_solidaire': True,
+                'coeff_pro': 10.0,
+                'etat_facturation_id': self.souscription_base.etat_facturation_id.id,
+                'date_debut': date(2024, 1, 1),
+            }
+        )
+        periode = self._periode(sous, energie_base_kwh=200.0)
+        facture = periode._creer_facture()
+
+        def ref(xmlid):
+            return self.env.ref(f'souscriptions_odoo.{xmlid}').id
+
+        produit_energie_sol = ref('souscriptions_product_energie_base_solidaire')
+        ligne = facture.invoice_line_ids.filtered(lambda l: l.product_id.id == produit_energie_sol)
+        self.assertTrue(ligne, 'La ligne doit porter le produit énergie solidaire (aucun produit dédié Moulin).')
+        # Prix Moulin (0.30) x majoration PRO (1.10).
+        self.assertAlmostEqual(ligne.price_unit, 0.30 * 1.10, places=6)
+
+        produit_ids = facture.invoice_line_ids.mapped('product_id').ids
         self.assertNotIn(ref('souscriptions_product_energie_base'), produit_ids)
 
 

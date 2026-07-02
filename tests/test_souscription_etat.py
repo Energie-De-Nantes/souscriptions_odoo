@@ -8,6 +8,8 @@ from datetime import date, timedelta
 
 from odoo.exceptions import AccessError
 from odoo.tests.common import tagged
+from odoo.tools import mute_logger
+from psycopg2 import IntegrityError
 
 from .common import SouscriptionsTestCase
 
@@ -177,3 +179,48 @@ class TestFiltresEtat(SouscriptionsTestCase):
 
         self.assertEqual(par_rsc, self.souscription_base)
         self.assertEqual(par_affaire, self.souscription_hphc)
+
+
+@tagged('souscriptions', 'souscriptions_etat', 'post_install', '-at_install')
+class TestRscUnique(SouscriptionsTestCase):
+    """#15 : deux souscriptions successives sur le même PDL sont distinguables
+    sans ambiguïté — l'identité est portée par la RSC, unique par contrat."""
+
+    def _souscription(self, pdl, rsc):
+        return (
+            self.env['souscription.souscription']
+            .with_context(rsc_automatisme=True)
+            .create(
+                {
+                    'partner_id': self.partner_test.id,
+                    'pdl': pdl,
+                    'puissance_souscrite': '6',
+                    'type_tarif': 'base',
+                    'etat_facturation_id': self.etat_facturation.id,
+                    'date_debut': date(2024, 1, 1),
+                    'ref_situation_contractuelle': rsc,
+                }
+            )
+        )
+
+    def test_deux_souscriptions_successives_meme_pdl_distinguables(self):
+        premiere = self._souscription('PDL_PARTAGE', 'RSC-OCCUPANT-1')
+        seconde = self._souscription('PDL_PARTAGE', 'RSC-OCCUPANT-2')
+
+        Souscription = self.env['souscription.souscription']
+        self.assertEqual(len(Souscription.search([('pdl', '=', 'PDL_PARTAGE')])), 2)
+        self.assertEqual(Souscription.search([('ref_situation_contractuelle', '=', 'RSC-OCCUPANT-1')]), premiere)
+        self.assertEqual(Souscription.search([('ref_situation_contractuelle', '=', 'RSC-OCCUPANT-2')]), seconde)
+
+    def test_rsc_dupliquee_refusee(self):
+        self._souscription('PDL_PARTAGE', 'RSC-DOUBLON')
+        with self.assertRaises(IntegrityError), mute_logger('odoo.sql_db'), self.cr.savepoint():
+            self._souscription('PDL_AUTRE', 'RSC-DOUBLON')
+            self.env.flush_all()
+
+    def test_rsc_absente_ne_bloque_pas_les_en_instance(self):
+        """Les souscriptions en instance (RSC NULL) cohabitent librement —
+        sémantique UNIQUE de Postgres, les NULL ne se gênent pas."""
+        self._souscription('PDL_A', False)
+        self._souscription('PDL_B', False)
+        self.env.flush_all()

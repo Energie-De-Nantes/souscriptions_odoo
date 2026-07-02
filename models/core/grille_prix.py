@@ -27,6 +27,23 @@ class GrillePrix(models.Model):
     )
     active = fields.Boolean('Active', default=True)
 
+    # Régime de prix (CONTEXT.md « Régime de prix ») : quel barème s'applique.
+    # Chaque régime versionne ses grilles indépendamment — l'unicité et la
+    # fermeture automatique (create()) jouent PAR régime, jamais tous régimes
+    # confondus. Le Tarif Moulin n'introduit aucun produit dédié : seul ce prix
+    # change, le catalogue (souscription.produit) reste inchangé.
+    regime_prix = fields.Selection(
+        [('standard', 'Standard'), ('moulin', 'Moulin')],
+        string='Régime de prix',
+        default='standard',
+        required=True,
+        tracking=True,
+        help='Barème appliqué par cette grille. Chaque régime versionne ses '
+        'grilles indépendamment : une grille Moulin ouverte coexiste avec une '
+        'grille standard ouverte (anti-chevauchement et fermeture automatique '
+        'scopés par régime).',
+    )
+
     ligne_ids = fields.One2many('grille.prix.ligne', 'grille_id', string='Lignes de prix')
 
     # Champs calculés pour info
@@ -41,12 +58,17 @@ class GrillePrix(models.Model):
     def create(self, vals_list):
         for vals in vals_list:
             date_debut_nouvelle = vals['date_debut']
+            regime = vals.get('regime_prix') or 'standard'
 
-            # Fermer la grille précédente (la plus récente avant cette date)
+            # Fermer la grille précédente DU MÊME RÉGIME (la plus récente avant
+            # cette date) : chaque régime versionne ses grilles indépendamment
+            # (CONTEXT.md « Régime de prix ») — une nouvelle grille Moulin ne
+            # ferme jamais une grille standard, et réciproquement.
             grille_precedente = self.search(
                 [
                     ('date_debut', '<', date_debut_nouvelle),
                     ('date_fin', '=', False),  # Grille ouverte
+                    ('regime_prix', '=', regime),
                 ],
                 order='date_debut desc',
                 limit=1,
@@ -61,18 +83,21 @@ class GrillePrix(models.Model):
         return super().create(vals_list)
 
     @api.model
-    def get_grille_active(self, date_facture=None):
-        """Récupère la grille dont la période de validité couvre la date donnée.
+    def get_grille_active(self, date_facture=None, regime='standard'):
+        """Récupère la grille du régime donné dont la période de validité couvre
+        la date donnée.
 
-        La sélection se fait sur la plage [date_debut, date_fin] (date_fin vide =
-        grille ouverte), et non sur le drapeau ``is_current`` : une facturation
-        rétroactive utilise ainsi la grille en vigueur à la date concernée.
+        La sélection se fait sur ``(régime, plage [date_debut, date_fin])``
+        (date_fin vide = grille ouverte), et non sur le drapeau ``is_current`` :
+        une facturation rétroactive utilise ainsi la grille en vigueur à la date
+        concernée, pour le régime de la Souscription/Période facturée.
         """
         if date_facture is None:
             date_facture = fields.Date.today()
 
         grille = self.search(
             [
+                ('regime_prix', '=', regime),
                 ('date_debut', '<=', date_facture),
                 '|',
                 ('date_fin', '=', False),
@@ -84,15 +109,18 @@ class GrillePrix(models.Model):
 
         if not grille:
             raise UserError(
-                f'Aucune grille de prix ne couvre la date {date_facture}. '
+                f'Aucune grille de prix ({regime}) ne couvre la date {date_facture}. '
                 f'Vérifiez la couverture des grilles (trou de période ?).'
             )
 
         return grille
 
-    @api.constrains('date_debut', 'date_fin')
+    @api.constrains('date_debut', 'date_fin', 'regime_prix')
     def _check_no_overlap(self):
-        """Interdit le chevauchement des périodes de validité entre grilles."""
+        """Interdit le chevauchement des périodes de validité entre grilles DU
+        MÊME RÉGIME. Deux grilles de régimes différents (standard, Moulin) ne se
+        gênent jamais, même sur des dates identiques (CONTEXT.md « Régime de
+        prix » : chaque régime versionne ses grilles indépendamment)."""
         for grille in self:
             if not grille.date_debut:
                 continue
@@ -100,12 +128,13 @@ class GrillePrix(models.Model):
             end_a = grille.date_fin or date.max
             if start_a > end_a:
                 raise ValidationError(f"La grille '{grille.name}' a une date de fin antérieure à sa date de début.")
-            for other in self.search([('id', '!=', grille.id)]):
+            for other in self.search([('id', '!=', grille.id), ('regime_prix', '=', grille.regime_prix)]):
                 start_b = other.date_debut
                 end_b = other.date_fin or date.max
                 if start_a <= end_b and start_b <= end_a:
                     raise ValidationError(
-                        f"La période de la grille '{grille.name}' chevauche celle de la grille '{other.name}'."
+                        f"La période de la grille '{grille.name}' chevauche celle de la grille '{other.name}' "
+                        f'(régime {grille.regime_prix}).'
                     )
 
     def get_prix_dict(self):
@@ -167,12 +196,14 @@ class GrillePrix(models.Model):
                 )
             )
 
-        # Créer la nouvelle grille avec ses lignes
+        # Créer la nouvelle grille avec ses lignes, dans le même régime (une
+        # duplication ne change jamais de régime de prix).
         nouvelle_grille = self.create(
             {
                 'name': f'Copie de {self.name}',
                 'date_debut': today,
                 'date_fin': False,
+                'regime_prix': self.regime_prix,
                 'ligne_ids': lignes_vals,
             }
         )

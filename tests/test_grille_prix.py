@@ -146,3 +146,119 @@ class TestGrillePrix(TransactionCase):
                 }
             )
             self.env.flush_all()
+
+    # === Régime de prix (standard | Moulin) — #105 ===
+
+    def test_regime_prix_defaut_standard(self):
+        """Une grille sans régime précisé est standard par défaut."""
+        self.assertEqual(self.grille.regime_prix, 'standard')
+
+    def test_grilles_moulin_et_standard_coexistent(self):
+        """Deux grilles ouvertes de régimes différents, mêmes dates, coexistent :
+        l'anti-chevauchement joue par régime (CONTEXT.md « Régime de prix »)."""
+        grille_moulin = self.env['grille.prix'].create(
+            {
+                'name': 'Grille Moulin 2024',
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 12, 31),
+                'regime_prix': 'moulin',
+            }
+        )
+        self.assertEqual(grille_moulin.regime_prix, 'moulin')
+        # La grille standard n'a pas été affectée par la création de la Moulin.
+        self.assertEqual(self.grille.date_fin, date(2024, 12, 31))
+
+    def test_chevauchement_meme_regime_toujours_interdit(self):
+        """Deux grilles Moulin qui se chevauchent restent interdites (l'anti-
+        chevauchement joue toujours au sein d'un même régime)."""
+        self.env['grille.prix'].create(
+            {
+                'name': 'Grille Moulin A',
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 6, 30),
+                'regime_prix': 'moulin',
+            }
+        )
+        with self.assertRaises(ValidationError):
+            self.env['grille.prix'].create(
+                {
+                    'name': 'Grille Moulin B',
+                    'date_debut': date(2024, 6, 1),
+                    'date_fin': date(2024, 12, 31),
+                    'regime_prix': 'moulin',
+                }
+            )
+
+    def test_fermeture_automatique_scopee_par_regime(self):
+        """La création d'une grille ne ferme que la grille OUVERTE précédente du
+        même régime — jamais une grille ouverte d'un autre régime."""
+        standard_ouverte = self.env['grille.prix'].create(
+            {
+                'name': 'Standard 2025',
+                'date_debut': date(2025, 1, 1),
+            }
+        )
+        moulin_1 = self.env['grille.prix'].create(
+            {
+                'name': 'Moulin 2025',
+                'date_debut': date(2025, 1, 1),
+                'regime_prix': 'moulin',
+            }
+        )
+        # La grille standard ouverte n'est pas fermée par la création de la Moulin.
+        self.assertFalse(standard_ouverte.date_fin)
+
+        self.env['grille.prix'].create(
+            {
+                'name': 'Moulin 2025 bis',
+                'date_debut': date(2025, 6, 1),
+                'regime_prix': 'moulin',
+            }
+        )
+        # Seule la grille Moulin précédente est fermée.
+        self.assertEqual(moulin_1.date_fin, date(2025, 5, 31))
+        self.assertFalse(standard_ouverte.date_fin)
+
+    def test_get_grille_active_par_regime(self):
+        """La sélection se fait par (régime, date) : standard et Moulin sont
+        résolus indépendamment, même sur des dates identiques."""
+        grille_moulin = self.env['grille.prix'].create(
+            {
+                'name': 'Grille Moulin 2024',
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 12, 31),
+                'regime_prix': 'moulin',
+            }
+        )
+        self.assertEqual(
+            self.env['grille.prix'].get_grille_active(date(2024, 6, 15), regime='standard'),
+            self.grille,
+        )
+        self.assertEqual(
+            self.env['grille.prix'].get_grille_active(date(2024, 6, 15), regime='moulin'),
+            grille_moulin,
+        )
+
+    def test_get_grille_active_defaut_standard(self):
+        """Sans régime précisé, get_grille_active reste sur le standard (compat)."""
+        self.assertEqual(self.env['grille.prix'].get_grille_active(date(2024, 6, 15)), self.grille)
+
+    def test_get_grille_active_moulin_sans_grille_leve(self):
+        """Un trou de couverture Moulin lève, même si le standard couvre la date :
+        les deux régimes ne se substituent jamais l'un à l'autre."""
+        with self.assertRaises(UserError):
+            self.env['grille.prix'].get_grille_active(date(2024, 6, 15), regime='moulin')
+
+    def test_dupliquer_grille_conserve_le_regime(self):
+        """Dupliquer une grille Moulin produit une nouvelle grille Moulin."""
+        grille_moulin = self.env['grille.prix'].create(
+            {
+                'name': 'Grille Moulin 2023',
+                'date_debut': date(2023, 1, 1),
+                'date_fin': date(2023, 12, 31),
+                'regime_prix': 'moulin',
+            }
+        )
+        action = grille_moulin.dupliquer_cette_grille()
+        nouvelle = self.env['grille.prix'].browse(action['res_id'])
+        self.assertEqual(nouvelle.regime_prix, 'moulin')

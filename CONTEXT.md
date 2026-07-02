@@ -36,9 +36,9 @@ remplace, le terme pipeline d'electricore, la catégorie produit « Abonnements 
 
 **En instance / En service** :
 États de cycle de vie de la *Souscription*, **calculés depuis les faits**, jamais saisis.
-**En instance** : née au *raccordement* (signée, complète commercialement — les *conditions
-particulières* peuvent partir) mais **sans RSC** : non facturable, ignorée du pull de
-facturation. **En service** : la RSC est acquise (raccordement effectif côté Enedis) —
+**En instance** : née à l'**acceptation** de la demande de *raccordement* (signée, consentements
+journalisés) mais **sans RSC** : non facturable, ignorée du pull de facturation. **En service** :
+la RSC est acquise — le C15 d'effectivité est arrivé, la mise en service est réelle (ADR 0022) —
 facturable. La correction passe par le **fait** (la RSC), jamais par l'état. La résiliation
 est un chantier distinct.
 _Éviter_ : **brouillon** (la Souscription est conclue et signée ; « brouillon » est réservé à
@@ -218,28 +218,46 @@ Rôle métier qui conduit la facturation mensuelle depuis Odoo et **vérifie les
 
 **Accueilliste** :
 Rôle métier qui instruit les demandes de *raccordement* au quotidien : accueil des nouvelles
-demandes, demandes SGE (mise en service F120 / changement de fournisseur F130, demande de
-mesures M023), saisie de l'*id_Affaire*, suivi des affaires Enedis jusqu'à la mise en
-service. Le kanban de raccordement est son tableau de bord.
+demandes, demandes SGE selon la *situation d'entrée* (F120 / F130), saisie de l'*id_Affaire*,
+calcul des mensualités et validation de l'abonnement une fois la mise en service effective.
+Le kanban de raccordement est son tableau de bord.
 _Éviter_ : le confondre avec le·la *facturiste* (facturation mensuelle, autre rôle).
 
 **Raccordement** :
 Le workflow d'**entrée** (kanban `raccordement.demande`), conduit par l'*accueilliste*, qui
-instruit une demande de fourniture de l'arrivée du formulaire jusqu'à la **mise en service**
-(étape « En service ») : demande SGE selon la situation d'entrée (mise en service F120 /
-changement de fournisseur F130), saisie de l'*id_Affaire*, puis **suivi de l'affaire** Enedis —
-automatisé par la résolution périodique `id_Affaire → RSC` (ADR 0021). À la **validation de
-l'abonnement** (provisions estimées, signature captée) il **crée** le·la *souscripteur·rice*,
-le compte bancaire et la *Souscription* — née *en instance* (cf. *En instance / En service*).
+instruit une demande de fourniture de l'arrivée du formulaire jusqu'à la **validation de
+l'abonnement** (étape « Abonnement Validé ») : acceptation (pour les PRO, décision du *collège*),
+demande SGE selon la *situation d'entrée* (F120 / F130), saisie de l'*id_Affaire*, **suivi de
+l'affaire** Enedis — automatisé par la résolution périodique `id_Affaire → RSC` (ADR 0021/0022) —
+puis calcul des mensualités une fois la mise en service effective. À l'**acceptation** il
+**crée** le·la *souscripteur·rice*, le compte bancaire et la *Souscription* — née *en instance*
+(cf. *En instance / En service*) ; un mail de **rassurage** part quand la demande SGE est
+déposée, les *conditions particulières* partent **complètes** à la validation de l'abonnement.
 Les étapes à entrée **factuelle** (id_Affaire saisi, RSC acquise) avancent seules et ne se
-forcent pas : on corrige le fait, la carte suit. C'est le point de **capture** des données
+forcent pas : on corrige le fait, la carte suit. Chaque colonne du kanban dit qui doit agir :
+**action attendue** (un humain), **attente externe** (personne — le poll veille), **fait**.
+C'est le point de **capture** des données
 saisies à l'adhésion — **dont les consentements et la signature** (équivalent du *LSD* de
 prod) —, **recopiées** sur la *Souscription* qui en devient **propriétaire** (système de
 référence) ; la *demande* reste un intake transitoire. Les *conditions particulières* lisent ces
 données sur la *Souscription*, jamais sur la demande.
 _Éviter_ : confondre la **demande de raccordement** (intake) et la *Souscription* (l'enregistrement
 qu'elle engendre) ; « raccordement » au sens réseau Enedis (mise en service physique du PDL) ;
-**« Souscrit » comme fin du workflow** (la chaîne va jusqu'à « En service »).
+**« Souscrit » ou « En service » comme colonnes** (la chaîne se clôt à « Abonnement Validé » ;
+la mise en service est un fait porté par la *Souscription*, reflété par « Validé sur SGE »).
+
+**Situation d'entrée** :
+La voie SGE par laquelle un·e *souscripteur·rice* entre dans le périmètre : **mise en service**
+(F120 — PDL hors service, emménagement) ou **changement de fournisseur** (CFNE F130 — PDL
+alimenté par un autre fournisseur). Déclarée au formulaire de souscription, **corrigeable par
+l'accueilliste** (l'erreur du demandeur est un cas nominal) ; elle route le suivi de l'affaire
+dans la branche F120 ou F130 du *raccordement*.
+_Éviter_ : « type de demande » (trop générique) ; la confondre avec la *Configuration fournisseur*.
+
+**Collège (PRO)** :
+Instance humaine qui **accepte** les demandes professionnelles : elle valide le PRO **et son
+tarif** (la *Majoration PRO* négociée) avant de faire avancer la carte — l'acceptation d'un PRO
+n'est jamais le geste d'un·e seul·e *accueilliste*.
 
 **Portail** :
 Espace en ligne en lecture du·de la *souscripteur·rice* (contrats, factures, infos utiles),

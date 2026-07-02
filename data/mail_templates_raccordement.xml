@@ -6,11 +6,15 @@
              chez Enedis. Un template par situation d'entrée ; le rassurage
              tient le rôle d'accusé de prise en compte, les conditions
              particulières partant plus tard, complètes (pack de bienvenue,
-             #103). Wording provisoire, le définitif viendra d'EDN. -->
+             #103). Wording provisoire, le définitif viendra d'EDN.
+             use_default_to=False : le défaut True (Odoo 19) ignorerait
+             email_to au profit de _message_get_default_recipients(), vide
+             pour raccordement.demande (contact_email n'y est pas reconnu). -->
 
         <record id="mail_template_raccordement_f120" model="mail.template">
             <field name="name">Raccordement — rassurage F120 (mise en service)</field>
             <field name="model_id" ref="model_raccordement_demande"/>
+            <field name="use_default_to" eval="False"/>
             <field name="subject">Votre emménagement est bien enregistré</field>
             <field name="email_to">{{ object.contact_email }}</field>
             <field name="body_html" type="html">
@@ -30,6 +34,7 @@
         <record id="mail_template_raccordement_f130" model="mail.template">
             <field name="name">Raccordement — rassurage F130 (changement de fournisseur)</field>
             <field name="model_id" ref="model_raccordement_demande"/>
+            <field name="use_default_to" eval="False"/>
             <field name="subject">Votre changement de fournisseur est bien enregistré</field>
             <field name="email_to">{{ object.contact_email }}</field>
             <field name="body_html" type="html">

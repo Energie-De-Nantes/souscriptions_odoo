@@ -9,11 +9,15 @@
              configurables (attachment_ids du template). Trois variantes
              reprenant les contenus du pack prod « Bienvenue à EDN », choisies
              par les faits de la demande (PRO / solidaire / particulier).
-             Wording provisoire, le définitif viendra d'EDN. -->
+             Wording provisoire, le définitif viendra d'EDN.
+             use_default_to=False : le défaut True (Odoo 19) court-circuiterait
+             partner_to au profit de _message_get_default_recipients() —
+             destinataire explicite plutôt qu'implicite. -->
 
         <record id="mail_template_bienvenue_particulier" model="mail.template">
             <field name="name">Raccordement — pack de bienvenue (particulier)</field>
             <field name="model_id" ref="model_souscription_souscription"/>
+            <field name="use_default_to" eval="False"/>
             <field name="subject">Bienvenue à Énergie De Nantes !</field>
             <field name="partner_to">{{ object.partner_id.id }}</field>
             <field name="report_template_ids" eval="[(6, 0, [ref('action_souscription_conditions_particulieres')])]"/>
@@ -36,6 +40,7 @@
         <record id="mail_template_bienvenue_pro" model="mail.template">
             <field name="name">Raccordement — pack de bienvenue (professionnel)</field>
             <field name="model_id" ref="model_souscription_souscription"/>
+            <field name="use_default_to" eval="False"/>
             <field name="subject">Bienvenue à Énergie De Nantes !</field>
             <field name="partner_to">{{ object.partner_id.id }}</field>
             <field name="report_template_ids" eval="[(6, 0, [ref('action_souscription_conditions_particulieres')])]"/>
@@ -58,6 +63,7 @@
         <record id="mail_template_bienvenue_solidaire" model="mail.template">
             <field name="name">Raccordement — pack de bienvenue (tarif solidaire)</field>
             <field name="model_id" ref="model_souscription_souscription"/>
+            <field name="use_default_to" eval="False"/>
             <field name="subject">Bienvenue à Énergie De Nantes !</field>
             <field name="partner_to">{{ object.partner_id.id }}</field>
             <field name="report_template_ids" eval="[(6, 0, [ref('action_souscription_conditions_particulieres')])]"/>

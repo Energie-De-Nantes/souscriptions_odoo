@@ -11,7 +11,7 @@ from datetime import date, timedelta
 
 from odoo.tests.common import TransactionCase, tagged
 
-from .common import SouscriptionsTestMixin
+from .common import SouscriptionsTestMixin, build_grille_lignes
 
 
 @tagged('souscriptions', 'souscriptions_raccordement_mails', 'post_install', '-at_install')
@@ -64,6 +64,7 @@ class TestMailsRassurageRaccordement(SouscriptionsTestMixin, TransactionCase):
         mails = self._mails(demande)
         self.assertEqual(len(mails), 1)
         self.assertEqual(mails.subject, self.template_f130.subject)
+        self.assertEqual(mails.email_to, demande.contact_email)
         self.assertNotEqual(self.template_f120.subject, self.template_f130.subject)
 
     def test_reroute_f120_vers_f130_envoie_mail_de_la_branche_darrivee(self):
@@ -76,7 +77,9 @@ class TestMailsRassurageRaccordement(SouscriptionsTestMixin, TransactionCase):
         self.assertEqual(demande.stage_id, self.stage_f130_cfne)
         mails = self._mails(demande)
         self.assertEqual(len(mails), 2, 'Le re-routage doit envoyer un second mail (celui de la nouvelle branche)')
-        self.assertEqual(mails.sorted('id')[-1].subject, self.template_f130.subject)
+        dernier = mails.sorted('id')[-1]
+        self.assertEqual(dernier.subject, self.template_f130.subject)
+        self.assertEqual(dernier.email_to, demande.contact_email)
 
     def test_autre_changement_detape_nenvoie_pas_de_rassurage(self):
         """Un changement d'étape hors branche ⏳ (drag manuel classique)
@@ -106,6 +109,20 @@ class TestPackBienvenueRaccordement(SouscriptionsTestMixin, TransactionCase):
         cls.template_particulier = cls.env.ref('souscriptions_odoo.mail_template_bienvenue_particulier')
         cls.template_pro = cls.env.ref('souscriptions_odoo.mail_template_bienvenue_pro')
         cls.template_solidaire = cls.env.ref('souscriptions_odoo.mail_template_bienvenue_solidaire')
+        # La CP jointe au pack se rend à la date de début de la Souscription
+        # (date_debut_souhaitee = aujourd'hui + 30 j) : grille ouverte à
+        # partir de 2025 pour couvrir cette date quel que soit le jour du
+        # run — la grille 2024 du mixin ne couvre que les fixtures
+        # historiques (pas de chevauchement).
+        grille_courante = cls.env['grille.prix'].create(
+            {
+                'name': 'Grille Test courante',
+                'date_debut': date(2025, 1, 1),
+                'date_fin': False,
+                'active': True,
+            }
+        )
+        build_grille_lignes(cls.env, grille_courante, prix_base=0.15, prix_hp=0.18, prix_hc=0.12)
 
     def create_demande(self, email, **kwargs):
         defaults = {
@@ -143,6 +160,7 @@ class TestPackBienvenueRaccordement(SouscriptionsTestMixin, TransactionCase):
         mails = self._mails(souscription)
         self.assertEqual(len(mails), 1)
         self.assertEqual(mails.subject, self.template_particulier.subject)
+        self.assertEqual(mails.recipient_ids, souscription.partner_id, 'Le pack part au contact de la demande')
         self.assertTrue(mails.attachment_ids, 'La CP devrait partir en pièce jointe (report_template_ids)')
 
     def test_variante_pro(self):

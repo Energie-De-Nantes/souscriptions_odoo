@@ -432,10 +432,15 @@ class RaccordementDemande(models.Model):
                     "l'IBAN est invalide. Corrigez l'IBAN avant d'accepter."
                 )
 
-    # Branches ⏳ ciblées par situation_entree (#100, ADR 0022 §1/§4).
+    # Branches ⏳ ciblées par situation_entree (#100, ADR 0022 §1/§4), et
+    # leur mail de rassurage associé (#102, ADR 0022 §6).
     _STAGE_XMLID_PAR_SITUATION = {
         'mes': 'souscriptions_odoo.stage_f120_mes',
         'cfne': 'souscriptions_odoo.stage_f130_cfne',
+    }
+    _TEMPLATE_XMLID_PAR_SITUATION = {
+        'mes': 'souscriptions_odoo.mail_template_raccordement_f120',
+        'cfne': 'souscriptions_odoo.mail_template_raccordement_f130',
     }
 
     def _stage_branche_cible(self):
@@ -462,6 +467,10 @@ class RaccordementDemande(models.Model):
           latéralement vers l'autre branche (ni avancement, ni recul) ;
         - en aval des branches (Validé sur SGE et au-delà) : aucun effet — on
           ne recule jamais une carte déjà instruite côté Enedis.
+
+        Chaque entrée effective (initiale ou re-routée) envoie le mail de
+        rassurage (#102) de la branche d'arrivée : c'est le moment où la
+        demande SGE part réellement chez Enedis.
         """
         branches = self._stages_branches_sge()
         for record in self:
@@ -474,6 +483,19 @@ class RaccordementDemande(models.Model):
             en_amont = record.stage_id.sequence < cible.sequence
             if en_branche or en_amont:
                 record.with_context(raccordement_automove=True).stage_id = cible.id
+                record._envoyer_mail_rassurage()
+
+    def _envoyer_mail_rassurage(self):
+        """Mail de rassurage (#102, ADR 0022 §6) à l'entrée effective d'une
+        branche ⏳ — accusé de prise en compte, un template par situation
+        d'entrée. Le re-routage F120<->F130 envoie le mail de la branche
+        d'arrivée (même seuil d'appel que l'avancement initial,
+        `_router_situation_entree`)."""
+        self.ensure_one()
+        xmlid = self._TEMPLATE_XMLID_PAR_SITUATION.get(self.situation_entree)
+        template = self.env.ref(xmlid, raise_if_not_found=False) if xmlid else False
+        if template:
+            template.send_mail(self.id, force_send=False)
 
     def _create_odoo_entries(self):
         """Crée automatiquement les entrées Odoo (contact, banque, souscription)"""

@@ -49,6 +49,7 @@ vit dans models/wizard/ et ne lève qu'au clic sur l'action du wizard.
         'data/raccordement_sequence.xml',
         'data/raccordement_stages.xml',
         'data/ir_cron_poll_affaires_enedis.xml',
+        'data/mail_templates_raccordement.xml',
         'reports/souscription_conditions_particulieres_report.xml',
         'reports/souscription_attestation_report.xml',
         'reports/facture_energie_template.xml',

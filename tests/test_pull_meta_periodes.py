@@ -11,12 +11,21 @@ Deux tranches :
 Fixtures RSC/PDL : identifiants factices (jamais des vrais échantillons).
 """
 
+from contextlib import contextmanager
 from datetime import date
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
+from odoo.addons.souscriptions_odoo.models.wizard import souscription_pull_meta_periodes_wizard as wizard_module
+from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
 from .common import SouscriptionsTestCase
+
+# Cible de patch en toutes lettres (mock.patch résout par import string) : on
+# tape sur les noms importés *dans le module wizard*, jamais sur le paquet
+# electricore_client lui-même (qui peut être absent du sandbox de tests).
+_WIZARD = 'odoo.addons.souscriptions_odoo.models.wizard.souscription_pull_meta_periodes_wizard'
 
 
 def _objet_releve(**kwargs):
@@ -163,3 +172,198 @@ class TestAmorcerDepuisMeta(SouscriptionsTestCase):
         with self.assertRaises(Exception):
             with self.env.cr.savepoint():
                 self.env['souscription.periode']._amorcer_depuis_meta(self.souscription_base, _periode_meta())
+
+
+# === Wizard « Récupérer les périodes du mois » : client mocké ===
+#
+# Exceptions factices mirant exactement les noms/sémantiques d'
+# electricore_client.exceptions (le paquet réel peut être absent du sandbox
+# d'exécution des tests ; le module wizard ne les utilise que par leur nom
+# importé, patché ci-dessous).
+
+
+class _FakeIngestionEnCours(Exception):
+    pass
+
+
+class _FakePreconditionNonRemplie(Exception):
+    pass
+
+
+class _FakeContractVersionError(Exception):
+    pass
+
+
+@contextmanager
+def _stream(metas):
+    """Mime `JsonlStream` : context manager itérable, cf.
+    electricore_client.streaming.JsonlStream."""
+    yield iter(metas)
+
+
+def _fake_client(metas=(), *, leve=None):
+    """Client factice : `.meta_periodes(mois=, rsc=)` renvoie un flux
+    (context manager) qui itère `metas`, ou lève `leve` à l'ouverture."""
+    client = MagicMock()
+    if leve is not None:
+        client.meta_periodes.side_effect = leve
+    else:
+        client.meta_periodes.return_value = _stream(metas)
+    return client
+
+
+@tagged('souscriptions', 'souscriptions_pull_meta', 'post_install', '-at_install')
+class TestWizardPullMetaPeriodes(SouscriptionsTestCase):
+    def setUp(self):
+        super().setUp()
+        # Le wizard résout ses paramètres via ir.config_parameter : posés une
+        # fois pour tous les tests de cette classe (pas de vrai réseau).
+        ICP = self.env['ir.config_parameter'].sudo()
+        ICP.set_param('souscriptions.electricore_url', 'https://electricore.example.test')
+        ICP.set_param('souscriptions.electricore_api_key', 'fake-api-key')
+
+        patcher_dispo = patch(f'{_WIZARD}.ELECTRICORE_CLIENT_DISPONIBLE', True)
+        patcher_dispo.start()
+        self.addCleanup(patcher_dispo.stop)
+
+        patcher_exc = patch.multiple(
+            wizard_module,
+            IngestionEnCours=_FakeIngestionEnCours,
+            PreconditionNonRemplie=_FakePreconditionNonRemplie,
+            ContractVersionError=_FakeContractVersionError,
+        )
+        patcher_exc.start()
+        self.addCleanup(patcher_exc.stop)
+
+    def _wizard(self, mois=date(2024, 1, 1)):
+        return self.env['souscription.pull.meta.periodes.wizard'].create({'mois': mois})
+
+    def _lancer_avec_client(self, client, mois=date(2024, 1, 1)):
+        wizard = self._wizard(mois)
+        with patch.object(wizard_module, 'ElectricoreClient', return_value=client):
+            wizard.action_lancer()
+        return wizard
+
+    def test_paquet_manquant_leve_userror_actionnable(self):
+        """AC1 : message clair si le paquet manque — pas d'appel réseau."""
+        with patch(f'{_WIZARD}.ELECTRICORE_CLIENT_DISPONIBLE', False):
+            wizard = self._wizard()
+            with self.assertRaises(UserError) as cm:
+                wizard.action_lancer()
+        self.assertIn('electricore_client', str(cm.exception))
+
+    def test_config_manquante_leve_userror(self):
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        self.env['ir.config_parameter'].sudo().set_param('souscriptions.electricore_api_key', False)
+        wizard = self._wizard()
+        with self.assertRaises(UserError):
+            wizard.action_lancer()
+
+    def test_cree_les_periodes_manquantes_pour_les_souscriptions_a_rsc(self):
+        """AC2 : le wizard crée les périodes manquantes du mois pour les
+        souscriptions à RSC."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        meta = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001',
+            debut='2024-01-01',
+            fin='2024-02-01',
+        )
+        client = _fake_client([meta])
+
+        wizard = self._lancer_avec_client(client)
+
+        periode = self.env['souscription.periode'].search(
+            [('souscription_id', '=', self.souscription_base.id), ('mois', '=', date(2024, 1, 1))]
+        )
+        self.assertEqual(len(periode), 1)
+        self.assertIn('Créées : 1', wizard.resultat)
+        self.assertEqual(wizard.state, 'done')
+        client.meta_periodes.assert_called_once_with(mois='2024-01-01', rsc=['RSC-00000000000001'])
+
+    def test_ne_reecrit_jamais_une_periode_existante(self):
+        """AC2 : create-missing-only — une période déjà amorcée n'est jamais
+        réécrite, même avec des valeurs différentes dans le payload."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        existante = self.create_test_periode(
+            self.souscription_base, date_debut=date(2024, 1, 1), date_fin=date(2024, 2, 1)
+        )
+        existante.cta_eur = 1.23
+
+        meta = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001',
+            debut='2024-01-01',
+            fin='2024-02-01',
+            cta_eur=999.0,
+        )
+        wizard = self._lancer_avec_client(_fake_client([meta]))
+
+        self.assertEqual(existante.cta_eur, 1.23)
+        self.assertIn('Déjà existantes : 1', wizard.resultat)
+        self.assertIn('Créées : 0', wizard.resultat)
+
+    def test_resume_les_souscriptions_sans_rsc(self):
+        """AC3 : résumé skip-and-report — souscriptions sans RSC comptées à part."""
+        self.assertFalse(self.souscription_hphc.ref_situation_contractuelle)
+        wizard = self._lancer_avec_client(_fake_client([]))
+        self.assertIn('Sans RSC (ignorées) :', wizard.resultat)
+        self.assertNotIn('Sans RSC (ignorées) : 0', wizard.resultat)
+
+    def test_releves_crees_avec_identifiant_externe_et_origine(self):
+        """AC4 : relevés créés avec identifiant externe + origine."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        meta = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001',
+            debut='2024-01-01',
+            fin='2024-02-01',
+            releves_utilises=[_objet_releve(releve_id='ELC-999', origine_releve='flux_R151')],
+        )
+        self._lancer_avec_client(_fake_client([meta]))
+
+        releve = self.env['souscription.releve'].search([('releve_externe_id', '=', 'ELC-999')])
+        self.assertEqual(len(releve), 1)
+        self.assertEqual(releve.origine, 'flux_R151')
+
+    def test_erreur_par_periode_ne_bloque_pas_le_lot(self):
+        """Skip-and-report par élément : une erreur d'amorçage sur une RSC
+        n'empêche pas les autres d'être traitées, et apparaît dans le résumé."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        meta_invalide = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001',
+            debut=None,  # déclenche une erreur de mapping (Date invalide)
+            fin='2024-02-01',
+        )
+        wizard = self._lancer_avec_client(_fake_client([meta_invalide]))
+        self.assertIn('Erreurs : 1', wizard.resultat)
+
+    def test_ingestion_en_cours_mappee_en_userror_reessayable(self):
+        """AC5 : IngestionEnCours -> message « réessayer plus tard »."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        client = _fake_client(leve=_FakeIngestionEnCours('verrou'))
+        with self.assertRaises(UserError) as cm:
+            self._lancer_avec_client(client)
+        self.assertIn('plus tard', str(cm.exception))
+
+    def test_precondition_non_remplie_mappee_en_userror_actionnable(self):
+        """AC5 : PreconditionNonRemplie -> message actionnable du serveur conservé."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        client = _fake_client(leve=_FakePreconditionNonRemplie('réconciliez les RSC avant de facturer'))
+        with self.assertRaises(UserError) as cm:
+            self._lancer_avec_client(client)
+        self.assertIn('réconciliez les RSC', str(cm.exception))
+
+    def test_contract_version_error_mappee_en_erreur_dure(self):
+        """AC5 : ContractVersionError -> erreur dure (UserError, pas de retry implicite)."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        client = _fake_client(leve=_FakeContractVersionError('serveur v2 < attendu v3'))
+        with self.assertRaises(UserError) as cm:
+            self._lancer_avec_client(client)
+        self.assertIn('v2', str(cm.exception))
+
+    def test_aucune_souscription_a_rsc_naboutit_pas_a_un_appel_client(self):
+        """Aucune RSC facturable -> le client n'est même pas construit (pas de
+        round-trip réseau inutile)."""
+        with patch.object(wizard_module, 'ElectricoreClient') as MockClient:
+            wizard = self._wizard()
+            wizard.action_lancer()
+            MockClient.assert_not_called()
+        self.assertIn('Sans RSC', wizard.resultat)

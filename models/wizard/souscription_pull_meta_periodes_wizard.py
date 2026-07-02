@@ -85,7 +85,12 @@ class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
                         if souscription is None:
                             continue  # RSC hors du filtre demandé, ignorée silencieusement
                         try:
-                            self._amorcer_une(Periode, souscription, meta, creees, existantes)
+                            # Savepoint par élément (skip-and-report, ADR 0011) :
+                            # un échec de mapping/contrainte sur une RSC ne doit
+                            # ni écrire de résultat partiel ni casser le curseur
+                            # pour les RSC suivantes du même lot.
+                            with self.env.cr.savepoint():
+                                self._amorcer_une(Periode, souscription, meta, creees, existantes)
                         except Exception as exc:
                             erreurs.append(f'{souscription.name} ({meta.ref_situation_contractuelle}) : {exc}')
             except IngestionEnCours:
@@ -107,9 +112,11 @@ class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
 
     def _amorcer_une(self, Periode, souscription, meta, creees, existantes):
         """Create-missing-only (ADR 0011) : un `(souscription, mois)` déjà
-        amorcé n'est jamais réécrit. La contrainte unique mensuelle
-        (ADR 0020 §2) fait foi ; on vérifie d'abord pour ne pas dépendre d'un
-        rollback de savepoint par élément."""
+        amorcé n'est jamais réécrit. Recherche explicite d'abord (lisible,
+        rapide) ; la contrainte unique mensuelle (ADR 0020 §2) reste le
+        garde-fou de dernier recours si deux amorçages se recouvraient malgré
+        tout — remontée comme une erreur normale, absorbée par le savepoint
+        appelant."""
         mois_cle = fields.Date.to_date(meta.debut).replace(day=1)
         existante = Periode.search(
             [

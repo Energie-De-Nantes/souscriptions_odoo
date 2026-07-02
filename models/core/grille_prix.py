@@ -37,7 +37,6 @@ class GrillePrix(models.Model):
         string='Régime de prix',
         default='standard',
         required=True,
-        tracking=True,
         help='Barème appliqué par cette grille. Chaque régime versionne ses '
         'grilles indépendamment : une grille Moulin ouverte coexiste avec une '
         'grille standard ouverte (anti-chevauchement et fermeture automatique '

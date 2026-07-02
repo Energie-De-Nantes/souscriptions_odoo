@@ -200,6 +200,9 @@ class RaccordementDemande(models.Model):
         for record in records:
             if not record.stage_id:
                 record.stage_id = self._get_default_stage_id()
+        # id_Affaire déjà renseigné à la création (rare, mais cohérent avec
+        # l'auto-move de write(), #90) : avance la carte si elle est en amont.
+        records.filtered('id_affaire')._avancer_stage_demande_sge()
         return records
 
     @api.model
@@ -311,6 +314,12 @@ class RaccordementDemande(models.Model):
 
     def write(self, vals):
         """Override write pour les actions automatiques de base"""
+        # Étapes pilotées par les faits (#90, ADR 0021 §5) : le drag-in
+        # manuel y est refusé, sauf pour les automatismes du module
+        # (contournement de contexte `raccordement_automove`).
+        if 'stage_id' in vals and not self.env.context.get('raccordement_automove'):
+            self._verifier_pas_de_drag_in_factuel(vals['stage_id'])
+
         # id_Affaire saisi/corrigé (#87) : date de saisie auto-stampée, sauf
         # si le vals la fixe explicitement (rattrapage de typo, tests
         # antidatant la grâce du poll #89).
@@ -326,7 +335,38 @@ class RaccordementDemande(models.Model):
                 if record.stage_id.is_close and not record.souscription_id:
                     record._create_odoo_entries()
 
+        # id_Affaire saisi/corrigé (#90) : la carte avance seule à « Demande
+        # SGE faite » si elle est en amont — jamais en aval (pas de recul).
+        if 'id_affaire' in vals:
+            self._avancer_stage_demande_sge()
+
         return res
+
+    def _verifier_pas_de_drag_in_factuel(self, nouveau_stage_id):
+        """Refuse le drag-in manuel vers une étape pilotée par un fait
+        (#90) : on corrige le fait, la carte suit — jamais l'inverse. Ne
+        s'applique qu'aux demandes qui *changent* réellement d'étape : une
+        ré-écriture sans changement (resync des données, module upgrade) ne
+        déclenche pas la garde."""
+        nouveau_stage = self.env['raccordement.stage'].browse(nouveau_stage_id)
+        if not nouveau_stage.entree_factuelle:
+            return
+        deplacees = self.filtered(lambda r: r.stage_id.id != nouveau_stage_id)
+        if deplacees:
+            raise UserError(
+                f'« {nouveau_stage.name} » est une étape pilotée par un fait : elle ne se force pas à la '
+                'main. Corrigez le fait (id_Affaire saisi, RSC acquise) — la carte suivra automatiquement.'
+            )
+
+    def _avancer_stage_demande_sge(self):
+        """Auto-move (#90) : id_Affaire renseigné -> « Demande SGE faite »,
+        seulement si la demande est encore en amont (jamais de recul)."""
+        stage = self.env.ref('souscriptions_odoo.stage_demande_sge', raise_if_not_found=False)
+        if not stage:
+            return
+        for record in self:
+            if record.id_affaire and record.stage_id.sequence < stage.sequence:
+                record.with_context(raccordement_automove=True).stage_id = stage.id
 
     def _create_odoo_entries(self):
         """Crée automatiquement les entrées Odoo (contact, banque, souscription)"""

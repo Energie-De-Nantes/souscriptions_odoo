@@ -246,7 +246,37 @@ class Souscription(models.Model):
             raise AccessError(self._MESSAGE_RSC_RESTREINTE)
         if vals.get('id_affaire') and 'id_affaire_date_saisie' not in vals:
             vals = dict(vals, id_affaire_date_saisie=fields.Date.context_today(self))
-        return super().write(vals)
+
+        # RSC nouvellement acquise (#90) : la demande liée avance à « En
+        # service » — que la RSC vienne du poll (#89) ou d'une saisie
+        # manuelle (#87), l'automatisme s'accroche au fait, pas au canal.
+        rsc_avant = (
+            {s.id: s.ref_situation_contractuelle for s in self} if 'ref_situation_contractuelle' in vals else None
+        )
+
+        res = super().write(vals)
+
+        if rsc_avant is not None:
+            nouvellement_resolues = self.filtered(lambda s: s.ref_situation_contractuelle and not rsc_avant.get(s.id))
+            nouvellement_resolues._avancer_demande_en_service()
+
+        return res
+
+    def _avancer_demande_en_service(self):
+        """Auto-move (#90) : la demande liée avance à « En service »,
+        seulement si elle est encore en amont (jamais de recul), avec trace
+        au chatter de la demande."""
+        stage = self.env.ref('souscriptions_odoo.stage_en_service', raise_if_not_found=False)
+        if not stage:
+            return
+        for sous in self:
+            demande = sous._demande_liee()
+            if not demande or demande.stage_id.sequence >= stage.sequence:
+                continue
+            demande.with_context(raccordement_automove=True).stage_id = stage.id
+            demande.message_post(
+                body=f'Étape avancée automatiquement à « En service » (RSC {sous.ref_situation_contractuelle} acquise).'
+            )
 
     def action_resoudre_rsc_maintenant(self):
         """Bouton « résoudre la RSC maintenant » (#88) : résout la RSC des

@@ -14,6 +14,7 @@ from . import (
     test_portal,
     test_pull_meta_periodes,
     test_raccordement,
+    test_raccordement_kanban_faits,
     test_refacturation,
     test_releve,
     test_releve_demo,

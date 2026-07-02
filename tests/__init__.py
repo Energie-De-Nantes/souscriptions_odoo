@@ -11,6 +11,7 @@ from . import (
     test_periode_form,
     test_periode_snapshot,
     test_portal,
+    test_pull_meta_periodes,
     test_raccordement,
     test_refacturation,
     test_releve,

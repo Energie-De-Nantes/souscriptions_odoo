@@ -536,6 +536,66 @@ class SouscriptionPeriode(models.Model):
 
         return lines_vals
 
+    # === Amorçage depuis le pull electricore (#77, ADR 0011/0019/0020) ===
+
+    # Nature du contrat (`nature_index` de l'ObjetReleve) → nature Odoo du
+    # Relevé (ADR 0020 §6) : réel/corrigé sont tous deux une mesure Enedis
+    # (le "corrigé" est un réel révisé) ; le reste est une estimation.
+    _NATURE_RELEVE = {'reel': 'reel', 'corrige': 'reel'}
+
+    @api.model
+    def _amorcer_depuis_meta(self, souscription, meta):
+        """Mappe une `PeriodeMeta` (contrat v3, duck-typée) vers `create()`.
+
+        Aucune table de traduction (ADR 0020) : les champs du contrat
+        atterrissent sous leur nom. N'écrit rien de son propre chef — construit
+        les vals et délègue à `create()`, qui applique le snapshot contractuel
+        habituel (type_tarif, puissance…) par-dessus. `meta` n'a besoin que des
+        attributs de `PeriodeMeta` (tests : un stub/namedtuple suffit).
+
+        Une période `qualite='incalculable'` est créée quand même, énergies
+        nulles (le brouillon facturable reste la règle, CONTEXT.md).
+        """
+        vals = {
+            'souscription_id': souscription.id,
+            'date_debut': fields.Date.to_date(meta.debut),
+            'date_fin': fields.Date.to_date(meta.fin),
+            'type_periode': 'mensuelle',
+            'puissance_moyenne_kva': meta.puissance_moyenne_kva or 0.0,
+            'energie_base_kwh': meta.energie_base_kwh or 0.0,
+            'energie_hp_kwh': meta.energie_hp_kwh or 0.0,
+            'energie_hc_kwh': meta.energie_hc_kwh or 0.0,
+            'turpe_fixe': meta.turpe_fixe_eur or 0.0,
+            'turpe_variable': meta.turpe_variable_eur or 0.0,
+            'cta_eur': meta.cta_eur or 0.0,
+            'taux_accise_eur_mwh': meta.taux_accise_eur_mwh or 0.0,
+            'has_changement': bool(meta.has_changement),
+            'qualite': meta.qualite or 'incalculable',
+            'statut_communication': meta.statut_communication or False,
+            'source_hash': meta.source_hash,
+            'releve_ids': [(0, 0, self._releve_vals_depuis_objet(releve)) for releve in (meta.releves_utilises or [])],
+        }
+        return self.create(vals)
+
+    def _releve_vals_depuis_objet(self, releve):
+        """Mappe un `ObjetReleve` (contrat v3) vers les vals d'un
+        `souscription.releve` enfant (ADR 0020 §6) : provenance conservée
+        (`releve_externe_id`, `origine`), nature réel/corrigé → `reel`,
+        estimé → `estime`."""
+        return {
+            'date': fields.Date.to_date(releve.date_releve),
+            'nature': self._NATURE_RELEVE.get(releve.nature_index, 'estime'),
+            'index_base': releve.index_base_kwh or 0.0,
+            'index_hp': releve.index_hp_kwh or 0.0,
+            'index_hc': releve.index_hc_kwh or 0.0,
+            'index_hph': releve.index_hph_kwh or 0.0,
+            'index_hpb': releve.index_hpb_kwh or 0.0,
+            'index_hch': releve.index_hch_kwh or 0.0,
+            'index_hcb': releve.index_hcb_kwh or 0.0,
+            'releve_externe_id': releve.releve_id,
+            'origine': releve.evenement or releve.origine_releve,
+        }
+
     def _creer_facture(self):
         """Émet la facture (``account.move``) de cette période.
 

@@ -41,6 +41,8 @@
                             <field name="date_demande_sge" />
                             <field name="date_demande_mesures" />
                             <field name="date_estimation" />
+                            <field name="id_affaire" />
+                            <field name="id_affaire_date_saisie" readonly="1" />
                             <field name="kanban_state" widget="state_selection" />
                         </group>
                     </group>
@@ -236,6 +238,7 @@
                 <field name="siret" />
                 <field name="contact_nom" />
                 <field name="contact_email" />
+                <field name="id_affaire" string="N° d'affaire Enedis" />
                 <filter string="Professionnel" name="pro" domain="[('pro', '=', True)]" />
                 <filter string="Particulier" name="particulier" domain="[('pro', '=', False)]" />
                 <separator />

@@ -2,7 +2,7 @@ import logging
 from datetime import date, timedelta
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 
 _logger = logging.getLogger(__name__)
 
@@ -144,37 +144,96 @@ class Souscription(models.Model):
     ref_compteur = fields.Char(string='Référence compteur')
     numero_depannage = fields.Char(string='Numéro de dépannage')
 
-    # Identité électricore (ADR 0010, ADR 0020 §3). `ref_situation_contractuelle`
+    # Identité électricore (ADR 0010, ADR 0020 §3, ADR 0021). `ref_situation_contractuelle`
     # est la clé d'articulation du pull de méta-périodes (RSC, unique par couple
     # PDL/usager·ère) ; `id_affaire` est l'amorce de réconciliation (référence
-    # d'affaire Enedis, connue tôt et non ambiguë). Peuplés à terme par le
-    # raccordement (id_Affaire capturé au raccordement, RSC résolue à la bascule
-    # « raccordement effectué » — issue dédiée) ; saisissables à la main d'ici là.
+    # d'affaire Enedis, connue tôt et non ambiguë). `id_affaire` est recopié depuis
+    # raccordement.demande à la création (#87) ; la RSC est acquise par le poll
+    # quotidien ou l'action manuelle (#88/#89) — écriture restreinte au groupe
+    # gestionnaire (ADR 0021 §5), c'est l'échappatoire quand Enedis/electricore
+    # déraille.
     ref_situation_contractuelle = fields.Char(
         string='RSC (référence situation contractuelle)',
         tracking=True,
         help="Clé d'articulation du pull de méta-périodes electricore, unique par "
-        'couple PDL/usager·ère. Non affichée dans SGE : peuplée par le raccordement '
-        "à terme (résolution id_Affaire → RSC), saisissable à la main d'ici là.",
+        'couple PDL/usager·ère. Non affichée dans SGE : acquise par le poll quotidien '
+        'des affaires Enedis, ou saisissable à la main (groupe gestionnaire) quand '
+        'le suivi automatique déraille.',
     )
     id_affaire = fields.Char(
         string="N° d'affaire Enedis",
         tracking=True,
         help="Référence d'affaire Enedis, renvoyée dès la demande de raccordement. "
         'Amorce de réconciliation (audit + ré-résolution de la RSC) — recopiée '
-        "depuis raccordement.demande à terme, saisissable à la main d'ici là.",
+        'depuis raccordement.demande à la création, corrigeable ensuite (rattrapage de typo).',
     )
+    id_affaire_date_saisie = fields.Date(
+        string="Date de saisie de l'id_Affaire",
+        help="Date de saisie de l'id_Affaire — recopiée depuis raccordement.demande à la "
+        'création, ré-amorcée à chaque correction. Amorce le délai de grâce du poll '
+        'quotidien des affaires Enedis (#89).',
+    )
+    etat = fields.Selection(
+        [('en_instance', 'En instance'), ('en_service', 'En service'), ('resiliee', 'Résiliée')],
+        string='État',
+        compute='_compute_etat',
+        store=True,
+        tracking=True,
+        help='Cycle de vie calculé depuis les faits (ADR 0021), jamais saisi : '
+        '*en instance* (RSC absente, non facturable), *en service* (RSC acquise, '
+        'facturable), *résiliée* (date de fin passée — logique minimale, chantier '
+        'dédié ultérieur). Se corrige par le fait (la RSC), jamais par ce champ.',
+    )
+
+    @api.depends('ref_situation_contractuelle', 'date_fin')
+    def _compute_etat(self):
+        today = fields.Date.context_today(self)
+        for sous in self:
+            if sous.date_fin and sous.date_fin < today:
+                sous.etat = 'resiliee'
+            elif sous.ref_situation_contractuelle:
+                sous.etat = 'en_service'
+            else:
+                sous.etat = 'en_instance'
 
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            if vals.get('ref_situation_contractuelle') and not self._peut_ecrire_rsc():
+                raise AccessError(self._MESSAGE_RSC_RESTREINTE)
             if vals.get('name', 'Nouveau') == 'Nouveau':
                 vals['name'] = self.env['ir.sequence'].next_by_code('souscription.sequence') or 'Nouveau'
             # Amorçage du calendrier de comptage tant qu'electricore ne l'alimente
             # pas (#12) : par défaut aligné sur le type de tarif.
             if not vals.get('config_cadrans'):
                 vals['config_cadrans'] = '4_cadrans' if vals.get('type_tarif') == 'hphc' else 'base'
+            # id_Affaire saisi/corrigé (#87) : date de saisie auto-stampée, sauf
+            # si le vals la fixe explicitement (recopie depuis la demande, tests
+            # antidatant la grâce du poll #89).
+            if vals.get('id_affaire') and not vals.get('id_affaire_date_saisie'):
+                vals['id_affaire_date_saisie'] = fields.Date.context_today(self)
         return super().create(vals_list)
+
+    _MESSAGE_RSC_RESTREINTE = (
+        'La RSC (référence situation contractuelle) ne peut être modifiée que par '
+        'un·e gestionnaire Souscriptions, ou par la résolution automatique (#88/#89).'
+    )
+
+    def _peut_ecrire_rsc(self):
+        """Écriture RSC restreinte (#87, ADR 0021 §5) : gestionnaire, ou
+        résolution automatique (poll/bouton, #88/#89) via la clé de contexte
+        `rsc_automatisme` — la RSC vient alors d'electricore, pas d'une saisie
+        manuelle."""
+        return bool(self.env.context.get('rsc_automatisme')) or self.env.user.has_group(
+            'souscriptions_odoo.group_souscriptions_manager'
+        )
+
+    def write(self, vals):
+        if 'ref_situation_contractuelle' in vals and not self._peut_ecrire_rsc():
+            raise AccessError(self._MESSAGE_RSC_RESTREINTE)
+        if vals.get('id_affaire') and 'id_affaire_date_saisie' not in vals:
+            vals = dict(vals, id_affaire_date_saisie=fields.Date.context_today(self))
+        return super().write(vals)
 
     @api.depends('periode_ids.facture_id')
     def _compute_factures_via_periodes(self):

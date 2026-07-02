@@ -18,4 +18,5 @@ from . import (
     test_releve_demo,
     test_security,
     test_souscription,
+    test_souscription_etat,
 )

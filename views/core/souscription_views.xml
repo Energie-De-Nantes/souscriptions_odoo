@@ -20,6 +20,10 @@
                         <field name="partner_id" />
                         <field name="cotitulaires" widget="many2many_tags" options="{'no_create': True}"/>
                         <field name="active" />
+                        <field name="etat" widget="badge"
+                               decoration-warning="etat == 'en_instance'"
+                               decoration-success="etat == 'en_service'"
+                               decoration-danger="etat == 'resiliee'"/>
                         <field name="etat_facturation_id"/>
                         <field name="date_debut"/>
                         <field name="date_fin"/>
@@ -45,13 +49,14 @@
                         <field name="numero_depannage" widget="phone"/>
                     </group>
 
-                    <!-- Identité electricore (ADR 0010/0020) : RSC = clé d'articulation
-                         du pull de méta-périodes, id_affaire = amorce de réconciliation.
-                         Peuplés par le raccordement à terme ; saisissables à la main
-                         d'ici là. -->
+                    <!-- Identité electricore (ADR 0010/0020/0021) : RSC = clé d'articulation
+                         du pull de méta-périodes, acquise par le poll quotidien ou l'action
+                         manuelle (#88/#89) ; id_affaire = amorce de réconciliation, recopié
+                         du raccordement, corrigeable (rattrapage de typo). -->
                     <group string="Identité électricore">
                         <field name="ref_situation_contractuelle"/>
                         <field name="id_affaire"/>
+                        <field name="id_affaire_date_saisie"/>
                     </group>
 
                     <group string="Adhésion (captée au raccordement)">
@@ -123,6 +128,12 @@
             <field name="name"/>
             <field name="partner_id"/>
             <field name="lisse"/>
+            <field name="etat" widget="badge"
+                   decoration-warning="etat == 'en_instance'"
+                   decoration-success="etat == 'en_service'"
+                   decoration-danger="etat == 'resiliee'"/>
+            <field name="id_affaire" optional="hide"/>
+            <field name="ref_situation_contractuelle" optional="hide"/>
             <field name="active"/>
           </list>
         </field>
@@ -156,11 +167,15 @@
         <field name="arch" type="xml">
             <kanban default_group_by="etat_facturation_id">
                 <field name="etat_facturation_id"/>
+                <field name="etat"/>
                 <templates>
                     <t t-name="card">
                         <div class="oe_kanban_global_click">
                             <strong><field name="name"/></strong><br/>
-                            <span><field name="etat_facturation_id"/></span>
+                            <span><field name="etat_facturation_id"/></span><br/>
+                            <span t-attf-class="badge #{record.etat.raw_value == 'en_service' ? 'text-bg-success' : record.etat.raw_value == 'resiliee' ? 'text-bg-danger' : 'text-bg-warning'}">
+                                <field name="etat"/>
+                            </span>
                         </div>
                     </t>
                 </templates>
@@ -168,10 +183,40 @@
         </field>
     </record>
 
+    <!-- Vue recherche : RSC/id_Affaire recherchables, état filtrable/groupable
+         (#87) — dont le filtre « en instance sans id_Affaire », les invisibles
+         du poll quotidien (#89). -->
+    <record id="view_souscription_search" model="ir.ui.view">
+        <field name="name">souscription.search</field>
+        <field name="model">souscription.souscription</field>
+        <field name="arch" type="xml">
+            <search string="Souscriptions">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="pdl"/>
+                <field name="ref_situation_contractuelle" string="RSC"/>
+                <field name="id_affaire" string="N° d'affaire Enedis"/>
+                <filter string="En instance" name="en_instance" domain="[('etat', '=', 'en_instance')]"/>
+                <filter string="En service" name="en_service" domain="[('etat', '=', 'en_service')]"/>
+                <filter string="Résiliée" name="resiliee" domain="[('etat', '=', 'resiliee')]"/>
+                <separator/>
+                <filter string="En instance sans id_Affaire" name="en_instance_sans_id_affaire"
+                        domain="[('etat', '=', 'en_instance'), ('id_affaire', '=', False)]"/>
+                <separator/>
+                <filter string="Archivée" name="inactive" domain="[('active', '=', False)]"/>
+                <group string="Grouper par">
+                    <filter string="État" name="group_etat" context="{'group_by': 'etat'}"/>
+                    <filter string="État de facturation" name="group_etat_facturation" context="{'group_by': 'etat_facturation_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_souscription" model="ir.actions.act_window">
         <field name="name">Souscriptions</field>
         <field name="res_model">souscription.souscription</field>
         <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_souscription_search"/>
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'list', 'view_id': ref('view_souscription_list')}),
             (0, 0, {'view_mode': 'form', 'view_id': ref('view_souscription_form')}),

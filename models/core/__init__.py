@@ -1,5 +1,6 @@
 from . import (
     account_move,
+    electricore_rsc_service,
     grille_prix,
     souscription,
     souscription_consentement,

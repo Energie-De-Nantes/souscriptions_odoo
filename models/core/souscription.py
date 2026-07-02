@@ -184,6 +184,16 @@ class Souscription(models.Model):
         'facturable), *résiliée* (date de fin passée — logique minimale, chantier '
         'dédié ultérieur). Se corrige par le fait (la RSC), jamais par ce champ.',
     )
+    motif_resolution_rsc = fields.Char(
+        string='Motif dernière résolution RSC',
+        help='Motif renvoyé par electricore (contrat RSC) quand la dernière tentative '
+        "de résolution (poll ou manuelle, #88/#89) n'a pas renvoyé de RSC. Effacé dès "
+        'que la RSC est résolue.',
+    )
+    date_derniere_resolution_rsc = fields.Date(
+        string='Date de dernière résolution RSC',
+        help='Date de la dernière tentative de résolution RSC (#88/#89), succès ou échec.',
+    )
 
     @api.depends('ref_situation_contractuelle', 'date_fin')
     def _compute_etat(self):
@@ -234,6 +244,47 @@ class Souscription(models.Model):
         if vals.get('id_affaire') and 'id_affaire_date_saisie' not in vals:
             vals = dict(vals, id_affaire_date_saisie=fields.Date.context_today(self))
         return super().write(vals)
+
+    def action_resoudre_rsc_maintenant(self):
+        """Bouton « résoudre la RSC maintenant » (#88) : résout la RSC des
+        Souscriptions sélectionnées via le service electricore, en un seul
+        appel batch même pour une seule Souscription. Idempotent : une
+        Souscription déjà *en service* n'est jamais re-ciblée — aucun appel
+        si le lot filtré est vide."""
+        cibles = self.filtered(lambda s: s.etat != 'en_service')
+        if not cibles:
+            return
+        sans_affaire = cibles.filtered(lambda s: not s.id_affaire)
+        if sans_affaire:
+            raise UserError(
+                f'Impossible de résoudre la RSC : id_Affaire manquant sur : {", ".join(sans_affaire.mapped("name"))}.'
+            )
+        cibles._resoudre_rsc()
+
+    def _resoudre_rsc(self):
+        """Résout `self` en un seul appel batch via le service electricore
+        (#88) et applique le mapping des motifs du contrat RSC (xor
+        `ref_situation_contractuelle`/`error`) : succès -> RSC écrite
+        (bascule *en service* + trace au chatter, #87) ; motif -> stocké
+        avec la date de tentative, visible sur la Souscription. Ne filtre
+        pas `self` : à l'appelant de ne cibler que ce qui doit l'être
+        (idempotence du bouton, ciblage du poll #89)."""
+        if not self:
+            return
+        resultats = self.env['souscription.rsc.service'].resoudre(self.mapped('id_affaire'))
+        today = fields.Date.context_today(self)
+        for sous in self:
+            resultat = resultats.get(sous.id_affaire)
+            if resultat is None:
+                continue  # ne devrait pas arriver (contrat : une réponse par entrée)
+            if resultat.ref_situation_contractuelle:
+                sous.with_context(rsc_automatisme=True).write(
+                    {'ref_situation_contractuelle': resultat.ref_situation_contractuelle}
+                )
+                sous.write({'motif_resolution_rsc': False, 'date_derniere_resolution_rsc': today})
+                sous.message_post(body=f'RSC résolue par electricore : {resultat.ref_situation_contractuelle}')
+            else:
+                sous.write({'motif_resolution_rsc': resultat.error, 'date_derniere_resolution_rsc': today})
 
     @api.depends('periode_ids.facture_id')
     def _compute_factures_via_periodes(self):

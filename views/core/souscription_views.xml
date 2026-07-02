@@ -13,6 +13,10 @@
                     <button name="%(action_souscription_attestation)d"
                             string="Attestation de fourniture"
                             type="action"/>
+                    <button name="action_resoudre_rsc_maintenant"
+                            string="Résoudre la RSC maintenant"
+                            type="object"
+                            invisible="etat == 'en_service'"/>
                 </header>
                 <sheet>
                     <group>
@@ -57,6 +61,8 @@
                         <field name="ref_situation_contractuelle"/>
                         <field name="id_affaire"/>
                         <field name="id_affaire_date_saisie"/>
+                        <field name="motif_resolution_rsc" invisible="not motif_resolution_rsc"/>
+                        <field name="date_derniere_resolution_rsc" invisible="not date_derniere_resolution_rsc"/>
                     </group>
 
                     <group string="Adhésion (captée au raccordement)">

@@ -198,6 +198,15 @@ class Souscription(models.Model):
         help='Date de la dernière tentative de résolution RSC (#88/#89), succès ou échec.',
     )
 
+    # Une RSC identifie un contrat unique (#15, ADR 0010) : deux souscriptions
+    # successives sur un même PDL portent des RSC différentes, et le pull clé
+    # sur RSC ne peut pas être ambigu. Les NULL (en instance) ne se gênent pas
+    # entre eux (sémantique UNIQUE de Postgres).
+    _rsc_unique = models.Constraint(
+        'UNIQUE(ref_situation_contractuelle)',
+        'Cette RSC est déjà portée par une autre souscription — une RSC identifie un contrat unique.',
+    )
+
     @api.depends('ref_situation_contractuelle', 'date_fin')
     def _compute_etat(self):
         today = fields.Date.context_today(self)

@@ -486,10 +486,10 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
     @classmethod
     def setUpRaccordementData(cls):
         """Setup des données spécifiques aux tests de raccordement"""
-        # Utiliser les vraies étapes du module
-        cls.stage_received = cls.env.ref('souscriptions_odoo.stage_demande_recue')
-        cls.stage_validated = cls.env.ref('souscriptions_odoo.stage_iban_valide')
-        cls.stage_final = cls.env.ref('souscriptions_odoo.stage_souscrit')
+        # Utiliser les vraies étapes du module (#100 : chaîne cible prod).
+        cls.stage_received = cls.env.ref('souscriptions_odoo.stage_nouveau')
+        cls.stage_validated = cls.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
+        cls.stage_final = cls.env.ref('souscriptions_odoo.stage_abonnement_valide')
 
     def create_complete_demande(self, **kwargs):
         """Helper pour créer une demande complète"""
@@ -917,7 +917,7 @@ class TestRaccordementSecurity(SouscriptionsTestMixin, TransactionCase):
         )
 
         # Essayer de passer à l'étape IBAN validé avec un IBAN invalide
-        self.env.ref('souscriptions_odoo.stage_iban_valide')
+        self.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
 
         # L'onchange devrait générer un warning (pas d'exception)
         # On vérifie juste que l'IBAN est invalide

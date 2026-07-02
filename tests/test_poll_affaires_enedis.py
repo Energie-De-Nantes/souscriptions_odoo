@@ -44,24 +44,25 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
         return patch.object(_SERVICE, '_appeler', return_value=return_value, side_effect=side_effect)
 
     def create_demande_avec_souscription(self, id_affaire=None, email='poll-rsc@example.com'):
-        """Demande complète menée jusqu'à « Souscrit » : Souscription créée,
-        liée à sa demande via souscription_id."""
-        demande = self.env['raccordement.demande'].create(
-            {
-                'pdl': 'PDL_POLL_' + email,
-                'date_debut_souhaitee': date.today() + timedelta(days=30),
-                'puissance_souscrite': '6',
-                'type_tarif': 'base',
-                'provision_mensuelle_kwh': 250.0,
-                'contact_nom': 'Test',
-                'contact_email': email,
-                'contact_street': 'Test Street',
-                'contact_zip': '12345',
-                'contact_city': 'Test City',
-                'id_affaire': id_affaire,
-            }
-        )
-        demande.stage_id = self.env.ref('souscriptions_odoo.stage_souscrit')
+        """Demande complète menée jusqu'à « Abonnement Validé » : Souscription
+        créée, liée à sa demande via souscription_id."""
+        vals = {
+            'pdl': 'PDL_POLL_' + email,
+            'date_debut_souhaitee': date.today() + timedelta(days=30),
+            'puissance_souscrite': '6',
+            'type_tarif': 'base',
+            'provision_mensuelle_kwh': 250.0,
+            'contact_nom': 'Test',
+            'contact_email': email,
+            'contact_street': 'Test Street',
+            'contact_zip': '12345',
+            'contact_city': 'Test City',
+            'id_affaire': id_affaire,
+        }
+        if id_affaire:
+            vals['situation_entree'] = 'mes'
+        demande = self.env['raccordement.demande'].create(vals)
+        demande.stage_id = self.env.ref('souscriptions_odoo.stage_abonnement_valide')
         return demande
 
     # --- Ciblage du lot ---

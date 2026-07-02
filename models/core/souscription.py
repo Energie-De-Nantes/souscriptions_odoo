@@ -267,15 +267,16 @@ class Souscription(models.Model):
 
         if rsc_avant is not None:
             nouvellement_resolues = self.filtered(lambda s: s.ref_situation_contractuelle and not rsc_avant.get(s.id))
-            nouvellement_resolues._avancer_demande_en_service()
+            nouvellement_resolues._avancer_demande_valide_sge()
 
         return res
 
-    def _avancer_demande_en_service(self):
-        """Auto-move (#90) : la demande liée avance à « En service »,
-        seulement si elle est encore en amont (jamais de recul), avec trace
-        au chatter de la demande."""
-        stage = self.env.ref('souscriptions_odoo.stage_en_service', raise_if_not_found=False)
+    def _avancer_demande_valide_sge(self):
+        """Auto-move (#90, reciblé #100 ADR 0022 §3 — pas de RSC sans C15
+        d'effectivité, RSC résolue ≡ validé sur SGE) : la demande liée avance
+        à « Validé sur SGE », seulement si elle est encore en amont (jamais
+        de recul), avec trace au chatter de la demande."""
+        stage = self.env.ref('souscriptions_odoo.stage_valide_sge', raise_if_not_found=False)
         if not stage:
             return
         for sous in self:
@@ -284,7 +285,7 @@ class Souscription(models.Model):
                 continue
             demande.with_context(raccordement_automove=True).stage_id = stage.id
             demande.message_post(
-                body=f'Étape avancée automatiquement à « En service » (RSC {sous.ref_situation_contractuelle} acquise).'
+                body=f'Étape avancée automatiquement à « Validé sur SGE » (RSC {sous.ref_situation_contractuelle} acquise).'
             )
 
     def action_resoudre_rsc_maintenant(self):

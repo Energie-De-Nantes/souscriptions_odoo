@@ -11,6 +11,7 @@ Deux tranches :
 Fixtures RSC/PDL : identifiants factices (jamais des vrais échantillons).
 """
 
+import unittest
 from contextlib import contextmanager
 from datetime import date
 from types import SimpleNamespace
@@ -367,3 +368,55 @@ class TestWizardPullMetaPeriodes(SouscriptionsTestCase):
             wizard.action_lancer()
             MockClient.assert_not_called()
         self.assertIn('Sans RSC', wizard.resultat)
+
+
+@unittest.skipIf(
+    not wizard_module.ELECTRICORE_CLIENT_DISPONIBLE,
+    'electricore_client non installé : test exercé uniquement là où le paquet réel est présent (CI Docker).',
+)
+@tagged('souscriptions', 'souscriptions_pull_meta', 'post_install', '-at_install')
+class TestAmorcerDepuisMetaAvecPaquetReel(SouscriptionsTestCase):
+    """`_amorcer_depuis_meta` face aux vrais modèles pydantic `PeriodeMeta`/
+    `ObjetReleve` (contrat v3) — pas seulement les stubs duck-typés ci-dessus.
+    Vérifie que le mapping accepte le type réel que le client renverra en
+    production, sans écart de champ (ADR 0019 : contrat single-source)."""
+
+    def test_mappe_un_vrai_periode_meta_pydantic(self):
+        from electricore_client import ObjetReleve, PeriodeMeta
+
+        meta = PeriodeMeta(
+            ref_situation_contractuelle='RSC-00000000000001',
+            pdl='14000000000001',
+            mois_annee='2024-01',
+            debut='2024-01-01',
+            fin='2024-02-01',
+            nb_jours=31,
+            puissance_moyenne_kva=6.0,
+            energie_base_kwh=280.0,
+            turpe_fixe_eur=8.5,
+            turpe_variable_eur=4.2,
+            cta_eur=1.1,
+            taux_accise_eur_mwh=21.0,
+            has_changement=False,
+            qualite='reelle',
+            statut_communication='communicante',
+            releves_utilises=[
+                ObjetReleve(
+                    releve_id='ELC-RELEVE-100',
+                    date_releve='2024-01-01',
+                    nature_index='reel',
+                    origine_releve='flux_R151',
+                    index_base_kwh=1000,
+                )
+            ],
+            source_hash='hash-abc123',
+        )
+
+        periode = self.env['souscription.periode']._amorcer_depuis_meta(self.souscription_base, meta)
+
+        self.assertEqual(periode.date_debut, date(2024, 1, 1))
+        self.assertEqual(periode.energie_base_kwh, 280.0)
+        self.assertEqual(periode.qualite, 'reelle')
+        self.assertEqual(len(periode.releve_ids), 1)
+        self.assertEqual(periode.releve_ids.releve_externe_id, 'ELC-RELEVE-100')
+        self.assertEqual(periode.releve_ids.index_base, 1000.0)

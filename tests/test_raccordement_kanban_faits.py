@@ -1,7 +1,10 @@
-"""Tests #90 — kanban de raccordement piloté par les faits (ADR 0021 §5) :
-auto-move à la saisie de l'id_Affaire et à l'acquisition de la RSC, drag-in
-manuel interdit sur ces deux étapes factuelles, pas de recul, non-régression
-de la création à « Souscrit »."""
+"""Tests #90/#100 — kanban de raccordement piloté par les faits (ADR 0021 §5,
+ADR 0022 §1/§4) : routage à la création (PRO/particulier), situation d'entrée
+requise à la saisie de l'id_Affaire, auto-move vers la branche ⏳ désignée,
+re-routage latéral d'une branche à l'autre à la correction de la situation
+d'entrée, reciblage de l'auto-move RSC vers « Validé sur SGE », drag-in manuel
+interdit sur les étapes factuelles, pas de recul, non-régression de la
+création à « Abonnement Validé »."""
 
 from datetime import date, timedelta
 
@@ -17,11 +20,14 @@ class TestKanbanPiloteParLesFaits(SouscriptionsTestMixin, TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.setUpSouscriptionsData()
-        cls.stage_recue = cls.env.ref('souscriptions_odoo.stage_demande_recue')
-        cls.stage_iban = cls.env.ref('souscriptions_odoo.stage_iban_valide')
-        cls.stage_demande_sge = cls.env.ref('souscriptions_odoo.stage_demande_sge')
-        cls.stage_souscrit = cls.env.ref('souscriptions_odoo.stage_souscrit')
-        cls.stage_en_service = cls.env.ref('souscriptions_odoo.stage_en_service')
+        cls.stage_nouveau = cls.env.ref('souscriptions_odoo.stage_nouveau')
+        cls.stage_pro_a_valider = cls.env.ref('souscriptions_odoo.stage_pro_a_valider')
+        cls.stage_accepte_iban_verifie = cls.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
+        cls.stage_f120_mes = cls.env.ref('souscriptions_odoo.stage_f120_mes')
+        cls.stage_f130_cfne = cls.env.ref('souscriptions_odoo.stage_f130_cfne')
+        cls.stage_valide_sge = cls.env.ref('souscriptions_odoo.stage_valide_sge')
+        cls.stage_calcul_mensualites = cls.env.ref('souscriptions_odoo.stage_calcul_mensualites')
+        cls.stage_abonnement_valide = cls.env.ref('souscriptions_odoo.stage_abonnement_valide')
 
     def create_demande(self, email, **kwargs):
         defaults = {
@@ -39,107 +45,195 @@ class TestKanbanPiloteParLesFaits(SouscriptionsTestMixin, TransactionCase):
         defaults.update(kwargs)
         return self.env['raccordement.demande'].create(defaults)
 
-    # --- Stage « En service » : nouvelle étape ---
+    # --- Routage à la création (#100, ADR 0022 §1) ---
 
-    def test_stage_en_service_finale_repliee_sans_role_de_creation(self):
-        self.assertGreater(self.stage_en_service.sequence, self.stage_souscrit.sequence)
-        self.assertTrue(self.stage_en_service.fold)
-        self.assertFalse(self.stage_en_service.is_close)
-        self.assertTrue(self.stage_en_service.entree_factuelle)
-        self.assertTrue(self.stage_demande_sge.entree_factuelle)
+    def test_routage_creation_particulier_vers_nouveau(self):
+        demande = self.create_demande('routage1@example.com')
+        self.assertEqual(demande.stage_id, self.stage_nouveau)
 
-    # --- Auto-move : id_Affaire -> Demande SGE faite ---
+    def test_routage_creation_pro_vers_pro_a_valider(self):
+        demande = self.create_demande('routage2@example.com', pro=True, siret='12345678901234')
+        self.assertEqual(demande.stage_id, self.stage_pro_a_valider)
 
-    def test_auto_move_a_la_saisie_id_affaire(self):
+    # --- Nature des étapes ---
+
+    def test_branches_sge_et_valide_sge_sont_factuelles(self):
+        self.assertTrue(self.stage_f120_mes.entree_factuelle)
+        self.assertTrue(self.stage_f130_cfne.entree_factuelle)
+        self.assertTrue(self.stage_valide_sge.entree_factuelle)
+
+    def test_stage_abonnement_valide_finale_repliee(self):
+        """La naissance (is_close) a migré vers « Accepté et IBAN vérifié »
+        (#101) : « Abonnement Validé » reste la terminale repliée, mais ne
+        crée plus rien."""
+        self.assertGreater(self.stage_abonnement_valide.sequence, self.stage_valide_sge.sequence)
+        self.assertTrue(self.stage_abonnement_valide.fold)
+        self.assertFalse(self.stage_abonnement_valide.is_close)
+        self.assertFalse(self.stage_abonnement_valide.entree_factuelle)
+
+    def test_stage_accepte_iban_verifie_porte_la_naissance(self):
+        self.assertTrue(self.stage_accepte_iban_verifie.is_close)
+
+    # --- Situation d'entrée requise à la saisie de l'id_Affaire ---
+
+    def test_id_affaire_sans_situation_entree_refuse_a_la_creation(self):
+        with self.assertRaises(UserError) as cm:
+            self.create_demande('faits_refus1@example.com', id_affaire='38233180')
+        self.assertIn("situation d'entrée", str(cm.exception).lower())
+
+    def test_id_affaire_sans_situation_entree_refuse_en_ecriture(self):
+        demande = self.create_demande('faits_refus2@example.com')
+        with self.assertRaises(UserError) as cm:
+            demande.id_affaire = '38233180'
+        self.assertIn("situation d'entrée", str(cm.exception).lower())
+
+    # --- Auto-move : id_Affaire + situation_entree -> branche ⏳ ---
+
+    def test_auto_move_vers_f120_mes(self):
         demande = self.create_demande('faits1@example.com')
-        self.assertEqual(demande.stage_id, self.stage_recue)
+        self.assertEqual(demande.stage_id, self.stage_nouveau)
 
-        demande.id_affaire = '38233180'
+        demande.write({'situation_entree': 'mes', 'id_affaire': '38233180'})
 
-        self.assertEqual(demande.stage_id, self.stage_demande_sge)
+        self.assertEqual(demande.stage_id, self.stage_f120_mes)
+
+    def test_auto_move_vers_f130_cfne(self):
+        demande = self.create_demande('faits1b@example.com')
+
+        demande.write({'situation_entree': 'cfne', 'id_affaire': '38233181'})
+
+        self.assertEqual(demande.stage_id, self.stage_f130_cfne)
 
     def test_auto_move_id_affaire_ne_recule_pas(self):
-        """Une demande déjà en aval (Souscrit) ne recule jamais vers
-        « Demande SGE faite » quand l'id_Affaire est (re)saisi."""
+        """Une demande déjà en aval (Abonnement Validé) ne recule jamais vers
+        une branche ⏳ quand l'id_Affaire est (re)saisi."""
         demande = self.create_demande(
             'faits2@example.com',
             mode_paiement='virement',
         )
-        demande.stage_id = self.stage_souscrit
-        self.assertEqual(demande.stage_id, self.stage_souscrit)
+        demande.stage_id = self.stage_abonnement_valide
+        self.assertEqual(demande.stage_id, self.stage_abonnement_valide)
 
-        demande.id_affaire = '38233181'
+        demande.write({'situation_entree': 'mes', 'id_affaire': '38233182'})
 
-        self.assertEqual(demande.stage_id, self.stage_souscrit)
+        self.assertEqual(demande.stage_id, self.stage_abonnement_valide)
 
     # --- Drag-in manuel interdit ---
 
-    def test_drag_in_manuel_refuse_vers_demande_sge(self):
+    def test_drag_in_manuel_refuse_vers_f120_mes(self):
         demande = self.create_demande('faits3@example.com')
         with self.assertRaises(UserError) as cm:
-            demande.stage_id = self.stage_demande_sge
+            demande.stage_id = self.stage_f120_mes
         self.assertIn('pilotée par un fait', str(cm.exception))
-        self.assertEqual(demande.stage_id, self.stage_recue)
+        self.assertEqual(demande.stage_id, self.stage_nouveau)
 
-    def test_drag_in_manuel_refuse_vers_en_service(self):
+    def test_drag_in_manuel_refuse_vers_valide_sge(self):
         demande = self.create_demande('faits4@example.com', mode_paiement='virement')
-        demande.stage_id = self.stage_souscrit
+        demande.stage_id = self.stage_calcul_mensualites
         with self.assertRaises(UserError) as cm:
-            demande.stage_id = self.stage_en_service
+            demande.stage_id = self.stage_valide_sge
         self.assertIn('pilotée par un fait', str(cm.exception))
-        self.assertEqual(demande.stage_id, self.stage_souscrit)
+        self.assertEqual(demande.stage_id, self.stage_calcul_mensualites)
 
     def test_drag_in_manuel_autorise_vers_etape_non_factuelle(self):
-        """Les étapes non pilotées par un fait restent librement draggables."""
+        """Les étapes non pilotées par un fait restent librement draggables
+        (hors « Accepté et IBAN vérifié », qui porte sa propre garde IBAN
+        depuis #101 — testée séparément plus bas)."""
         demande = self.create_demande('faits5@example.com')
-        demande.stage_id = self.stage_iban
-        self.assertEqual(demande.stage_id, self.stage_iban)
+        demande.stage_id = self.stage_calcul_mensualites
+        self.assertEqual(demande.stage_id, self.stage_calcul_mensualites)
 
     def test_contournement_de_contexte_reserve_aux_automatismes(self):
         demande = self.create_demande('faits6@example.com')
-        demande.with_context(raccordement_automove=True).stage_id = self.stage_demande_sge
-        self.assertEqual(demande.stage_id, self.stage_demande_sge)
+        demande.with_context(raccordement_automove=True).stage_id = self.stage_f120_mes
+        self.assertEqual(demande.stage_id, self.stage_f120_mes)
 
-    # --- Auto-move : RSC acquise -> En service ---
+    # --- Re-routage latéral F120 <-> F130 (correction de situation_entree) ---
 
-    def test_auto_move_en_service_a_la_rsc_manuelle(self):
-        demande = self.create_demande('faits7@example.com', mode_paiement='virement', id_affaire='38233182')
-        demande.stage_id = self.stage_souscrit
+    def test_correction_situation_entree_reroute_de_f120_vers_f130(self):
+        demande = self.create_demande('faits_reroute1@example.com', situation_entree='mes', id_affaire='38233190')
+        self.assertEqual(demande.stage_id, self.stage_f120_mes)
+
+        demande.situation_entree = 'cfne'
+
+        self.assertEqual(demande.stage_id, self.stage_f130_cfne)
+
+    def test_correction_situation_entree_reroute_de_f130_vers_f120(self):
+        demande = self.create_demande('faits_reroute2@example.com', situation_entree='cfne', id_affaire='38233191')
+        self.assertEqual(demande.stage_id, self.stage_f130_cfne)
+
+        demande.situation_entree = 'mes'
+
+        self.assertEqual(demande.stage_id, self.stage_f120_mes)
+
+    def test_correction_situation_entree_ne_fait_jamais_reculer_une_carte_en_aval(self):
+        demande = self.create_demande(
+            'faits_reroute3@example.com', mode_paiement='virement', situation_entree='mes', id_affaire='38233192'
+        )
+        self.assertEqual(demande.stage_id, self.stage_f120_mes)
+        # Simule l'avancement à « Validé sur SGE » (poll RSC déjà couvert
+        # plus bas) : contournement de contexte réservé aux automatismes,
+        # étape factuelle.
+        demande.with_context(raccordement_automove=True).stage_id = self.stage_valide_sge
+
+        demande.situation_entree = 'cfne'
+
+        self.assertEqual(demande.stage_id, self.stage_valide_sge)
+
+    # --- Auto-move : RSC acquise -> Validé sur SGE (reciblage #100) ---
+
+    # Ces trois tests exercent l'automove RSC -> Validé sur SGE isolément :
+    # les entrées Odoo sont créées directement (`_create_odoo_entries`, déjà
+    # couvert par les tests de création plus haut) pour lier la Souscription
+    # à sa demande sans déplacer la carte — la demande reste en amont de
+    # « Validé sur SGE » (état intérimaire #100 : la naissance normale
+    # n'intervient qu'à la toute dernière étape, cf. #101).
+
+    def test_auto_move_valide_sge_a_la_rsc_manuelle(self):
+        demande = self.create_demande(
+            'faits7@example.com', mode_paiement='virement', situation_entree='mes', id_affaire='38233182'
+        )
+        self.assertEqual(demande.stage_id, self.stage_f120_mes)
+        demande._create_odoo_entries()
         souscription = demande.souscription_id
         self.assertTrue(souscription)
         self.assertEqual(souscription.id_affaire, '38233182')
 
         souscription.write({'ref_situation_contractuelle': 'RSC-9001'})  # gestionnaire (superuser en test)
 
-        self.assertEqual(demande.stage_id, self.stage_en_service)
+        self.assertEqual(demande.stage_id, self.stage_valide_sge)
         messages = demande.message_ids.mapped('body')
-        self.assertTrue(any('En service' in body for body in messages))
+        self.assertTrue(any('Validé sur SGE' in body for body in messages))
 
-    def test_auto_move_en_service_a_la_rsc_du_poll(self):
+    def test_auto_move_valide_sge_a_la_rsc_du_poll(self):
         """L'automatisme s'accroche au fait, pas au canal : une RSC écrite
         via le contournement `rsc_automatisme` (poll #89) avance la carte
         exactement comme une écriture manuelle."""
-        demande = self.create_demande('faits8@example.com', mode_paiement='virement', id_affaire='38233183')
-        demande.stage_id = self.stage_souscrit
+        demande = self.create_demande(
+            'faits8@example.com', mode_paiement='virement', situation_entree='mes', id_affaire='38233183'
+        )
+        demande._create_odoo_entries()
         souscription = demande.souscription_id
 
         souscription.with_context(rsc_automatisme=True).write({'ref_situation_contractuelle': 'RSC-9002'})
 
-        self.assertEqual(demande.stage_id, self.stage_en_service)
+        self.assertEqual(demande.stage_id, self.stage_valide_sge)
 
-    def test_auto_move_en_service_ne_recule_jamais(self):
+    def test_auto_move_valide_sge_ne_recule_jamais(self):
         """Une nouvelle résolution RSC (re-résolution) sur une demande déjà
-        « En service » ne provoque ni erreur ni recul."""
-        demande = self.create_demande('faits9@example.com', mode_paiement='virement', id_affaire='38233184')
-        demande.stage_id = self.stage_souscrit
+        « Validé sur SGE » ne provoque ni erreur ni recul."""
+        demande = self.create_demande(
+            'faits9@example.com', mode_paiement='virement', situation_entree='mes', id_affaire='38233184'
+        )
+        demande._create_odoo_entries()
         souscription = demande.souscription_id
         souscription.write({'ref_situation_contractuelle': 'RSC-9003'})
-        self.assertEqual(demande.stage_id, self.stage_en_service)
+        self.assertEqual(demande.stage_id, self.stage_valide_sge)
 
         # Ré-écriture (même valeur) : no-op côté auto-move (pas de nouvelle
-        # trace, la demande reste en service).
+        # trace, la demande reste à Validé sur SGE).
         souscription.write({'ref_situation_contractuelle': 'RSC-9003'})
-        self.assertEqual(demande.stage_id, self.stage_en_service)
+        self.assertEqual(demande.stage_id, self.stage_valide_sge)
 
     def test_souscription_sans_demande_liee_ne_leve_pas_derreur(self):
         """Une Souscription sans demande (saisie manuelle) : la RSC s'écrit
@@ -156,10 +250,80 @@ class TestKanbanPiloteParLesFaits(SouscriptionsTestMixin, TransactionCase):
         souscription.write({'ref_situation_contractuelle': 'RSC-MANUEL'})
         self.assertEqual(souscription.etat, 'en_service')
 
-    # --- Non-régression : « Souscrit » garde son rôle de création ---
+    # --- Naissance à l'acceptation (#101, ADR 0022 §2) : la création migre
+    # de « Abonnement Validé » vers « Accepté et IBAN vérifié ». ---
 
-    def test_souscrit_garde_son_role_de_creation(self):
+    def test_naissance_a_laccepte_iban_verifie(self):
         demande = self.create_demande('faits10@example.com', mode_paiement='virement')
-        demande.stage_id = self.stage_souscrit
+        demande.stage_id = self.stage_accepte_iban_verifie
         self.assertTrue(demande.souscription_id)
         self.assertTrue(demande.partner_id)
+
+    def test_abonnement_valide_ne_cree_plus_rien(self):
+        """« Abonnement Validé » ne porte plus le rôle de création (#101) :
+        un drag direct vers cette étape sans être passé par l'acceptation ne
+        crée aucune entrée Odoo."""
+        demande = self.create_demande('faits10b@example.com', mode_paiement='virement')
+        demande.stage_id = self.stage_abonnement_valide
+        self.assertFalse(demande.souscription_id)
+        self.assertFalse(demande.partner_id)
+
+    # --- Garde bloquante IBAN à l'acceptation (#101) ---
+
+    def test_acceptation_refusee_si_prelevement_et_iban_invalide(self):
+        demande = self.create_demande(
+            'faits_iban1@example.com', mode_paiement='prelevement', bank_iban='FR1420041010050500013M02607'
+        )
+        self.assertFalse(demande.iban_valide)
+        with self.assertRaises(UserError) as cm:
+            demande.stage_id = self.stage_accepte_iban_verifie
+        self.assertIn('IBAN', str(cm.exception))
+        self.assertFalse(demande.souscription_id)
+
+    def test_acceptation_autorisee_si_prelevement_et_iban_valide(self):
+        demande = self.create_demande(
+            'faits_iban2@example.com', mode_paiement='prelevement', bank_iban='FR1420041010050500013M02606'
+        )
+        demande.stage_id = self.stage_accepte_iban_verifie
+        self.assertTrue(demande.souscription_id)
+
+    def test_acceptation_autorisee_hors_prelevement_meme_sans_iban(self):
+        demande = self.create_demande('faits_iban3@example.com', mode_paiement='virement', bank_iban='')
+        demande.stage_id = self.stage_accepte_iban_verifie
+        self.assertTrue(demande.souscription_id)
+
+    # --- coeff_pro recopié à la naissance (#101, ADR 0022 §7) ---
+
+    def test_coeff_pro_recopie_sur_la_souscription_nee(self):
+        demande = self.create_demande(
+            'faits_coeffpro@example.com', mode_paiement='virement', pro=True, siret='12345678901234', coeff_pro=12.5
+        )
+        demande.stage_id = self.stage_accepte_iban_verifie
+        self.assertEqual(demande.souscription_id.coeff_pro, 12.5)
+
+    # --- Write-through id_Affaire post-naissance (#101, ADR 0022 §2) ---
+
+    def test_id_affaire_saisi_apres_naissance_se_propage_a_la_souscription(self):
+        demande = self.create_demande('faits_wt1@example.com', mode_paiement='virement')
+        demande.stage_id = self.stage_accepte_iban_verifie
+        souscription = demande.souscription_id
+        self.assertFalse(souscription.id_affaire)
+
+        demande.write({'situation_entree': 'mes', 'id_affaire': 'AFF-WT-001'})
+
+        self.assertEqual(souscription.id_affaire, 'AFF-WT-001')
+        self.assertEqual(souscription.id_affaire_date_saisie, demande.id_affaire_date_saisie)
+
+    def test_id_affaire_corrige_apres_naissance_se_propage_avec_sa_date(self):
+        demande = self.create_demande(
+            'faits_wt2@example.com', mode_paiement='virement', situation_entree='mes', id_affaire='AFF-WT-002'
+        )
+        demande.stage_id = self.stage_accepte_iban_verifie
+        souscription = demande.souscription_id
+        self.assertEqual(souscription.id_affaire, 'AFF-WT-002')
+
+        hier = date.today() - timedelta(days=1)
+        demande.write({'id_affaire': 'AFF-WT-002-CORRIGE', 'id_affaire_date_saisie': hier})
+
+        self.assertEqual(souscription.id_affaire, 'AFF-WT-002-CORRIGE')
+        self.assertEqual(souscription.id_affaire_date_saisie, hier)

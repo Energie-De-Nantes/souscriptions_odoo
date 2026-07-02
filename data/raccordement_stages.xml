@@ -1,62 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data noupdate="0">
-        <!-- Étapes de raccordement -->
-        <record id="stage_demande_recue" model="raccordement.stage">
-            <field name="name">Demande reçue</field>
+        <!-- Chaîne de raccordement alignée sur la prod, sans F305 (#100, ADR
+             0022 §1). Trichotomie visuelle portée par le préfixe de nom et la
+             couleur d'étape (re-purposée, #100 ADR 0022 §5) :
+             🔴 action attendue (orange, 2) — ⏳ attente externe, le poll
+             travaille (neutre, 0) — ✓ fait (vert, 10, colonne repliée).
+             Pas de migration : le module n'existe pas en prod. -->
+
+        <record id="stage_nouveau" model="raccordement.stage">
+            <field name="name">🔴 Nouveau</field>
             <field name="sequence">10</field>
-            <field name="color">1</field>
+            <field name="color">2</field>
             <field name="description">Nouvelle demande de raccordement à traiter</field>
         </record>
 
-        <record id="stage_iban_valide" model="raccordement.stage">
-            <field name="name">IBAN validé</field>
+        <record id="stage_pro_a_valider" model="raccordement.stage">
+            <field name="name">🔴 PRO à valider</field>
             <field name="sequence">20</field>
             <field name="color">2</field>
-            <field name="description">Coordonnées bancaires vérifiées et validées</field>
+            <field name="description">Demande professionnelle en attente de validation du Collège (PRO + majoration tarifaire négociée)</field>
         </record>
 
-        <record id="stage_demande_sge" model="raccordement.stage">
-            <field name="name">Demande SGE faite</field>
+        <!-- Naissance de la Souscription (#101, ADR 0022 §2) : is_close pose
+             ici le déclencheur de création (contact, banque, Souscription en
+             instance) — déplacé depuis « Abonnement Validé » (état
+             intérimaire #100). Garde bloquante IBAN au drag (#101). -->
+        <record id="stage_accepte_iban_verifie" model="raccordement.stage">
+            <field name="name">🔴 Accepté et IBAN vérifié</field>
             <field name="sequence">30</field>
-            <field name="color">3</field>
-            <field name="description">Demande transmise au Système de Gestion des Échanges</field>
-            <field name="entree_factuelle">True</field>
-        </record>
-
-        <record id="stage_demande_mesures" model="raccordement.stage">
-            <field name="name">Demande mesures faite</field>
-            <field name="sequence">40</field>
-            <field name="color">4</field>
-            <field name="description">Demande des données de consommation historiques</field>
-        </record>
-
-        <record id="stage_estimation" model="raccordement.stage">
-            <field name="name">Estimation mensualité</field>
-            <field name="sequence">50</field>
-            <field name="color">5</field>
-            <field name="description">Calcul des provisions mensuelles basé sur l'historique</field>
-        </record>
-
-        <record id="stage_souscrit" model="raccordement.stage">
-            <field name="name">Souscrit</field>
-            <field name="sequence">60</field>
-            <field name="color">10</field>
-            <field name="fold">True</field>
+            <field name="color">2</field>
             <field name="is_close">True</field>
-            <field name="description">Raccordement finalisé - Souscription créée</field>
+            <field name="description">Demande acceptée (collège pour les PRO) — IBAN vérifié si prélèvement — Souscription née en instance</field>
         </record>
 
-        <!-- Étape finale (#90, ADR 0021 §5-6) : atteinte seule quand la RSC de
-             la Souscription est acquise (poll ou saisie manuelle) — jamais de
-             rôle de création, celui-ci reste sur « Souscrit ». -->
-        <record id="stage_en_service" model="raccordement.stage">
-            <field name="name">En service</field>
+        <!-- Branches ⏳ : entrée factuelle (id_Affaire saisi), drag-in manuel
+             refusé (#100, ADR 0022 §1/§4). Routées par situation_entree. -->
+        <record id="stage_f120_mes" model="raccordement.stage">
+            <field name="name">⏳ Mise en Service (F120) en cours</field>
+            <field name="sequence">40</field>
+            <field name="color">0</field>
+            <field name="entree_factuelle">True</field>
+            <field name="description">Suivi de l'affaire Enedis F120 (mise en service, PDL hors service)</field>
+        </record>
+
+        <record id="stage_f130_cfne" model="raccordement.stage">
+            <field name="name">⏳ Changement de fournisseur (F130) en cours</field>
+            <field name="sequence">41</field>
+            <field name="color">0</field>
+            <field name="entree_factuelle">True</field>
+            <field name="description">Suivi de l'affaire Enedis F130 (changement de fournisseur, PDL déjà alimenté)</field>
+        </record>
+
+        <!-- Entrée factuelle : RSC résolue (#100, ADR 0022 §3 — pas de RSC
+             sans C15 d'effectivité, RSC résolue ≡ validé sur SGE). -->
+        <record id="stage_valide_sge" model="raccordement.stage">
+            <field name="name">🔴 Validé sur SGE</field>
+            <field name="sequence">50</field>
+            <field name="color">2</field>
+            <field name="entree_factuelle">True</field>
+            <field name="description">Affaire aboutie côté Enedis — RSC acquise (poll quotidien ou saisie manuelle)</field>
+        </record>
+
+        <record id="stage_calcul_mensualites" model="raccordement.stage">
+            <field name="name">🔴 Calcul de mensualités en cours</field>
+            <field name="sequence">60</field>
+            <field name="color">2</field>
+            <field name="description">Calcul des provisions mensuelles avant validation de l'abonnement</field>
+        </record>
+
+        <!-- Terminale, repliée (#100). is_close (naissance) est désormais
+             sur « Accepté et IBAN vérifié » (#101) : cette étape ne fait
+             plus que refléter l'aboutissement, elle ne crée plus rien. -->
+        <record id="stage_abonnement_valide" model="raccordement.stage">
+            <field name="name">✓ Abonnement Validé</field>
             <field name="sequence">70</field>
             <field name="color">10</field>
             <field name="fold">True</field>
-            <field name="entree_factuelle">True</field>
-            <field name="description">Raccordement effectif côté Enedis — RSC acquise (poll ou saisie manuelle)</field>
+            <field name="description">Raccordement finalisé — mise en service effective, mensualités calculées</field>
         </record>
     </data>
 </odoo>

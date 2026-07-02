@@ -24,7 +24,7 @@ class TestCaptureConsentement(SouscriptionsTestMixin, TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.setUpSouscriptionsData()
-        cls.stage_final = cls.env.ref('souscriptions_odoo.stage_souscrit')
+        cls.stage_final = cls.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
 
     def _demande(self, **kwargs):
         defaults = {
@@ -313,7 +313,7 @@ class TestJournalConsentement(SouscriptionsTestMixin, TransactionCase):
                 'consent_conso_quotidienne': False,
             }
         )
-        demande.stage_id = self.env.ref('souscriptions_odoo.stage_souscrit')
+        demande.stage_id = self.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
 
         souscription = demande.souscription_id
         self.assertEqual(souscription.etat_consentement('courbe_charge'), 'donne')

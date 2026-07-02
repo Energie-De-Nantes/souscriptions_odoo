@@ -41,6 +41,16 @@ class RaccordementDemande(models.Model):
         help="Cocher si c'est une demande professionnelle (création d'une société)",
     )
     siret = fields.Char(string='N° SIRET', tracking=True, help="Numéro SIRET de l'entreprise (14 chiffres)")
+    # Majoration négociée par le Collège pendant « PRO à valider » (#101,
+    # ADR 0022 §7) ; recopiée sur la Souscription à la naissance.
+    coeff_pro = fields.Float(
+        string='Majoration PRO (%)',
+        default=0.0,
+        digits=(5, 2),
+        tracking=True,
+        help='Majoration en % négociée par le Collège pour cette demande PRO — recopiée sur la '
+        'Souscription à sa naissance (0% pour les particuliers).',
+    )
     pdl = fields.Char(string='PDL', required=True, tracking=True)
     date_debut_souhaitee = fields.Date(string='Date de début souhaitée', required=True, tracking=True)
     puissance_souscrite = fields.Selection(
@@ -178,6 +188,20 @@ class RaccordementDemande(models.Model):
         'du poll quotidien des affaires Enedis (#89).',
     )
 
+    # Situation d'entrée (#100, ADR 0021 §4 / ADR 0022 §1 & §4) : voie SGE par
+    # laquelle la demande entre dans le périmètre. Requise à la saisie de
+    # l'id_Affaire (elle route l'auto-move vers la bonne branche ⏳) ;
+    # éditable par l'accueilliste — sa correction re-route une carte déjà en
+    # branche vers l'autre branche, jamais de recul.
+    situation_entree = fields.Selection(
+        [('mes', 'Mise en service (F120)'), ('cfne', 'Changement de fournisseur (F130)')],
+        string="Situation d'entrée",
+        tracking=True,
+        help="Voie SGE d'entrée dans le périmètre : mise en service (F120, PDL hors service) "
+        'ou changement de fournisseur (CFNE F130, PDL déjà alimenté). Requise à la saisie de '
+        "l'id_Affaire ; sa correction re-route la carte déjà en branche vers l'autre branche.",
+    )
+
     # Champs liés après création
     partner_id = fields.Many2one('res.partner', string='Contact créé', readonly=True, tracking=True)
     partner_bank_id = fields.Many2one('res.partner.bank', string='Compte bancaire créé', readonly=True, tracking=True)
@@ -188,27 +212,40 @@ class RaccordementDemande(models.Model):
     # Notes
     notes = fields.Text(string='Notes')
 
+    _MESSAGE_SITUATION_ENTREE_REQUISE = (
+        "La situation d'entrée (mise en service F120 ou changement de fournisseur F130) est "
+        "requise pour saisir l'id_Affaire."
+    )
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
             if vals.get('name', 'Nouveau') == 'Nouveau':
                 vals['name'] = self.env['ir.sequence'].next_by_code('raccordement.demande.sequence') or 'Nouveau'
+            if vals.get('id_affaire') and not vals.get('situation_entree'):
+                raise UserError(self._MESSAGE_SITUATION_ENTREE_REQUISE)
             if vals.get('id_affaire') and not vals.get('id_affaire_date_saisie'):
                 vals['id_affaire_date_saisie'] = fields.Date.context_today(self)
         records = super().create(vals_list)
-        # Définir l'étape initiale si non définie
+        # Définir l'étape initiale si non définie : routage à la création
+        # (#100, ADR 0022 §1) — PRO coché -> « PRO à valider », sinon
+        # « Nouveau ».
         for record in records:
             if not record.stage_id:
-                record.stage_id = self._get_default_stage_id()
+                record.stage_id = record._get_default_stage_id()
         # id_Affaire déjà renseigné à la création (rare, mais cohérent avec
-        # l'auto-move de write(), #90) : avance la carte si elle est en amont.
-        records.filtered('id_affaire')._avancer_stage_demande_sge()
+        # l'auto-move de write(), #90/#100) : avance la carte si elle est en amont.
+        records.filtered('id_affaire')._router_situation_entree()
         return records
 
-    @api.model
     def _get_default_stage_id(self):
-        """Retourne la première étape par défaut"""
-        return self.env['raccordement.stage'].search([], order='sequence', limit=1)
+        """Étape de routage à la création (#100, ADR 0022 §1) : une demande
+        PRO naît en « PRO à valider » (décision du Collège) ; une demande
+        particulière naît en « Nouveau »."""
+        self.ensure_one()
+        xmlid = 'souscriptions_odoo.stage_pro_a_valider' if self.pro else 'souscriptions_odoo.stage_nouveau'
+        stage = self.env.ref(xmlid, raise_if_not_found=False)
+        return stage or self.env['raccordement.stage'].search([], order='sequence', limit=1)
 
     @api.model
     def _read_group_stage_ids(self, stages, domain):
@@ -283,17 +320,11 @@ class RaccordementDemande(models.Model):
     def _onchange_stage_id(self):
         """Actions lors du changement d'étape"""
         if self.stage_id:
-            # Si on passe à l'étape "IBAN validé"
-            if 'iban' in self.stage_id.name.lower() and 'valid' in self.stage_id.name.lower():
-                if not self.iban_valide:
-                    return {
-                        'warning': {
-                            'title': 'IBAN non valide',
-                            'message': "L'IBAN n'est pas valide. Veuillez le vérifier avant de passer à cette étape.",
-                        }
-                    }
-
-            # Si on passe à l'étape finale "Souscrit"
+            # Étape finale (naissance de la Souscription, is_close) : vérifie
+            # que les informations nécessaires sont présentes. L'ancienne
+            # heuristique par nom (« IBAN validé ») a disparu avec l'étape :
+            # la garde IBAN devient un blocage dur au drag d'acceptation
+            # (#101), plus un avertissement non bloquant ici.
             if self.stage_id.is_close:
                 # Vérifier que toutes les infos nécessaires sont présentes
                 missing = []
@@ -319,12 +350,26 @@ class RaccordementDemande(models.Model):
         # (contournement de contexte `raccordement_automove`).
         if 'stage_id' in vals and not self.env.context.get('raccordement_automove'):
             self._verifier_pas_de_drag_in_factuel(vals['stage_id'])
+        if 'stage_id' in vals:
+            self._verifier_garde_iban_acceptation(vals['stage_id'])
+
+        # id_Affaire saisi/corrigé : la situation d'entrée est requise (#100,
+        # ADR 0022 §4) — elle route l'auto-move vers la bonne branche ⏳.
+        if vals.get('id_affaire'):
+            for record in self:
+                if not vals.get('situation_entree', record.situation_entree):
+                    raise UserError(self._MESSAGE_SITUATION_ENTREE_REQUISE)
 
         # id_Affaire saisi/corrigé (#87) : date de saisie auto-stampée, sauf
         # si le vals la fixe explicitement (rattrapage de typo, tests
         # antidatant la grâce du poll #89).
         if vals.get('id_affaire') and 'id_affaire_date_saisie' not in vals:
             vals = dict(vals, id_affaire_date_saisie=fields.Date.context_today(self))
+
+        # Stage avant écriture (#103) : seule une transition *effective* vers
+        # « Abonnement Validé » envoie le pack de bienvenue — une
+        # ré-écriture sans changement n'en envoie pas un second.
+        stage_avant = {r.id: r.stage_id.id for r in self} if 'stage_id' in vals else None
 
         res = super().write(vals)
 
@@ -335,10 +380,37 @@ class RaccordementDemande(models.Model):
                 if record.stage_id.is_close and not record.souscription_id:
                     record._create_odoo_entries()
 
-        # id_Affaire saisi/corrigé (#90) : la carte avance seule à « Demande
-        # SGE faite » si elle est en amont — jamais en aval (pas de recul).
+            stage_abonnement_valide = self.env.ref(
+                'souscriptions_odoo.stage_abonnement_valide', raise_if_not_found=False
+            )
+            if stage_abonnement_valide:
+                for record in self:
+                    if (
+                        record.stage_id == stage_abonnement_valide
+                        and stage_avant.get(record.id) != stage_abonnement_valide.id
+                    ):
+                        record._envoyer_pack_bienvenue()
+
+        # id_Affaire saisi ou situation_entree corrigée (#90/#100) : la carte
+        # avance seule vers la branche ⏳ désignée, ou re-route latéralement
+        # une carte déjà en branche — jamais en aval (pas de recul).
+        if 'id_affaire' in vals or 'situation_entree' in vals:
+            self._router_situation_entree()
+
+        # Write-through post-naissance (#101, ADR 0022 §2) : une fois la
+        # Souscription née, la saisie ou correction de l'id_Affaire sur la
+        # demande se propage à la Souscription liée, avec sa date de saisie
+        # (elle amorce la grâce du poll #89). La RSC et l'état restent portés
+        # par la Souscription — la carte ne fait que refléter.
         if 'id_affaire' in vals:
-            self._avancer_stage_demande_sge()
+            for record in self:
+                if record.souscription_id and record.id_affaire:
+                    record.souscription_id.write(
+                        {
+                            'id_affaire': record.id_affaire,
+                            'id_affaire_date_saisie': record.id_affaire_date_saisie,
+                        }
+                    )
 
         return res
 
@@ -358,15 +430,115 @@ class RaccordementDemande(models.Model):
                 'main. Corrigez le fait (id_Affaire saisi, RSC acquise) — la carte suivra automatiquement.'
             )
 
-    def _avancer_stage_demande_sge(self):
-        """Auto-move (#90) : id_Affaire renseigné -> « Demande SGE faite »,
-        seulement si la demande est encore en amont (jamais de recul)."""
-        stage = self.env.ref('souscriptions_odoo.stage_demande_sge', raise_if_not_found=False)
-        if not stage:
+    def _verifier_garde_iban_acceptation(self, nouveau_stage_id):
+        """Garde bloquante IBAN (#101, ADR 0022 §2) : le drag vers l'étape de
+        naissance (is_close) est refusé si le mode de paiement est le
+        prélèvement et l'IBAN invalide — la colonne « IBAN vérifié » ne ment
+        jamais. Remplace l'ancien avertissement non bloquant (onchange),
+        disparu avec l'étape qui le portait (#100). Vérifiée avant l'écriture
+        (comme la garde factuelle) pour qu'un refus n'altère pas l'étape."""
+        nouveau_stage = self.env['raccordement.stage'].browse(nouveau_stage_id)
+        if not nouveau_stage.is_close:
             return
+        cible = self.filtered(lambda r: not r.souscription_id and r.stage_id.id != nouveau_stage_id)
+        for record in cible:
+            if record.mode_paiement == 'prelevement' and not record._validate_iban(record.bank_iban):
+                raise UserError(
+                    "Impossible d'accepter la demande : le mode de paiement est le prélèvement et "
+                    "l'IBAN est invalide. Corrigez l'IBAN avant d'accepter."
+                )
+
+    # Branches ⏳ ciblées par situation_entree (#100, ADR 0022 §1/§4), et
+    # leur mail de rassurage associé (#102, ADR 0022 §6).
+    _STAGE_XMLID_PAR_SITUATION = {
+        'mes': 'souscriptions_odoo.stage_f120_mes',
+        'cfne': 'souscriptions_odoo.stage_f130_cfne',
+    }
+    _TEMPLATE_XMLID_PAR_SITUATION = {
+        'mes': 'souscriptions_odoo.mail_template_raccordement_f120',
+        'cfne': 'souscriptions_odoo.mail_template_raccordement_f130',
+    }
+
+    def _stage_branche_cible(self):
+        """L'étape ⏳ désignée par situation_entree, ou vide si absente/non
+        configurée."""
+        self.ensure_one()
+        xmlid = self._STAGE_XMLID_PAR_SITUATION.get(self.situation_entree)
+        return self.env.ref(xmlid, raise_if_not_found=False) if xmlid else self.env['raccordement.stage']
+
+    def _stages_branches_sge(self):
+        """Les deux étapes ⏳ (branches F120/F130), pour distinguer un
+        re-routage latéral d'un avancement amont->branche."""
+        stage_f120 = self.env.ref('souscriptions_odoo.stage_f120_mes', raise_if_not_found=False)
+        stage_f130 = self.env.ref('souscriptions_odoo.stage_f130_cfne', raise_if_not_found=False)
+        return (stage_f120 or self.env['raccordement.stage']) | (stage_f130 or self.env['raccordement.stage'])
+
+    def _router_situation_entree(self):
+        """Route la carte vers la branche ⏳ désignée par situation_entree
+        (#100, ADR 0021 §5 / ADR 0022 §1 & §4) :
+
+        - en amont des branches (id_Affaire tout juste saisi) : avance seule
+          vers la branche demandée ;
+        - déjà dans une branche : une correction de situation_entree bascule
+          latéralement vers l'autre branche (ni avancement, ni recul) ;
+        - en aval des branches (Validé sur SGE et au-delà) : aucun effet — on
+          ne recule jamais une carte déjà instruite côté Enedis.
+
+        Chaque entrée effective (initiale ou re-routée) envoie le mail de
+        rassurage (#102) de la branche d'arrivée : c'est le moment où la
+        demande SGE part réellement chez Enedis.
+        """
+        branches = self._stages_branches_sge()
         for record in self:
-            if record.id_affaire and record.stage_id.sequence < stage.sequence:
-                record.with_context(raccordement_automove=True).stage_id = stage.id
+            if not record.id_affaire or not record.situation_entree:
+                continue
+            cible = record._stage_branche_cible()
+            if not cible or record.stage_id == cible:
+                continue
+            en_branche = record.stage_id in branches
+            en_amont = record.stage_id.sequence < cible.sequence
+            if en_branche or en_amont:
+                record.with_context(raccordement_automove=True).stage_id = cible.id
+                record._envoyer_mail_rassurage()
+
+    def _envoyer_mail_rassurage(self):
+        """Mail de rassurage (#102, ADR 0022 §6) à l'entrée effective d'une
+        branche ⏳ — accusé de prise en compte, un template par situation
+        d'entrée. Le re-routage F120<->F130 envoie le mail de la branche
+        d'arrivée (même seuil d'appel que l'avancement initial,
+        `_router_situation_entree`)."""
+        self.ensure_one()
+        xmlid = self._TEMPLATE_XMLID_PAR_SITUATION.get(self.situation_entree)
+        template = self.env.ref(xmlid, raise_if_not_found=False) if xmlid else False
+        if template:
+            template.send_mail(self.id, force_send=False)
+
+    # Variante du pack de bienvenue (#103, ADR 0022 §6) par faits de la
+    # demande : PRO, sinon solidaire, sinon particulier.
+    _TEMPLATE_XMLID_BIENVENUE_PRO = 'souscriptions_odoo.mail_template_bienvenue_pro'
+    _TEMPLATE_XMLID_BIENVENUE_SOLIDAIRE = 'souscriptions_odoo.mail_template_bienvenue_solidaire'
+    _TEMPLATE_XMLID_BIENVENUE_PARTICULIER = 'souscriptions_odoo.mail_template_bienvenue_particulier'
+
+    def _envoyer_pack_bienvenue(self):
+        """Pack de bienvenue (#103, ADR 0022 §6) à l'entrée effective en
+        « Abonnement Validé » : conditions particulières complètes (RSC +
+        mensualités réelles) en pièce jointe (`report_template_ids` du
+        template, rendu pour la Souscription) + documents d'accueil
+        statiques configurables (`attachment_ids` du template). Variante
+        choisie par les faits de la demande ; no-op si la Souscription
+        n'existe pas (rien à joindre, rien à notifier)."""
+        self.ensure_one()
+        if not self.souscription_id:
+            return
+        if self.pro:
+            xmlid = self._TEMPLATE_XMLID_BIENVENUE_PRO
+        elif self.tarif_solidaire:
+            xmlid = self._TEMPLATE_XMLID_BIENVENUE_SOLIDAIRE
+        else:
+            xmlid = self._TEMPLATE_XMLID_BIENVENUE_PARTICULIER
+        template = self.env.ref(xmlid, raise_if_not_found=False)
+        if template:
+            template.send_mail(self.souscription_id.id, force_send=False)
 
     def _create_odoo_entries(self):
         """Crée automatiquement les entrées Odoo (contact, banque, souscription)"""
@@ -494,6 +666,8 @@ class RaccordementDemande(models.Model):
             # amorce de réconciliation, avec sa date de saisie (grâce du poll #89).
             'id_affaire': self.id_affaire,
             'id_affaire_date_saisie': self.id_affaire_date_saisie,
+            # Majoration PRO négociée par le Collège (#101, ADR 0022 §7).
+            'coeff_pro': self.coeff_pro,
         }
 
         # Ajouter les provisions selon le type de tarif

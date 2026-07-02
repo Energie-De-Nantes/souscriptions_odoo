@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Mails de rassurage (#102, ADR 0022 §6) : envoyés à l'entrée des
+             branches ⏳ — c'est le moment où la demande SGE part réellement
+             chez Enedis. Un template par situation d'entrée ; le rassurage
+             tient le rôle d'accusé de prise en compte, les conditions
+             particulières partant plus tard, complètes (pack de bienvenue,
+             #103). Wording provisoire, le définitif viendra d'EDN.
+             use_default_to=False : le défaut True (Odoo 19) ignorerait
+             email_to au profit de _message_get_default_recipients(), vide
+             pour raccordement.demande (contact_email n'y est pas reconnu). -->
+
+        <record id="mail_template_raccordement_f120" model="mail.template">
+            <field name="name">Raccordement — rassurage F120 (mise en service)</field>
+            <field name="model_id" ref="model_raccordement_demande"/>
+            <field name="use_default_to" eval="False"/>
+            <field name="subject">Votre emménagement est bien enregistré</field>
+            <field name="email_to">{{ object.contact_email }}</field>
+            <field name="body_html" type="html">
+                <div style="margin: 0px; padding: 0px;">
+                    <p>Bonjour <t t-out="object.contact_prenom or ''"/> <t t-out="object.contact_nom or ''"/>,</p>
+                    <p>
+                        Votre demande de mise en service (PDL <t t-out="object.pdl"/>) vient d'être transmise
+                        à Enedis. Votre emménagement est bien enregistré : nous vous tiendrons informé·e dès
+                        que le raccordement sera effectif.
+                    </p>
+                    <p>Les conditions particulières complètes de votre contrat vous parviendront à cette étape.</p>
+                    <p>L'équipe Énergie De Nantes</p>
+                </div>
+            </field>
+        </record>
+
+        <record id="mail_template_raccordement_f130" model="mail.template">
+            <field name="name">Raccordement — rassurage F130 (changement de fournisseur)</field>
+            <field name="model_id" ref="model_raccordement_demande"/>
+            <field name="use_default_to" eval="False"/>
+            <field name="subject">Votre changement de fournisseur est bien enregistré</field>
+            <field name="email_to">{{ object.contact_email }}</field>
+            <field name="body_html" type="html">
+                <div style="margin: 0px; padding: 0px;">
+                    <p>Bonjour <t t-out="object.contact_prenom or ''"/> <t t-out="object.contact_nom or ''"/>,</p>
+                    <p>
+                        Votre demande de changement de fournisseur (PDL <t t-out="object.pdl"/>) vient d'être
+                        transmise à Enedis. Votre dossier est bien enregistré : nous vous tiendrons informé·e
+                        dès que le changement sera effectif.
+                    </p>
+                    <p>Les conditions particulières complètes de votre contrat vous parviendront à cette étape.</p>
+                    <p>L'équipe Énergie De Nantes</p>
+                </div>
+            </field>
+        </record>
+    </data>
+</odoo>

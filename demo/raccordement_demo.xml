@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <data>
-        <!-- Demandes de raccordement de démonstration -->
-        
-        <!-- Demande 1: Nouvelle demande -->
+        <!-- Demandes de raccordement de démonstration — chaîne cible prod
+             (#100, ADR 0022 §1) : une demande par étape (sauf la terminale,
+             jamais peuplée en démo — cohérent avec la démo précédente). -->
+
+        <!-- Demande 1: 🔴 Nouveau -->
         <record id="demo_raccordement_1" model="raccordement.demande">
             <field name="pdl">14325698745236</field>
             <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(months=1)).strftime('%Y-%m-%d')"/>
@@ -23,11 +25,11 @@
             <field name="bank_acc_holder_name">Marie Dupont</field>
             <field name="bank_iban">FR1420041010050500013M02606</field>
             <field name="bank_bic">BNPAFRPP</field>
-            <field name="stage_id" ref="stage_demande_recue"/>
+            <field name="stage_id" ref="stage_nouveau"/>
             <field name="notes">Nouvelle demande de raccordement pour un appartement</field>
         </record>
-        
-        <!-- Demande 2: IBAN validé -->
+
+        <!-- Demande 2: 🔴 Accepté et IBAN vérifié -->
         <record id="demo_raccordement_2" model="raccordement.demande">
             <field name="pdl">25874136985247</field>
             <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=3)).strftime('%Y-%m-%d')"/>
@@ -49,10 +51,10 @@
             <field name="bank_bic">SOGEFRPP</field>
             <field name="sepa_mandate_date" eval="DateTime.today().strftime('%Y-%m-%d')"/>
             <field name="sepa_mandate_ref">SEPA-2024-001</field>
-            <field name="stage_id" ref="stage_iban_valide"/>
+            <field name="stage_id" ref="stage_accepte_iban_verifie"/>
         </record>
-        
-        <!-- Demande 3: Demande SGE faite -->
+
+        <!-- Demande 3: ⏳ Mise en Service (F120) en cours (tarif solidaire) -->
         <record id="demo_raccordement_3" model="raccordement.demande">
             <field name="pdl">36985214736985</field>
             <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=2)).strftime('%Y-%m-%d')"/>
@@ -74,11 +76,13 @@
             <field name="bank_bic">CMCIFRPP</field>
             <field name="sepa_mandate_date" eval="(DateTime.today() - relativedelta(days=3)).strftime('%Y-%m-%d')"/>
             <field name="sepa_mandate_ref">SEPA-2024-002</field>
-            <field name="date_demande_sge" eval="(DateTime.today() - relativedelta(days=2)).strftime('%Y-%m-%d')"/>
-            <field name="stage_id" ref="stage_demande_sge"/>
+            <field name="situation_entree">mes</field>
+            <field name="id_affaire">DEMO-AFFAIRE-F120</field>
+            <field name="id_affaire_date_saisie" eval="(DateTime.today() - relativedelta(days=2)).strftime('%Y-%m-%d')"/>
+            <field name="stage_id" ref="stage_f120_mes"/>
         </record>
-        
-        <!-- Demande 4: Demande mesures faite (PROFESSIONNELLE) -->
+
+        <!-- Demande 4: ⏳ Changement de fournisseur (F130) en cours (PROFESSIONNELLE, bloquée) -->
         <record id="demo_raccordement_4" model="raccordement.demande">
             <field name="pro">True</field>
             <field name="siret">12345678901234</field>
@@ -100,14 +104,15 @@
             <field name="bank_bic">BNPAGFPP</field>
             <field name="sepa_mandate_date" eval="(DateTime.today() - relativedelta(days=7)).strftime('%Y-%m-%d')"/>
             <field name="sepa_mandate_ref">SEPA-2024-003</field>
-            <field name="date_demande_sge" eval="(DateTime.today() - relativedelta(days=5)).strftime('%Y-%m-%d')"/>
-            <field name="date_demande_mesures" eval="(DateTime.today() - relativedelta(days=3)).strftime('%Y-%m-%d')"/>
-            <field name="stage_id" ref="stage_demande_mesures"/>
-            <field name="notes">Client professionnel - Boulangerie</field>
+            <field name="situation_entree">cfne</field>
+            <field name="id_affaire">DEMO-AFFAIRE-F130</field>
+            <field name="id_affaire_date_saisie" eval="(DateTime.today() - relativedelta(days=5)).strftime('%Y-%m-%d')"/>
+            <field name="stage_id" ref="stage_f130_cfne"/>
+            <field name="notes">Client professionnel - Boulangerie (affaire Enedis en cours de vérification)</field>
             <field name="kanban_state">blocked</field>
         </record>
-        
-        <!-- Demande 5: Estimation mensualité -->
+
+        <!-- Demande 5: 🔴 Validé sur SGE -->
         <record id="demo_raccordement_5" model="raccordement.demande">
             <field name="pdl">58963214789632</field>
             <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(days=15)).strftime('%Y-%m-%d')"/>
@@ -130,14 +135,14 @@
             <field name="bank_bic">AGRIFRPP</field>
             <field name="sepa_mandate_date" eval="(DateTime.today() - relativedelta(days=10)).strftime('%Y-%m-%d')"/>
             <field name="sepa_mandate_ref">SEPA-2024-004</field>
-            <field name="date_demande_sge" eval="(DateTime.today() - relativedelta(days=8)).strftime('%Y-%m-%d')"/>
-            <field name="date_demande_mesures" eval="(DateTime.today() - relativedelta(days=5)).strftime('%Y-%m-%d')"/>
-            <field name="date_estimation" eval="(DateTime.today() - relativedelta(days=1)).strftime('%Y-%m-%d')"/>
-            <field name="stage_id" ref="stage_estimation"/>
+            <field name="situation_entree">mes</field>
+            <field name="id_affaire">DEMO-AFFAIRE-SGE</field>
+            <field name="id_affaire_date_saisie" eval="(DateTime.today() - relativedelta(days=8)).strftime('%Y-%m-%d')"/>
+            <field name="stage_id" ref="stage_valide_sge"/>
             <field name="kanban_state">done</field>
         </record>
-        
-        <!-- Demande 6: Mode paiement autre que prélèvement -->
+
+        <!-- Demande 6: 🔴 Calcul de mensualités en cours (mode paiement autre que prélèvement, tarif solidaire) -->
         <record id="demo_raccordement_6" model="raccordement.demande">
             <field name="pdl">69874521369874</field>
             <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=5)).strftime('%Y-%m-%d')"/>
@@ -153,11 +158,14 @@
             <field name="contact_zip">59000</field>
             <field name="contact_city">Lille</field>
             <field name="mode_paiement">cheque_energie</field>
-            <field name="stage_id" ref="stage_demande_recue"/>
+            <field name="situation_entree">mes</field>
+            <field name="id_affaire">DEMO-AFFAIRE-MENSU</field>
+            <field name="id_affaire_date_saisie" eval="(DateTime.today() - relativedelta(days=20)).strftime('%Y-%m-%d')"/>
+            <field name="stage_id" ref="stage_calcul_mensualites"/>
             <field name="notes">Bénéficiaire du chèque énergie</field>
         </record>
-        
-        <!-- Demande 7: Professionnelle sans mobile -->
+
+        <!-- Demande 7: 🔴 PRO à valider -->
         <record id="demo_raccordement_7" model="raccordement.demande">
             <field name="pro">True</field>
             <field name="siret">98765432109876</field>
@@ -174,10 +182,11 @@
             <field name="contact_zip">67000</field>
             <field name="contact_city">Strasbourg</field>
             <field name="mode_paiement">virement</field>
-            <field name="stage_id" ref="stage_demande_recue"/>
+            <field name="stage_id" ref="stage_pro_a_valider"/>
+            <field name="notes">En attente de validation du Collège (PRO + majoration tarifaire)</field>
         </record>
-        
-        <!-- Demande 8: IBAN non valide pour test -->
+
+        <!-- Demande 8: 🔴 Nouveau, IBAN non valide pour test -->
         <record id="demo_raccordement_8" model="raccordement.demande">
             <field name="pdl">81234567890123</field>
             <field name="date_debut_souhaitee" eval="(DateTime.today() + relativedelta(weeks=6)).strftime('%Y-%m-%d')"/>
@@ -195,10 +204,10 @@
             <field name="mode_paiement">prelevement</field>
             <field name="bank_acc_holder_name">Marc Richard</field>
             <field name="bank_iban">FR1420041010050500013M02607</field>
-            <field name="stage_id" ref="stage_demande_recue"/>
+            <field name="stage_id" ref="stage_nouveau"/>
             <field name="notes">IBAN à vérifier</field>
             <field name="kanban_state">blocked</field>
         </record>
-        
+
     </data>
 </odoo>

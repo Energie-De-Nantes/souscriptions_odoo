@@ -5,6 +5,7 @@ from . import (
     test_facturation,
     test_grille_prix,
     test_integration,
+    test_mails_raccordement,
     test_periode_composition,
     test_periode_energie,
     test_periode_facture,

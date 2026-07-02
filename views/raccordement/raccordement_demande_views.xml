@@ -30,6 +30,7 @@
                         <group name="souscription_info" string="Informations Souscription">
                             <field name="pro" />
                             <field name="siret" invisible="pro == False" />
+                            <field name="coeff_pro" invisible="pro == False" />
                             <field name="pdl" />
                             <field name="date_debut_souhaitee" />
                             <field name="puissance_souscrite" />
@@ -38,6 +39,7 @@
                             <field name="mode_paiement" />
                         </group>
                         <group name="dates_suivi" string="Suivi">
+                            <field name="situation_entree" />
                             <field name="date_demande_sge" />
                             <field name="date_demande_mesures" />
                             <field name="date_estimation" />

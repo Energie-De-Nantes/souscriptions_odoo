@@ -73,9 +73,11 @@ est un brouillon facturable, pas une copie figée d'electricore).
 
 **Relevé (d'index)** :
 Événement de lecture **daté** du compteur, enfant d'une *Période* (`souscription.releve`,
-`periode_id`). Porte un **index** (compteur cumulé) **par cadran réseau** — même axe *mesuré* que
-les `energie_*` (registres physiques : HPH/HPB/HCH/HCB, ou HP/HC, ou Base selon le *calendrier de
-comptage*), jamais par cadran **facturé**. Consigne **tous les index qu'electricore a utilisés**
+`periode_id`). Porte un **index** (compteur cumulé) **par registre réel** du compteur
+(HPH/HPB/HCH/HCB, ou HP/HC, ou Base selon le *calendrier de comptage*), jamais par cadran
+**facturé** — c'est le seul endroit où ce détail survit, les énergies de la *Période* arrivant
+déjà regroupées (contrat v3, ADR 0020). Porte sa **provenance** (`releve_externe_id`,
+`origine`) : l'identifiant du justificatif côté electricore, support de la dédup au re-pull. Consigne **tous les index qu'electricore a utilisés**
 pour le calcul d'énergie de la Période — **obligation légale** sur la *Facture* et support de
 **vérification** par le·la *souscripteur·rice*. Chaque relevé déclare sa **nature** : *réel*
 (mesure Enedis) ou *estimé* (estimation electricore ou *facturiste*), étiquetée sur la facture.
@@ -139,8 +141,10 @@ calendrier de comptage distingue.
 La configuration *commerciale* portée par la *Souscription* : formule tarifaire fournisseur
 (cadrans **facturés** : Base, ou HP/HC), lissage, provisions, mode de paiement. **Orthogonale
 à la _Configuration Enedis_** : un PDL peut avoir une FTA 4 cadrans (pour minorer le TURPE) et
-être facturé en Base. electricore renvoie le détail par cadran réseau ; Odoo le **regroupe**
-selon la formule fournisseur.
+être facturé en Base. electricore sert l'énergie **déjà regroupée** depuis les 4 cadrans
+saisonniers (HP = HPH+HPB, HC = HCH+HCB — contrat v3, ADR 0020) ; ne reste côté Odoo que le
+regroupement final vers le cadran **facturé** (HP/HC → Base si la formule fournisseur est
+Base), le détail par registre réel ne survivant que dans les index des *Relevés*.
 _Éviter_ : FTA (c'est l'acheminement réseau, côté Enedis), option tarifaire.
 
 **Tarif solidaire** :

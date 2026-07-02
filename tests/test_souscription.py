@@ -125,3 +125,22 @@ class TestSouscription(TransactionCase):
         )
 
         self.assertTrue(souscription.tarif_solidaire)
+
+    def test_rsc_et_id_affaire_saisissables_a_la_main(self):
+        """`ref_situation_contractuelle` (clé d'articulation) et `id_affaire`
+        (amorce de réconciliation, ADR 0010) sont saisissables à la main tant
+        que le raccordement ne les peuple pas (#76, ADR 0020 §3)."""
+        souscription = self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.partner.id,
+                'pdl': 'PDL_RSC',
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'etat_facturation_id': self.etat_actif.id,
+                'ref_situation_contractuelle': 'RSC0001234',
+                'id_affaire': 'AFF-56789',
+            }
+        )
+
+        self.assertEqual(souscription.ref_situation_contractuelle, 'RSC0001234')
+        self.assertEqual(souscription.id_affaire, 'AFF-56789')

@@ -144,6 +144,27 @@ class Souscription(models.Model):
     ref_compteur = fields.Char(string='Référence compteur')
     numero_depannage = fields.Char(string='Numéro de dépannage')
 
+    # Identité électricore (ADR 0010, ADR 0020 §3). `ref_situation_contractuelle`
+    # est la clé d'articulation du pull de méta-périodes (RSC, unique par couple
+    # PDL/usager·ère) ; `id_affaire` est l'amorce de réconciliation (référence
+    # d'affaire Enedis, connue tôt et non ambiguë). Peuplés à terme par le
+    # raccordement (id_Affaire capturé au raccordement, RSC résolue à la bascule
+    # « raccordement effectué » — issue dédiée) ; saisissables à la main d'ici là.
+    ref_situation_contractuelle = fields.Char(
+        string='RSC (référence situation contractuelle)',
+        tracking=True,
+        help="Clé d'articulation du pull de méta-périodes electricore, unique par "
+        'couple PDL/usager·ère. Non affichée dans SGE : peuplée par le raccordement '
+        "à terme (résolution id_Affaire → RSC), saisissable à la main d'ici là.",
+    )
+    id_affaire = fields.Char(
+        string="N° d'affaire Enedis",
+        tracking=True,
+        help="Référence d'affaire Enedis, renvoyée dès la demande de raccordement. "
+        'Amorce de réconciliation (audit + ré-résolution de la RSC) — recopiée '
+        "depuis raccordement.demande à terme, saisissable à la main d'ici là.",
+    )
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:

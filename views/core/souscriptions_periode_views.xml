@@ -37,8 +37,10 @@
                             <field name="date_debut"/>
                             <field name="date_fin"/>
                             <field name="mois_annee"/>
+                            <field name="mois"/>
                             <field name="jours"/>
                             <field name="type_periode"/>
+                            <field name="ref_situation_contractuelle"/>
                         </group>
                         <group string="Contrat (historisé)">
                             <field name="config_cadrans"/>
@@ -49,6 +51,19 @@
                             <field name="provision_mensuelle_kwh_periode"/>
                             <field name="coeff_pro_periode"/>
                         </group>
+                    </group>
+
+                    <!-- Atterrissage du contrat PeriodeMeta v3 electricore (#76,
+                         ADR 0020 §4/§7) : verdicts jumeaux, montants et grandeur
+                         physique servis par le pull, visibles du·de la facturiste. -->
+                    <group string="Atterrissage electricore (v3)">
+                        <field name="qualite"/>
+                        <field name="statut_communication"/>
+                        <field name="has_changement"/>
+                        <field name="puissance_moyenne_kva"/>
+                        <field name="cta_eur"/>
+                        <field name="taux_accise_eur_mwh"/>
+                        <field name="source_hash"/>
                     </group>
 
                     <!-- Énergie : niveau de saisie piloté par le calendrier de comptage
@@ -111,6 +126,8 @@
                                        column_invisible="parent.config_cadrans != '4_cadrans'"/>
                                 <field name="index_hcb"
                                        column_invisible="parent.config_cadrans != '4_cadrans'"/>
+                                <field name="releve_externe_id"/>
+                                <field name="origine"/>
                             </list>
                         </field>
                     </group>

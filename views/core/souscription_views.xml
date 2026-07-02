@@ -45,6 +45,15 @@
                         <field name="numero_depannage" widget="phone"/>
                     </group>
 
+                    <!-- Identité electricore (ADR 0010/0020) : RSC = clé d'articulation
+                         du pull de méta-périodes, id_affaire = amorce de réconciliation.
+                         Peuplés par le raccordement à terme ; saisissables à la main
+                         d'ici là. -->
+                    <group string="Identité électricore">
+                        <field name="ref_situation_contractuelle"/>
+                        <field name="id_affaire"/>
+                    </group>
+
                     <group string="Adhésion (captée au raccordement)">
                         <field name="date_validation"/>
                         <field name="renonce_retractation"/>

@@ -1,5 +1,10 @@
 # Identité de la *Souscription* : la RSC comme clé, l'`id_Affaire` comme amorce de réconciliation
 
+*Note (juillet 2026) : décision inchangée. Les champs atterrissent via #76
+([ADR-0020](0020-alignement-contrat-meta-periodes-v3.md)) — saisissables à la main tant que
+le raccordement ne les peuple pas ; l'acquisition automatique (`id_Affaire → RSC`, §3) est
+portée par #79.*
+
 La *Souscription* était entièrement clée sur le **PDL**, qui n'est pas un identifiant de
 contrat : un même PDL est attribué à plusieurs *souscripteur·rice·s* successif·ves (issue #5).
 electricore travaille en **`ref_situation_contractuelle`** (RSC), unique par couple

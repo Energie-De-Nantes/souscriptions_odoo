@@ -55,6 +55,47 @@ class TestSouscription(TransactionCase):
         self.assertEqual(souscription.type_tarif, 'hphc')
         self.assertEqual(souscription.provision_mensuelle_kwh, 500.0)
 
+    def test_provisions_cadrans_repartition_70_30(self):
+        """_provisions_cadrans() répartit la provision mensuelle 70% HP / 30% HC
+        quand hp/hc ne sont pas renseignées explicitement (issue #73)."""
+        souscription = self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.partner.id,
+                'pdl': 'PDL_REPARTITION',
+                'puissance_souscrite': '9',
+                'type_tarif': 'hphc',
+                'etat_facturation_id': self.etat_actif.id,
+                'provision_mensuelle_kwh': 500.0,
+            }
+        )
+
+        provisions = souscription._provisions_cadrans()
+
+        self.assertEqual(provisions['hp'], 350.0)
+        self.assertEqual(provisions['hc'], 150.0)
+        self.assertEqual(provisions['base'], 500.0)
+
+    def test_provisions_cadrans_explicites_priment(self):
+        """_provisions_cadrans() renvoie les provisions HP/HC explicites telles
+        quelles (cas raccordement) sans passer par la répartition 70/30, même si
+        provision_mensuelle_kwh vaut 0 (issue #73)."""
+        souscription = self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.partner.id,
+                'pdl': 'PDL_EXPLICITE',
+                'puissance_souscrite': '9',
+                'type_tarif': 'hphc',
+                'etat_facturation_id': self.etat_actif.id,
+                'provision_hp_kwh': 200.0,
+                'provision_hc_kwh': 120.0,
+            }
+        )
+
+        provisions = souscription._provisions_cadrans()
+
+        self.assertEqual(provisions['hp'], 200.0)
+        self.assertEqual(provisions['hc'], 120.0)
+
     def test_coefficient_pro(self):
         """Test majoration PRO"""
         souscription = self.env['souscription.souscription'].create(

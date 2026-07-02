@@ -595,6 +595,53 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
         self.assertEqual(souscription.provision_hp_kwh, 150.0)
         self.assertEqual(souscription.provision_hc_kwh, 100.0)
 
+    def test_raccordement_hphc_lisse_facture_energie_non_nulle(self):
+        """Régression #73 : une souscription HP/HC lissée née du raccordement
+        (provision_hp_kwh/provision_hc_kwh peuplées, provision_mensuelle_kwh à 0)
+        produit une Période dont les provisions par cadran sont non nulles, et
+        dont la facture porte une quantité d'énergie non nulle — cohérente avec
+        la mensualité affichée sur les conditions particulières."""
+        demande = self.create_complete_demande(
+            type_tarif='hphc',
+            provision_hp_kwh=150.0,
+            provision_hc_kwh=100.0,
+            provision_mensuelle_kwh=0.0,
+        )
+
+        demande.stage_id = self.stage_final
+        souscription = demande.souscription_id
+        self.assertTrue(souscription.lisse, 'Le raccordement active le lissage par défaut')
+
+        # La CP affiche une mensualité non nulle pour cette souscription (grille
+        # de test active sur 2024, indépendante de la date de début souhaitée).
+        mensualite_cp = souscription._prix_documents(a_date=date(2024, 1, 1))['mensualite']
+        self.assertGreater(mensualite_cp, 0.0, 'La CP doit afficher une mensualité non nulle')
+
+        periode = self.env['souscription.periode'].create(
+            {
+                'souscription_id': souscription.id,
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 1, 31),
+                'type_periode': 'mensuelle',
+            }
+        )
+
+        # La Période doit porter des provisions par cadran non nulles, cohérentes
+        # avec ce qui a été saisi au raccordement.
+        self.assertEqual(periode.provision_hp_kwh, 150.0)
+        self.assertEqual(periode.provision_hc_kwh, 100.0)
+
+        produits = [vals for (_cmd, _id, vals) in periode._composer_lignes(self.grille_prix) if vals.get('product_id')]
+        hp = next(d for d in produits if d['name'] == 'Énergie HP')
+        hc = next(d for d in produits if d['name'] == 'Énergie HC')
+        self.assertEqual(hp['quantity'], 150.0)
+        self.assertEqual(hc['quantity'], 100.0)
+        self.assertGreater(
+            hp['quantity'] + hc['quantity'],
+            0.0,
+            "La facture doit porter une quantité d'énergie non nulle (provision HP+HC)",
+        )
+
     def test_create_odoo_entries_no_bank_for_other_payment(self):
         """Test de création sans compte bancaire pour autre mode de paiement"""
         demande = self.create_complete_demande(

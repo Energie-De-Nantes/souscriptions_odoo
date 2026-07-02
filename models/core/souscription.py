@@ -146,6 +146,13 @@ class Souscription(models.Model):
     ## Informations
     ref_compteur = fields.Char(string='Référence compteur')
     numero_depannage = fields.Char(string='Numéro de dépannage')
+    # Champ d'atterrissage migration (#106, ADR 0023) : adresse du point de
+    # livraison, distincte de l'adresse du·de la souscripteur·rice
+    # (`partner_id`) — le PDL peut être ailleurs (locatif, second logement...).
+    adresse_pdl = fields.Text(
+        string='Adresse du PDL',
+        help="Adresse du point de livraison, distincte de l'adresse du·de la souscripteur·rice.",
+    )
 
     # Identité électricore (ADR 0010, ADR 0020 §3, ADR 0021). `ref_situation_contractuelle`
     # est la clé d'articulation du pull de méta-périodes (RSC, unique par couple

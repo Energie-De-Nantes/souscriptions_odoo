@@ -154,6 +154,7 @@ class SouscriptionPeriode(models.Model):
     regime_prix_periode = fields.Selection(
         [('standard', 'Standard'), ('moulin', 'Moulin')],
         string='Régime de prix (période)',
+        default='standard',
         readonly=True,
         help='Régime de prix de la Souscription au moment de la création de '
         'cette période (snapshot, ADR 0006) — sélectionne la Grille de prix '

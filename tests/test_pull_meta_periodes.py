@@ -66,7 +66,7 @@ def _periode_meta(**kwargs):
         cta_eur=1.1,
         taux_accise_eur_mwh=21.0,
         has_changement=False,
-        qualite='reelle',
+        qualite='réelle',
         statut_communication='communicante',
         releves_utilises=[],
         source_hash='hash-abc123',
@@ -91,7 +91,7 @@ class TestAmorcerDepuisMeta(SouscriptionsTestCase):
         self.assertEqual(periode.turpe_variable, 4.2)
         self.assertEqual(periode.cta_eur, 1.1)
         self.assertEqual(periode.taux_accise_eur_mwh, 21.0)
-        self.assertEqual(periode.qualite, 'reelle')
+        self.assertEqual(periode.qualite, 'réelle')
         self.assertEqual(periode.statut_communication, 'communicante')
         self.assertEqual(periode.source_hash, 'hash-abc123')
         self.assertFalse(periode.has_changement)
@@ -403,7 +403,7 @@ class TestAmorcerDepuisMetaAvecPaquetReel(SouscriptionsTestCase):
             cta_eur=1.1,
             taux_accise_eur_mwh=21.0,
             has_changement=False,
-            qualite='reelle',
+            qualite='réelle',
             statut_communication='communicante',
             releves_utilises=[
                 ObjetReleve(
@@ -421,7 +421,7 @@ class TestAmorcerDepuisMetaAvecPaquetReel(SouscriptionsTestCase):
 
         self.assertEqual(periode.date_debut, date(2024, 1, 1))
         self.assertEqual(periode.energie_base_kwh, 280.0)
-        self.assertEqual(periode.qualite, 'reelle')
+        self.assertEqual(periode.qualite, 'réelle')
         self.assertEqual(len(periode.releve_ids), 1)
         self.assertEqual(periode.releve_ids.releve_externe_id, 'ELC-RELEVE-100')
         self.assertEqual(periode.releve_ids.index_base, 1000.0)

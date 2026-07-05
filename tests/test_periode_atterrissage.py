@@ -33,7 +33,7 @@ class TestPeriodeAtterrissage(SouscriptionsTestCase):
         """Les champs d'atterrissage v3 se créent et se lisent tels quels."""
         periode = self._periode(
             self.souscription_base,
-            qualite='estimee',
+            qualite='estimée',
             statut_communication='non_communicante',
             has_changement=True,
             source_hash='abc123',
@@ -42,7 +42,7 @@ class TestPeriodeAtterrissage(SouscriptionsTestCase):
             puissance_moyenne_kva=5.8,
         )
 
-        self.assertEqual(periode.qualite, 'estimee')
+        self.assertEqual(periode.qualite, 'estimée')
         self.assertEqual(periode.statut_communication, 'non_communicante')
         self.assertTrue(periode.has_changement)
         self.assertEqual(periode.source_hash, 'abc123')
@@ -65,7 +65,7 @@ class TestPeriodeAtterrissage(SouscriptionsTestCase):
         with self.assertRaises(UserError):
             periode.write({'cta_eur': 999.0})
         with self.assertRaises(UserError):
-            periode.write({'qualite': 'reelle'})
+            periode.write({'qualite': 'réelle'})
         with self.assertRaises(UserError):
             periode.write({'puissance_moyenne_kva': 12.0})
 

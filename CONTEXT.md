@@ -105,6 +105,18 @@ _Éviter_ : confondre **index** (la valeur cumulée d'un registre) et **relevé*
 en porte plusieurs) ; confondre avec `energie_*` (la *consommation* dérivée des relevés) ; cadran
 facturé.
 
+**Qualité (verdict)** :
+Verdict electricore sur l'énergie d'une *Période* : **réelle**, **estimée** ou **incalculable** —
+les termes du glossaire electricore, portés **tels quels** (accents compris) sur la Période
+(ADR 0020 : noms *et valeurs* du contrat). Concept **amont** : le rollup depuis la nature des
+relevés bornants (pire-gagne) appartient à electricore (son ADR-0033) ; côté addon le·la
+*facturiste* le **lit**, ne le calcule ni le modifie. Une période *incalculable* est créée quand
+même (brouillon facturable, cf. *Période*). Jumeau : **statut de communication**
+(communicante / non communicante), même provenance, même statut readonly.
+_Éviter_ : `data_complete` (l'ancien drapeau binaire qu'il remplace) ; confondre avec la **nature**
+d'un *Relevé* (réel/estimé au grain relevé — la qualité est le verdict au grain *période*) ;
+désaccentuer les valeurs (`reelle` n'existe pas sur le fil — bug S0001).
+
 **Grille de prix** :
 Barème **fournisseur** daté (`grille.prix`), **tout-compris** : le TURPE y est **absorbé**, jamais
 refacturé ligne à ligne (ADR 0002). Porte le prix d'abonnement **affine** — prix de base 3 kVA +

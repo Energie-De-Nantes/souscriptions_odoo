@@ -87,7 +87,7 @@ class SouscriptionPeriode(models.Model):
     # data_complete d'ADR 0011 ; une période incalculable est créée quand même
     # (le brouillon facturable reste la règle, CONTEXT.md).
     qualite = fields.Selection(
-        [('reelle', 'Réelle'), ('estimee', 'Estimée'), ('incalculable', 'Incalculable')],
+        [('réelle', 'Réelle'), ('estimée', 'Estimée'), ('incalculable', 'Incalculable')],
         string='Qualité',
         readonly=True,
         help="Verdict electricore sur la qualité de l'énergie de cette période.",

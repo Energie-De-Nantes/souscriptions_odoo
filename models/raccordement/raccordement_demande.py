@@ -1,6 +1,7 @@
 import logging
 import re
 
+import requests
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
@@ -31,6 +32,15 @@ class RaccordementDemande(models.Model):
     color = fields.Integer(string='Couleur', related='stage_id.color')
     kanban_state = fields.Selection(
         [('normal', 'En cours'), ('blocked', 'Bloqué'), ('done', 'Prêt')], string='État kanban', default='normal'
+    )
+    # Visibilité du bouton « Estimer les provisions » (#121) : calculée plutôt
+    # que comparée en XML (un many2one ne se compare pas à un xmlid dans une
+    # expression de vue) — même idiome que les autres gardes par étape
+    # (env.ref) du module, cf. _avancer_demande_valide_sge.
+    en_calcul_mensualites = fields.Boolean(
+        string="À l'étape « Calcul de mensualités »",
+        compute='_compute_en_calcul_mensualites',
+        help="Vrai à l'étape « Calcul de mensualités en cours » (#121).",
     )
 
     # Informations souscription
@@ -252,6 +262,14 @@ class RaccordementDemande(models.Model):
         """Retourne toutes les étapes pour la vue kanban"""
         # Retourne toutes les étapes dans l'ordre défini
         return stages.search([], order='sequence')
+
+    @api.depends('stage_id')
+    def _compute_en_calcul_mensualites(self):
+        """Vrai à l'étape « Calcul de mensualités en cours » (#121) — pilote
+        la visibilité du bouton « Estimer les provisions »."""
+        stage = self.env.ref('souscriptions_odoo.stage_calcul_mensualites', raise_if_not_found=False)
+        for record in self:
+            record.en_calcul_mensualites = bool(stage) and record.stage_id == stage
 
     @api.depends('bank_iban')
     def _compute_iban_valide(self):
@@ -694,3 +712,133 @@ class RaccordementDemande(models.Model):
             souscription.enregistrer_consentement('courbe_charge', source=source)
 
         return souscription
+
+    # --- Estimation des provisions (#121, GET /provision/estimation) ---
+    #
+    # Bouton seulement, pas d'auto-déclenchement au drag kanban : un appel
+    # réseau dans write() bloquerait la transaction du drag-and-drop — le
+    # bouton suffit (l'AC de l'issue accepte « bouton, et/ou auto »).
+
+    _CONTRACT_VERSION_ESTIMATION_ATTENDU = 1
+
+    def action_estimer_provisions(self):
+        """Bouton « Estimer les provisions » (visible à l'étape « Calcul de
+        mensualités en cours ») : interroge electricore
+        (GET /provision/estimation) et pré-remplit les provisions selon le
+        tarif. L'humain garde la main — les champs restent éditables — et
+        l'absence de données (trouve=False, 503 flux R67) n'empêche jamais la
+        saisie manuelle : c'est le chemin normal."""
+        self.ensure_one()
+        client = self.env['souscription.electricore.client'].client()  # fast-fail paquet+config (ADR 0024)
+        try:
+            reponse = self._appeler_estimation(client, self.pdl)
+        except requests.exceptions.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 503:
+                return self._notifier_estimation_indisponible(exc.response)
+            raise UserError(f"Erreur electricore lors de l'estimation des provisions : {exc}") from exc
+        except requests.exceptions.RequestException as exc:
+            raise UserError(f"Erreur electricore lors de l'estimation des provisions : {exc}") from exc
+
+        contract_version = reponse.get('contract_version')
+        if contract_version is None or contract_version < self._CONTRACT_VERSION_ESTIMATION_ATTENDU:
+            raise UserError(
+                "Version de contrat electricore inattendue pour l'estimation des provisions : "
+                f'{contract_version!r} (attendu >= {self._CONTRACT_VERSION_ESTIMATION_ATTENDU}).'
+            )
+
+        if not reponse.get('trouve'):
+            self.message_post(
+                body='Aucune mesure R67 dans la fenêtre de 12 mois : estimation impossible, saisie manuelle.'
+            )
+            return
+
+        self._appliquer_estimation(reponse['estimation'])
+
+    def _appeler_estimation(self, client, pdl):
+        """Point de transport unique : GET /provision/estimation?pdl=<pdl>
+        (couture patchée en tests, réponse en boîte — rien d'autre n'est
+        mocké).
+
+        TODO: electricore-client 0.2.0 n'expose pas encore
+        `/provision/estimation` (seuls meta_periodes, chronologie,
+        turpe_variable, resoudre_rsc existent) : basculer sur la méthode du
+        client quand elle existera."""
+        response = requests.get(
+            f'{client.url}/provision/estimation',
+            params={'pdl': pdl},
+            headers={'X-API-Key': client.api_key},
+            timeout=30,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def _notifier_estimation_indisponible(self, response):
+        """503 = état opérationnel attendu (flux R67 non matérialisé — M023
+        pas encore ingérée sur le portail SGE — ou ingestion en cours) :
+        jamais une UserError. Tracé au chatter comme information
+        opérationnelle, et notification non bloquante côté utilisateur."""
+        self.ensure_one()
+        try:
+            detail = response.json().get('detail')
+        except ValueError:
+            detail = None
+        message = detail or (
+            'Flux R67 non disponible pour ce PDL (mesures pas encore ingérées, ou ingestion en cours) : '
+            'réessayez plus tard, ou saisissez les provisions à la main.'
+        )
+        self.message_post(body=f'Estimation des provisions indisponible : {message}')
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Estimation des provisions indisponible',
+                'message': message,
+                'type': 'warning',
+                'sticky': False,
+            },
+        }
+
+    def _appliquer_estimation(self, estimation):
+        """Pré-remplit les provisions selon le tarif à partir de l'estimation
+        electricore — en kWh, zéro € (la valorisation reste côté grille de
+        prix) — puis trace un unique message chatter récapitulatif (pas de
+        spam). Profondeur HP/HC insuffisante (champs null, ou
+        `profondeur_cadran == 'base'`) sur un tarif HP/HC : ne remplit rien,
+        repli manuel signalé au chatter."""
+        self.ensure_one()
+        if self.type_tarif == 'base':
+            vals = {'provision_mensuelle_kwh': estimation.get('energie_base_mensuel_kwh') or 0.0}
+        else:  # hphc
+            hp = estimation.get('energie_hp_mensuel_kwh')
+            hc = estimation.get('energie_hc_mensuel_kwh')
+            if hp is None or hc is None or estimation.get('profondeur_cadran') == 'base':
+                self.message_post(
+                    body='Estimation electricore insuffisamment détaillée (profondeur HP/HC absente) : '
+                    'aucune provision pré-remplie, saisie manuelle nécessaire.'
+                )
+                return
+            vals = {'provision_hp_kwh': hp, 'provision_hc_kwh': hc}
+
+        self.write(vals)
+        self.message_post(body=self._message_recapitulatif_estimation(estimation, vals))
+
+    @staticmethod
+    def _message_recapitulatif_estimation(estimation, vals):
+        """Résumé chatter (un seul post par clic, pas de spam) : valeurs
+        pré-remplies, couverture, profondeur, qualité, alerte éventuelle."""
+        lignes = ['Estimation des provisions (electricore) :']
+        if 'provision_mensuelle_kwh' in vals:
+            lignes.append(f'- Provision mensuelle (Base) : {vals["provision_mensuelle_kwh"]:.1f} kWh')
+        if 'provision_hp_kwh' in vals:
+            lignes.append(f'- Provision HP mensuelle : {vals["provision_hp_kwh"]:.1f} kWh')
+            lignes.append(f'- Provision HC mensuelle : {vals["provision_hc_kwh"]:.1f} kWh')
+        suffisante = 'suffisante' if estimation.get('couverture_suffisante') else 'insuffisante'
+        lignes.append(
+            f'- Couverture : {estimation.get("couverture_mois")} mois, '
+            f'{estimation.get("couverture_debut")} → {estimation.get("couverture_fin")} ({suffisante})'
+        )
+        lignes.append(f'- Profondeur : {estimation.get("profondeur_cadran")}')
+        lignes.append(f'- Qualité : {estimation.get("qualite")}')
+        if estimation.get('signal_alertable'):
+            lignes.append('⚠️ Signal alertable : estimation à vérifier avant validation.')
+        return '\n'.join(lignes)

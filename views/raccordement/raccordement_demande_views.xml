@@ -7,6 +7,11 @@
         <field name="arch" type="xml">
             <form>
                 <header>
+                    <button name="action_estimer_provisions"
+                            string="Estimer les provisions"
+                            type="object"
+                            icon="fa-calculator"
+                            invisible="not en_calcul_mensualites" />
                     <field name="stage_id" widget="statusbar" options="{'clickable': '1'}" />
                 </header>
                 <sheet>

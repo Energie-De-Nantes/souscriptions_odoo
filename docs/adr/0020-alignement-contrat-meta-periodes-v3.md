@@ -1,5 +1,14 @@
 # Alignement sur le contrat méta-périodes v3 : noms du contrat, `mois` canonique, atterrissage des verdicts et montants, provenance des relevés
 
+*Note (juillet 2026) : le §1 s'étend des **noms** aux **valeurs** du contrat. Le fil sert les
+verdicts avec les termes du glossaire electricore — `qualite ∈ {réelle, estimée, incalculable}`,
+**accentués** (son ADR-0033) — et les clés de sélection Odoo les reprennent **telles quelles** ;
+les clés désaccentuées (`reelle`, `estimee`) du premier atterrissage étaient une traduction
+involontaire, révélée en prod par le rejet du pull S0001 (`Wrong value ... 'réelle'`). Même
+raison que pour les noms : toute couche de traduction est une classe de bugs. Une valeur de fil
+hors sélection reste un **échec bruyant** skip-and-report (savepoint, ADR-0011) — pas de repli
+silencieux : hors bump de `contract_version`, c'est une violation de contrat qui doit se voir.*
+
 [ADR-0011](0011-contrat-pull-facturation-electricore-cle-rsc-mois.md) a fixé le pull
 facturiste sur un payload *supposé* ; depuis, electricore a versionné son contrat **réel** :
 `PeriodeMeta` **v3** (`electricore_client.models.meta_periodes`, servi en `response_model`,

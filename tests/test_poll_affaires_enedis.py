@@ -29,17 +29,6 @@ def _resultat(id_affaire, rsc=None, error=None):
 
 @tagged('souscriptions', 'souscriptions_poll_rsc', 'post_install', '-at_install')
 class TestPollAffairesEnedis(SouscriptionsTestCase):
-    def setUp(self):
-        super().setUp()
-        # Le paquet peut être absent du sandbox d'exécution des tests : forcé
-        # disponible (même garde que le wizard #84 et le service #88).
-        patcher = patch.object(service_module, 'ELECTRICORE_CLIENT_DISPONIBLE', True)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        ICP = self.env['ir.config_parameter'].sudo()
-        ICP.set_param('souscriptions.electricore_url', 'https://electricore.example.test')
-        ICP.set_param('souscriptions.electricore_api_key', 'fake-api-key')
-
     def _patch_appeler(self, return_value=None, side_effect=None):
         return patch.object(_SERVICE, '_appeler', return_value=return_value, side_effect=side_effect)
 

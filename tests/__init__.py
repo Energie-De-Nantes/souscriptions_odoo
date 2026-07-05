@@ -10,6 +10,7 @@ from . import (
     test_periode_energie,
     test_periode_facture,
     test_periode_form,
+    test_periode_ouverture,
     test_periode_snapshot,
     test_poll_affaires_enedis,
     test_portal,

@@ -1,11 +1,11 @@
 """Service transport unique vers l'endpoint de résolution RSC d'electricore
 (#88, ADR 0021 §3, contrat figé `docs/contrat-rsc.md` côté electricore).
 
-Enveloppe le paquet PyPI épinglé `electricore-client` (requirements.txt),
-même garde d'import et mêmes paramètres système que le wizard de pull des
-méta-périodes (#84, `souscriptions.electricore_url` /
-`souscriptions.electricore_api_key`) — dépendance déclarée par le pin +
-la garde, pas par `external_dependencies` (cf. requirements.txt).
+Le client electricore est acquis auprès de la fabrique unique
+`souscription.electricore.client` (ADR 0024) : ce module ne porte plus ni
+garde d'import, ni drapeau de disponibilité, ni lecture de config — seul son
+propre appel d'endpoint (`resoudre_rsc` en lot) et son mapping d'exception
+(`ContractVersionError`).
 
 C'est l'unique point du module qui parle réseau pour la résolution RSC ; le
 pull des périodes (#12) s'y branchera plus tard.
@@ -17,11 +17,12 @@ from odoo import models
 from odoo.exceptions import UserError
 
 try:
-    from electricore_client import ContractVersionError, ElectricoreClient
+    from electricore_client import ContractVersionError
+except ImportError:  # pragma: no cover - paquet optionnel (ADR 0024) ; la fabrique lève avant tout mapping
 
-    ELECTRICORE_CLIENT_DISPONIBLE = True
-except ImportError:  # pragma: no cover - exercé par test_paquet_manquant_leve_userror_actionnable
-    ELECTRICORE_CLIENT_DISPONIBLE = False
+    class ContractVersionError(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique — la fabrique
+        (`souscription.electricore.client`) échoue avant tout appel qui pourrait la lever."""
 
 
 class SouscriptionRscService(models.AbstractModel):
@@ -41,19 +42,14 @@ class SouscriptionRscService(models.AbstractModel):
             désordre de la réponse.
 
         Raises:
-            UserError: paquet absent, configuration manquante, ou version de
-                contrat inattendue — dans tous les cas, aucune donnée n'est
-                écrite par l'appelant puisque l'exception interrompt l'appel
-                avant tout accès au résultat.
+            UserError: paquet absent, configuration manquante (fabrique,
+                ADR 0024), ou version de contrat inattendue — dans tous les
+                cas, aucune donnée n'est écrite par l'appelant puisque
+                l'exception interrompt l'appel avant tout accès au résultat.
         """
         ids = list(ids)
         if not ids:
             return {}
-        if not ELECTRICORE_CLIENT_DISPONIBLE:
-            raise UserError(
-                "Le paquet 'electricore_client' n'est pas installé sur ce serveur. "
-                'Installez la dépendance épinglée dans requirements.txt puis réessayez.'
-            )
         try:
             resultats = self._appeler(ids)
         except ContractVersionError as exc:
@@ -61,20 +57,8 @@ class SouscriptionRscService(models.AbstractModel):
         return {r.id_affaire: r for r in resultats}
 
     def _appeler(self, ids):
-        """Point de transport unique : construit le client et appelle
+        """Point de transport unique : acquiert le client via la fabrique
+        (`souscription.electricore.client`, ADR 0024) et appelle
         `resoudre_rsc`. Seul endroit qui parle réseau — c'est la couture
         patchée en tests (réponses en boîte, rien d'autre n'est mocké)."""
-        return self._client().resoudre_rsc(ids)
-
-    def _client(self):
-        """Client electricore depuis `ir.config_parameter` — mêmes clés que
-        le wizard de pull des méta-périodes (#84)."""
-        ICP = self.env['ir.config_parameter'].sudo()
-        url = ICP.get_param('souscriptions.electricore_url')
-        api_key = ICP.get_param('souscriptions.electricore_api_key')
-        if not url or not api_key:
-            raise UserError(
-                'Configuration electricore manquante : renseignez les paramètres système '
-                "'souscriptions.electricore_url' et 'souscriptions.electricore_api_key'."
-            )
-        return ElectricoreClient(url=url, api_key=api_key)
+        return self.env['souscription.electricore.client'].client().resoudre_rsc(ids)

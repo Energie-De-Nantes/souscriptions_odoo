@@ -33,19 +33,8 @@ def _resultat(id_affaire, rsc=None, error=None):
 @tagged('souscriptions', 'souscriptions_rsc_service', 'post_install', '-at_install')
 class TestServiceRscTransport(SouscriptionsTestCase):
     """Le service (`souscription.rsc.service`) isolément : appariement,
-    lot vide, garde d'import, config manquante, version de contrat."""
-
-    def setUp(self):
-        super().setUp()
-        # Le paquet peut être absent du sandbox d'exécution des tests : forcé
-        # disponible par défaut (même garde que le wizard #84), sauf test
-        # dédié qui le repatche localement à False.
-        patcher = patch.object(service_module, 'ELECTRICORE_CLIENT_DISPONIBLE', True)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        ICP = self.env['ir.config_parameter'].sudo()
-        ICP.set_param('souscriptions.electricore_url', 'https://electricore.example.test')
-        ICP.set_param('souscriptions.electricore_api_key', 'fake-api-key')
+    lot vide, version de contrat. La garde d'import/config de la fabrique
+    (ADR 0024) est testée une fois dans test_electricore_client_fabrique.py."""
 
     def _patch_appeler(self, return_value=None, side_effect=None):
         return patch.object(
@@ -94,17 +83,6 @@ class TestServiceRscTransport(SouscriptionsTestCase):
         self.assertTrue(resultat['SANS-C15'].error.startswith('Affaire connue'))
         self.assertTrue(resultat['AMBIGUE'].error.startswith('Résolution ambiguë'))
 
-    def test_paquet_manquant_leve_userror_actionnable(self):
-        with patch.object(service_module, 'ELECTRICORE_CLIENT_DISPONIBLE', False):
-            with self.assertRaises(UserError) as cm:
-                self.env[_SERVICE_MODEL].resoudre(['A'])
-        self.assertIn('electricore_client', str(cm.exception))
-
-    def test_config_manquante_leve_userror(self):
-        self.env['ir.config_parameter'].sudo().set_param('souscriptions.electricore_api_key', False)
-        with self.assertRaises(UserError):
-            self.env[_SERVICE_MODEL].resoudre(['A'])
-
     def test_version_de_contrat_inattendue_signalee_sans_ecriture(self):
         """AC2 : version de contrat inattendue -> signalée (UserError), le
         service n'écrit jamais de donnée (l'exception interrompt l'appel
@@ -119,15 +97,6 @@ class TestServiceRscTransport(SouscriptionsTestCase):
 @tagged('souscriptions', 'souscriptions_rsc_service', 'post_install', '-at_install')
 class TestActionResoudreRscMaintenant(SouscriptionsTestCase):
     """Le bouton « résoudre la RSC maintenant » sur la Souscription."""
-
-    def setUp(self):
-        super().setUp()
-        patcher = patch.object(service_module, 'ELECTRICORE_CLIENT_DISPONIBLE', True)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        ICP = self.env['ir.config_parameter'].sudo()
-        ICP.set_param('souscriptions.electricore_url', 'https://electricore.example.test')
-        ICP.set_param('souscriptions.electricore_api_key', 'fake-api-key')
 
     def _patch_appeler(self, return_value=None, side_effect=None):
         return patch.object(

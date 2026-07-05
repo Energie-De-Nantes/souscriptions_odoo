@@ -2,6 +2,7 @@ from . import (
     test_basic,
     test_catalogue,
     test_documents_contractuels,
+    test_electricore_client_fabrique,
     test_facturation,
     test_grille_prix,
     test_integration,

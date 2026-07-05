@@ -1,4 +1,8 @@
-from odoo import api, fields, models
+import logging
+
+from odoo import _, api, fields, models
+
+_logger = logging.getLogger(__name__)
 
 
 class SouscriptionRefacturation(models.Model):
@@ -104,3 +108,107 @@ class SouscriptionRefacturation(models.Model):
                 'price_unit': self.prix,
             },
         )
+
+    # --- Sync electricore : pull-tout des prestations F15 (#37, ADR 0009 §2) ---
+
+    def synchroniser_depuis_electricore(self):
+        """Tire TOUTES les prestations F15 d'electricore et upsert par référence Enedis.
+
+        Pas de fenêtre temporelle : les lignes F15 arrivent en retard, datées dans
+        le passé — un curseur de date les manquerait (ADR 0009 §2) ; l'idempotence
+        vient de la contrainte UNIQUE sur `reference_enedis`. Le client est acquis
+        en tête, avant tout travail (échec rapide et déterministe, ADR 0024 §5).
+        """
+        client = self.env['souscription.electricore.client'].client()
+        compte = self._upserter_prestations(self._tirer_prestations(client))
+        message = _(
+            'Prestations : %(creees)s créée(s), %(maj)s mise(s) à jour, %(facturees)s facturée(s) '
+            'inchangée(s), %(ignorees)s sans souscription, %(erreurs)s en erreur (voir logs).',
+            **compte,
+        )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Sync prestations electricore'),
+                'message': message,
+                'type': 'warning' if compte['erreurs'] else 'success',
+                'sticky': False,
+            },
+        }
+
+    def _tirer_prestations(self, client):
+        """Couture transport (patchée par les tests) : consomme le flux JSONL typé
+        (`PrestationF15`, contrat v1) et rend des dicts plats."""
+        with client.prestations() as flux:
+            return [presta.model_dump() for presta in flux]
+
+    def _upserter_prestations(self, lignes):
+        """Upsert par `reference_enedis` après résolution de la souscription.
+
+        Savepoint par ligne (skip-and-report, ADR 0011) : une contrainte sur une
+        ligne n'emporte pas le lot. Une prestation déjà FACTURÉE n'est jamais
+        réécrite — `facture_id` est la source de vérité du « facturé » (ADR 0009
+        §4), la refacturer suivrait la facture, pas le flux.
+        """
+        existantes = {
+            p.reference_enedis: p
+            for p in self.search([('reference_enedis', 'in', [ligne['reference'] for ligne in lignes])])
+        }
+        compte = {'creees': 0, 'maj': 0, 'facturees': 0, 'ignorees': 0, 'erreurs': 0}
+        for ligne in lignes:
+            souscription = self._resoudre_souscription(ligne)
+            if not souscription:
+                compte['ignorees'] += 1
+                continue
+            existante = existantes.get(ligne['reference'])
+            if existante and existante.facture_id:
+                compte['facturees'] += 1
+                continue
+            try:
+                with self.env.cr.savepoint():
+                    vals = self._vals_prestation(ligne, souscription)
+                    if existante:
+                        existante.write(vals)
+                        compte['maj'] += 1
+                    else:
+                        self.create(vals)
+                        compte['creees'] += 1
+            except Exception:
+                _logger.warning('Sync prestation %s : échec, ligne sautée.', ligne.get('reference'), exc_info=True)
+                compte['erreurs'] += 1
+        return compte
+
+    def _resoudre_souscription(self, ligne):
+        """RSC d'abord (une RSC identifie LE contrat — vrai même pour une prestation
+        d'un ancien contrat sur le même PDL), PDL non résilié en repli et seulement
+        s'il est sans ambiguïté. Sans résolution : recordset vide (ligne ignorée, v1)."""
+        Souscription = self.env['souscription.souscription']
+        rsc = ligne.get('ref_situation_contractuelle')
+        if rsc:
+            par_rsc = Souscription.search([('ref_situation_contractuelle', '=', rsc)], limit=1)
+            if par_rsc:
+                return par_rsc
+        pdl = ligne.get('pdl')
+        if pdl:
+            candidates = Souscription.search([('pdl', '=', pdl), ('etat', '!=', 'resiliee')])
+            if len(candidates) == 1:
+                return candidates
+        return Souscription.browse()
+
+    @api.model
+    def _vals_prestation(self, ligne, souscription):
+        # 'NS' (non soumis) = indemnité hors champ TVA (pénalité due par Enedis) ;
+        # tout taux numérique = prestation taxée. La TVA elle-même suit le PRODUIT
+        # choisi par la nature (ADR 0009 §5) — jamais un taux recopié par ligne.
+        non_soumis = (ligne.get('taux_tva_applicable') or '').strip().upper() == 'NS'
+        return {
+            'reference_enedis': ligne['reference'],
+            'souscription_id': souscription.id,
+            'pdl': ligne.get('pdl') or False,
+            'code_enedis': ligne.get('id_ev') or False,
+            'libelle': ligne.get('libelle_ev') or ligne.get('id_ev') or 'Prestation Enedis',
+            'prix': ligne.get('prix_unitaire') or 0.0,
+            'quantite': ligne.get('quantite') or 1.0,
+            'nature': 'indemnite' if non_soumis else 'prestation',
+        }

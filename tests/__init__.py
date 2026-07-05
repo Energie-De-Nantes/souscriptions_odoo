@@ -27,4 +27,5 @@ from . import (
     test_security,
     test_souscription,
     test_souscription_etat,
+    test_sync_prestations,
 )

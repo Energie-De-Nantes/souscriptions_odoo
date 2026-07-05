@@ -7,4 +7,5 @@
 # manifeste : l'absence du paquet ne doit pas empêcher l'installation du
 # module (garde d'import dans models/wizard/souscription_pull_meta_periodes_wizard.py,
 # UserError explicite au clic si absent).
-electricore-client==0.2.0
+# 0.3.0 : méthode prestations() — sync de la file « à refacturer » (#37).
+electricore-client==0.3.0

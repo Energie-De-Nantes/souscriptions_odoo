@@ -4,6 +4,8 @@ Période, saisie backend. Forme large par cadran réseau, nature réel/estimé,
 cardinalité variable. Pas de verrou ici (#56) ni de rendu (#55/#57).
 """
 
+import os
+import runpy
 from datetime import date
 
 from odoo.exceptions import UserError
@@ -249,3 +251,35 @@ class TestReleveFacturePDF(SouscriptionsTestCase):
         html = self._render_facture(facture)
         for jalon in ('01/01/2024', '15/01/2024', '31/01/2024'):
             self.assertIn(jalon, html)
+
+
+@tagged('souscriptions', 'souscriptions_releve', 'post_install', '-at_install')
+class TestMigrationIndexInteger(SouscriptionsTestCase):
+    """Migration `19.0.1.7.0/pre-migrate.py` (#132) : conversion double
+    precision -> integer des 7 colonnes index_*. Testée sans base réelle via
+    la fonction pure `_colonnes_a_convertir`, chargée par chemin (le dossier
+    de version n'est pas un identifiant Python importable)."""
+
+    @staticmethod
+    def _migration():
+        chemin = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'migrations', '19.0.1.7.0', 'pre-migrate.py')
+        return runpy.run_path(chemin)
+
+    def test_colonnes_double_precision_toutes_a_convertir(self):
+        migration = self._migration()
+        types_avant = dict.fromkeys(migration['COLONNES_INDEX'], 'double precision')
+        self.assertEqual(
+            sorted(migration['_colonnes_a_convertir'](types_avant)),
+            sorted(migration['COLONNES_INDEX']),
+        )
+
+    def test_colonnes_deja_integer_ignorees_idempotence(self):
+        """Upgrade rejoué (déjà migré) : aucune colonne à reconvertir."""
+        migration = self._migration()
+        types_deja_migres = dict.fromkeys(migration['COLONNES_INDEX'], 'integer')
+        self.assertEqual(migration['_colonnes_a_convertir'](types_deja_migres), [])
+
+    def test_colonne_absente_ignoree(self):
+        """Colonne absente du dict (table pas encore créée) : ignorée."""
+        migration = self._migration()
+        self.assertEqual(migration['_colonnes_a_convertir']({}), [])

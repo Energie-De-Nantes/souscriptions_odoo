@@ -567,6 +567,11 @@ class Souscription(models.Model):
         facture (garde anti-doublon) et délègue l'émission à la période
         (``periode._creer_facture``). La composition des lignes et la création du
         ``account.move`` vivent désormais sur la Période (ADR 0006).
+
+        Une Période d'ouverture (#107) est déjà facturée côté legacy
+        (``facture_legacy_ref``) même si elle n'a pas de ``facture_id`` (pas de
+        move dans ce système) : l'anti-doublon l'exclut aussi, pour ne jamais
+        émettre une seconde facture sur un mois déjà réglé en prod.
         """
         _logger.info(f'Créer factures appelé pour {len(self)} souscriptions')
 
@@ -576,7 +581,8 @@ class Souscription(models.Model):
                 continue
 
             premiere_facture = self.env['account.move']
-            for periode in souscription.periode_ids.filtered(lambda p: not p.facture_id):
+            a_facturer = souscription.periode_ids.filtered(lambda p: not p.facture_id and not p.facture_legacy_ref)
+            for periode in a_facturer:
                 try:
                     facture = periode._creer_facture()
                     premiere_facture = premiere_facture or facture

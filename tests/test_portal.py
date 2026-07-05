@@ -396,6 +396,9 @@ class PortalReleveTestCase(SouscriptionsTestMixin, HttpCase):
 
         self.assertIn('71000', response.text)
         self.assertIn('71280', response.text)
+        # Integer (#132) : rendu entier côté portail, pas de '.0' flottant.
+        self.assertNotIn('71000.0', response.text)
+        self.assertNotIn('71280.0', response.text)
         self.assertIn('Réel', response.text)
         self.assertIn('Estimé', response.text)
 

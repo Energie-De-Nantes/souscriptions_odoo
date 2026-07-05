@@ -196,6 +196,9 @@ class TestReleveFacturePDF(SouscriptionsTestCase):
         self.assertIn('31/01/2024', html)
         self.assertIn('10000', html)
         self.assertIn('10250', html)
+        # Integer (#132) : entier sans partie décimale, sans passer par '%g'.
+        self.assertNotIn('10000.0', html)
+        self.assertNotIn('10250.0', html)
         self.assertIn('Réel', html)
         self.assertIn('Estimé', html)
         # Ordre chronologique : le relevé de début précède celui de fin dans le rendu.

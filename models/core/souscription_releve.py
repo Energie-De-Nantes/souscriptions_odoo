@@ -42,13 +42,17 @@ class SouscriptionReleve(models.Model):
     # Index par cadran réseau (même axe mesuré que energie_*) — colonnes
     # pertinentes selon config_cadrans : 4_cadrans → HPH/HPB/HCH/HCB ;
     # hp_hc → HP/HC ; base → Base.
-    index_hph = fields.Float(string='Index HPH', help='Heures Pleines saison Haute')
-    index_hpb = fields.Float(string='Index HPB', help='Heures Pleines saison Basse')
-    index_hch = fields.Float(string='Index HCH', help='Heures Creuses saison Haute')
-    index_hcb = fields.Float(string='Index HCB', help='Heures Creuses saison Basse')
-    index_hp = fields.Float(string='Index HP')
-    index_hc = fields.Float(string='Index HC')
-    index_base = fields.Float(string='Index Base')
+    # Integer (#132) : le contrat electricore (index_*_kwh) normalise l'index en
+    # kWh entier par floor au boundary d'ingestion (ADR-0034 côté electricore) ;
+    # contrairement aux énergies (`energie_*_kwh`) et montants (`*_eur`), qui
+    # restent Float, la résolution sub-kWh n'existe plus pour un index.
+    index_hph = fields.Integer(string='Index HPH', help='Heures Pleines saison Haute')
+    index_hpb = fields.Integer(string='Index HPB', help='Heures Pleines saison Basse')
+    index_hch = fields.Integer(string='Index HCH', help='Heures Creuses saison Haute')
+    index_hcb = fields.Integer(string='Index HCB', help='Heures Creuses saison Basse')
+    index_hp = fields.Integer(string='Index HP')
+    index_hc = fields.Integer(string='Index HC')
+    index_base = fields.Integer(string='Index Base')
 
     # Provenance du justificatif côté electricore (#76, ADR 0020 §6) :
     # `releve_externe_id` (← `releve_id` du contrat v3) identifie le relevé

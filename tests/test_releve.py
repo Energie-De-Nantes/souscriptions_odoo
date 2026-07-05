@@ -4,6 +4,8 @@ Période, saisie backend. Forme large par cadran réseau, nature réel/estimé,
 cardinalité variable. Pas de verrou ici (#56) ni de rendu (#55/#57).
 """
 
+import os
+import runpy
 from datetime import date
 
 from odoo.exceptions import UserError
@@ -75,6 +77,23 @@ class TestReleveModel(SouscriptionsTestCase):
             (1000.0, 2000.0, 3000.0, 4000.0),
         )
         self.assertEqual(releve.config_cadrans, '4_cadrans')
+
+    def test_index_sont_des_champs_integer(self):
+        """Les 7 index (#132) sont des `fields.Integer` — un index de compteur
+        electricore est un entier kWh par construction (ADR-0034 côté
+        electricore), affiché sans décimale ni widget côté Odoo."""
+        Releve = self.env['souscription.releve']
+        champs_index = (
+            'index_hph',
+            'index_hpb',
+            'index_hch',
+            'index_hcb',
+            'index_hp',
+            'index_hc',
+            'index_base',
+        )
+        for champ in champs_index:
+            self.assertEqual(Releve._fields[champ].type, 'integer', champ)
 
     def test_releves_ordonnes_chronologiquement(self):
         """Relu depuis la base (comme au rendu PDF/portail), releve_ids est trié
@@ -179,6 +198,9 @@ class TestReleveFacturePDF(SouscriptionsTestCase):
         self.assertIn('31/01/2024', html)
         self.assertIn('10000', html)
         self.assertIn('10250', html)
+        # Integer (#132) : entier sans partie décimale, sans passer par '%g'.
+        self.assertNotIn('10000.0', html)
+        self.assertNotIn('10250.0', html)
         self.assertIn('Réel', html)
         self.assertIn('Estimé', html)
         # Ordre chronologique : le relevé de début précède celui de fin dans le rendu.
@@ -229,3 +251,35 @@ class TestReleveFacturePDF(SouscriptionsTestCase):
         html = self._render_facture(facture)
         for jalon in ('01/01/2024', '15/01/2024', '31/01/2024'):
             self.assertIn(jalon, html)
+
+
+@tagged('souscriptions', 'souscriptions_releve', 'post_install', '-at_install')
+class TestMigrationIndexInteger(SouscriptionsTestCase):
+    """Migration `19.0.1.7.0/pre-migrate.py` (#132) : conversion double
+    precision -> integer des 7 colonnes index_*. Testée sans base réelle via
+    la fonction pure `_colonnes_a_convertir`, chargée par chemin (le dossier
+    de version n'est pas un identifiant Python importable)."""
+
+    @staticmethod
+    def _migration():
+        chemin = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'migrations', '19.0.1.7.0', 'pre-migrate.py')
+        return runpy.run_path(chemin)
+
+    def test_colonnes_double_precision_toutes_a_convertir(self):
+        migration = self._migration()
+        types_avant = dict.fromkeys(migration['COLONNES_INDEX'], 'double precision')
+        self.assertEqual(
+            sorted(migration['_colonnes_a_convertir'](types_avant)),
+            sorted(migration['COLONNES_INDEX']),
+        )
+
+    def test_colonnes_deja_integer_ignorees_idempotence(self):
+        """Upgrade rejoué (déjà migré) : aucune colonne à reconvertir."""
+        migration = self._migration()
+        types_deja_migres = dict.fromkeys(migration['COLONNES_INDEX'], 'integer')
+        self.assertEqual(migration['_colonnes_a_convertir'](types_deja_migres), [])
+
+    def test_colonne_absente_ignoree(self):
+        """Colonne absente du dict (table pas encore créée) : ignorée."""
+        migration = self._migration()
+        self.assertEqual(migration['_colonnes_a_convertir']({}), [])

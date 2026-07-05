@@ -202,7 +202,7 @@
                                                     <span t-if="releve.nature == 'reel'" class="fe_badge fe_badge_reel">Réel</span>
                                                     <span t-else="" class="fe_badge fe_badge_est">Estimé</span>
                                                 </td>
-                                                <td t-foreach="colonnes" t-as="col" class="num" t-out="'%g' % releve[col['field']]"/>
+                                                <td t-foreach="colonnes" t-as="col" class="num" t-out="releve[col['field']]"/>
                                             </tr>
                                         </t>
                                     </tbody>

@@ -16,7 +16,7 @@ services:
       retries: 5
 
   odoo:
-    build: 
+    build:
       context: ../
       dockerfile: docker/Dockerfile
     depends_on:
@@ -39,9 +39,10 @@ services:
       --db_password=odoo
       --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
       --load-language=fr_FR
+      --max-cron-threads=0
 
   odoo-dev:
-    build: 
+    build:
       context: ../
       dockerfile: docker/Dockerfile
     depends_on:
@@ -63,6 +64,7 @@ services:
       --db_password=odoo
       --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
       --load-language=fr_FR
+      --max-cron-threads=0
       --dev=reload,xml,qweb
     profiles:
       - dev

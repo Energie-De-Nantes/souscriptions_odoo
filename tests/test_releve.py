@@ -76,6 +76,23 @@ class TestReleveModel(SouscriptionsTestCase):
         )
         self.assertEqual(releve.config_cadrans, '4_cadrans')
 
+    def test_index_sont_des_champs_integer(self):
+        """Les 7 index (#132) sont des `fields.Integer` — un index de compteur
+        electricore est un entier kWh par construction (ADR-0034 côté
+        electricore), affiché sans décimale ni widget côté Odoo."""
+        Releve = self.env['souscription.releve']
+        champs_index = (
+            'index_hph',
+            'index_hpb',
+            'index_hch',
+            'index_hcb',
+            'index_hp',
+            'index_hc',
+            'index_base',
+        )
+        for champ in champs_index:
+            self.assertEqual(Releve._fields[champ].type, 'integer', champ)
+
     def test_releves_ordonnes_chronologiquement(self):
         """Relu depuis la base (comme au rendu PDF/portail), releve_ids est trié
         par date — support du « justificatif chronologique » (#55/#57)."""

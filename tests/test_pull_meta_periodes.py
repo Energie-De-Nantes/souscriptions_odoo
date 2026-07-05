@@ -142,6 +142,15 @@ class TestAmorcerDepuisMeta(SouscriptionsTestCase):
         self.assertEqual(premier.index_base, 1000.0)
         self.assertEqual(second.nature, 'estime')
 
+    def test_index_kwh_absent_devient_zero_entier(self):
+        """`index_*_kwh=None` (registre non transmis) → défaut `0` (int, #132),
+        pas `0.0` : les index sont des `fields.Integer` côté Odoo."""
+        meta = _periode_meta(releves_utilises=[_objet_releve(index_base_kwh=None)])
+        periode = self.env['souscription.periode']._amorcer_depuis_meta(self.souscription_base, meta)
+
+        self.assertEqual(periode.releve_ids.index_base, 0)
+        self.assertIsInstance(periode.releve_ids.index_base, int)
+
     def test_nature_corrige_devient_reel(self):
         """`nature_index='corrige'` (réel révisé) atterrit en `reel` (ADR 0020 §6)."""
         meta = _periode_meta(

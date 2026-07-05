@@ -75,7 +75,7 @@
                     <notebook>
                         <page string="Périodes de facturation">
                             <field name="periode_ids">
-                                <list editable="bottom">
+                                <list editable="bottom" decoration-info="facture_legacy_ref and not facture_id">
                                     <field name="mois_annee"/>
                                     <field name="type_periode"/>
                                     <field name="type_tarif_periode"/>
@@ -89,6 +89,9 @@
                                     <field name="turpe_fixe"/>
                                     <field name="turpe_variable"/>
                                     <field name="facture_id"/>
+                                    <!-- Période d'ouverture (#107) : backfill lié à une
+                                         facture legacy plutôt qu'à un account.move. -->
+                                    <field name="facture_legacy_ref"/>
                                 </list>
                             </field>
                         </page>

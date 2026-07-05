@@ -4,7 +4,7 @@
         <field name="name">souscription.periode.list</field>
         <field name="model">souscription.periode</field>
         <field name="arch" type="xml">
-            <list>
+            <list decoration-info="facture_legacy_ref and not facture_id">
                 <field name="souscription_id"/>
                 <field name="pdl"/>
                 <field name="mois_annee"/>
@@ -20,6 +20,10 @@
                 <field name="facture_state" widget="badge"
                        decoration-success="facture_state == 'posted'"
                        decoration-warning="facture_state == 'draft'"/>
+                <!-- Période d'ouverture (#107) : facturée côté legacy, pas
+                     d'account.move — la référence prod est le marqueur
+                     d'identification, mise en évidence par la couleur de ligne. -->
+                <field name="facture_legacy_ref"/>
             </list>
         </field>
     </record>
@@ -136,6 +140,11 @@
                     <group string="Documents">
                         <field name="facture_id"/>
                         <field name="facture_state"/>
+                        <!-- Période d'ouverture (#107, ADR 0023) : backfill lié
+                             à une facture PROD (Odoo 17), hors du système —
+                             pas d'account.move ; ce champ est le marqueur
+                             d'identification de la Période d'ouverture. -->
+                        <field name="facture_legacy_ref"/>
                     </group>
                     <!-- Tous les documents liés (factures, avoirs…), brouillons
                          compris : une facture remise en brouillon reste visible ici. -->

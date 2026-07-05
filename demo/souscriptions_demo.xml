@@ -200,6 +200,61 @@
         </record>
 
         <!-- ================================ -->
+        <!-- PÉRIODES D'OUVERTURE (BACKFILL MIGRATION — #107, ADR 0023 §3) -->
+        <!-- ================================ -->
+        <!-- Client migré depuis la prod (Odoo 17) : contrat lissé dont les mois
+             antérieurs à la bascule ne sont pas régularisés. Démontre le
+             backfill : les Périodes d'ouverture portent le facturé prod
+             (provision, jours) et référencent une facture LEGACY plutôt qu'un
+             account.move (ADR 0004/0023) — aucune facture n'est créée dans ce
+             système pour ces mois. -->
+        <record id="demo_client_migre_lisse" model="res.partner">
+            <field name="name">Amélie Rousseau</field>
+            <field name="is_company">False</field>
+            <field name="street">27 rue de la Bascule</field>
+            <field name="city">Nantes</field>
+            <field name="zip">44100</field>
+            <field name="country_id" ref="base.fr"/>
+            <field name="email">amelie.rousseau@email.fr</field>
+        </record>
+
+        <record id="demo_souscription_migree_lissee" model="souscription.souscription">
+            <field name="partner_id" ref="demo_client_migre_lisse"/>
+            <field name="pdl">PDL22516914077777</field>
+            <field name="puissance_souscrite">9</field>
+            <field name="type_tarif">hphc</field>
+            <field name="date_debut">2022-10-01</field>
+            <field name="provision_hp_kwh">210</field>
+            <field name="provision_hc_kwh">130</field>
+            <field name="lisse">True</field>
+            <field name="mode_paiement">prelevement</field>
+            <field name="etat_facturation_id" ref="etat_a_facturer"/>
+            <field name="ref_compteur">85445566</field>
+        </record>
+
+        <!-- Novembre et décembre 2023 : mois non régularisés au moment de la
+             bascule, backfillés depuis la facture legacy correspondante. -->
+        <record id="demo_periode_ouverture_novembre_2023" model="souscription.periode">
+            <field name="souscription_id" ref="demo_souscription_migree_lissee"/>
+            <field name="date_debut">2023-11-01</field>
+            <field name="date_fin">2023-12-01</field>
+            <field name="type_periode">mensuelle</field>
+            <field name="provision_hp_kwh">210</field>
+            <field name="provision_hc_kwh">130</field>
+            <field name="facture_legacy_ref">FACT-PROD-2023-11-004521</field>
+        </record>
+
+        <record id="demo_periode_ouverture_decembre_2023" model="souscription.periode">
+            <field name="souscription_id" ref="demo_souscription_migree_lissee"/>
+            <field name="date_debut">2023-12-01</field>
+            <field name="date_fin">2024-01-01</field>
+            <field name="type_periode">mensuelle</field>
+            <field name="provision_hp_kwh">210</field>
+            <field name="provision_hc_kwh">130</field>
+            <field name="facture_legacy_ref">FACT-PROD-2023-12-004890</field>
+        </record>
+
+        <!-- ================================ -->
         <!-- PÉRIODES ADMIN (PORTAL TESTING) -->
         <!-- ================================ -->
 

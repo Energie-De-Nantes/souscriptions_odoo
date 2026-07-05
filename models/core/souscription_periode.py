@@ -204,6 +204,21 @@ class SouscriptionPeriode(models.Model):
     # une facture est remise en brouillon par le·la facturiste.
     facture_state = fields.Selection(related='facture_id.state', string='État facture', readonly=True)
 
+    # Période d'ouverture (#107, ADR 0023 décision 3) : Période légitime
+    # backfillée par la migration pour un mois non régularisé d'un contrat
+    # lissé, portant du facturé (provision, jours — champs existants) mais
+    # liée à une facture PROD (Odoo 17), hors du système — donc sans
+    # account.move (facture_id/move_ids restent vides, pas de move fictif). Ce
+    # champ est le seul marqueur : sa présence identifie la Période d'ouverture,
+    # aucun type_periode dédié — elle reste 'mensuelle', pour rester dans le
+    # même périmètre qu'une Période facturée normale (régularisation #20).
+    facture_legacy_ref = fields.Char(
+        string='Facture legacy (référence)',
+        readonly=True,
+        help='Référence de la facture prod (Odoo 17) dont cette Période est le backfill. '
+        "Marque la Période comme « d'ouverture » : pas d'account.move dans ce système.",
+    )
+
     @api.depends('move_ids.move_type')
     def _compute_facture_id(self):
         for periode in self:
@@ -315,19 +330,24 @@ class SouscriptionPeriode(models.Model):
             'cta_eur',
             'taux_accise_eur_mwh',
             'puissance_moyenne_kva',
+            # Référence de la facture legacy (#107) : au même titre que
+            # facture_id, sa présence fige la période — l'écraser romprait le
+            # lien vers la facture prod sans passer par le verrou.
+            'facture_legacy_ref',
         }
     )
 
     def write(self, vals):
         """Verrou de facturation (#14) : la période est le brouillon de travail
-        éditable *avant* facturation ; dès qu'une facture la référence (facturée,
-        brouillon de facture compris), ses champs facturables sont figés et toute
-        réécriture est rejetée (UserError, y compris via RPC). Pour corriger :
-        supprimer la facture (ce qui dé-fige la période) ou émettre une
-        régularisation."""
+        éditable *avant* facturation ; dès qu'une facture la référence — un
+        account.move (facture_id, #14) ou une facture legacy (facture_legacy_ref,
+        #107, Période d'ouverture sans move) —, ses champs facturables sont
+        figés et toute réécriture est rejetée (UserError, y compris via RPC).
+        Pour corriger : supprimer la facture (ce qui dé-fige la période) ou
+        émettre une régularisation."""
         if self._LOCKED_FIELDS.intersection(vals):
             for periode in self:
-                if periode.facture_id:
+                if periode.facture_id or periode.facture_legacy_ref:
                     raise UserError(
                         f'Période {periode.mois_annee} : déjà facturée, modification interdite. '
                         'Supprimez la facture pour corriger, ou créez une régularisation.'

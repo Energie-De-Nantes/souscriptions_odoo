@@ -1,0 +1,32 @@
+# electricore-client : dépendance *molle* (garde d'import), jamais `external_dependencies` — une fabrique de client unique
+
+*Statut : accepté. Formalise une décision déjà prise mais éparse — comment (#77 AC1), requirements.txt, docstring du manifeste — au moment où les deux gardes d'import dupliquées (service RSC #88 ; wizard de pull #77) fusionnent en une couture de construction unique, `souscription.electricore.client`. Ne re-décide pas [ADR-0019](0019-consommation-electricore-client-fin-contrat-type-versionne.md) (quel paquet, quel contrat) : elle en fixe la **posture de dépendance** et le **point de construction**.*
+
+Odoo consomme electricore via le paquet fin `electricore-client` ([ADR-0019](0019-consommation-electricore-client-fin-contrat-type-versionne.md)). Deux fonctionnalités l'appellent : la **résolution RSC** (poll de raccordement, [ADR-0021](0021-chaine-raccordement-pilotee-faits-naissance-instance-rsc-poll.md)) et le **pull des méta-périodes** (wizard facturiste, [ADR-0011](0011-contrat-pull-facturation-electricore-cle-rsc-mois.md)). Odoo offre la clé de manifeste `external_dependencies` : il vérifie l'importabilité des paquets Python **au chargement** et **refuse de charger le module entier** si l'un manque (échec fermé, en amont). L'AC de #77 exige au contraire un module **installable sur toute instance**, même sans le paquet — avec un message clair *au clic* si absent. Avant cet ADR, chaque fonctionnalité portait sa **propre** garde d'import + sa propre méthode `_client()` (bloc `try/import`, lecture des paramètres système, deux `UserError` — le tout **copié à l'identique**).
+
+## Décision
+
+1. **Dépendance molle, jamais `external_dependencies`.** `electricore-client` est **épinglé** dans `requirements.txt` (préoccupation de déploiement) et **gardé** par un `try/import` (préoccupation runtime), mais **n'est pas déclaré** en `external_dependencies`. Son absence n'empêche ni l'installation ni le chargement du module ; seules les deux fonctionnalités qui appellent electricore échouent, et seulement **à l'usage**.
+2. **Détection au démarrage, levée à l'usage.** La garde d'import s'évalue **une fois** au chargement (drapeau de disponibilité). L'erreur actionnable (`UserError`) **ne peut pas** être levée à l'import — cela casserait le chargement du registre, précisément ce que ferait `external_dependencies` — elle est donc levée au moment de l'appel.
+3. **Deux « disponibilités » distinctes.** (a) *paquet présent* = un **fait de démarrage** (drapeau d'import) ; (b) *URL + api_key configurés* = une **donnée runtime** (`ir.config_parameter`, éditable à chaud, sans redémarrage) — donc vérifiée à l'usage. Aucune des deux ne peut être un contrôle d'installation.
+4. **Une fabrique de client unique.** Un `AbstractModel` `souscription.electricore.client` (méthode publique `client()`) porte **la** garde d'import, **le** drapeau, **la** lecture de config et **la** construction du client — les deux `UserError` (*paquet manquant* / *config manquante*) comprises. Le service RSC et le wizard de pull l'appellent ; **aucun** ne reconstruit de client. Chaque appelant conserve son **appel d'endpoint** (`resoudre_rsc` en **lot** ↔ `meta_periodes` en **flux**/context-manager) et sa **propre** correspondance d'exceptions.
+5. **Échec rapide et déterministe.** Chaque action acquiert le client **en tête** (`client()`), avant tout travail dépendant des données : un même clic produit toujours la même classe de résultat. La construction **n'ouvre aucune socket** (le HTTP n'a lieu qu'à l'ouverture du flux / à l'appel batch), donc l'échec précoce est gratuit.
+6. **Couture de test par endpoint.** Chaque appelant patche **sa** méthode de transport nommée (`_appeler` côté RSC — inchangée ; `_ouvrir_flux` côté pull) et retourne une réponse en boîte, sans construire de client. La **fabrique** a son propre petit test (paquet manquant / config manquante / construction), là où ces gardes se testaient auparavant **en double**.
+
+## Conséquences
+
+- Le module reste **installable partout** ; le déploiement doit `pip install electricore-client` (odoo.sh / Docker) — une **étape de build**, pas une dépendance de manifeste.
+- La garde de disponibilité **vit et se teste une seule fois** (dans la fabrique) ; les `setUp` des tests d'endpoint cessent de patcher le drapeau `ELECTRICORE_CLIENT_DISPONIBLE`.
+- **Garde-fou pour un futur audit** : voir « import gardé + `UserError` au clic » et vouloir le *corriger* en `external_dependencies` **régresse l'AC #77** — relire cet ADR d'abord.
+- Le nom du service RSC cesse de mentir : il reste *pour la résolution RSC*, et n'est plus le point de construction de facto du client de pull.
+
+## Options écartées
+
+- **`external_dependencies` dans le manifeste** (idiome Odoo standard, échec fermé à l'install) : ferait échouer le module **entier** — y compris contrats, factures, portail — sur toute instance sans le paquet. Contredit « module installable » (#77).
+- **Statu quo : deux gardes d'import dupliquées.** Même bloc `try/import`, même `_client()`, mêmes deux `UserError` copiés dans le service RSC et le wizard — deux endroits à patcher, deux jeux de tests du même garde.
+- **Router le pull *à travers* le service RSC** (`souscription.rsc.service._client()`) : réutilise une **méthode privée** d'un modèle **nommé pour un autre endpoint** ; le nom du service devient trompeur dès que le pull s'en sert.
+- **Fabrique de *transport complète*** (appels d'endpoint inclus) : les sémantiques diffèrent (lot ↔ flux/context-manager) et les vocabulaires d'exception aussi (`ContractVersionError` seul ↔ `+ IngestionEnCours`, `PreconditionNonRemplie`) — chaque endpoint deviendrait un **passe-plat mince** à signature différente. La fabrique s'arrête donc à « rends-moi un client configuré ».
+
+## Raison
+
+electricore est **optionnel à l'installation** mais **requis à l'usage** des deux features qui l'appellent. La seule forme qui respecte cela : *détecter au démarrage, lever à l'usage, lire la config à l'usage* — et concentrer ces trois gestes dans **une** couture, pour que l'invariant « dépendance molle, message actionnable » ait **un seul gardien, testé une fois**. C'est aussi la frontière voulue par [ADR-0001](0001-odoo-systeme-ecriture-electricore-api-read-only.md)/[ADR-0019](0019-consommation-electricore-client-fin-contrat-type-versionne.md) : tout ce qui parle réseau vers electricore passe par un point nommé et unique.

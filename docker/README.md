@@ -1,21 +1,9 @@
 # Déploiement Docker - Module Souscriptions
 
-Ce dossier contient tous les fichiers nécessaires pour le déploiement Docker du module Souscriptions.
+Ce dossier contient les fichiers Docker du module Souscriptions.
 
-## 🚀 Déploiement en une commande
-
-**Sur la machine de démo :**
-```bash
-curl -sSL https://raw.githubusercontent.com/Energie-De-Nantes/souscriptions_odoo/refactor/minimal-version/docker/scripts/demo_simple.sh | bash
-```
-
-Cette commande va :
-- Télécharger et lancer PostgreSQL
-- Télécharger l'image Odoo pré-configurée depuis Docker Hub
-- Créer automatiquement la base de données et les données de démo
-- Démarrer Odoo sur http://localhost:8069
-
-**Connexion :** admin / admin
+> Pour lancer une instance de dev en une commande, voir `scripts/run-app.sh` à
+> la racine du dépôt (démarre PostgreSQL + Odoo avec les données de démo).
 
 ## 📁 Structure des fichiers
 
@@ -23,15 +11,10 @@ Cette commande va :
 docker/
 ├── Dockerfile                    # Image personnalisée avec le module
 ├── docker-entrypoint-init.sh     # Script d'auto-initialisation
-├── docker-compose.yml            # Version développement
-├── docker-compose.demo.yml       # Version pour Docker Hub
-├── docker-compose.prod.yml       # Version optimisée
+├── docker-compose.yml            # Stack de développement (db + odoo)
 ├── config/
 │   ├── odoo.conf                 # Configuration standard
-│   └── odoo-prod.conf           # Configuration optimisée
-├── scripts/
-│   ├── build_and_push.sh        # Construction et publication
-│   └── demo_simple.sh           # Démo one-liner
+│   └── odoo-prod.conf            # Configuration optimisée
 └── README.md                     # Cette documentation
 ```
 
@@ -43,50 +26,33 @@ docker/
 docker build -f docker/Dockerfile -t souscriptions-local .
 ```
 
-### Développement avec docker-compose
+### Développement avec docker compose
 ```bash
 cd docker/
-docker-compose up -d                    # Version production
-docker-compose --profile dev up odoo-dev # Version développement
-```
-
-### Publication sur Docker Hub
-```bash
-# Depuis la racine du projet
-./docker/scripts/build_and_push.sh
+docker compose up -d                      # service odoo (lecture seule, port 8069)
+docker compose --profile dev up odoo-dev  # service odoo-dev (hot reload, port 8070)
 ```
 
 ## 🗄️ Données de démo
 
-L'image crée automatiquement :
-- 4 clients (2 particuliers, 2 professionnels)
-- 4 souscriptions avec différents profils (Base, HP/HC)
-- 1 grille de prix active pour 2025
-- États de facturation pré-configurés
+L'entrypoint (`docker-entrypoint-init.sh`) crée automatiquement la base
+`souscriptions_demo` et installe le module avec les données de démo
+(`demo/*.xml`) au premier lancement.
 
 ## 🛠️ Maintenance
 
-### Arrêter la démo
+### Arrêter la stack
 ```bash
-docker stop odoo-app odoo-db && docker rm odoo-app odoo-db
+cd docker/ && docker compose down
 ```
 
-### Mise à jour
+### Reset complet (repartir d'une base vierge)
 ```bash
-# La même commande que pour l'installation
-curl -sSL [...]/demo_simple.sh | bash
-```
-
-### Reset complet
-```bash
-docker stop odoo-app odoo-db && docker rm odoo-app odoo-db
-docker volume prune -f
-# Puis relancer la démo
+cd docker/ && docker compose down -v
 ```
 
 ## 📝 Notes techniques
 
-- **Taille de l'image** : ~1.5GB (incluant Odoo + PostgreSQL + dépendances Python)
 - **RAM requise** : ~2GB minimum
-- **Ports utilisés** : 8069 (Odoo)
+- **Ports utilisés** : 8069 (odoo), 8070 (odoo-dev)
 - **Base de données** : `souscriptions_demo` créée automatiquement

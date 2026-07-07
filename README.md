@@ -6,7 +6,7 @@ Un addon libre pour Odoo 19 qui aide à gérer les abonnements électriques en F
 
 ## Pourquoi ce projet existe ?
 
-Parce que gérer un contrat d'électricité, c'est pas pareil que vendre des chaussettes ! 
+Parce que gérer un contrat d'électricité, c'est pas pareil que vendre des chaussettes !
 
 Les abonnements électriques en France ont des spécificités que le module standard d'Odoo ne gère pas du tout :
 - Les prix changent en cours de contrat (merci les fluctuations du marché et des taxes...)
@@ -22,7 +22,7 @@ Ce module remplace le système d'abonnement standard d'Odoo par quelque chose qu
 
 **Ce qui fonctionne déjà (Phase 1) :**
 - ✅ Gestion des contrats avec facturation mensuelle
-- ✅ Support des tarifs HP/HC et Base  
+- ✅ Support des tarifs HP/HC et Base
 - ✅ Lissage des factures avec régularisation
 - ✅ Intégration propre dans Odoo (facturation, comptabilité, etc.)
 - ✅ Module de demandes de raccordement
@@ -39,16 +39,16 @@ graph TD
     A[Addon Souscriptions Électriques] --> B[Module Core/Souscriptions]
     A --> C[Module Métier - DÉSACTIVÉ]
     A --> D[Module Raccordement]
-    
+
     B --> E[Gestion des contrats]
     B --> F[Facturation HP/HC]
     B --> G[Lissage & régularisation]
     B --> H[Intégration Odoo]
-    
+
     C --> I[Import données Enedis]
     C --> J[Historique consommation]
     C --> K[Données PDL]
-    
+
     D --> L[Demandes raccordement]
     D --> M[Suivi des étapes]
     D --> N[Documents associés]
@@ -64,7 +64,7 @@ git clone https://github.com/votre-repo/souscriptions_odoo.git
 cd souscriptions_odoo
 
 # Lancer avec des données d'exemple
-docker compose -f docker/docker-compose.demo.yml up
+./scripts/run-app.sh
 
 # Accéder à Odoo : http://localhost:8069
 # Compte admin : admin / admin

@@ -11,7 +11,7 @@
             <list string="Refacturations" default_order="prix desc">
                 <field name="souscription_id"/>
                 <field name="pdl"/>
-                <field name="reference_enedis"/>
+                <field name="reference"/>
                 <field name="code_enedis"/>
                 <field name="libelle"/>
                 <field name="nature"/>
@@ -38,7 +38,7 @@
                         <group string="Prestation">
                             <field name="souscription_id"/>
                             <field name="pdl"/>
-                            <field name="reference_enedis"/>
+                            <field name="reference"/>
                             <field name="code_enedis"/>
                             <field name="libelle"/>
                         </group>
@@ -61,7 +61,7 @@
         <field name="model">souscription.refacturation</field>
         <field name="arch" type="xml">
             <search>
-                <field name="reference_enedis"/>
+                <field name="reference"/>
                 <field name="libelle"/>
                 <field name="souscription_id"/>
                 <field name="pdl"/>

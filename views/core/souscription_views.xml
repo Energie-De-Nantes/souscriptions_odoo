@@ -98,7 +98,7 @@
                         <page string="Refacturations">
                             <field name="refacturation_ids">
                                 <list editable="bottom">
-                                    <field name="reference_enedis"/>
+                                    <field name="reference"/>
                                     <field name="code_enedis"/>
                                     <field name="libelle"/>
                                     <field name="quantite"/>

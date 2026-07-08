@@ -14,9 +14,10 @@ fait mensuel mais un **en-cours refacturable** à cadence Enedis.
    `prix`, `quantite`, sa **nature** (`prestation` taxée / `indemnite` hors champ TVA, cf. §5),
    un `souscription_id` (M2o) et un `facture_id` (M2o). Aucun lien vers `souscription.periode`.
 
-2. **Alimenté par electricore, dédupliqué par référence Enedis.** Les prestations sont
+2. **Alimenté par electricore, dédupliqué par référence de contenu.** Les prestations sont
    **tirées en totalité** d'un endpoint electricore dédié (le volume est faible — ~une par PDL),
-   puis **upsert** sur une **référence Enedis unique** (contrainte d'unicité). Pas de fenêtre
+   puis **upsert** sur une **référence de contenu unique** (contrainte d'unicité ; terme corrigé
+   par #146 — le F15 n'a pas d'identifiant de ligne, la clé est fabriquée par electricore). Pas de fenêtre
    temporelle : pull-tout-et-dédup est plus robuste qu'un curseur de date (les lignes F15
    arrivent en retard, datées dans le passé — un curseur les manquerait). Le PDL est résolu en
    *Souscription* au moment du sync ; les PDL **sans souscription active sont ignorés** (v1).
@@ -65,7 +66,7 @@ porté comme **ligne signée** qui se nette dans la facture mensuelle.
   prestations-seules (souscription sans période ce mois-là, ex. après résiliation) reste un
   **follow-up** assumé, pas du v1.
 - **Curseur temporel `[dernière facturée → maintenant]`** : fragile (prestations en retard datées
-  avant le curseur → perdues ; relances → double-facturation). La dédup par référence Enedis
+  avant le curseur → perdues ; relances → double-facturation). La dédup par référence de contenu
   supprime les deux risques.
 - **Booléen `facturee`** au lieu du M2o : deux champs à désynchroniser, et perd le « où ».
 

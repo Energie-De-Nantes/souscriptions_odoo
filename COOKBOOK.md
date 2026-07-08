@@ -8,7 +8,7 @@ recipe(s) for a change and fills the `{placeholders}`.
 ## bring-up
 mode: afk
 when: you need a live instance to exercise a change end to end
-do: `./scripts/run-app.sh` (runs a server — background it; `--reset` rebuilds the demo DB from scratch)
+do: `./scripts/dev.sh` (runs a server — background it; `--data=prod` switches to souscriptions_prodlocal without demo; `--reset` rebuilds the current mode's DB from scratch)
 observe: startup logs — ready when it prints `Odoo démarre sur http://localhost:8069` (login admin / admin, DB souscriptions_demo)
 
 ## tests

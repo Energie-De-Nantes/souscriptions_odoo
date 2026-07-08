@@ -220,8 +220,8 @@ comme distinct de la réalité *physique* mesurée par electricore.
 
 **Refacturation (Enedis)** :
 En-cours refacturable d'origine **Enedis** que le fournisseur **refacture** au·à la
-*souscripteur·rice* (`souscription.refacturation`). Porte un *Code Enedis*, un libellé, un prix et une
-quantité. **Indépendante de la _Période_** : ce n'est pas un fait mensuel mais un en-cours rattaché à
+*souscripteur·rice* (`souscription.refacturation`). Porte une *Référence de contenu*, un *Code
+Enedis*, un libellé, un prix et une quantité. **Indépendante de la _Période_** : ce n'est pas un fait mensuel mais un en-cours rattaché à
 un·e *souscripteur·rice*, qu'une *Facture* **rassemble** au moment de la facturation (plusieurs
 *Refacturations* par *Facture*).
 Deux **natures** :
@@ -240,6 +240,16 @@ factures : il n'y a pas de garde-fou bloquant.
 _Éviter_ : **« prestation » pour désigner l'ensemble** (c'est une *nature*, pas l'umbrella — dire
 *Refacturation*) ; « presta » seule ; *service* ; confondre avec un *Geste commercial* ; **« en attente »
 pour la file par défaut** (c'est *à refacturer*).
+
+**Référence de contenu** :
+La clé d'identité d'une *Refacturation* (champ `reference`, libellé « Référence (electricore) »),
+**fabriquée par electricore** à partir du contenu de la ligne (contrat `prestations` v1, cf.
+Energie-De-Nantes/electricore#590 et `docs/contrat-prestations.md` côté electricore). Ce n'est
+**pas** une référence Enedis : le flux F15 n'a **aucun identifiant de ligne**. Le champ porte le
+nom exact du payload du contrat (`reference` — symétrie producteur/consommateur) et une contrainte
+UNIQUE : c'est elle qui rend le sync pull-tout-et-dédup **idempotent** (ADR 0009 §2).
+_Éviter_ : « référence Enedis » (le F15 n'en fournit pas) ; confondre avec le *Code Enedis* (qui
+identifie le **type** de prestation au catalogue Enedis, pas une ligne précise).
 
 **Facturiste** :
 Rôle métier qui conduit la facturation mensuelle depuis Odoo et **vérifie les données avant

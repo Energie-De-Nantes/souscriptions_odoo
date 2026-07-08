@@ -19,8 +19,10 @@ fait mensuel mais un **en-cours refacturable** à cadence Enedis.
    puis **upsert** sur une **référence de contenu unique** (contrainte d'unicité ; terme corrigé
    par #146 — le F15 n'a pas d'identifiant de ligne, la clé est fabriquée par electricore). Pas de fenêtre
    temporelle : pull-tout-et-dédup est plus robuste qu'un curseur de date (les lignes F15
-   arrivent en retard, datées dans le passé — un curseur les manquerait). Le PDL est résolu en
-   *Souscription* au moment du sync ; les PDL **sans souscription active sont ignorés** (v1).
+   arrivent en retard, datées dans le passé — un curseur les manquerait). ~~Le PDL est résolu en
+   *Souscription* au moment du sync ; les PDL **sans souscription active sont ignorés** (v1).~~
+   *(Amendé par #147, cf. ci-dessous : résolution par **RSC seule** — pas de repli PDL — et
+   **insert-si-absente** plutôt qu'upsert.)*
 
 3. **Rassemblée sur la facture de la Période, orchestrée par la Souscription.** Une *Prestation*
    ne fabrique **pas** sa propre facture. Au moment de `souscription.creer_factures()`, après que
@@ -102,3 +104,26 @@ prestations taxées — d'où deux produits. Le module les livre tous deux **san
 
 Bénéfices : plus de mapping taux→enregistrement, positions fiscales respectées, et la « TVA pas
 depuis le défaut produit » d'origine devient « TVA *depuis* le bon produit, choisi par nature ».
+
+## Amendement (#147) — résolution par RSC seule, insert-si-absente
+
+Décisions re-instruites en séance de grill du 2026-07-08 (contre le contrat mergé
+Energie-De-Nantes/electricore#590), amendant le §2 :
+
+1. **Résolution par RSC seule, pas de repli PDL.** Cohérent avec
+   [ADR-0010](0010-identite-souscription-rsc-cle-id-affaire-amorce.md) §4 : aucun repli flou sur le
+   flux vif (vérifié en spike : 0 RSC nulle dans le F15). Une ligne dont la RSC ne matche aucune
+   *Souscription* est **ignorée et comptée au rapport** — c'est un signal de backfill RSC, la ligne
+   est rattrapée gratuitement au run suivant (pull-tout).
+
+2. **Insert-si-absente, pas d'upsert.** La *Référence de contenu* EST le contenu (hash fabriqué par
+   electricore) : même référence = même prestation **par construction** ; une vraie correction
+   Enedis arrive comme nouvelle ligne sur une nouvelle facture (nouvelle référence). Le gel des
+   facturées (§4) devient **automatique** : une ligne existante n'est jamais touchée. Limite
+   assumée : une retouche rétroactive de libellé/taux à référence constante ne se propage pas —
+   échappatoire : supprimer la ligne non facturée et resynchroniser.
+
+3. **Nature depuis le taux F15.** `taux_tva_applicable = 'NS'` (non soumis) → *indemnité* hors
+   champ TVA ; taux numérique → *prestation* taxée. La TVA suit le produit choisi par la nature
+   (§5), jamais un taux recopié par ligne. `montant_ht` est **ignoré** (vérifié en spike : 0 écart
+   avec prix × quantité sur toutes les lignes UNITE).

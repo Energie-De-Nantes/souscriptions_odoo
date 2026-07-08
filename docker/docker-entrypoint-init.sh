@@ -1,8 +1,16 @@
 #!/bin/bash
 set -e
 
-# Entrypoint de développement : garantit que la base `souscriptions_demo` existe
-# ET que le module y est installé (avec la démo), puis lance le serveur Odoo.
+# Entrypoint de développement : garantit que la base $DB existe ET que le
+# module y est installé (avec la démo si LOAD_DEMO), puis lance le serveur Odoo.
+#
+# Paramètres (env) :
+# - DB         : nom de la base (défaut souscriptions_demo). Un mode à la fois :
+#                souscriptions_demo et souscriptions_prodlocal coexistent dans
+#                le même volume PG mais sont servies séparément (--db-filter).
+# - LOAD_DEMO  : active le chargement de la démo (défaut activé). LOAD_DEMO=
+#                (vide, explicitement mis à vide par l'appelant) installe le
+#                module SANS charger la démo.
 #
 # Auto-réparant : la condition d'installation porte sur l'ÉTAT DU MODULE, pas sur
 # la simple existence de la base. Une base résiduelle laissée à moitié initialisée
@@ -16,7 +24,10 @@ set -e
 #   charge explicitement via `force_demo` dans un `odoo shell`. On ne ré-écrit donc
 #   plus de données de démo à la main : tout vient de `demo/*.xml`.
 
-DB=souscriptions_demo
+DB="${DB:-souscriptions_demo}"
+# Expansion SANS ':' : seule l'ABSENCE de la variable applique le défaut ; un
+# LOAD_DEMO= (vide) explicite reste vide, donc désactive la démo (cf. mode prod).
+LOAD_DEMO="${LOAD_DEMO-1}"
 
 wait_for_postgres() {
     echo "Attente de PostgreSQL..."
@@ -49,13 +60,15 @@ else
     odoo --db_host="$HOST" --db_user="$USER" --db_password="$PASSWORD" \
          -d "$DB" -i souscriptions_odoo --load-language=fr_FR --stop-after-init
 
-    echo "📊 Chargement des données de démo du manifeste (force_demo)..."
-    odoo shell --db_host="$HOST" --db_user="$USER" --db_password="$PASSWORD" -d "$DB" <<'PY'
+    if [ "$LOAD_DEMO" ]; then
+        echo "📊 Chargement des données de démo du manifeste (force_demo)..."
+        odoo shell --db_host="$HOST" --db_user="$USER" --db_password="$PASSWORD" -d "$DB" <<'PY'
 import odoo.modules.loading as loading
 loading.force_demo(env)
 env.cr.commit()
 print("✅ Données de démo chargées (grilles, souscriptions, périodes…)")
 PY
+    fi
     echo "✅ Base '$DB' prête"
 fi
 

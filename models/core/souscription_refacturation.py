@@ -1,4 +1,28 @@
-from odoo import api, fields, models
+import logging
+
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
+
+# Garde d'import minimale (ADR 0024) : seules les exceptions du mapping de ce
+# module sont importées ici — la construction du client (garde + drapeau +
+# config) vit dans la fabrique. Si le paquet est absent, la fabrique lève
+# avant qu'aucune de ces exceptions ne puisse être levée.
+try:
+    from electricore_client import ContractVersionError, IngestionEnCours
+    from electricore_client.exceptions import PreconditionNonRemplie
+except ImportError:  # pragma: no cover - paquet optionnel ; la fabrique lève avant tout mapping
+
+    class ContractVersionError(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
+    class IngestionEnCours(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
+    class PreconditionNonRemplie(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
+
+_logger = logging.getLogger(__name__)
 
 
 class SouscriptionRefacturation(models.Model):
@@ -83,6 +107,105 @@ class SouscriptionRefacturation(models.Model):
         'UNIQUE(reference)',
         'Une prestation existe déjà pour cette référence.',
     )
+
+    # --- Sync electricore : pull-tout des prestations F15 (#147, ADR 0009 §2 amendé) ---
+
+    def synchroniser_depuis_electricore(self):
+        """Tire TOUTES les prestations F15 d'electricore, insert-si-absente par `reference`.
+
+        Pas de fenêtre temporelle : les lignes F15 arrivent en retard, datées dans
+        le passé — un curseur de date les manquerait (ADR 0009 §2) ; l'idempotence
+        vient de l'insert-si-absente sur la *Référence de contenu* (même référence
+        = même contenu par construction, cf. CONTEXT.md) — aucun chemin d'update,
+        le gel des facturées (ADR 0009 §4) est donc automatique. Le client est
+        acquis en tête, avant tout travail (échec rapide et déterministe, ADR 0024 §5).
+        """
+        client = self.env['souscription.electricore.client'].client()
+        try:
+            lignes = self._tirer_prestations(client)
+        except IngestionEnCours:
+            raise UserError(_("L'ingestion electricore est en cours (verrou base) : réessayez plus tard."))
+        except PreconditionNonRemplie as exc:
+            raise UserError(_('Précondition non remplie côté electricore : %s', exc))
+        except ContractVersionError as exc:
+            raise UserError(_('Contrat electricore obsolète : %s', exc))
+        compte = self._inserer_prestations(lignes)
+        message = _(
+            'Prestations : %(creees)s créée(s), %(ignorees)s sans souscription (RSC inconnue), '
+            '%(erreurs)s en erreur (voir logs).',
+            **compte,
+        )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Sync prestations electricore'),
+                'message': message,
+                'type': 'warning' if compte['erreurs'] or compte['ignorees'] else 'success',
+                'sticky': False,
+            },
+        }
+
+    def _tirer_prestations(self, client):
+        """Couture transport (patchée par les tests) : consomme le flux JSONL typé
+        (`PrestationF15`, contrat v1) et rend des dicts plats. Seul endroit qui
+        parle réseau."""
+        with client.prestations() as flux:
+            return [presta.model_dump() for presta in flux]
+
+    def _inserer_prestations(self, lignes):
+        """Insert-si-absente par `reference`, résolution par RSC seule.
+
+        Résolution par RSC, sans repli PDL (ADR 0010 §4 : aucun repli flou sur le
+        flux vif) : une RSC qui ne matche aucune *Souscription* est ignorée et
+        comptée — signal de backfill RSC, la ligne est rattrapée gratuitement au
+        run suivant. Une référence déjà présente n'est jamais touchée (pas de
+        chemin d'update). Savepoint par ligne (skip-and-report, ADR 0011) : une
+        contrainte sur une ligne n'emporte pas le lot.
+        """
+        existantes = set(
+            self.search([('reference', 'in', [ligne['reference'] for ligne in lignes])]).mapped('reference')
+        )
+        rscs = {ligne['ref_situation_contractuelle'] for ligne in lignes if ligne.get('ref_situation_contractuelle')}
+        par_rsc = {
+            s.ref_situation_contractuelle: s
+            for s in self.env['souscription.souscription'].search([('ref_situation_contractuelle', 'in', list(rscs))])
+        }
+        compte = {'creees': 0, 'ignorees': 0, 'erreurs': 0}
+        for ligne in lignes:
+            if ligne['reference'] in existantes:
+                continue
+            souscription = par_rsc.get(ligne.get('ref_situation_contractuelle'))
+            if souscription is None:
+                compte['ignorees'] += 1
+                continue
+            try:
+                with self.env.cr.savepoint():
+                    self.create(self._vals_prestation(ligne, souscription))
+                compte['creees'] += 1
+            except Exception:
+                _logger.warning('Sync prestation %s : échec, ligne sautée.', ligne.get('reference'), exc_info=True)
+                compte['erreurs'] += 1
+        return compte
+
+    @api.model
+    def _vals_prestation(self, ligne, souscription):
+        # 'NS' (non soumis) = indemnité hors champ TVA (pénalité due par Enedis) ;
+        # tout taux numérique = prestation taxée. La TVA elle-même suit le PRODUIT
+        # choisi par la nature (ADR 0009 §5) — jamais un taux recopié par ligne.
+        # `montant_ht` est ignoré : prix × quantité fait foi (vérifié en spike,
+        # 0 écart sur toutes les lignes UNITE).
+        non_soumis = (ligne.get('taux_tva_applicable') or '').strip().upper() == 'NS'
+        return {
+            'reference': ligne['reference'],
+            'souscription_id': souscription.id,
+            'pdl': ligne.get('pdl') or False,
+            'code_enedis': ligne.get('id_ev') or False,
+            'libelle': ligne.get('libelle_ev') or ligne.get('id_ev') or 'Prestation Enedis',
+            'prix': ligne.get('prix_unitaire') or 0.0,
+            'quantite': ligne.get('quantite') or 1.0,
+            'nature': 'indemnite' if non_soumis else 'prestation',
+        }
 
     def _composer_ligne(self):
         """Compose la ligne de facture (`(0, 0, vals)`) de cette prestation.

@@ -9,6 +9,13 @@
         <field name="model">souscription.refacturation</field>
         <field name="arch" type="xml">
             <list string="Refacturations" default_order="prix desc">
+                <!-- Pull-tout depuis electricore, insert-si-absente par référence de
+                     contenu (#147) : déclencheur manuel (crons off en dev, garde-fou
+                     migration). -->
+                <header>
+                    <button name="synchroniser_depuis_electricore" type="object"
+                            string="Tirer d'electricore" class="btn-primary" display="always"/>
+                </header>
                 <field name="souscription_id"/>
                 <field name="pdl"/>
                 <field name="reference"/>

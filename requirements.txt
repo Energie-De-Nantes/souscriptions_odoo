@@ -7,4 +7,8 @@
 # manifeste : l'absence du paquet ne doit pas empêcher l'installation du
 # module (garde d'import dans models/wizard/souscription_pull_meta_periodes_wizard.py,
 # UserError explicite au clic si absent).
+# TODO(#147 gate) : bump à 0.3.0 (méthode prestations(), sync de la file « à
+# refacturer ») dès sa publication sur PyPI — le pin est installé par le build
+# Docker de la CI, bumper avant publication casserait le build. D'ici là le
+# bouton « Tirer d'electricore » échoue en réel (gate de déploiement, pas de merge).
 electricore-client==0.2.0

@@ -13,7 +13,7 @@
         <record id="demo_presta_mise_en_service" model="souscription.refacturation">
             <field name="souscription_id" ref="demo_souscription_admin"/>
             <field name="pdl">PDL22516914099999</field>
-            <field name="reference_enedis">F15-DEMO-0001</field>
+            <field name="reference">F15-DEMO-0001</field>
             <field name="code_enedis">MES</field>
             <field name="libelle">Mise en service</field>
             <field name="prix">45.85</field>
@@ -24,7 +24,7 @@
         <record id="demo_presta_penalite_coupure" model="souscription.refacturation">
             <field name="souscription_id" ref="demo_souscription_admin"/>
             <field name="pdl">PDL22516914099999</field>
-            <field name="reference_enedis">F15-DEMO-0002</field>
+            <field name="reference">F15-DEMO-0002</field>
             <field name="code_enedis">PENA</field>
             <field name="libelle">Pénalité de coupure (due par Enedis)</field>
             <field name="prix">-30.00</field>
@@ -37,7 +37,7 @@
         <record id="demo_presta_deplacement" model="souscription.refacturation">
             <field name="souscription_id" ref="demo_souscription_admin"/>
             <field name="pdl">PDL22516914099999</field>
-            <field name="reference_enedis">F15-DEMO-0003</field>
+            <field name="reference">F15-DEMO-0003</field>
             <field name="code_enedis">DEPL</field>
             <field name="libelle">Déplacement</field>
             <field name="prix">19.66</field>

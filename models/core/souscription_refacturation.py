@@ -18,7 +18,7 @@ class SouscriptionRefacturation(models.Model):
         'souscription.souscription', required=True, ondelete='cascade', string='Souscription'
     )
     pdl = fields.Char(string='PDL')
-    reference_enedis = fields.Char(string='Référence Enedis', required=True)
+    reference = fields.Char(string='Référence (electricore)', required=True)
     code_enedis = fields.Char(string='Code Enedis')
     libelle = fields.Char(string='Libellé', required=True)
     prix = fields.Float(string='Prix (€)', help='Prix de refacturation ; peut être négatif (avoir/pénalité).')
@@ -76,10 +76,12 @@ class SouscriptionRefacturation(models.Model):
     facture_id = fields.Many2one('account.move', string='Facture', readonly=True, ondelete='set null', copy=False)
 
     # Clé de dédup du sync electricore (ADR 0009) : une prestation = une référence
-    # Enedis. Pull-tout-et-dédup s'appuie dessus pour rester idempotent.
-    _unique_reference_enedis = models.Constraint(
-        'UNIQUE(reference_enedis)',
-        'Une prestation existe déjà pour cette référence Enedis.',
+    # de contenu fabriquée par electricore (contrat `prestations` v1 — le F15 n'a
+    # pas d'identifiant de ligne). Pull-tout-et-dédup s'appuie dessus pour rester
+    # idempotent.
+    _unique_reference = models.Constraint(
+        'UNIQUE(reference)',
+        'Une prestation existe déjà pour cette référence.',
     )
 
     def _composer_ligne(self):

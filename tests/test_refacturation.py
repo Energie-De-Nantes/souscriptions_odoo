@@ -21,7 +21,7 @@ class TestRefacturation(SouscriptionsTestCase):
     def _presta(self, souscription, **vals):
         base = {
             'souscription_id': souscription.id,
-            'reference_enedis': 'F15-001',
+            'reference': 'F15-001',
             'libelle': 'Déplacement technicien',
             'prix': 45.0,
             'quantite': 1.0,
@@ -46,7 +46,7 @@ class TestRefacturation(SouscriptionsTestCase):
         """Opt-out (ADR 0012) : une prestation mise en attente par le·la
         facturiste n'est PAS ramassée par creer_factures() — elle reste dans
         la file, facture_id NULL."""
-        presta = self._presta(self.souscription_base, reference_enedis='F15-HOLD', en_attente=True)
+        presta = self._presta(self.souscription_base, reference='F15-HOLD', en_attente=True)
         self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
 
         self.souscription_base.creer_factures()
@@ -55,17 +55,17 @@ class TestRefacturation(SouscriptionsTestCase):
 
     def test_etat_a_refacturer_par_defaut(self):
         """Sans facture ni mise en attente, l'état dérivé est « à refacturer »."""
-        presta = self._presta(self.souscription_base, reference_enedis='F15-ETAT-AR')
+        presta = self._presta(self.souscription_base, reference='F15-ETAT-AR')
         self.assertEqual(presta.etat, 'a_refacturer')
 
     def test_etat_en_attente_quand_mise_en_attente(self):
         """Mise en attente par le·la facturiste, pas encore facturée → « en attente »."""
-        presta = self._presta(self.souscription_base, reference_enedis='F15-ETAT-EA', en_attente=True)
+        presta = self._presta(self.souscription_base, reference='F15-ETAT-EA', en_attente=True)
         self.assertEqual(presta.etat, 'en_attente')
 
     def test_etat_facturee_sur_facture_brouillon(self):
         """Ramassée sur une facture encore en brouillon → « facturée »."""
-        presta = self._presta(self.souscription_base, reference_enedis='F15-ETAT-FACT')
+        presta = self._presta(self.souscription_base, reference='F15-ETAT-FACT')
         self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
         self.souscription_base.creer_factures()
         self.assertEqual(presta.facture_id.state, 'draft')
@@ -74,7 +74,7 @@ class TestRefacturation(SouscriptionsTestCase):
     def test_etat_emise_apres_emission_facture(self):
         """Émission de la facture (brouillon → posted) : l'état dérivé passe
         « facturée » → « émise » automatiquement (recalcul, pas de cron)."""
-        presta = self._presta(self.souscription_base, reference_enedis='F15-ETAT-EMISE')
+        presta = self._presta(self.souscription_base, reference='F15-ETAT-EMISE')
         self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
         self.souscription_base.creer_factures()
         self.assertEqual(presta.etat, 'facturee')
@@ -102,7 +102,7 @@ class TestRefacturation(SouscriptionsTestCase):
         Même sur une souscription PRO, la ligne refacturée garde son prix brut.
         """
         self.souscription_base.coeff_pro = 30.0
-        presta = self._presta(self.souscription_base, reference_enedis='F15-PRO', prix=45.0)
+        presta = self._presta(self.souscription_base, reference='F15-PRO', prix=45.0)
 
         _cmd, _id, vals = presta._composer_ligne()
         self.assertEqual(vals['price_unit'], 45.0)
@@ -112,7 +112,7 @@ class TestRefacturation(SouscriptionsTestCase):
         sa ligne avec le produit Indemnité dédié, pas le produit Prestation
         (TVA). La TVA suit le produit choisi par la nature (ADR 0009), jamais un
         override de ligne."""
-        presta = self._presta(self.souscription_base, reference_enedis='F15-IND', nature='indemnite')
+        presta = self._presta(self.souscription_base, reference='F15-IND', nature='indemnite')
         _cmd, _id, vals = presta._composer_ligne()
 
         produit_indemnite = self.env.ref('souscriptions_odoo.souscriptions_product_indemnite_enedis')
@@ -128,10 +128,10 @@ class TestRefacturation(SouscriptionsTestCase):
         )
         self.env.ref('souscriptions_odoo.souscriptions_product_prestation_enedis').taxes_id = tva
 
-        self._presta(self.souscription_base, reference_enedis='F15-TVA', libelle='Déplacement', prix=50.0)
+        self._presta(self.souscription_base, reference='F15-TVA', libelle='Déplacement', prix=50.0)
         self._presta(
             self.souscription_base,
-            reference_enedis='F15-IND2',
+            reference='F15-IND2',
             libelle='Pénalité coupure',
             prix=-30.0,
             nature='indemnite',
@@ -139,9 +139,7 @@ class TestRefacturation(SouscriptionsTestCase):
         self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
 
         self.souscription_base.creer_factures()
-        facture = self.souscription_base.refacturation_ids.filtered(
-            lambda p: p.reference_enedis == 'F15-TVA'
-        ).facture_id
+        facture = self.souscription_base.refacturation_ids.filtered(lambda p: p.reference == 'F15-TVA').facture_id
         facture.action_post()
 
         self.assertEqual(facture.state, 'posted', 'la facture avec lignes prestation + indemnité se pose')
@@ -154,7 +152,7 @@ class TestRefacturation(SouscriptionsTestCase):
         """Une prestation négative (pénalité de coupure due par Enedis) atterrit
         comme ligne négative sur la facture mensuelle."""
         periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
-        self._presta(self.souscription_base, reference_enedis='F15-NEG', libelle='Pénalité coupure', prix=-30.0)
+        self._presta(self.souscription_base, reference='F15-NEG', libelle='Pénalité coupure', prix=-30.0)
 
         self.souscription_base.creer_factures()
 
@@ -166,7 +164,7 @@ class TestRefacturation(SouscriptionsTestCase):
     def test_presta_facturee_une_seule_fois_sur_plusieurs_periodes(self):
         """Deux périodes facturées en un run : la presta n'atterrit que sur UNE
         facture, jamais dupliquée (pas de double facturation)."""
-        self._presta(self.souscription_base, reference_enedis='F15-UNIQ')
+        self._presta(self.souscription_base, reference='F15-UNIQ')
         p1 = self.create_test_periode(
             self.souscription_base, date_debut=date(2024, 1, 1), date_fin=date(2024, 1, 31), provision_base_kwh=100.0
         )
@@ -182,7 +180,7 @@ class TestRefacturation(SouscriptionsTestCase):
     def test_supprimer_facture_remet_presta_dans_la_file(self):
         """Supprimer la facture (échappatoire de correction, ADR 0007) re-met la
         prestation dans la file « à refacturer » (ondelete=set null)."""
-        presta = self._presta(self.souscription_base, reference_enedis='F15-DEL')
+        presta = self._presta(self.souscription_base, reference='F15-DEL')
         self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
         self.souscription_base.creer_factures()
         facture = presta.facture_id
@@ -208,12 +206,12 @@ class TestRefacturation(SouscriptionsTestCase):
         self.assertEqual(menu.parent_id, self.env.ref('souscriptions_odoo.menu_souscription_root'))
 
     @mute_logger('odoo.sql_db')
-    def test_reference_enedis_unique(self):
-        """Deux prestations ne peuvent partager la même référence Enedis : c'est
-        la clé de dédup du sync electricore (ADR 0009)."""
-        self._presta(self.souscription_base, reference_enedis='F15-DUP')
+    def test_reference_unique(self):
+        """Deux prestations ne peuvent partager la même référence de contenu :
+        c'est la clé de dédup du sync electricore (ADR 0009)."""
+        self._presta(self.souscription_base, reference='F15-DUP')
         with self.assertRaises(IntegrityError), self.env.cr.savepoint():
-            self._presta(self.souscription_base, reference_enedis='F15-DUP')
+            self._presta(self.souscription_base, reference='F15-DUP')
             self.env.flush_all()
 
 

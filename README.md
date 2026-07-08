@@ -63,8 +63,8 @@ graph TD
 git clone https://github.com/votre-repo/souscriptions_odoo.git
 cd souscriptions_odoo
 
-# Lancer avec des données d'exemple
-./scripts/run-app.sh
+# Lancer avec des données d'exemple (image construite, electricore-client inclus)
+./scripts/dev.sh
 
 # Accéder à Odoo : http://localhost:8069
 # Compte admin : admin / admin
@@ -149,15 +149,21 @@ Pour lancer une instance Odoo 19 complète avec des données d'exemple et clique
 dans l'interface :
 
 ```bash
-./scripts/run-app.sh
+./scripts/dev.sh
 # puis ouvrir http://localhost:8069   (identifiants : admin / admin)
 ```
 
-Le script démarre PostgreSQL, installe le module **avec les données de démo**
-(`--with-demo` ; sous Odoo 19 la démo n'est plus chargée par défaut), puis sert
-l'application. La base est persistée : les modifications faites dans l'UI sont
-conservées entre deux lancements. `Ctrl-C` arrête le serveur ;
-`./scripts/run-app.sh --reset` repart d'une base vierge.
+Le script lance `docker compose` sur l'image **construite** (`docker/Dockerfile`,
+`electricore-client` inclus), avec le hot reload actif (`--dev=reload,xml,qweb`) :
+une modification de vue ou de rapport QWeb est visible sans reconstruire l'image.
+Par défaut, mode **demo** : base `souscriptions_demo`, module installé avec les
+données de démo (`demo/*.xml`). La base est persistée : les modifications faites
+dans l'UI sont conservées entre deux lancements. `Ctrl-C` arrête le serveur ;
+`./scripts/dev.sh --reset` repart d'une base vierge.
+
+Un mode **prod local** existe aussi (`./scripts/dev.sh --data=prod`, base
+`souscriptions_prodlocal`, module installé sans démo) : il pose le socle pour
+le pilotage de `souscriptions_migration`, qui arrive dans une tranche suivante.
 
 Vous y trouverez :
 - **Souscriptions** (menu principal) : 5 contrats d'exemple (Base, HP/HC, solidaire, pro)

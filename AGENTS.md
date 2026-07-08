@@ -4,7 +4,7 @@ Court, factuel, vivant. Module Odoo **19** en Docker. Si je te corrige sur une
 convention, mets à jour ce fichier dans la foulée.
 
 ## Lancer / tester (FAITS)
-- Stack dev : `docker compose -f docker/docker-compose.yml up odoo-dev` (port 8070)
+- Stack dev : `./scripts/dev.sh` (port 8069, image construite, hot reload ; `--data=prod` pour souscriptions_prodlocal)
 - Suite de tests COMPLÈTE (lourde, délibérée) : `./test.sh`
   → `odoo -d <db> -i <module> --test-enable --test-tags /<module> --stop-after-init`
 - Le hook `Stop` ne lance QUE le gate rapide (syntaxe Python + XML bien formé). Les vrais tests = `./test.sh` + la CI.

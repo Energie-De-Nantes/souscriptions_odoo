@@ -43,3 +43,16 @@ do: use the odoo MCP tools (search_records, read_record, get_model_fields…) ag
   # `dev`     = http://localhost:8069, db souscriptions_demo — the local docker; HAS the souscriptions module
   # `default` = energie-de-nantes.odoo.com SaaS — does NOT carry the souscriptions module
 observe: the returned records/fields
+
+## odoo-shell
+mode: human
+when: you need an interactive Python shell to read/write records (MCP is read-only) — purge/fix data, run ORM code
+do: stack up (see `bring-up`), then in another terminal:
+  `docker compose -f docker/docker-compose.yml exec odoo odoo shell -d {db} --db_host=db --db_user=odoo --db_password=odoo --no-http`
+  # {db}: souscriptions_demo (mode demo) OR souscriptions_prodlocal (mode prod, real electricore sync data)
+  # the db flags are mandatory — `exec` skips the entrypoint, so shell would hit a local socket without them
+  # writes need an explicit `env.cr.commit()` — the shell never commits on its own
+look: prompt with `env`/`self` bound; pick the db that actually holds your records
+  # gotcha: souscriptions_demo carries only the F15-DEMO-* demo rows; real synced data lives in souscriptions_prodlocal
+  # gotcha: a stale schema (e.g. `column … does not exist`) means the module wasn't upgraded on that db — re-run bring-up with --reset, or `-u souscriptions_odoo`
+expect: your ORM code runs; after `env.cr.commit()` the change persists

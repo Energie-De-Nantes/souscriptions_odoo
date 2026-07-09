@@ -18,13 +18,20 @@ correctif de `payment_account_id` ne réécrit que si nécessaire — rejouable 
 chaque upgrade sans doublon.
 """
 
-CODE_COMPTE_CHEQUE_ENERGIE = '511800'
+CODE_COMPTE_CHEQUE_ENERGIE = '467100'
 CODE_JOURNAL_CHEQUE_ENERGIE = 'CHEN'
 
 
 def setup_cheque_energie_compta(env):
     company = env.company
 
+    # ponytail : classe 4 générique (« autres comptes débiteurs »), pas un
+    # code PCG spécifique État (44x) — paramétrage à préciser par la compta,
+    # au même niveau que la neutralisation des produits 331/332 (cf.
+    # migrations/19.0.1.8.0/post-migrate.py). `asset_receivable` (et non
+    # `asset_current`) est requis : c'est ce qui rend le compte `reconcile`
+    # et compatible avec `_get_valid_payment_account_types()` côté
+    # `account.payment` (ADR 0026 §2).
     compte = env['account.account']._load_records(
         [
             {
@@ -33,7 +40,7 @@ def setup_cheque_energie_compta(env):
                 'values': {
                     'name': "Chèques énergie à recevoir de l'État",
                     'code': CODE_COMPTE_CHEQUE_ENERGIE,
-                    'account_type': 'asset_current',
+                    'account_type': 'asset_receivable',
                     'company_ids': [(6, 0, [company.id])],
                 },
             }

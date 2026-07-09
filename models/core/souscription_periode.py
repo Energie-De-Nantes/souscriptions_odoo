@@ -682,9 +682,13 @@ class SouscriptionPeriode(models.Model):
         for cheque in cheques:
             if facture.currency_id.is_zero(facture.amount_residual):
                 break
-            ligne_paiement = cheque.payment_id.move_id.line_ids.filtered(
-                lambda l: l.account_id.account_type in compte_tiers and not l.reconciled
-            )
+            # `_seek_for_lines()` (natif) plutôt qu'un filtre par account_type
+            # brut : le compte « à recevoir de l'État » est lui-même typé
+            # asset_receivable (#170 FIX 4), donc un filtre account_type seul
+            # matcherait aussi la ligne de liquidité du paiement — on veut
+            # uniquement la ligne contrepartie tiers (411 usager·ère).
+            _liquidite, contrepartie, ecart = cheque.payment_id._seek_for_lines()
+            ligne_paiement = (contrepartie + ecart).filtered(lambda l: l.account_id.reconcile and not l.reconciled)
             ligne_facture = facture.line_ids.filtered(
                 lambda l: l.account_id.account_type in compte_tiers and not l.reconciled
             )

@@ -47,7 +47,6 @@ class SouscriptionChequeEnergie(models.Model):
         default='recu',
         required=True,
         copy=False,
-        tracking=True,
     )
 
     # Généré et posté par le gate `action_valider()` — jamais créé/modifié
@@ -57,10 +56,17 @@ class SouscriptionChequeEnergie(models.Model):
 
     currency_id = fields.Many2one('res.currency', string='Devise', compute='_compute_currency_id')
 
-    # `related`, jamais recopié (ADR 0026) : le solde vit sur le paiement.
+    # Pas un `related` (ADR 0026 le visait, mais `account.payment` n'a pas de
+    # champ `amount_residual` en Odoo 19 Community — il vit sur les lignes
+    # d'écriture du paiement). On délègue quand même : `_seek_for_lines()`
+    # (natif, account_payment.py:232) sépare la ligne de liquidité (compte
+    # « à recevoir », #170) de la ligne contrepartie tiers (411 usager·ère,
+    # celle lettrée contre les Factures, #172) — c'est le residual natif de
+    # cette dernière qui est le solde. Aucune arithmétique de lettrage
+    # réimplémentée ici.
     solde = fields.Monetary(
         string='Solde restant',
-        related='payment_id.amount_residual',
+        compute='_compute_solde',
         currency_field='currency_id',
         help='Portion du chèque non encore imputée sur une Facture — dérivé, jamais saisi.',
     )
@@ -77,14 +83,25 @@ class SouscriptionChequeEnergie(models.Model):
         compute='_compute_etat_solde',
     )
 
-    _sql_constraints = [
-        ('numero_uniq', 'unique(numero)', 'Ce numéro de chèque énergie est déjà saisi.'),
-    ]
-
     @api.depends('payment_id.currency_id')
     def _compute_currency_id(self):
         for cheque in self:
             cheque.currency_id = cheque.payment_id.currency_id or cheque.env.company.currency_id
+
+    @api.depends(
+        'payment_id.state', 'payment_id.move_id.line_ids.amount_residual', 'payment_id.move_id.line_ids.account_id'
+    )
+    def _compute_solde(self):
+        for cheque in self:
+            pay = cheque.payment_id
+            # Un paiement non posté (draft/canceled/rejected) n'a rien lettré :
+            # solde nul plutôt qu'une erreur ou un résidu périmé.
+            if not pay or pay.state not in ('paid', 'in_process'):
+                cheque.solde = 0.0
+                continue
+            _liquidity, counterpart, writeoff = pay._seek_for_lines()
+            reconcile_lines = (counterpart + writeoff).filtered(lambda l: l.account_id.reconcile)
+            cheque.solde = abs(sum(reconcile_lines.mapped('amount_residual')))
 
     @api.depends('payment_id', 'solde', 'montant')
     def _compute_etat_solde(self):

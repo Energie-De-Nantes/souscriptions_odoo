@@ -25,7 +25,7 @@ class TestChequeEnergieConfig(TransactionCase):
 
         self.assertEqual(journal.type, 'cash')
         self.assertEqual(journal.default_account_id, compte)
-        self.assertEqual(compte.account_type, 'asset_current')
+        self.assertEqual(compte.account_type, 'asset_receivable')
 
         # Outstanding receipts account posé explicitement sur la méthode de
         # paiement entrante : sans lui, action_post() sur un account.payment
@@ -40,7 +40,7 @@ class TestChequeEnergieConfig(TransactionCase):
         setup_cheque_energie_compta(self.env)
 
         self.assertEqual(self.env['account.journal'].search_count([('code', '=', 'CHEN')]), 1)
-        self.assertEqual(self.env['account.account'].search_count([('code', '=', '511800')]), 1)
+        self.assertEqual(self.env['account.account'].search_count([('code', '=', '467100')]), 1)
 
 
 @tagged('souscriptions', 'souscriptions_cheque_energie', 'post_install', '-at_install')
@@ -68,7 +68,11 @@ class TestChequeEnergieModel(SouscriptionsTestCase):
 
         self.assertEqual(cheque.state, 'valide')
         self.assertTrue(cheque.payment_id)
-        self.assertEqual(cheque.payment_id.state, 'posted')
+        # Odoo 19 n'a pas d'état 'posted' sur account.payment (draft/in_process/
+        # paid/canceled/rejected) : action_post() aboutit à 'in_process' tant que
+        # le compte de liquidité du paiement (compte à recevoir, classe 4) n'est
+        # pas de type asset_cash (account_payment.py:action_post()).
+        self.assertEqual(cheque.payment_id.state, 'in_process')
         self.assertEqual(cheque.payment_id.payment_type, 'inbound')
         self.assertEqual(cheque.payment_id.partner_id, self.partner_test)
         self.assertEqual(cheque.payment_id.journal_id.code, 'CHEN')

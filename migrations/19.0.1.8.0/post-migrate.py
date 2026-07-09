@@ -10,6 +10,10 @@ Neutralise aussi les deux produits prod hérités du traitement manuel :
 chèque énergie » (produit 332 → CA 707100, incohérent). Le modèle propre
 `souscription.cheque_energie` (#171/#172) les remplace.
 
+Le compte « à recevoir de l'État » posé par `setup_cheque_energie_compta`
+(classe 4 générique, code 467100) est, comme ces deux produits, un
+paramétrage à préciser par la compta — cf. le commentaire dans hooks.py.
+
 ponytail : ces deux produits ne sont jamais seedés par ce repo (cf.
 data/produits_*.xml — ils n'existent qu'en prod, cf. ADR 0026 « Constat
 prod »), donc matchés par nom plutôt que par xmlid/ID technique. No-op propre

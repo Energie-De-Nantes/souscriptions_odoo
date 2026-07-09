@@ -23,7 +23,7 @@ class Souscription(models.Model):
     # mail.activity.mixin (#89) : porte l'alerte du poll quotidien des affaires
     # Enedis quand la Souscription n'a pas de demande de raccordement liée
     # (saisie manuelle) — sinon l'alerte est portée par la demande.
-    _inherit = ['mail.thread', 'mail.activity.mixin']
+    _inherit = ['mail.thread', 'mail.activity.mixin', 'portal.mixin']
 
     name = fields.Char(string='Référence', required=True, copy=False, readonly=True, default='Nouveau')
     partner_id = fields.Many2one('res.partner', string='Souscripteur·trice')
@@ -258,6 +258,46 @@ class Souscription(models.Model):
             if vals.get('id_affaire') and not vals.get('id_affaire_date_saisie'):
                 vals['id_affaire_date_saisie'] = fields.Date.context_today(self)
         return super().create(vals_list)
+
+    def _octroyer_acces_portail(self):
+        """Donne l'accès portail au·à la souscripteur·trice.
+
+        Odoo ne le fait pas par défaut : un contact n'a aucun login. On réutilise
+        le wizard standard « Grant portal access » (crée le user portail + envoie
+        l'email d'invitation). Appelé depuis l'onboarding raccordement uniquement
+        (`_create_souscription`), pas depuis `create()` — sinon tests, imports et
+        synchro electricore déclencheraient des invitations en masse.
+        Idempotent : partenaires déjà portail/interne ignorés (`is_portal`/
+        `is_internal`), user portail archivé réactivé, sans email ignoré. Un échec
+        (email en doublon…) n'annule pas la souscription.
+        """
+        partners = self.partner_id.filtered('email')
+        if not partners:
+            return
+        wizard = self.env['portal.wizard'].with_context(active_ids=partners.ids).sudo().create({})
+        for wu in wizard.user_ids:
+            if wu.is_portal or wu.is_internal:
+                continue
+            try:
+                wu.action_grant_access()
+            except Exception as e:  # noqa: BLE001 — un souci portail ne bloque pas la souscription
+                _logger.warning('Accès portail non octroyé pour %s : %s', wu.partner_id.display_name, e)
+
+    def _compute_access_url(self):
+        """URL portail de la souscription (portal.mixin) → route custom."""
+        super()._compute_access_url()
+        for souscription in self:
+            souscription.access_url = f'/my/souscription/{souscription.id}'
+
+    def action_apercu_portail(self):
+        """Bouton « Aperçu » : ouvre la page portail du·de la souscripteur·rice
+        (URL signée par access_token) sans se connecter en tant que client."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_url',
+            'url': self.get_portal_url(),
+            'target': 'new',
+        }
 
     _MESSAGE_RSC_RESTREINTE = (
         'La RSC (référence situation contractuelle) ne peut être modifiée que par '

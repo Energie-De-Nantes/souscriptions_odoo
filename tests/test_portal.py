@@ -109,6 +109,29 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
         self.assertIn(self.souscription_base.name, response.text)
         self.assertIn(self.souscription_base.pdl, response.text)
 
+    def test_apercu_via_access_token(self):
+        """L'URL signée (access_token) ouvre la page à un non-propriétaire — c'est
+        ce qui alimente le bouton « Aperçu » back-office. Sans token : 403."""
+        autre_partner = self.env['res.partner'].create({'name': 'Autre', 'email': 'autre_apercu@test.com'})
+        autre = self.env['souscription.souscription'].create(
+            {
+                'partner_id': autre_partner.id,
+                'pdl': 'PDL_APERCU_TOKEN',
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'etat_facturation_id': self.etat_facturation.id,
+            }
+        )
+        url = autre.get_portal_url()  # /my/souscription/<id>?access_token=...
+        self.assertIn('access_token=', url)
+
+        # portal_user n'est PAS le souscripteur d'`autre`
+        self.authenticate(self.portal_user.login, self.portal_user.login)
+        self.assertEqual(self.url_open(f'/my/souscription/{autre.id}').status_code, 403)
+        response = self.url_open(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('PDL_APERCU_TOKEN', response.text)
+
     # --- Historique intégré ---
 
     def test_detail_affiche_historique_inline_sans_bouton(self):

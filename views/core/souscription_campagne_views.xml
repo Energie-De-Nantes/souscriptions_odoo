@@ -17,6 +17,10 @@
                     <group>
                         <field name="mois"/>
                     </group>
+                    <group string="Factures du mois">
+                        <field name="nb_factures_creees"/>
+                        <field name="nb_factures_emises"/>
+                    </group>
                     <notebook>
                         <page string="Étapes" name="etapes">
                             <field name="etape_ids" create="0" delete="0">
@@ -30,7 +34,9 @@
                                     <field name="valide" widget="boolean_toggle" invisible="type_etape != 'porte'"/>
                                     <field name="valide_par_id" readonly="1" invisible="not valide"/>
                                     <field name="valide_le" readonly="1" invisible="not valide"/>
+                                    <field name="nb_reste_a_faire" invisible="type_etape != 'derive'"/>
                                     <field name="fait" widget="boolean" readonly="1"/>
+                                    <button name="action_drill_down" type="object" string="Voir" icon="fa-search"/>
                                 </list>
                             </field>
                         </page>

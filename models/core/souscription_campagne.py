@@ -95,6 +95,11 @@ class SouscriptionCampagneFacturation(models.Model):
 
     etape_ids = fields.One2many('souscription.campagne.etape', 'campagne_id', string='Étapes')
 
+    # Décompte factures créées/émises du mois (#157) : dérivé, non stocké — cf.
+    # _factures_du_mois().
+    nb_factures_creees = fields.Integer(string='Factures créées', compute='_compute_stats_factures')
+    nb_factures_emises = fields.Integer(string='Factures émises', compute='_compute_stats_factures')
+
     _unique_mois = models.Constraint(
         'UNIQUE(mois)',
         'Une campagne de facturation existe déjà pour ce mois.',
@@ -140,6 +145,82 @@ class SouscriptionCampagneFacturation(models.Model):
                 ]
             )
 
+    # --- Signaux dérivés (#157) : 0 champ ajouté sur souscription.souscription.
+    # Statut de facturation par (souscription, mois de la campagne) et
+    # compteurs reste-à-faire, tous recalculés à la volée depuis
+    # souscription.periode / account.move (ADR 0025 §2). ---
+
+    def _souscriptions_facturables(self):
+        """Souscriptions concernées par une campagne : *en service* (RSC
+        acquise, facturable) — les souscriptions *en instance* sont hors
+        périmètre de facturation (CONTEXT.md « En instance / En service »)."""
+        return self.env['souscription.souscription'].search([('etat', '=', 'en_service')])
+
+    def _statut_facturation(self, souscription):
+        """Statut de facturation dérivé de `(souscription, mois de la
+        campagne)` — à tirer / à facturer / facturée / émise (#157). Aucun
+        champ stocké : rejoué à chaque appel depuis
+        `souscription.periode.mois`/`facture_id`/`facture_state`.
+
+        ponytail: vocabulaire PRD tel quel (à tirer/à facturer/facturée/
+        émise) — l'alignement avec le vocabulaire prod sale_order.invoice_status
+        demande l'inspection via l'odoo MCP (indisponible en sandbox) ;
+        follow-up possible si besoin de convergence de vocabulaire un jour.
+        """
+        self.ensure_one()
+        periode = self.env['souscription.periode'].search(
+            [
+                ('souscription_id', '=', souscription.id),
+                ('mois', '=', self.mois),
+                ('type_periode', '=', 'mensuelle'),
+            ],
+            limit=1,
+        )
+        if not periode:
+            return 'a_tirer'
+        if not periode.facture_id:
+            return 'a_facturer'
+        return 'emise' if periode.facture_state == 'posted' else 'facturee'
+
+    def _souscriptions_par_statut(self, statut):
+        """ponytail: une requête par souscription facturable (échelle
+        facturiste — dizaines/centaines, pas un flux temps réel) ; upgrade en
+        une seule requête SQL groupée si ça devient lent un jour."""
+        self.ensure_one()
+        cibles = self._souscriptions_facturables()
+        return cibles.filtered(lambda s: self._statut_facturation(s) == statut)
+
+    # Étape à signal dérivé -> statut de facturation dont le reste-à-faire la
+    # concerne. Les étapes absentes (portes, action) n'ont pas de signal
+    # dérivé (cf. ETAPES_CAMPAGNE) : reste-à-faire vide par construction.
+    _STATUT_PAR_ETAPE_DERIVEE = {
+        'pull_meta_periodes': 'a_tirer',
+        'creer_factures': 'a_facturer',
+        'emettre_factures': 'facturee',
+    }
+
+    def _reste_a_faire(self, code):
+        """Souscriptions restantes pour l'étape dérivée `code` (#157) — feed
+        aussi bien le compteur affiché (`nb_reste_a_faire`) que le drill-down."""
+        self.ensure_one()
+        statut = self._STATUT_PAR_ETAPE_DERIVEE.get(code)
+        if not statut:
+            return self.env['souscription.souscription']
+        return self._souscriptions_par_statut(statut)
+
+    def _factures_du_mois(self):
+        """Factures (account.move) des périodes du mois de la campagne."""
+        self.ensure_one()
+        periodes = self.env['souscription.periode'].search([('mois', '=', self.mois), ('facture_id', '!=', False)])
+        return periodes.facture_id
+
+    @api.depends('mois')
+    def _compute_stats_factures(self):
+        for campagne in self:
+            factures = campagne._factures_du_mois()
+            campagne.nb_factures_creees = len(factures)
+            campagne.nb_factures_emises = len(factures.filtered(lambda f: f.state == 'posted'))
+
 
 class SouscriptionCampagneEtape(models.Model):
     """Ligne d'état par étape de campagne (#156, ADR 0025) : le seul état
@@ -182,10 +263,15 @@ class SouscriptionCampagneEtape(models.Model):
         compute='_compute_etat_prerequis',
     )
     # « Fait » : pour une porte manuelle, la validation ; pour une étape à
-    # signal dérivé, son reste-à-faire (#157, pas encore câblé dans cette
-    # tranche — cf. ETAPES_CAMPAGNE) ; pour une action sans signal (sync F15),
-    # jamais fait automatiquement (cf. commentaire sur le catalogue).
+    # signal dérivé, son reste-à-faire (#157 : fait quand nb_reste_a_faire == 0) ;
+    # pour une action sans signal (sync F15), jamais fait automatiquement (cf.
+    # commentaire sur le catalogue).
     fait = fields.Boolean(string='Fait', compute='_compute_fait')
+
+    # Reste-à-faire dérivé (#157) : nombre de souscriptions que cette étape
+    # concerne encore. Vide (0) pour les portes/actions, qui n'ont pas de
+    # signal dérivé (cf. ETAPES_CAMPAGNE et campagne_id._reste_a_faire()).
+    nb_reste_a_faire = fields.Integer(string='Reste à faire', compute='_compute_nb_reste_a_faire')
 
     @api.model
     def _selection_code(self):
@@ -203,14 +289,27 @@ class SouscriptionCampagneEtape(models.Model):
             vals.setdefault('valide_le', fields.Datetime.now())
         return super().write(vals)
 
-    @api.depends('valide', 'type_etape')
+    @api.depends('type_etape', 'campagne_id.mois')
+    def _compute_nb_reste_a_faire(self):
+        """#157 : délègue à `campagne_id._reste_a_faire(code)` — recompté à
+        chaque lecture (pas de relation ORM déclarée vers période/facture,
+        donc pas d'invalidation de cache automatique inter-modèles, ADR 0025)."""
+        for etape in self:
+            if etape.type_etape == 'derive' and etape.campagne_id:
+                etape.nb_reste_a_faire = len(etape.campagne_id._reste_a_faire(etape.code))
+            else:
+                etape.nb_reste_a_faire = 0
+
+    @api.depends('valide', 'type_etape', 'nb_reste_a_faire')
     def _compute_fait(self):
         for etape in self:
             if etape.type_etape == 'porte':
                 etape.fait = etape.valide
+            elif etape.type_etape == 'derive':
+                etape.fait = etape.nb_reste_a_faire == 0
             else:
-                # 'derive' : signal câblé en #157 (0 reste-à-faire -> fait).
-                # 'action' : jamais de signal dérivé (cf. ETAPES_CAMPAGNE).
+                # 'action' : jamais de signal dérivé (cf. ETAPES_CAMPAGNE : sync
+                # F15 n'a pas de backlog mensuel dérivable).
                 etape.fait = False
 
     @api.depends('code', 'campagne_id.etape_ids.fait')
@@ -222,3 +321,21 @@ class SouscriptionCampagneEtape(models.Model):
                 continue
             freres = {e.code: e.fait for e in etape.campagne_id.etape_ids}
             etape.etat_prerequis = 'prete' if all(freres.get(p) for p in prerequis) else 'bloquee'
+
+    # --- Drill-down (#157) : la liste filtrée des souscriptions concernées
+    # par cette étape (pour les étapes à signal dérivé) ou, à défaut, toutes
+    # les souscriptions facturables du mois. ---
+
+    def action_drill_down(self):
+        self.ensure_one()
+        if self.type_etape == 'derive':
+            souscriptions = self.campagne_id._reste_a_faire(self.code)
+        else:
+            souscriptions = self.campagne_id._souscriptions_facturables()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': ETAPES_CAMPAGNE.get(self.code, {}).get('label', self.code),
+            'res_model': 'souscription.souscription',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', souscriptions.ids)],
+        }

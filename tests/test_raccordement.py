@@ -549,6 +549,11 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
         self.assertEqual(souscription.type_tarif, 'base')
         self.assertEqual(souscription.partner_id, partner)
 
+        # Accès portail donné dès l'onboarding : le·la souscripteur·trice a
+        # désormais un utilisateur portail actif (invitation envoyée).
+        self.assertTrue(partner.user_ids, 'Un utilisateur portail doit être créé')
+        self.assertTrue(partner.user_ids._is_portal(), 'Utilisateur créé dans le groupe portail')
+
     def test_create_odoo_entries_pro(self):
         """Test de création des entrées Odoo pour une demande professionnelle"""
         demande = self.create_complete_demande(

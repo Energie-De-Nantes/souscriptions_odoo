@@ -17,11 +17,24 @@ from .common import SouscriptionsTestCase
 
 @tagged('souscriptions', 'souscriptions_cheque_energie', 'post_install', '-at_install')
 class TestChequeEnergieConfig(TransactionCase):
-    """#170 : le journal + le compte existent après install, posés idempotents."""
+    """#170 : le setup pose le journal + le compte, idempotent.
+
+    Note : on exerce `setup_cheque_energie_compta` directement plutôt que de
+    dépendre de la persistance du `post_init_hook`. En install *sans plan
+    comptable préexistant* (CI/test), le provisioning du plan comptable par le
+    module `account` (`chart_template._load`) *purge* en fin d'install les
+    journaux/comptes « nus » — dont ceux posés par notre post_init. En prod
+    (plan comptable déjà en place) ils survivent, et `action_valider` les
+    (re)pose de toute façon à la volée (get-or-create). Le livrable #170, c'est
+    la *fonction* de setup : c'est elle qu'on teste ici."""
 
     def test_journal_et_compte_existent(self):
-        journal = self.env.ref('souscriptions_odoo.souscriptions_journal_cheque_energie')
-        compte = self.env.ref('souscriptions_odoo.souscriptions_account_cheque_energie_a_recevoir')
+        from odoo.addons.souscriptions_odoo.hooks import setup_cheque_energie_compta
+
+        journal = setup_cheque_energie_compta(self.env)
+        compte = self.env['account.account'].search([('code', '=', '467100')], limit=1)
+        self.assertTrue(journal, 'le journal « Chèques énergie » doit être posé par le setup')
+        self.assertTrue(compte, "le compte « à recevoir de l'État » doit être posé par le setup")
 
         self.assertEqual(journal.type, 'cash')
         self.assertEqual(journal.default_account_id, compte)

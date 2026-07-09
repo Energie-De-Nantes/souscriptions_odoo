@@ -127,7 +127,12 @@ class SouscriptionChequeEnergie(models.Model):
         le lettrage. Un chèque qui n'est pas à l'état `reçu` (déjà validé,
         rejeté ou expiré) ne peut pas être (re)validé — erreur explicite plutôt
         qu'un second paiement fantôme."""
-        journal = self.env.ref('souscriptions_odoo.souscriptions_journal_cheque_energie')
+        # get-or-create par code (auto-réparation) : la config #170 n'a pas
+        # d'xmlid — cf. hooks.py, un record xmlid'é posé en post_init est purgé
+        # par le nettoyage de fin d'install. On (re)pose le journal au besoin.
+        from ...hooks import setup_cheque_energie_compta
+
+        journal = setup_cheque_energie_compta(self.env)
         for cheque in self:
             if cheque.state != 'recu':
                 label = dict(cheque._fields['state'].selection).get(cheque.state, cheque.state)

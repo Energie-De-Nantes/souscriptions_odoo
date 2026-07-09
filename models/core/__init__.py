@@ -6,6 +6,7 @@ from . import (
     res_partner,
     souscription,
     souscription_campagne,
+    souscription_cheque_energie,
     souscription_consentement,
     souscription_periode,
     souscription_produit,

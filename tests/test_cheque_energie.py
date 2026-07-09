@@ -1,12 +1,18 @@
 """Chèque énergie — tiers-payeur (ADR 0026).
 
-Config comptable posée par `hooks.setup_cheque_energie_compta` (#170 —
-journal « Chèques énergie » + compte « à recevoir de l'État »). Le modèle
-propre `souscription.cheque_energie` (#171) et l'imputation FIFO à la
-facturation (#172) sont testés dans des slices suivantes.
+Deux niveaux : la config comptable posée par `hooks.setup_cheque_energie_compta`
+(#170 — journal « Chèques énergie » + compte « à recevoir de l'État »), puis le
+modèle propre `souscription.cheque_energie` et son gate `action_valider()`
+(#171 — couture 1). L'imputation FIFO à la facturation (#172) est testée côté
+`test_periode_facture.py`, au point de couture le plus haut (`_creer_facture()`).
 """
 
+from datetime import date
+
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
+
+from .common import SouscriptionsTestCase
 
 
 @tagged('souscriptions', 'souscriptions_cheque_energie', 'post_install', '-at_install')
@@ -35,3 +41,53 @@ class TestChequeEnergieConfig(TransactionCase):
 
         self.assertEqual(self.env['account.journal'].search_count([('code', '=', 'CHEN')]), 1)
         self.assertEqual(self.env['account.account'].search_count([('code', '=', '511800')]), 1)
+
+
+@tagged('souscriptions', 'souscriptions_cheque_energie', 'post_install', '-at_install')
+class TestChequeEnergieModel(SouscriptionsTestCase):
+    """#171, couture 1 : cycle de vie + payment posté + solde."""
+
+    def _new_cheque(self, **kwargs):
+        vals = {
+            'numero': 'CHQ-0001',
+            'partner_id': self.partner_test.id,
+            'montant': 194.0,
+            'date_reception': date(2024, 1, 5),
+            'date_expiration': date(2025, 3, 31),
+        }
+        vals.update(kwargs)
+        return self.env['souscription.cheque_energie'].create(vals)
+
+    def test_action_valider_recu_vers_valide_cree_payment_poste(self):
+        """Le gate : reçu -> validé crée et poste l'account.payment ; solde == montant."""
+        cheque = self._new_cheque()
+        self.assertEqual(cheque.state, 'recu')
+        self.assertFalse(cheque.payment_id)
+
+        cheque.action_valider()
+
+        self.assertEqual(cheque.state, 'valide')
+        self.assertTrue(cheque.payment_id)
+        self.assertEqual(cheque.payment_id.state, 'posted')
+        self.assertEqual(cheque.payment_id.payment_type, 'inbound')
+        self.assertEqual(cheque.payment_id.partner_id, self.partner_test)
+        self.assertEqual(cheque.payment_id.journal_id.code, 'CHEN')
+        self.assertEqual(cheque.solde, cheque.montant)
+
+    def test_action_valider_etat_interdit_leve_erreur(self):
+        """Un chèque déjà validé, ou rejeté/expiré, ne peut pas être (re)validé."""
+        deja_valide = self._new_cheque(numero='CHQ-0002')
+        deja_valide.action_valider()
+        with self.assertRaises(UserError):
+            deja_valide.action_valider()
+
+        rejete = self._new_cheque(numero='CHQ-0003')
+        rejete.state = 'rejete'
+        with self.assertRaises(UserError):
+            rejete.action_valider()
+
+    def test_numero_deja_saisi_refuse(self):
+        """Un `numero` déjà utilisé par un autre chèque est refusé (unicité)."""
+        self._new_cheque(numero='CHQ-DUP')
+        with self.assertRaises(ValidationError):
+            self._new_cheque(numero='CHQ-DUP')

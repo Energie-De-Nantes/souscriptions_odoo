@@ -5,6 +5,7 @@ from . import (
     grille_prix,
     res_partner,
     souscription,
+    souscription_campagne,
     souscription_consentement,
     souscription_periode,
     souscription_produit,

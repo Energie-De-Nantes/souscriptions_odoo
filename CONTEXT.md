@@ -253,7 +253,30 @@ identifie le **type** de prestation au catalogue Enedis, pas une ligne précise)
 
 **Facturiste** :
 Rôle métier qui conduit la facturation mensuelle depuis Odoo et **vérifie les données avant
-émission** des factures. Public cible de l'interface de vérification.
+émission** des factures. Public cible de l'interface de vérification. Sa *Campagne de
+facturation* est son tableau de bord — le pendant, côté facturation, du kanban de
+*raccordement* de l'*accueilliste*.
+
+**Campagne de facturation** :
+Le tableau de bord mensuel du·de la *Facturiste* (`souscription.campagne.facturation`), pendant
+du kanban de *raccordement*. **Un enregistrement par mois** : orchestre les étapes de la
+facturation du mois — pulls electricore (méta-périodes, prestations F15), vérifications, création
+puis émission des factures — sous forme de **matrice à prérequis**, un **DAG d'étapes fixes**
+(pas une file linéaire : le sync F15 et le pull méta-périodes sont indépendants). Chaque étape
+affiche un **reste-à-faire dérivé** des données là où le signal existe (périodes tirées, factures
+créées/émises) et une **porte de validation manuelle** là où il manque (vérifs) : la campagne ne
+porte **aucun** drapeau de vérification sur les *Périodes* ni les *Refacturations* — elle reste
+une fine couche d'orchestration au-dessus d'états **dérivés**. Draine un **statut de facturation
+par souscription** dérivé à **zéro champ** (à tirer → à facturer → facturée → émise). Porte des
+**notes** dont certaines, marquées « à reporter », renaissent en **prérequis (rappel doux, non
+bloquant)** de la campagne suivante à sa création — les validations manuelles et ces notes sont
+le seul état vraiment **persisté**, l'historique n'étant que la liste des campagnes passées. Le
+DAG est pensé pour être **rejouable par un automate** (facturation automatique suivant les mêmes
+étapes qu'un humain).
+_Éviter_ : **cycle de facturation** pour l'instance (c'est la *récurrence* / le nom du menu, pas
+l'enregistrement mensuel) ; **pipeline linéaire** (les étapes forment un DAG) ; instrumenter les
+*Périodes* / *Refacturations* d'un drapeau « vérifiée » (la vérif est une porte à la maille
+campagne).
 
 **Accueilliste** :
 Rôle métier qui instruit les demandes de *raccordement* au quotidien : accueil des nouvelles

@@ -10,7 +10,8 @@ existantes (#157).
 from datetime import timedelta
 
 from babel.dates import format_date
-from odoo import api, fields, models
+from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 # Catalogue des étapes (#156, ADR 0025 §1) : le DAG est déclaré en code, pas de
 # modèle de configuration ni de moteur de workflow. L'ordre d'insertion EST un
@@ -221,6 +222,59 @@ class SouscriptionCampagneFacturation(models.Model):
             campagne.nb_factures_creees = len(factures)
             campagne.nb_factures_emises = len(factures.filtered(lambda f: f.state == 'posted'))
 
+    # --- Boutons d'étape (#158) : délèguent aux actions déjà couvertes par
+    # ailleurs (test_pull_meta_periodes.py, test_periode_facture.py...) —
+    # aucune nouvelle couture réseau, `_ouvrir_flux`/`_tirer_prestations`
+    # inchangées. ---
+
+    def _etape(self, code):
+        self.ensure_one()
+        etape = self.etape_ids.filtered(lambda e: e.code == code)
+        if not etape:
+            raise UserError(_('Étape « %s » introuvable sur cette campagne.', code))
+        return etape
+
+    def _verifier_gate(self, code):
+        """Garde-fou dur (#158) : bloque l'action tant que le DAG ne montre
+        pas l'étape `code` prête — réutilise `etat_prerequis` (donc le
+        catalogue ETAPES_CAMPAGNE), aucune logique de gate dupliquée."""
+        self.ensure_one()
+        etape = self._etape(code)
+        if etape.etat_prerequis != 'prete':
+            raise UserError(_('Étape « %s » bloquée : prérequis non satisfaits.', ETAPES_CAMPAGNE[code]['label']))
+
+    def action_pull_meta_periodes(self):
+        """Ouvre le wizard de pull existant (#77), mois de la campagne
+        pré-rempli via le contexte `default_mois` (#158)."""
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id(
+            'souscriptions_odoo.action_souscription_pull_meta_periodes_wizard'
+        )
+        action['context'] = {'default_mois': self.mois}
+        return action
+
+    def action_sync_f15(self):
+        """Délègue directement à la sync F15 déjà couverte (#147),
+        indépendante du pull (#158 — les deux racines du DAG n'ont aucune
+        dépendance entre elles)."""
+        self.ensure_one()
+        return self.env['souscription.refacturation'].synchroniser_depuis_electricore()
+
+    def action_creer_factures(self):
+        """Gated sur les deux portes de vérif (#158) ; délègue à
+        `creer_factures()`, déjà idempotent (anti-doublon par période,
+        test_periode_facture.py)."""
+        self.ensure_one()
+        self._verifier_gate('creer_factures')
+        self._souscriptions_facturables().creer_factures()
+
+    def action_emettre_factures(self):
+        """Gated sur créer factures (#158) : poste les factures brouillon du
+        mois de la campagne (accounting standard, `action_post`)."""
+        self.ensure_one()
+        self._verifier_gate('emettre_factures')
+        self._factures_du_mois().filtered(lambda f: f.state == 'draft').action_post()
+
 
 class SouscriptionCampagneEtape(models.Model):
     """Ligne d'état par étape de campagne (#156, ADR 0025) : le seul état
@@ -339,3 +393,23 @@ class SouscriptionCampagneEtape(models.Model):
             'view_mode': 'list,form',
             'domain': [('id', 'in', souscriptions.ids)],
         }
+
+    # --- Bouton d'étape (#158) : un seul bouton générique par ligne, qui
+    # dispatche vers la méthode de la Campagne nommée par ce code — jamais de
+    # logique dupliquée entre la vue et ETAPES_CAMPAGNE. Les portes manuelles
+    # n'ont pas d'entrée ici : elles se valident via le champ `valide`.
+    _ACTIONS_PAR_ETAPE = {
+        'pull_meta_periodes': 'action_pull_meta_periodes',
+        'sync_f15': 'action_sync_f15',
+        'creer_factures': 'action_creer_factures',
+        'emettre_factures': 'action_emettre_factures',
+    }
+
+    def action_executer(self):
+        self.ensure_one()
+        methode = self._ACTIONS_PAR_ETAPE.get(self.code)
+        if not methode:
+            raise UserError(
+                _("Pas d'action pour l'étape « %s ».", ETAPES_CAMPAGNE.get(self.code, {}).get('label', self.code))
+            )
+        return getattr(self.campagne_id, methode)()

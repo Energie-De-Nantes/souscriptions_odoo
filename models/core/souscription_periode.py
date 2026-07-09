@@ -637,7 +637,7 @@ class SouscriptionPeriode(models.Model):
         """
         self.ensure_one()
         grille = self.env['grille.prix'].get_grille_active(self.date_fin, regime=self.regime_prix_periode)
-        return self.env['account.move'].create(
+        facture = self.env['account.move'].create(
             {
                 'move_type': 'out_invoice',
                 'partner_id': self.souscription_id.partner_id.id,
@@ -646,3 +646,48 @@ class SouscriptionPeriode(models.Model):
                 'invoice_line_ids': self._composer_lignes(grille),
             }
         )
+        self._imputer_cheques_energie(facture)
+        return facture
+
+    def _imputer_cheques_energie(self, facture):
+        """Impute en FIFO (par date d'expiration) les *outstanding credits* des
+        chèques énergie **validés** de l'usager·ère sur la ``Facture`` qui vient
+        d'être créée (#172, ADR 0026). Aucun effet si l'usager·ère ne détient
+        aucun chèque validé à solde positif : la ``Facture`` reste ``draft``,
+        comportement de facturation inchangé (#170, non-régression) — c'est ce
+        qui garde le cas commun (pas de chèque) intact pour la campagne, qui
+        poste ses factures plus tard (``souscription_campagne.py``).
+
+        Le lettrage **natif** d'Odoo fait tout le travail — même mécanique que
+        le widget « Outstanding credits »/``js_assign_outstanding_line`` : seul
+        l'ordre FIFO par expiration est du code métier ici. Le plafonnement
+        (``min(solde, total)``, jamais de ligne/solde négatif) et le report du
+        reliquat sur la ``Facture`` suivante sont natifs à
+        ``account.move.line.reconcile()``, jamais réimplémentés — la
+        réconciliation exige des écritures **postées** des deux côtés, d'où le
+        ``action_post()`` déclenché ici quand un chèque est disponible.
+        """
+        Cheque = self.env['souscription.cheque_energie']
+        cheques = Cheque.search([('partner_id', '=', facture.partner_id.id), ('state', '=', 'valide')]).sorted(
+            'date_expiration'
+        )
+        cheques = cheques.filtered(lambda c: c.solde > 0.0)
+        if not cheques:
+            return
+
+        if facture.state == 'draft':
+            facture.action_post()
+
+        compte_tiers = ('asset_receivable', 'liability_payable')
+        for cheque in cheques:
+            if facture.currency_id.is_zero(facture.amount_residual):
+                break
+            ligne_paiement = cheque.payment_id.move_id.line_ids.filtered(
+                lambda l: l.account_id.account_type in compte_tiers and not l.reconciled
+            )
+            ligne_facture = facture.line_ids.filtered(
+                lambda l: l.account_id.account_type in compte_tiers and not l.reconciled
+            )
+            if not ligne_paiement or not ligne_facture:
+                continue
+            (ligne_paiement + ligne_facture).reconcile()

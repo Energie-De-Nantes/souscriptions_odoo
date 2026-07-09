@@ -190,12 +190,19 @@ class SouscriptionRefacturation(models.Model):
 
     @api.model
     def _vals_prestation(self, ligne, souscription):
-        # 'NS' (non soumis) = indemnité hors champ TVA (pénalité due par Enedis) ;
-        # tout taux numérique = prestation taxée. La TVA elle-même suit le PRODUIT
-        # choisi par la nature (ADR 0009 §5) — jamais un taux recopié par ligne.
+        # On ne classe 'prestation' (taxée) QUE sur un taux numérique explicite.
+        # 'NS', null, vide ou toute valeur non numérique -> 'indemnite' (hors champ
+        # TVA, pénalité due par Enedis). Le fail-safe est fiscal : sans lui, un taux
+        # null — vu sur des DCOUP_PEN de l'API prestations — retombait sur 'prestation'
+        # et facturait de la TVA sur une pénalité qui n'en porte pas. La TVA elle-même
+        # suit le PRODUIT choisi par la nature (ADR 0009 §5) — jamais ce taux.
         # `montant_ht` est ignoré : prix × quantité fait foi (vérifié en spike,
         # 0 écart sur toutes les lignes UNITE).
-        non_soumis = (ligne.get('taux_tva_applicable') or '').strip().upper() == 'NS'
+        taux = (ligne.get('taux_tva_applicable') or '').strip().replace(',', '.')
+        try:
+            taxee = float(taux) > 0
+        except ValueError:
+            taxee = False
         return {
             'reference': ligne['reference'],
             'souscription_id': souscription.id,
@@ -204,7 +211,7 @@ class SouscriptionRefacturation(models.Model):
             'libelle': ligne.get('libelle_ev') or ligne.get('id_ev') or 'Prestation Enedis',
             'prix': ligne.get('prix_unitaire') or 0.0,
             'quantite': ligne.get('quantite') or 1.0,
-            'nature': 'indemnite' if non_soumis else 'prestation',
+            'nature': 'prestation' if taxee else 'indemnite',
         }
 
     def _composer_ligne(self):

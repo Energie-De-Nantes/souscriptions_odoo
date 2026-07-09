@@ -1,5 +1,6 @@
 from . import (
     test_basic,
+    test_campagne_facturation,
     test_catalogue,
     test_documents_contractuels,
     test_electricore_client_fabrique,

@@ -109,6 +109,30 @@ class TestCampagneFacturationSpine(SouscriptionsTestCase):
         campagne.etape_ids.invalidate_recordset()
         self.assertEqual(creer_factures.etat_prerequis, 'bloquee')
 
+    def test_valider_sync_f15_debloque_verif_refacturations(self):
+        """La sync F15 (étape « action ») n'a pas de reste-à-faire dérivable :
+        son « fait » est une validation manuelle assumée (PRD #153). Sans elle,
+        « vérif refacturations » (prereq : sync_f15) resterait bloquée à vie et
+        son badge n'aurait aucun sens. La valider (comme une porte) débloque la
+        porte avale."""
+        campagne = self._campagne()
+        sync_f15 = self._etape(campagne, 'sync_f15')
+        verif_refacturations = self._etape(campagne, 'verif_refacturations')
+
+        self.assertFalse(sync_f15.fait, 'non faite tant que non validée manuellement')
+        self.assertEqual(verif_refacturations.etat_prerequis, 'bloquee')
+
+        sync_f15.write({'valide': True})
+        campagne.etape_ids.invalidate_recordset()
+
+        self.assertTrue(sync_f15.fait, 'validée manuellement -> faite')
+        self.assertEqual(sync_f15.valide_par_id, self.env.user, 'validé_par estampillé comme une porte')
+        self.assertEqual(
+            verif_refacturations.etat_prerequis,
+            'prete',
+            'sync F15 faite -> vérif refacturations débloquée',
+        )
+
     def test_aucun_champ_verification_ajoute_sur_periode_ou_refacturation(self):
         """AC (ADR 0025) : la porte de vérif reste à la maille campagne — 0
         champ de vérification sur souscription.periode / .refacturation."""

@@ -25,11 +25,12 @@ from odoo.exceptions import UserError
 #  - 'action' : étape déclenchée par bouton (#158) sans backlog mensuel
 #               dérivable — la refacturation Enedis n'est pas rattachée à un
 #               mois (CONTEXT.md « Refacturation »), donc « sync F15 » n'a pas
-#               de reste-à-faire naturel. ponytail: elle reste donc
-#               structurellement « non faite » — ça ne bloque rien de dur
-#               (« créer factures » ne dépend que des deux portes de vérif,
-#               jamais de « sync F15 » directement) ; upgrade path si un vrai
-#               signal (ou une porte manuelle dédiée) devient nécessaire.
+#               de reste-à-faire naturel. Son « fait » est donc une validation
+#               MANUELLE (case à cocher, comme une porte) EN PLUS de son bouton
+#               Lancer : le·la facturiste tire la sync puis coche « fait » (PRD
+#               #153, « validation manuelle assumée »). Sans ça, « vérif
+#               refacturations » (prereq : sync_f15) resterait bloquée à vie —
+#               son badge n'aurait jamais de sens.
 ETAPES_CAMPAGNE = {
     'pull_meta_periodes': {
         'label': 'Pull méta-périodes',
@@ -343,9 +344,9 @@ class SouscriptionCampagneEtape(models.Model):
         string='Type',
     )
 
-    # Porte manuelle (#156, ADR 0025 §2) : seul état vraiment persisté du DAG
-    # avec les notes (#159). validé_par/validé_le sont estampillés au write
-    # (jamais saisis à la main) — cf. write() ci-dessous.
+    # Validation manuelle (#156, ADR 0025 §2) : portes de vérif ET l'action sync
+    # F15 — seul état vraiment persisté du DAG avec les notes (#159). validé_par/
+    # validé_le sont estampillés au write (jamais saisis à la main) — cf. write().
     valide = fields.Boolean(string='Validé')
     valide_par_id = fields.Many2one('res.users', string='Validé par', readonly=True)
     valide_le = fields.Datetime(string='Validé le', readonly=True)
@@ -355,10 +356,9 @@ class SouscriptionCampagneEtape(models.Model):
         string='Prérequis',
         compute='_compute_etat_prerequis',
     )
-    # « Fait » : pour une porte manuelle, la validation ; pour une étape à
-    # signal dérivé, son reste-à-faire (#157 : fait quand nb_reste_a_faire == 0) ;
-    # pour une action sans signal (sync F15), jamais fait automatiquement (cf.
-    # commentaire sur le catalogue).
+    # « Fait » : pour une porte manuelle OU une action (sync F15), la validation
+    # manuelle ; pour une étape à signal dérivé, son reste-à-faire (#157 : fait
+    # quand nb_reste_a_faire == 0). Cf. commentaire sur le catalogue.
     fait = fields.Boolean(string='Fait', compute='_compute_fait')
 
     # Reste-à-faire dérivé (#157) : nombre de souscriptions que cette étape
@@ -396,14 +396,14 @@ class SouscriptionCampagneEtape(models.Model):
     @api.depends('valide', 'type_etape', 'nb_reste_a_faire')
     def _compute_fait(self):
         for etape in self:
-            if etape.type_etape == 'porte':
-                etape.fait = etape.valide
-            elif etape.type_etape == 'derive':
+            if etape.type_etape == 'derive':
                 etape.fait = etape.nb_reste_a_faire == 0
             else:
-                # 'action' : jamais de signal dérivé (cf. ETAPES_CAMPAGNE : sync
-                # F15 n'a pas de backlog mensuel dérivable).
-                etape.fait = False
+                # 'porte' comme 'action' (sync F15) : « fait » = validation
+                # manuelle. La sync F15 n'a pas de reste-à-faire dérivable, donc
+                # son « fait » est une assomption manuelle (PRD #153) — sinon
+                # « vérif refacturations » (prereq : sync_f15) resterait bloquée.
+                etape.fait = etape.valide
 
     @api.depends('code', 'campagne_id.etape_ids.fait')
     def _compute_etat_prerequis(self):

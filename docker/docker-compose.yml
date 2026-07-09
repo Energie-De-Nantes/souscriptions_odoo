@@ -32,6 +32,10 @@ services:
       # pour que `docker compose up` marche aussi hors dev.sh (mode demo).
       - DB=${DB:-souscriptions_demo}
       - LOAD_DEMO=${LOAD_DEMO-1}
+      # Repli config electricore en dev : renseignés dans docker/.env (non commité),
+      # lus en dernier recours par la fabrique quand les paramètres système sont vides.
+      - ELECTRICORE_URL=${ELECTRICORE_URL:-}
+      - ELECTRICORE_API_KEY=${ELECTRICORE_API_KEY:-}
     volumes:
       - odoo-web-data:/var/lib/odoo
       - ../:/mnt/extra-addons/souscriptions_odoo:rw

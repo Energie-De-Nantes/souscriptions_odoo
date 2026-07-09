@@ -57,7 +57,11 @@ def _stream(metas):
 
 def _fake_electricore_client(metas=()):
     client = MagicMock()
-    client.meta_periodes.return_value = _stream(metas)
+    # Un @contextmanager est à usage unique. Le vrai client rend un flux frais à
+    # chaque appel de meta_periodes() ; on le mime avec side_effect (rappelé par
+    # appel) et non return_value (une seule instance réutilisée → le 2e run du
+    # test d'idempotence ré-entrait un CM déjà consommé → AttributeError, #158).
+    client.meta_periodes.side_effect = lambda *args, **kwargs: _stream(metas)
     return client
 
 

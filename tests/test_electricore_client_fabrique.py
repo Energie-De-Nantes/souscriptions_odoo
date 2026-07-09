@@ -7,6 +7,7 @@ couture de transport (`_appeler` / `_ouvrir_flux`), plus jamais cette garde
 (cf. tests/test_rsc_service.py, tests/test_pull_meta_periodes.py).
 """
 
+import os
 from unittest.mock import patch
 
 from odoo.addons.souscriptions_odoo.models.core import electricore_client_fabrique as fabrique_module
@@ -25,6 +26,15 @@ class TestElectricoreClientFabrique(SouscriptionsTestCase):
         patcher = patch.object(fabrique_module, 'ELECTRICORE_CLIENT_DISPONIBLE', True)
         patcher.start()
         self.addCleanup(patcher.stop)
+        # #152 : la fabrique retombe sur les variables d'environnement
+        # ELECTRICORE_URL/API_KEY quand l'ir.config_parameter est absent. On les
+        # neutralise ici pour rendre ces tests hermétiques (config = config_parameter
+        # seul) — sinon un .env local (ELECTRICORE_* réels, monté par docker-compose)
+        # fait passer le repli et les cas « config absente → UserError » échouent en
+        # local (verts en CI, où l'env est vide).
+        env_patcher = patch.dict(os.environ, {'ELECTRICORE_URL': '', 'ELECTRICORE_API_KEY': ''})
+        env_patcher.start()
+        self.addCleanup(env_patcher.stop)
         ICP = self.env['ir.config_parameter'].sudo()
         ICP.set_param('souscriptions.electricore_url', 'https://electricore.example.test')
         ICP.set_param('souscriptions.electricore_api_key', 'fake-api-key')

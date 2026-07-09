@@ -277,13 +277,20 @@ class SouscriptionCampagneFacturation(models.Model):
 
     def action_pull_meta_periodes(self):
         """Ouvre le wizard de pull existant (#77), mois de la campagne
-        pré-rempli via le contexte `default_mois` (#158)."""
+        pré-rempli via le contexte `default_mois` (#158). Même forme d'action
+        que `action_souscription_pull_meta_periodes_wizard`
+        (souscription_pull_meta_periodes_wizard_views.xml) — reconstruite ici
+        plutôt que résolue par xml-id pour ne dépendre que du modèle, jamais
+        de l'id de vue."""
         self.ensure_one()
-        action = self.env['ir.actions.act_window']._for_xml_id(
-            'souscriptions_odoo.action_souscription_pull_meta_periodes_wizard'
-        )
-        action['context'] = {'default_mois': self.mois}
-        return action
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Récupérer les périodes du mois',
+            'res_model': 'souscription.pull.meta.periodes.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_mois': self.mois},
+        }
 
     def action_sync_f15(self):
         """Délègue directement à la sync F15 déjà couverte (#147),

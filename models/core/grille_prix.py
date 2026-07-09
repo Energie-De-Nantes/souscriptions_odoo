@@ -56,6 +56,11 @@ class GrillePrix(models.Model):
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
+            # Une grille créée inactive est un brouillon hors timeline (ex. copie
+            # à retravailler en grille Moulin) : elle ne ferme aucune sœur.
+            if vals.get('active', True) is False:
+                continue
+
             date_debut_nouvelle = vals['date_debut']
             regime = vals.get('regime_prix') or 'standard'
 
@@ -172,10 +177,17 @@ class GrillePrix(models.Model):
         return prix_journalier
 
     def dupliquer_cette_grille(self):
-        """Action pour dupliquer cette grille avec toutes ses lignes"""
+        """Action pour dupliquer cette grille avec toutes ses lignes.
+
+        La copie est créée en **brouillon (inactive)** : dupliquer sert à
+        amorcer une nouvelle grille (ex. une grille Moulin) sans perturber la
+        timeline en cours. Tant qu'elle est inactive, elle ne ferme aucune
+        grille sœur et ne déclenche pas l'anti-chevauchement. L'utilisateur
+        ajuste régime/dates puis l'active.
+        """
         self.ensure_one()
 
-        # Créer une copie de la grille avec date d'aujourd'hui
+        # Date de départ indicative : l'utilisateur la corrige avant activation.
         today = fields.Date.today()
 
         # Préparer les lignes à copier
@@ -203,6 +215,7 @@ class GrillePrix(models.Model):
                 'date_debut': today,
                 'date_fin': False,
                 'regime_prix': self.regime_prix,
+                'active': False,
                 'ligne_ids': lignes_vals,
             }
         )

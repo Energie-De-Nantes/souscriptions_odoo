@@ -1,6 +1,6 @@
 {
     'name': 'Souscriptions Électricité',
-    'version': '19.0.1.7.0',
+    'version': '19.0.1.8.0',
     'depends': ['base', 'mail', 'contacts', 'account', 'portal'],
     'author': 'Virgile Daugé',
     'category': 'Energy',
@@ -36,6 +36,10 @@ vit dans models/wizard/ et ne lève qu'au clic sur l'action du wizard.
     'installable': True,
     'application': True,
     'auto_install': False,
+    # Journal « Chèques énergie » + compte « à recevoir de l'État » (#170, ADR
+    # 0026) : posés en Python (hooks.setup_cheque_energie_compta), pas en
+    # data/*.xml — cf. docstring de hooks.py pour le pourquoi.
+    'post_init_hook': 'setup_cheque_energie_compta',
     'data': [
         # Phase 1 - Core (toujours actif)
         'security/souscriptions_groups.xml',

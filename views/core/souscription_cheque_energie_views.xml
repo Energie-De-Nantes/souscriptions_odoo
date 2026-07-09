@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Écran facturiste (#171, ADR 0026) : validation manuelle (le gate,
+         saisie sur le site étatique) + suivi du solde. Le solde et l'imputation
+         sont natifs (payment_id.amount_residual, lettrage) — jamais saisis ici. -->
+    <record id="view_souscription_cheque_energie_list" model="ir.ui.view">
+        <field name="name">souscription.cheque_energie.list</field>
+        <field name="model">souscription.cheque_energie</field>
+        <field name="arch" type="xml">
+            <list string="Chèques énergie" default_order="date_expiration">
+                <field name="numero"/>
+                <field name="partner_id"/>
+                <field name="montant" sum="Total"/>
+                <field name="date_reception"/>
+                <field name="date_expiration"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'valide'"
+                       decoration-danger="state in ('rejete', 'expire')"/>
+                <field name="etat_solde" widget="badge"
+                       decoration-success="etat_solde == 'non_entame'"
+                       decoration-warning="etat_solde == 'en_cours'"
+                       decoration-danger="etat_solde == 'epuise'"/>
+                <field name="solde" sum="Solde restant"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_souscription_cheque_energie_form" model="ir.ui.view">
+        <field name="name">souscription.cheque_energie.form</field>
+        <field name="model">souscription.cheque_energie</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_valider" type="object" string="Valider"
+                            class="btn-primary" invisible="state != 'recu'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="recu,valide"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Identité">
+                            <field name="numero"/>
+                            <field name="partner_id"/>
+                            <field name="montant"/>
+                        </group>
+                        <group string="Cycle de vie">
+                            <field name="date_reception"/>
+                            <field name="date_expiration"/>
+                            <field name="etat_solde"/>
+                            <field name="solde"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="payment_id" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_souscription_cheque_energie_search" model="ir.ui.view">
+        <field name="name">souscription.cheque_energie.search</field>
+        <field name="model">souscription.cheque_energie</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="numero"/>
+                <field name="partner_id"/>
+                <filter string="Reçu" name="state_recu" domain="[('state', '=', 'recu')]"/>
+                <filter string="Validé" name="state_valide" domain="[('state', '=', 'valide')]"/>
+                <filter string="Rejeté" name="state_rejete" domain="[('state', '=', 'rejete')]"/>
+                <filter string="Expiré" name="state_expire" domain="[('state', '=', 'expire')]"/>
+                <separator/>
+                <filter string="Expire dans les 30 jours" name="expiration_proche"
+                        domain="[('date_expiration', '&lt;=', (context_today() + relativedelta(days=30)).strftime('%Y-%m-%d'))]"/>
+                <group>
+                    <filter name="group_state" string="État" context="{'group_by': 'state'}"/>
+                    <filter name="group_expiration" string="Expiration" context="{'group_by': 'date_expiration'}"/>
+                    <filter name="group_partner" string="Usager·ère" context="{'group_by': 'partner_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_souscription_cheque_energie" model="ir.actions.act_window">
+        <field name="name">Chèques énergie</field>
+        <field name="res_model">souscription.cheque_energie</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_souscription_cheque_energie_search"/>
+    </record>
+
+    <menuitem
+        id="menu_souscription_cheque_energie"
+        name="Chèques énergie"
+        parent="menu_souscription_root"
+        action="action_souscription_cheque_energie"
+        sequence="40"/>
+</odoo>

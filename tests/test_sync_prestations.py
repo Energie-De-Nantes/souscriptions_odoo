@@ -90,6 +90,19 @@ class TestSyncPrestations(SouscriptionsTestCase):
         self.assertEqual(pen.code_enedis, 'DCOUP_PEN')
         self.assertIn('2 créée(s)', action['params']['message'])
 
+    def test_taux_null_ou_vide_classe_indemnite(self):
+        """Régression : l'API prestations renvoie des DCOUP_PEN à `taux_tva_applicable`
+        null. Un null (ou vide) ne doit JAMAIS retomber sur 'prestation' — sinon on
+        facture de la TVA sur une pénalité hors champ. Seul un taux numérique taxe."""
+        self._sync(
+            [
+                _ligne(reference='ref-null', id_ev='DCOUP_PEN', taux_tva_applicable=None),
+                _ligne(reference='ref-vide', id_ev='DCOUP_PEN', taux_tva_applicable=''),
+            ]
+        )
+        self.assertEqual(self._prestas('ref-null').nature, 'indemnite')
+        self.assertEqual(self._prestas('ref-vide').nature, 'indemnite')
+
     def test_rerun_idempotent_zero_creation_zero_write(self):
         """AC1 : 2ᵉ run = 0 création, 0 write — insert-si-absente, aucun chemin
         d'update. Même un payload amont différent à référence constante ne touche

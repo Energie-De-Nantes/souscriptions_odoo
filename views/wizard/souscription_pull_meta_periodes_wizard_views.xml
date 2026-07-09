@@ -32,11 +32,4 @@
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
-
-    <menuitem
-        id="menu_souscription_pull_meta_periodes_wizard"
-        name="Récupérer les périodes du mois"
-        parent="menu_souscription_root"
-        action="action_souscription_pull_meta_periodes_wizard"
-        sequence="25"/>
 </odoo>

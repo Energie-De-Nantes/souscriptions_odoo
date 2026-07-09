@@ -57,6 +57,7 @@ vit dans models/wizard/ et ne lève qu'au clic sur l'action du wizard.
         'views/core/souscription_views.xml',
         'views/core/res_partner_views.xml',
         'views/core/grille_prix_views.xml',
+        'views/wizard/souscription_pull_meta_periodes_wizard_views.xml',
         'views/core/souscriptions_periode_views.xml',
         'views/core/souscription_refacturation_views.xml',
         'views/wizard/souscription_pull_meta_periodes_wizard_views.xml',

@@ -1,6 +1,7 @@
 from odoo import http
 from odoo.addons.portal.controllers.portal import CustomerPortal
 from odoo.addons.portal.controllers.portal import pager as portal_pager
+from odoo.exceptions import MissingError
 from odoo.http import request
 
 
@@ -43,12 +44,15 @@ class SouscriptionPortal(CustomerPortal):
         return request.render('souscriptions_odoo.portal_my_souscriptions', values)
 
     @http.route(['/my/souscription/<int:souscription_id>'], type='http', auth='user', website=True)
-    def portal_my_souscription(self, souscription_id=None, **kw):
-        partner = request.env.user.partner_id
-        souscription = request.env['souscription.souscription'].browse(souscription_id)
-
-        # Vérifier que la souscription appartient bien au partenaire
-        if not souscription.exists() or souscription.partner_id != partner:
+    def portal_my_souscription(self, souscription_id=None, access_token=None, **kw):
+        # Accès soit par le·la souscripteur·rice (propriétaire), soit via un
+        # access_token signé — c'est ce qui alimente le bouton « Aperçu » côté
+        # back-office (portal.mixin), sans se connecter en tant que client.
+        # AccessError (ni propriétaire ni token valide) remonte en 403 ;
+        # MissingError (id inexistant) → retour à l'accueil portail.
+        try:
+            souscription = self._document_check_access('souscription.souscription', souscription_id, access_token)
+        except MissingError:
             return request.redirect('/my')
 
         # Historique des consommations intégré à la page : uniquement les périodes

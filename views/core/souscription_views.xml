@@ -17,6 +17,10 @@
                             string="Résoudre la RSC maintenant"
                             type="object"
                             invisible="etat == 'en_service'"/>
+                    <button name="action_apercu_portail"
+                            string="Aperçu portail"
+                            type="object"
+                            icon="fa-external-link"/>
                 </header>
                 <sheet>
                     <group>

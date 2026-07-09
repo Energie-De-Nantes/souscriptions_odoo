@@ -702,6 +702,10 @@ class RaccordementDemande(models.Model):
 
         souscription = self.env['souscription.souscription'].create(souscription_vals)
 
+        # Accès portail donné dès l'onboarding : le·la souscripteur·trice reçoit
+        # l'invitation à activer son espace usager·ère (Odoo ne le fait pas seul).
+        souscription._octroyer_acces_portail()
+
         # Journal de consentement (ADR 0017) : une finalité cochée = un acte
         # 'donné'. Capture back-office (preuve faible), tracée comme telle ; l'acte
         # réel du·de la souscripteur·rice viendra du formulaire public (#62).

@@ -22,6 +22,8 @@ s'arrête à « rends-moi un client configuré » (ADR 0024 §4, option écarté
 
 from __future__ import annotations
 
+import os
+
 from odoo import models
 from odoo.exceptions import UserError
 
@@ -55,8 +57,14 @@ class SouscriptionElectricoreClient(models.AbstractModel):
                 'Installez la dépendance épinglée dans requirements.txt puis réessayez.'
             )
         ICP = self.env['ir.config_parameter'].sudo()
-        url = ICP.get_param('souscriptions.electricore_url')
-        api_key = ICP.get_param('souscriptions.electricore_api_key')
+        # strip() : un paramètre système collé à la main arrive souvent avec un
+        # saut de ligne parasite — httpx refuse toute URL contenant '\n'.
+        # Repli env var (dev) : évite de re-cliquer les paramètres système après
+        # chaque reset de base. Le paramètre système (prod) reste prioritaire.
+        url = (ICP.get_param('souscriptions.electricore_url') or os.environ.get('ELECTRICORE_URL', '')).strip()
+        api_key = (
+            ICP.get_param('souscriptions.electricore_api_key') or os.environ.get('ELECTRICORE_API_KEY', '')
+        ).strip()
         if not url or not api_key:
             raise UserError(
                 'Configuration electricore manquante : renseignez les paramètres système '

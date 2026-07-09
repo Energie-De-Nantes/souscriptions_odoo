@@ -45,6 +45,19 @@
                                 </list>
                             </field>
                         </page>
+                        <!-- Notes dédiées (#159) : pas le chatter (qui ne sait ni flaguer
+                             « à reporter » ni se chaîner d'un mois à l'autre). Les prérequis
+                             repris (surlignés) sont des rappels doux, jamais des portes du DAG. -->
+                        <page string="Notes" name="notes">
+                            <field name="note_ids">
+                                <list editable="bottom" decoration-info="reprise">
+                                    <field name="texte"/>
+                                    <field name="a_reporter"/>
+                                    <field name="traite"/>
+                                    <field name="reprise" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
                     </notebook>
                 </sheet>
             </form>

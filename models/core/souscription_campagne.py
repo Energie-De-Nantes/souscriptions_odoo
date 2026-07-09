@@ -95,6 +95,7 @@ class SouscriptionCampagneFacturation(models.Model):
     )
 
     etape_ids = fields.One2many('souscription.campagne.etape', 'campagne_id', string='Étapes')
+    note_ids = fields.One2many('souscription.campagne.note', 'campagne_id', string='Notes')
 
     # Décompte factures créées/émises du mois (#157) : dérivé, non stocké — cf.
     # _factures_du_mois().
@@ -127,6 +128,7 @@ class SouscriptionCampagneFacturation(models.Model):
                 vals['mois'] = fields.Date.to_date(vals['mois']).replace(day=1)
         campagnes = super().create(vals_list)
         campagnes._seed_etapes()
+        campagnes._reporter_notes_precedentes()
         return campagnes
 
     def write(self, vals):
@@ -145,6 +147,36 @@ class SouscriptionCampagneFacturation(models.Model):
                     for i, code in enumerate(ETAPES_CAMPAGNE)
                 ]
             )
+
+    # --- Notes reportées (#159) : rappel doux, jamais bloquant — aucune étape
+    # ne lit note_ids, donc une note ne peut jamais gater le DAG. ---
+
+    def _reporter_notes_precedentes(self):
+        """Reprend les notes « à reporter, non traitées » de la campagne du
+        mois précédent, comme prérequis repris (rappel doux, non bloquant).
+
+        Chaîne naturellement (N -> N+1 -> N+2…) : la note copiée conserve
+        `à_reporter=True` et repart `traité=False`, donc redevient elle-même
+        éligible à la reprise lors de la création de la campagne suivante —
+        jusqu'à ce qu'elle soit marquée traitée. Chaîne rompue (pas de
+        campagne pour le mois précédent) : rien à reporter, aucune erreur."""
+        Note = self.env['souscription.campagne.note']
+        for campagne in self:
+            mois_precedent = (campagne.mois - timedelta(days=1)).replace(day=1)
+            precedente = self.search([('mois', '=', mois_precedent)], limit=1)
+            if not precedente:
+                continue
+            a_reporter = precedente.note_ids.filtered(lambda n: n.a_reporter and not n.traite)
+            for note in a_reporter:
+                Note.create(
+                    {
+                        'campagne_id': campagne.id,
+                        'texte': note.texte,
+                        'a_reporter': True,
+                        'traite': False,
+                        'origine_note_id': note.id,
+                    }
+                )
 
     # --- Signaux dérivés (#157) : 0 champ ajouté sur souscription.souscription.
     # Statut de facturation par (souscription, mois de la campagne) et
@@ -413,3 +445,37 @@ class SouscriptionCampagneEtape(models.Model):
                 _("Pas d'action pour l'étape « %s ».", ETAPES_CAMPAGNE.get(self.code, {}).get('label', self.code))
             )
         return getattr(self.campagne_id, methode)()
+
+
+class SouscriptionCampagneNote(models.Model):
+    """Note de campagne (#159, ADR 0025) : modèle dédié, pas le chatter — le
+    chatter ne sait ni flaguer « à reporter » ni se chaîner d'un mois à
+    l'autre. Une note « à reporter » non traitée renaît comme **prérequis
+    repris** (rappel doux, non bloquant) dans la campagne suivante tant
+    qu'elle reste non traitée (chaînage N→N+1→N+2…, cf.
+    `SouscriptionCampagneFacturation._reporter_notes_precedentes`).
+    """
+
+    _name = 'souscription.campagne.note'
+    _description = 'Note de campagne de facturation'
+    _order = 'id'
+
+    campagne_id = fields.Many2one(
+        'souscription.campagne.facturation', required=True, ondelete='cascade', string='Campagne'
+    )
+    texte = fields.Text(required=True, string='Note')
+    a_reporter = fields.Boolean(string='À reporter')
+    traite = fields.Boolean(string='Traité')
+
+    # Prérequis repris (#159) : pointeur vers la note du mois précédent dont
+    # celle-ci est la reprise — truthy = rappel doux à mettre en avant côté
+    # vue. Jamais un prérequis DAG : aucune étape ne lit note_ids/reprise.
+    origine_note_id = fields.Many2one(
+        'souscription.campagne.note', string='Reprise de', readonly=True, ondelete='set null'
+    )
+    reprise = fields.Boolean(string='Prérequis repris', compute='_compute_reprise', store=True)
+
+    @api.depends('origine_note_id')
+    def _compute_reprise(self):
+        for note in self:
+            note.reprise = bool(note.origine_note_id)

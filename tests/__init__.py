@@ -2,6 +2,7 @@ from . import (
     test_basic,
     test_campagne_etapes_actions,
     test_campagne_facturation,
+    test_campagne_notes,
     test_campagne_signaux,
     test_catalogue,
     test_documents_contractuels,

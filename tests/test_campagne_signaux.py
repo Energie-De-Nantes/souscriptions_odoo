@@ -96,14 +96,15 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
         self.assertEqual(self._etape('pull_meta_periodes').nb_reste_a_faire, 0)
         self.assertTrue(self._etape('pull_meta_periodes').fait)
 
-    def test_creer_factures_reste_a_faire_compte_periodes_sans_facture(self):
-        """Seules les souscriptions « à facturer » comptent — pas celles
-        encore « à tirer »."""
+    def test_creer_factures_reste_a_faire_compte_tout_ce_qui_nest_pas_facture(self):
+        """Reste-à-faire cumulatif amont : toute souscription pas encore
+        facturée compte — celle « à facturer » ET celle encore « à tirer »
+        (sinon « créer » lirait « fait » avant que tout soit tiré)."""
         self._periode(self.souscription_base)  # à facturer
-        # souscription_hphc reste sans période -> à tirer, hors décompte créer.
+        # souscription_hphc reste sans période -> à tirer : compte aussi.
         self.campagne.etape_ids.invalidate_recordset()
 
-        self.assertEqual(self._etape('creer_factures').nb_reste_a_faire, 1)
+        self.assertEqual(self._etape('creer_factures').nb_reste_a_faire, 2)
         self.assertFalse(self._etape('creer_factures').fait)
 
     def test_emettre_factures_reste_a_faire_compte_brouillons(self):
@@ -174,7 +175,7 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
     def test_sync_f15_et_portes_nont_pas_de_reste_a_faire(self):
         """Les étapes sans signal dérivé (action, portes) ont un
         reste-à-faire vide par construction — cf. ETAPES_CAMPAGNE."""
-        for code in ('sync_f15', 'releves_index', 'verif_periodes', 'verif_refacturations'):
+        for code in ('sync_f15', 'verif_periodes', 'verif_refacturations'):
             self.assertEqual(self._etape(code).nb_reste_a_faire, 0, code)
 
     # --- Drill-down (#157) ---

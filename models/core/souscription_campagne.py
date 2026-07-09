@@ -23,14 +23,18 @@ from odoo.exceptions import UserError
 #  - 'derive' : signal dérivé des données (#157) — un reste-à-faire existe,
 #               l'étape est faite quand il vaut 0 ;
 #  - 'action' : étape déclenchée par bouton (#158) sans backlog mensuel
-#               dérivable — la refacturation Enedis n'est pas rattachée à un
-#               mois (CONTEXT.md « Refacturation »), donc « sync F15 » n'a pas
-#               de reste-à-faire naturel. Son « fait » est donc une validation
-#               MANUELLE (case à cocher, comme une porte) EN PLUS de son bouton
-#               Lancer : le·la facturiste tire la sync puis coche « fait » (PRD
-#               #153, « validation manuelle assumée »). Sans ça, « vérif
-#               refacturations » (prereq : sync_f15) resterait bloquée à vie —
-#               son badge n'aurait jamais de sens.
+#               dérivable — le pull F15 tire TOUT (pas de fenêtre temporelle,
+#               ADR 0009 §2), donc pas de reste-à-faire mensuel. Elle est
+#               « faite » dès qu'elle a été lancée sans erreur pour la
+#               campagne (champ `lance` persisté, posé par action_executer) :
+#               c'est ce qui lui permet de gater sa vérif au même titre que le
+#               pull des périodes. Revirement assumé du PRD #153 (« validation
+#               manuelle ») décidé au rebase de cette branche : le lancement
+#               suffit, plus de coche (#163 est remplacé).
+#
+# Les deux « vrais pulls » (méta-périodes + F15) gatent chacun leur porte de
+# vérif. Les relevés d'index NE sont PAS une étape : ils arrivent avec le pull
+# des périodes (enfants souscription.releve, cf. _amorcer_depuis_meta).
 ETAPES_CAMPAGNE = {
     'pull_meta_periodes': {
         'label': 'Pull méta-périodes',
@@ -42,15 +46,10 @@ ETAPES_CAMPAGNE = {
         'type': 'action',
         'prerequis': (),
     },
-    'releves_index': {
-        'label': "Relevés d'index",
-        'type': 'porte',
-        'prerequis': (),
-    },
     'verif_periodes': {
         'label': 'Vérif périodes',
         'type': 'porte',
-        'prerequis': ('pull_meta_periodes', 'releves_index'),
+        'prerequis': ('pull_meta_periodes',),
     },
     'verif_refacturations': {
         'label': 'Vérif refacturations',
@@ -218,31 +217,39 @@ class SouscriptionCampagneFacturation(models.Model):
             return 'a_facturer'
         return 'emise' if periode.facture_state == 'posted' else 'facturee'
 
-    def _souscriptions_par_statut(self, statut):
-        """ponytail: une requête par souscription facturable (échelle
-        facturiste — dizaines/centaines, pas un flux temps réel) ; upgrade en
-        une seule requête SQL groupée si ça devient lent un jour."""
-        self.ensure_one()
-        cibles = self._souscriptions_facturables()
-        return cibles.filtered(lambda s: self._statut_facturation(s) == statut)
+    # Statuts de facturation, dans l'ordre du cycle (#157). Le reste-à-faire
+    # d'une étape dérivée = toutes les souscriptions pas encore parvenues au
+    # statut *cible* de l'étape (cumulatif amont), pas seulement celles dans le
+    # bucket juste avant : sinon une étape aval lit « fait » (reste 0) tant que
+    # rien n'a atteint sa file — « émettre » se marquait faite alors que
+    # « créer » avait encore tout son backlog (aucune facture créée => 0
+    # souscription en « facturée » => reste 0).
+    _STATUTS_ORDONNES = ('a_tirer', 'a_facturer', 'facturee', 'emise')
 
-    # Étape à signal dérivé -> statut de facturation dont le reste-à-faire la
-    # concerne. Les étapes absentes (portes, action) n'ont pas de signal
+    # Étape à signal dérivé -> statut cible atteint = étape faite pour cette
+    # souscription. Les étapes absentes (portes, action) n'ont pas de signal
     # dérivé (cf. ETAPES_CAMPAGNE) : reste-à-faire vide par construction.
-    _STATUT_PAR_ETAPE_DERIVEE = {
-        'pull_meta_periodes': 'a_tirer',
-        'creer_factures': 'a_facturer',
-        'emettre_factures': 'facturee',
+    _CIBLE_PAR_ETAPE_DERIVEE = {
+        'pull_meta_periodes': 'a_facturer',
+        'creer_factures': 'facturee',
+        'emettre_factures': 'emise',
     }
 
     def _reste_a_faire(self, code):
-        """Souscriptions restantes pour l'étape dérivée `code` (#157) — feed
-        aussi bien le compteur affiché (`nb_reste_a_faire`) que le drill-down."""
+        """Souscriptions restantes pour l'étape dérivée `code` (#157) — toutes
+        celles pas encore parvenues au statut cible de l'étape. Feed aussi bien
+        le compteur affiché (`nb_reste_a_faire`) que le drill-down.
+
+        ponytail: une requête par souscription facturable (échelle facturiste —
+        dizaines/centaines, pas un flux temps réel) ; upgrade en une seule
+        requête SQL groupée si ça devient lent un jour."""
         self.ensure_one()
-        statut = self._STATUT_PAR_ETAPE_DERIVEE.get(code)
-        if not statut:
+        cible = self._CIBLE_PAR_ETAPE_DERIVEE.get(code)
+        if not cible:
             return self.env['souscription.souscription']
-        return self._souscriptions_par_statut(statut)
+        pas_encore = set(self._STATUTS_ORDONNES[: self._STATUTS_ORDONNES.index(cible)])
+        cibles = self._souscriptions_facturables()
+        return cibles.filtered(lambda s: self._statut_facturation(s) in pas_encore)
 
     def _factures_du_mois(self):
         """Factures (account.move) des périodes du mois de la campagne."""
@@ -359,21 +366,28 @@ class SouscriptionCampagneEtape(models.Model):
         string='Type',
     )
 
-    # Validation manuelle (#156, ADR 0025 §2) : portes de vérif ET l'action sync
-    # F15 — seul état vraiment persisté du DAG avec les notes (#159). validé_par/
-    # validé_le sont estampillés au write (jamais saisis à la main) — cf. write().
+    # Porte manuelle (#156, ADR 0025 §2) : état persisté du DAG avec `lance`
+    # ci-dessous et les notes (#159). validé_par/validé_le sont estampillés au
+    # write (jamais saisis à la main) — cf. write() ci-dessous.
     valide = fields.Boolean(string='Validé')
     valide_par_id = fields.Many2one('res.users', string='Validé par', readonly=True)
     valide_le = fields.Datetime(string='Validé le', readonly=True)
+
+    # Étape 'action' (sync F15) : « faite » = lancée au moins une fois pour
+    # cette campagne. Le pull F15 tire tout, sans signal mensuel dérivable
+    # (ADR 0009 §2) ; ce drapeau persisté joue le rôle de « pull effectué »
+    # pour gater « vérif refacturations », comme le reste-à-faire gate « vérif
+    # périodes ». Posé par action_executer, jamais saisi à la main.
+    lance = fields.Boolean(string='Lancé', readonly=True)
 
     etat_prerequis = fields.Selection(
         [('prete', 'Prête'), ('bloquee', 'Bloquée')],
         string='Prérequis',
         compute='_compute_etat_prerequis',
     )
-    # « Fait » : pour une porte manuelle OU une action (sync F15), la validation
-    # manuelle ; pour une étape à signal dérivé, son reste-à-faire (#157 : fait
-    # quand nb_reste_a_faire == 0). Cf. commentaire sur le catalogue.
+    # « Fait » : pour une porte manuelle, la validation ; pour une étape à
+    # signal dérivé, son reste-à-faire (#157 : fait quand nb_reste_a_faire == 0) ;
+    # pour une action (sync F15), son lancement (`lance`). Cf. le catalogue.
     fait = fields.Boolean(string='Fait', compute='_compute_fait')
 
     # Reste-à-faire dérivé (#157) : nombre de souscriptions que cette étape
@@ -408,23 +422,27 @@ class SouscriptionCampagneEtape(models.Model):
             else:
                 etape.nb_reste_a_faire = 0
 
-    @api.depends('valide', 'type_etape', 'nb_reste_a_faire')
+    @api.depends('valide', 'type_etape', 'nb_reste_a_faire', 'lance')
     def _compute_fait(self):
         for etape in self:
-            if etape.type_etape == 'derive':
+            if etape.type_etape == 'porte':
+                etape.fait = etape.valide
+            elif etape.type_etape == 'derive':
                 etape.fait = etape.nb_reste_a_faire == 0
             else:
-                # 'porte' comme 'action' (sync F15) : « fait » = validation
-                # manuelle. La sync F15 n'a pas de reste-à-faire dérivable, donc
-                # son « fait » est une assomption manuelle (PRD #153) — sinon
-                # « vérif refacturations » (prereq : sync_f15) resterait bloquée.
-                etape.fait = etape.valide
+                # 'action' : pas de backlog dérivable (sync F15 tire tout,
+                # ADR 0009 §2) — « faite » une fois lancée pour la campagne.
+                etape.fait = etape.lance
 
-    @api.depends('code', 'campagne_id.etape_ids.fait')
+    @api.depends('code', 'valide', 'type_etape', 'campagne_id.etape_ids.fait')
     def _compute_etat_prerequis(self):
         for etape in self:
             prerequis = ETAPES_CAMPAGNE.get(etape.code, {}).get('prerequis', ())
-            if not prerequis:
+            # Une porte validée n'est jamais « bloquée » : la validation
+            # manuelle EST l'override du·de la facturiste — Bloquée veut dire
+            # « pas encore le moment », pas « déjà accompli ». Sans ça une porte
+            # validée hors-séquence s'affiche Bloquée ET Faite (incohérent).
+            if not prerequis or (etape.type_etape == 'porte' and etape.valide):
                 etape.etat_prerequis = 'prete'
                 continue
             freres = {e.code: e.fait for e in etape.campagne_id.etape_ids}
@@ -466,7 +484,12 @@ class SouscriptionCampagneEtape(models.Model):
             raise UserError(
                 _("Pas d'action pour l'étape « %s ».", ETAPES_CAMPAGNE.get(self.code, {}).get('label', self.code))
             )
-        return getattr(self.campagne_id, methode)()
+        resultat = getattr(self.campagne_id, methode)()
+        # Étape 'action' réussie (pas d'exception) = « pull effectué » pour la
+        # campagne : débloque sa vérif (cf. champ `lance`).
+        if self.type_etape == 'action':
+            self.lance = True
+        return resultat
 
 
 class SouscriptionCampagneNote(models.Model):

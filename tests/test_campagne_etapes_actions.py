@@ -187,6 +187,21 @@ class TestCampagneEtapeSyncF15(SouscriptionsTestCase):
             action = etape.action_executer()
         self.assertEqual(action['type'], 'ir.actions.client')
 
+    def test_lancer_sync_f15_debloque_verif_refacturations(self):
+        """Le pull F15 gate sa vérif : « vérif refacturations » est bloquée
+        tant que sync F15 n'a pas tourné, puis prête une fois lancé."""
+        sync = self.campagne.etape_ids.filtered(lambda e: e.code == 'sync_f15')
+        verif = self.campagne.etape_ids.filtered(lambda e: e.code == 'verif_refacturations')
+        self.assertFalse(sync.fait)
+        self.assertEqual(verif.etat_prerequis, 'bloquee')
+
+        with patch.object(refacturation_module.SouscriptionRefacturation, '_tirer_prestations', return_value=[]):
+            sync.action_executer()
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.assertTrue(sync.fait)
+        self.assertEqual(verif.etat_prerequis, 'prete')
+
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneEtapeCreerFactures(SouscriptionsTestCase):

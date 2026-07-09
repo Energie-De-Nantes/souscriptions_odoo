@@ -1,10 +1,11 @@
 """Tests de la Campagne de facturation — spine (#156, ADR 0025).
 
-Le DAG déclaré par `ETAPES_CAMPAGNE` : `pull_meta_periodes`/`sync_f15`/
-`releves_index` sont des racines indépendantes ; `verif_periodes` (prereq :
-pull + relevés) et `verif_refacturations` (prereq : sync F15) sont des portes
-manuelles ; `creer_factures` (prereq : les deux vérifs) et `emettre_factures`
-(prereq : créer) sont des étapes à signal dérivé.
+Le DAG déclaré par `ETAPES_CAMPAGNE` : `pull_meta_periodes`/`sync_f15` sont les
+deux racines (les deux « vrais pulls ») ; chacun gate sa porte de vérif —
+`verif_periodes` (prereq : pull méta-périodes) et `verif_refacturations`
+(prereq : sync F15) ; `creer_factures` (prereq : les deux vérifs) et
+`emettre_factures` (prereq : créer) sont des étapes à signal dérivé. Les
+relevés d'index ne sont pas une étape : ils arrivent avec le pull des périodes.
 
 Dans cette tranche, les étapes à signal dérivé (pull, créer, émettre) sont
 volontairement toujours « non faites » (leur signal arrive en #157, cf.
@@ -47,33 +48,33 @@ class TestCampagneFacturationSpine(SouscriptionsTestCase):
         self.assertEqual(campagne.mois, date(2026, 7, 1))
 
     def test_racines_du_dag_toujours_pretes(self):
-        """Les étapes sans prérequis (pull, sync F15, relevés) sont toujours
-        « prête » : aucune dépendance à satisfaire."""
+        """Les deux racines (les vrais pulls : méta-périodes + sync F15) sont
+        toujours « prête » : aucune dépendance à satisfaire."""
         campagne = self._campagne()
-        racines = campagne.etape_ids.filtered(lambda e: e.code in ('pull_meta_periodes', 'sync_f15', 'releves_index'))
-        self.assertEqual(len(racines), 3)
+        racines = campagne.etape_ids.filtered(lambda e: e.code in ('pull_meta_periodes', 'sync_f15'))
+        self.assertEqual(len(racines), 2)
         self.assertTrue(all(e.etat_prerequis == 'prete' for e in racines))
 
     def test_etape_avec_prerequis_bloquee_tant_que_non_satisfaits(self):
-        """`verif_periodes` (prereq : pull + relevés) reste bloquée : le pull
-        (signal dérivé) est toujours non fait dans cette tranche (#157)."""
+        """`verif_refacturations` (prereq : sync F15) reste bloquée tant que le
+        pull F15 n'a pas été lancé pour la campagne (`lance` = False)."""
         campagne = self._campagne()
-        self.assertEqual(self._etape(campagne, 'verif_periodes').etat_prerequis, 'bloquee')
+        self.assertEqual(self._etape(campagne, 'verif_refacturations').etat_prerequis, 'bloquee')
 
     def test_valider_porte_persiste_valide_par_et_valide_le(self):
-        """AC : valider une porte manuelle (« relevés d'index », sans
-        prérequis) persiste validé_par/validé_le et la rend « faite »."""
+        """AC : valider une porte manuelle persiste validé_par/validé_le et la
+        rend « faite » (la validation manuelle vaut override du prérequis)."""
         campagne = self._campagne()
-        releves = self._etape(campagne, 'releves_index')
-        self.assertFalse(releves.valide_par_id)
-        self.assertFalse(releves.valide_le)
-        self.assertFalse(releves.fait)
+        verif = self._etape(campagne, 'verif_periodes')
+        self.assertFalse(verif.valide_par_id)
+        self.assertFalse(verif.valide_le)
+        self.assertFalse(verif.fait)
 
-        releves.write({'valide': True})
+        verif.write({'valide': True})
 
-        self.assertEqual(releves.valide_par_id, self.env.user)
-        self.assertTrue(releves.valide_le)
-        self.assertTrue(releves.fait)
+        self.assertEqual(verif.valide_par_id, self.env.user)
+        self.assertTrue(verif.valide_le)
+        self.assertTrue(verif.fait)
 
     def test_validation_des_deux_portes_amont_debloque_letape_avale(self):
         """AC : valider une porte flippe les étapes avales de bloquée à
@@ -108,30 +109,6 @@ class TestCampagneFacturationSpine(SouscriptionsTestCase):
         verif_periodes.write({'valide': False})
         campagne.etape_ids.invalidate_recordset()
         self.assertEqual(creer_factures.etat_prerequis, 'bloquee')
-
-    def test_valider_sync_f15_debloque_verif_refacturations(self):
-        """La sync F15 (étape « action ») n'a pas de reste-à-faire dérivable :
-        son « fait » est une validation manuelle assumée (PRD #153). Sans elle,
-        « vérif refacturations » (prereq : sync_f15) resterait bloquée à vie et
-        son badge n'aurait aucun sens. La valider (comme une porte) débloque la
-        porte avale."""
-        campagne = self._campagne()
-        sync_f15 = self._etape(campagne, 'sync_f15')
-        verif_refacturations = self._etape(campagne, 'verif_refacturations')
-
-        self.assertFalse(sync_f15.fait, 'non faite tant que non validée manuellement')
-        self.assertEqual(verif_refacturations.etat_prerequis, 'bloquee')
-
-        sync_f15.write({'valide': True})
-        campagne.etape_ids.invalidate_recordset()
-
-        self.assertTrue(sync_f15.fait, 'validée manuellement -> faite')
-        self.assertEqual(sync_f15.valide_par_id, self.env.user, 'validé_par estampillé comme une porte')
-        self.assertEqual(
-            verif_refacturations.etat_prerequis,
-            'prete',
-            'sync F15 faite -> vérif refacturations débloquée',
-        )
 
     def test_aucun_champ_verification_ajoute_sur_periode_ou_refacturation(self):
         """AC (ADR 0025) : la porte de vérif reste à la maille campagne — 0

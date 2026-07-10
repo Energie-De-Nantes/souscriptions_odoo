@@ -262,3 +262,19 @@ class TestGrillePrix(TransactionCase):
         action = grille_moulin.dupliquer_cette_grille()
         nouvelle = self.env['grille.prix'].browse(action['res_id'])
         self.assertEqual(nouvelle.regime_prix, 'moulin')
+
+    def test_dupliquer_grille_ne_perime_pas_la_sœur(self):
+        """La copie est un brouillon inactif : dupliquer une grille ouverte ne
+        ferme pas la grille en cours (ancien comportement corrigé)."""
+        grille_active = self.env['grille.prix'].create(
+            {
+                'name': 'Grille juin 2025',
+                'date_debut': date(2025, 6, 1),
+                'regime_prix': 'standard',
+            }
+        )
+        action = grille_active.dupliquer_cette_grille()
+        nouvelle = self.env['grille.prix'].browse(action['res_id'])
+
+        self.assertFalse(nouvelle.active, 'La copie doit être un brouillon inactif')
+        self.assertFalse(grille_active.date_fin, "La grille d'origine ne doit pas être fermée")

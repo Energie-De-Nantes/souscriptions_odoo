@@ -126,6 +126,11 @@ class GrillePrix(models.Model):
         gênent jamais, même sur des dates identiques (CONTEXT.md « Régime de
         prix » : chaque régime versionne ses grilles indépendamment)."""
         for grille in self:
+            # Un brouillon inactif est hors timeline (cf. create()) : il ne ferme
+            # aucune sœur et ne déclenche pas l'anti-chevauchement. Sans ce skip,
+            # dupliquer une grille ouverte lèverait un chevauchement contre elle.
+            if not grille.active:
+                continue
             if not grille.date_debut:
                 continue
             start_a = grille.date_debut

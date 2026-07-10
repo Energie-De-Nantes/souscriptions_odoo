@@ -241,6 +241,33 @@ class Souscription(models.Model):
             else:
                 sous.etat = 'en_instance'
 
+    @api.model
+    def souscriptions_concernees(self, mois):
+        """Périmètre de campagne (CONTEXT.md « Périmètre de campagne ») : les
+        Souscriptions concernées par le mois `M`, par recouvrement de
+        l'intervalle de service avec `M` sur les dates propres de la
+        Souscription — RSC acquise ET `date_debut <= dernier jour de M` ET
+        (`date_fin` vide OU `date_fin >= premier jour de M`).
+
+        Point unique du prédicat : la Campagne (`_souscriptions_facturables`)
+        et le wizard ad-hoc de pull le consomment tous les deux, pour ne
+        jamais diverger. Historique et figé par le mois — à distinguer de
+        `etat == 'en_service'`, un instantané vivant (aujourd'hui), qui
+        sur-compte les Souscriptions entrées après `M` et sous-compte celles
+        résiliées depuis (ADR 0025)."""
+        premier_jour = fields.Date.to_date(mois).replace(day=1)
+        premier_jour_suivant = (premier_jour + timedelta(days=31)).replace(day=1)
+        dernier_jour = premier_jour_suivant - timedelta(days=1)
+        return self.search(
+            [
+                ('ref_situation_contractuelle', '!=', False),
+                ('date_debut', '<=', dernier_jour),
+                '|',
+                ('date_fin', '=', False),
+                ('date_fin', '>=', premier_jour),
+            ]
+        )
+
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:

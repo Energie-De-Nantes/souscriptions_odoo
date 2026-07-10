@@ -185,10 +185,12 @@ class SouscriptionCampagneFacturation(models.Model):
     # souscription.periode / account.move (ADR 0025 §2). ---
 
     def _souscriptions_facturables(self):
-        """Souscriptions concernées par une campagne : *en service* (RSC
-        acquise, facturable) — les souscriptions *en instance* sont hors
-        périmètre de facturation (CONTEXT.md « En instance / En service »)."""
-        return self.env['souscription.souscription'].search([('etat', '=', 'en_service')])
+        """Souscriptions concernées par la campagne : le Périmètre de
+        campagne du mois (CONTEXT.md « Périmètre de campagne ») — recouvrement
+        de l'intervalle de service avec `self.mois`, jamais l'instantané vivant
+        `etat == 'en_service'` (#175)."""
+        self.ensure_one()
+        return self.env['souscription.souscription'].souscriptions_concernees(self.mois)
 
     def _statut_facturation(self, souscription):
         """Statut de facturation dérivé de `(souscription, mois de la

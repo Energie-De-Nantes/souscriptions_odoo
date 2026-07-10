@@ -185,10 +185,12 @@ class SouscriptionCampagneFacturation(models.Model):
     # souscription.periode / account.move (ADR 0025 §2). ---
 
     def _souscriptions_facturables(self):
-        """Souscriptions concernées par une campagne : *en service* (RSC
-        acquise, facturable) — les souscriptions *en instance* sont hors
-        périmètre de facturation (CONTEXT.md « En instance / En service »)."""
-        return self.env['souscription.souscription'].search([('etat', '=', 'en_service')])
+        """Souscriptions concernées par la campagne : le Périmètre de
+        campagne du mois (CONTEXT.md « Périmètre de campagne ») — recouvrement
+        de l'intervalle de service avec `self.mois`, jamais l'instantané vivant
+        `etat == 'en_service'` (#175)."""
+        self.ensure_one()
+        return self.env['souscription.souscription'].souscriptions_concernees(self.mois)
 
     def _statut_facturation(self, souscription):
         """Statut de facturation dérivé de `(souscription, mois de la
@@ -277,20 +279,33 @@ class SouscriptionCampagneFacturation(models.Model):
             raise UserError(_('Étape « %s » bloquée : prérequis non satisfaits.', ETAPES_CAMPAGNE[code]['label']))
 
     def action_pull_meta_periodes(self):
-        """Ouvre le wizard de pull existant (#77), mois de la campagne
-        pré-rempli via le contexte `default_mois` (#158). Même forme d'action
-        que `action_souscription_pull_meta_periodes_wizard`
-        (souscription_pull_meta_periodes_wizard_views.xml) — reconstruite ici
-        plutôt que résolue par xml-id pour ne dépendre que du modèle, jamais
-        de l'id de vue."""
+        """Lance le tirage en un clic (#176), sans fenêtre intermédiaire :
+        cible le Périmètre de campagne (#175) pour `self.mois` — aucun mois
+        re-proposé, la scope est déjà celle de la campagne — et délègue la
+        boucle de tirage au point partagé avec le wizard ad-hoc
+        (`souscription.pull.meta.periodes.wizard._tirer_meta_periodes`, même
+        couture réseau `_ouvrir_flux`/fabrique client, ADR 0024). Retourne une
+        notification résumant créées/déjà présentes/erreurs — sticky si des
+        erreurs, auto-dismiss sinon — aucun résumé persisté."""
         self.ensure_one()
+        cibles = self._souscriptions_facturables()
+        creees, existantes, erreurs = self.env['souscription.pull.meta.periodes.wizard']._tirer_meta_periodes(
+            cibles, self.mois
+        )
         return {
-            'type': 'ir.actions.act_window',
-            'name': 'Récupérer les périodes du mois',
-            'res_model': 'souscription.pull.meta.periodes.wizard',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': {'default_mois': self.mois},
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Pull méta-périodes'),
+                'message': _(
+                    'Créées : %(creees)s · Déjà présentes : %(existantes)s · Erreurs : %(erreurs)s',
+                    creees=len(creees),
+                    existantes=len(existantes),
+                    erreurs=len(erreurs),
+                ),
+                'type': 'warning' if erreurs else 'success',
+                'sticky': bool(erreurs),
+            },
         }
 
     def action_sync_f15(self):

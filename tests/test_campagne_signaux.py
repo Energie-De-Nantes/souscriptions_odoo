@@ -33,6 +33,25 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
     def _periode(self, souscription):
         return self.create_test_periode(souscription, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
 
+    def _creer_souscription_rsc(self, name, rsc, date_debut, date_fin=False):
+        """Souscription minimale, RSC acquise, dates propres pilotées par le
+        test — pour exercer le Périmètre de campagne (#175) sans perturber
+        les fixtures partagées souscription_base/souscription_hphc."""
+        sous = self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.partner_test.id,
+                'pdl': name,
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'etat_facturation_id': self.etat_facturation.id,
+                'date_debut': date_debut,
+                'date_fin': date_fin,
+                'provision_mensuelle_kwh': 300.0,
+            }
+        )
+        sous.with_context(rsc_automatisme=True).write({'ref_situation_contractuelle': rsc})
+        return sous
+
     # --- Statut par souscription, quatre configurations fixture (AC #157) ---
 
     def test_statut_a_tirer_sans_periode_du_mois(self):
@@ -107,6 +126,51 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
 
         self.assertEqual(self._etape('emettre_factures').nb_reste_a_faire, 0)
         self.assertTrue(self._etape('emettre_factures').fait)
+
+    # --- Périmètre de campagne (#175, CONTEXT.md) : recouvrement de
+    # l'intervalle de service avec le mois M, sur les dates propres de la
+    # Souscription — jamais l'instantané vivant `etat == 'en_service'`. ---
+
+    def test_perimetre_exclut_souscription_entree_en_service_apres_le_mois(self):
+        """Mise en service en avril, campagne de mars : hors périmètre — pas
+        de sur-compte (le reste-à-faire ne l'attend jamais)."""
+        self._creer_souscription_rsc('PDL_APRES', 'RSC-APRES', date(2024, 4, 1))
+        self.campagne.invalidate_recordset()
+
+        self.assertEqual(self._etape('pull_meta_periodes').nb_reste_a_faire, 2)
+
+    def test_perimetre_inclut_souscription_en_service_pendant_le_mois_mais_resiliee_depuis(self):
+        """En service dès janvier, résiliée en juin (dans le passé par
+        rapport à aujourd'hui) : concernée par mars, donc dans le
+        périmètre — pas de sous-compte malgré `etat == 'resiliee'`."""
+        resiliee = self._creer_souscription_rsc('PDL_RESILIEE', 'RSC-RESILIEE', date(2024, 1, 1), date(2024, 6, 30))
+        self.assertEqual(resiliee.etat, 'resiliee')
+        self.campagne.invalidate_recordset()
+
+        self.assertIn(resiliee, self.campagne._souscriptions_facturables())
+        self.assertEqual(self._etape('pull_meta_periodes').nb_reste_a_faire, 3)
+
+    def test_perimetre_inclut_souscription_entree_en_service_en_cours_de_mois(self):
+        """Mise en service le 15 mars : concernée par mars dès son entrée,
+        pas seulement à partir du mois suivant."""
+        en_cours = self._creer_souscription_rsc('PDL_EN_COURS', 'RSC-EN-COURS', date(2024, 3, 15))
+        self.campagne.invalidate_recordset()
+
+        self.assertIn(en_cours, self.campagne._souscriptions_facturables())
+        self.assertEqual(self._etape('pull_meta_periodes').nb_reste_a_faire, 3)
+
+    def test_drill_down_liste_exactement_les_souscriptions_du_perimetre(self):
+        """Le drill-down d'une étape dérivée liste exactement les
+        souscriptions comptées par son reste-à-faire (#175)."""
+        self._creer_souscription_rsc('PDL_APRES', 'RSC-APRES-DD', date(2024, 4, 1))
+        en_cours = self._creer_souscription_rsc('PDL_EN_COURS_DD', 'RSC-EN-COURS-DD', date(2024, 3, 15))
+        self.campagne.invalidate_recordset()
+
+        action = self._etape('pull_meta_periodes').action_drill_down()
+        self.assertEqual(
+            set(action['domain'][0][2]),
+            {self.souscription_base.id, self.souscription_hphc.id, en_cours.id},
+        )
 
     def test_sync_f15_et_portes_nont_pas_de_reste_a_faire(self):
         """Les étapes sans signal dérivé (action, portes) ont un

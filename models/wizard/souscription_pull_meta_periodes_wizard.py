@@ -60,23 +60,49 @@ class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
         RSC, crée les périodes manquantes (create-missing-only), résume le
         résultat (créées / déjà existantes / sans RSC / erreurs).
 
-        Le client est acquis en tête, avant toute recherche (échec rapide et
-        déterministe, ADR 0024 §5) : un même clic produit toujours la même
-        classe de résultat, que des souscriptions à RSC existent ou non."""
+        Chemin ad-hoc (mois saisi, portée toutes-RSC) : délègue la boucle de
+        tirage à `_tirer_meta_periodes` (#176), partagée avec le chemin
+        Campagne (`souscription.campagne.facturation.action_pull_meta_periodes`,
+        portée Périmètre de campagne)."""
         self.ensure_one()
-        client = self.env['souscription.electricore.client'].client()
-
         Souscription = self.env['souscription.souscription']
-        Periode = self.env['souscription.periode']
 
         avec_rsc = Souscription.search([('ref_situation_contractuelle', '!=', False), ('active', '=', True)])
         sans_rsc = Souscription.search([('ref_situation_contractuelle', '=', False), ('active', '=', True)])
-        par_rsc = {s.ref_situation_contractuelle: s for s in avec_rsc}
+
+        creees, existantes, erreurs = self._tirer_meta_periodes(avec_rsc, self.mois)
+
+        self.resultat = self._formatter_resultat(creees, existantes, sans_rsc, erreurs)
+        self.state = 'done'
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': self._name,
+            'res_id': self.id,
+            'view_mode': 'form',
+            'target': 'new',
+        }
+
+    @api.model
+    def _tirer_meta_periodes(self, souscriptions, mois):
+        """Boucle de tirage partagée (#176) : acquiert le client (fabrique
+        `souscription.electricore.client`, ADR 0024), ouvre le flux
+        `meta_periodes` pour `mois` sur les RSC de `souscriptions`, crée les
+        périodes manquantes (create-missing-only) avec savepoint par élément
+        (skip-and-report, ADR 0011) et mappe les exceptions typées electricore
+        en `UserError`. Rend `(creees, existantes, erreurs)` — trois listes de
+        libellés, consommées par le résumé du wizard ad-hoc et par le
+        résultat/toast de la Campagne (#158/#176). `souscriptions` est déjà le
+        périmètre voulu par l'appelant (toutes-RSC pour le wizard, Périmètre
+        de campagne du mois pour la Campagne) : aucun filtre supplémentaire
+        ici."""
+        client = self.env['souscription.electricore.client'].client()
+        Periode = self.env['souscription.periode']
+        par_rsc = {s.ref_situation_contractuelle: s for s in souscriptions if s.ref_situation_contractuelle}
 
         creees, existantes, erreurs = [], [], []
 
         if par_rsc:
-            mois_str = fields.Date.to_string(self.mois)
+            mois_str = fields.Date.to_string(mois)
             try:
                 with self._ouvrir_flux(client, mois_str, list(par_rsc)) as stream:
                     for meta in stream:
@@ -99,15 +125,7 @@ class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
             except ContractVersionError as exc:
                 raise UserError(f'Contrat electricore obsolète : {exc}')
 
-        self.resultat = self._formatter_resultat(creees, existantes, sans_rsc, erreurs)
-        self.state = 'done'
-        return {
-            'type': 'ir.actions.act_window',
-            'res_model': self._name,
-            'res_id': self.id,
-            'view_mode': 'form',
-            'target': 'new',
-        }
+        return creees, existantes, erreurs
 
     def _amorcer_une(self, Periode, souscription, meta, creees, existantes):
         """Create-missing-only (ADR 0011) : un `(souscription, mois)` déjà

@@ -43,6 +43,7 @@ odoo-server.log
 .codanna/
 .fastembed_cache/
 .env
+.env.pass
 
 # Local agent state / caches (Serena MCP, Claude Code)
 .serena/

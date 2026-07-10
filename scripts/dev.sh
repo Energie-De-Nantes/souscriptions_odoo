@@ -11,6 +11,11 @@
 #                                      # (pilotage souscriptions_migration : tranche suivante, pas ici)
 #   ./scripts/dev.sh --reset          # repart d'une base vierge pour le mode choisi
 #
+# Secrets electricore (ELECTRICORE_URL / _API_KEY) : injectés depuis Proton Pass —
+#   pr ./scripts/dev.sh              # pass-cli résout .env.pass -> env shell -> pass-through compose -> conteneur
+# Sans `pr` : vars vides -> intégration electricore désactivée (repli, ADR-0024), pas de crash.
+# Voir docs/adr/0026 + electricore ADR-0056.
+#
 # -> http://localhost:8069  (admin / admin)
 #
 # Remplace scripts/run-app.sh (image stock odoo:19, sans electricore-client).

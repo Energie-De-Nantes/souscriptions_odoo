@@ -76,38 +76,49 @@ class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
         )
         self.campagne = self.env['souscription.campagne.facturation'].create({'mois': self.MOIS})
 
-    def test_bouton_pull_ouvre_le_wizard_avec_le_mois_pre_rempli(self):
-        """AC : le step pull ouvre le wizard, mois pré-rempli."""
-        action = self.campagne.action_pull_meta_periodes()
-        self.assertEqual(action['res_model'], 'souscription.pull.meta.periodes.wizard')
-        self.assertEqual(action['context']['default_mois'], self.campagne.mois)
-
-    def test_bouton_pull_delegue_a_laction_deja_couverte(self):
-        """Le bouton délègue à l'action wizard déjà couverte par
-        test_pull_meta_periodes.py — même couture réseau (_ouvrir_flux),
-        aucune nouvelle."""
-        action = self.campagne.action_pull_meta_periodes()
-        wizard = self.env['souscription.pull.meta.periodes.wizard'].with_context(**action['context']).create({})
-        self.assertEqual(wizard.mois, self.campagne.mois)
-
+    def test_bouton_pull_agit_directement_et_retourne_une_notification(self):
+        """AC #176 : le bouton n'ouvre plus de fenêtre — il tire directement
+        (Périmètre de campagne du mois) et retourne un toast, pas une
+        ouverture de fenêtre."""
         client = _fake_electricore_client([_periode_meta()])
         with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
-            wizard.action_lancer()
+            action = self.campagne.action_pull_meta_periodes()
+
+        self.assertEqual(action['type'], 'ir.actions.client')
+        self.assertEqual(action['tag'], 'display_notification')
+        params = action['params']
+        self.assertIn('Créées : 1', params['message'])
+        self.assertIn('Déjà présentes : 0', params['message'])
+        self.assertIn('Erreurs : 0', params['message'])
+        self.assertEqual(params['type'], 'success')
+        self.assertFalse(params['sticky'], "pas d'erreur -> toast auto-dismiss")
 
         periode = self.env['souscription.periode'].search(
             [('souscription_id', '=', self.souscription_base.id), ('mois', '=', self.MOIS)]
         )
         self.assertEqual(len(periode), 1)
 
-    def test_pull_idempotent_via_le_wizard(self):
-        """AC : rejouer le pull deux fois ne double pas la période
-        (create-missing-only, #77/#158)."""
-        action = self.campagne.action_pull_meta_periodes()
+    def test_bouton_pull_toast_sticky_quand_une_souscription_echoue(self):
+        """AC #176 : skip-and-report préservé — un échec sur une souscription
+        n'interrompt pas le lot, apparaît au compteur d'erreurs, et rend le
+        toast sticky."""
+        meta_invalide = _periode_meta(debut=None)  # déclenche une erreur de mapping (Date invalide)
+        client = _fake_electricore_client([meta_invalide])
+        with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
+            action = self.campagne.action_pull_meta_periodes()
+
+        params = action['params']
+        self.assertIn('Erreurs : 1', params['message'])
+        self.assertEqual(params['type'], 'warning')
+        self.assertTrue(params['sticky'], 'une erreur -> toast sticky')
+
+    def test_pull_idempotent_via_la_campagne(self):
+        """AC #176 : rejouer le pull deux fois ne double pas la période
+        (create-missing-only préservé, #77/#158)."""
         client = _fake_electricore_client([_periode_meta()])
         for _run in range(2):
-            wizard = self.env['souscription.pull.meta.periodes.wizard'].with_context(**action['context']).create({})
             with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
-                wizard.action_lancer()
+                self.campagne.action_pull_meta_periodes()
 
         periode = self.env['souscription.periode'].search(
             [('souscription_id', '=', self.souscription_base.id), ('mois', '=', self.MOIS)]
@@ -118,8 +129,22 @@ class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
         """`action_executer` de la ligne d'étape « pull » délègue à
         `campagne.action_pull_meta_periodes` — un seul point de dispatch (#158)."""
         etape = self.campagne.etape_ids.filtered(lambda e: e.code == 'pull_meta_periodes')
-        action = etape.action_executer()
-        self.assertEqual(action['res_model'], 'souscription.pull.meta.periodes.wizard')
+        client = _fake_electricore_client([])
+        with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
+            action = etape.action_executer()
+        self.assertEqual(action['tag'], 'display_notification')
+
+    def test_wizard_ad_hoc_fonctionne_toujours(self):
+        """Non-régression : le wizard « Récupérer les périodes du mois » et
+        son bouton d'en-tête restent inchangés (chemin secondaire, #176)."""
+        wizard = self.env['souscription.pull.meta.periodes.wizard'].create({'mois': self.MOIS})
+        client = _fake_electricore_client([_periode_meta()])
+        with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
+            action = wizard.action_lancer()
+
+        self.assertEqual(action['type'], 'ir.actions.act_window')
+        self.assertEqual(wizard.state, 'done')
+        self.assertIn('Créées : 1', wizard.resultat)
 
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')

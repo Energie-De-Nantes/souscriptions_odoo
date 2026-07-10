@@ -282,6 +282,19 @@ l'enregistrement mensuel) ; **pipeline linéaire** (les étapes forment un DAG) 
 *Périodes* / *Refacturations* d'un drapeau « vérifiée » (la vérif est une porte à la maille
 campagne).
 
+**Périmètre de campagne** (souscriptions concernées par le mois M) :
+L'ensemble des *Souscriptions* qu'une *Campagne de facturation* du mois M doit traiter — base de
+tous ses **reste-à-faire** dérivés (pull, création, émission). Défini par **recouvrement de
+l'intervalle de service avec M**, calculé sur les **dates propres** de la Souscription : RSC
+acquise **et** `date_debut ≤ dernier jour de M` **et** (`date_fin` vide **ou** `date_fin ≥ premier
+jour de M`). C'est **historique et figé** par le mois — à distinguer de l'état *En service* qui est
+un **instantané vivant** (« a une RSC et n'est pas encore résiliée *aujourd'hui* »). Utiliser
+l'instantané pour cadrer une campagne d'un mois passé **sur-compte** les souscriptions entrées en
+service après M (jamais concernées, reste-à-faire jamais résorbé) et **sous-compte** celles
+résiliées depuis (concernées par M, mais devenues *Résiliée*). Corollaire : la justesse du périmètre
+**dépend** de la fiabilité de `date_debut` / `date_fin`.
+_Éviter_ : cadrer le périmètre sur `etat == 'en_service'` (instantané, pas maille-mois).
+
 **Accueilliste** :
 Rôle métier qui instruit les demandes de *raccordement* au quotidien : accueil des nouvelles
 demandes, demandes SGE selon la *situation d'entrée* (F120 / F130), saisie de l'*id_Affaire*,

@@ -355,6 +355,38 @@ class TestReleveFacturePDF(SouscriptionsTestCase):
         for jalon in ('01/01/2024', '15/01/2024', '31/01/2024'):
             self.assertIn(jalon, html)
 
+    def test_swap_compteur_deux_familles_affiche_union_sur_le_pdf(self):
+        """Facturée Base mais relevée par deux familles (swap de compteur en
+        cours de période, #138) : le PDF affiche l'union des colonnes — Base ET
+        HPH/HPB/HCH/HCB — pas seulement Base comme le ferait config_cadrans lu
+        directement. Même source (releve_colonnes()) que le portail et le
+        formulaire backend."""
+        periode = self.create_test_periode(self.souscription_base)
+        self.assertEqual(periode.config_cadrans, 'base')
+        Releve = self.env['souscription.releve']
+        Releve.create({'periode_id': periode.id, 'date': date(2024, 1, 1), 'nature': 'reel', 'index_base': 88801})
+        Releve.create(
+            {
+                'periode_id': periode.id,
+                'date': date(2024, 1, 31),
+                'nature': 'reel',
+                'index_hph': 711,
+                'index_hpb': 622,
+                'index_hch': 533,
+                'index_hcb': 444,
+            }
+        )
+        facture = periode._creer_facture()
+
+        html = self._render_facture(facture)
+        # Les deux familles sont rendues : la valeur d'index_base (relevé avant
+        # swap) ET les 4 index HPH/HPB/HCH/HCB (relevé après swap) apparaissent
+        # — l'ancienne lecture directe de config_cadrans n'aurait affiché que
+        # la colonne Base, jamais ces 4 valeurs.
+        self.assertIn('88801', html)
+        for valeur in ('711', '622', '533', '444'):
+            self.assertIn(valeur, html)
+
 
 @tagged('souscriptions', 'souscriptions_releve', 'post_install', '-at_install')
 class TestMigrationIndexInteger(SouscriptionsTestCase):

@@ -10,6 +10,10 @@
                             string="Résoudre la RSC maintenant"
                             type="object"
                             invisible="etat == 'en_service'"/>
+                    <button name="action_ouvrir_chronologie"
+                            string="Chronologie"
+                            type="object"
+                            groups="souscriptions_odoo.group_souscriptions_user"/>
                     <field name="etat" widget="statusbar" readonly="1"/>
                 </header>
                 <sheet>

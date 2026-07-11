@@ -13,15 +13,30 @@ mapping d'exceptions locaux à ce module, même posture que le wizard de pull
 des méta-périodes (`souscription_pull_meta_periodes_wizard.py`, ADR 0024) :
 la fabrique s'arrête à « rends-moi un client configuré », chaque appelant
 garde son appel d'endpoint et son propre mapping.
-
-Cette tranche pose le modèle de ligne transitoire et son mapping pur (3
-types) ; le bouton lui-même (`action_ouvrir_chronologie`, appel réseau,
-purge/recréation) arrive dans la tranche suivante.
 """
 
 from __future__ import annotations
 
 from odoo import api, fields, models
+from odoo.exceptions import UserError
+
+# Garde d'import minimale (ADR 0024) : seules les exceptions du mapping de ce
+# module sont importées ici — la construction du client (garde + drapeau +
+# config) vit dans la fabrique. Si le paquet est absent, la fabrique lève
+# avant qu'aucune de ces exceptions ne puisse être levée.
+try:
+    from electricore_client import ContractVersionError, IngestionEnCours
+    from electricore_client.exceptions import PreconditionNonRemplie
+except ImportError:  # pragma: no cover - paquet optionnel ; la fabrique lève avant tout mapping
+
+    class ContractVersionError(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
+    class IngestionEnCours(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
+    class PreconditionNonRemplie(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
 
 
 class SouscriptionChronologieLigne(models.Model):
@@ -101,7 +116,7 @@ class SouscriptionChronologieLigne(models.Model):
     def _vals_depuis_ligne(self, souscription, ligne):
         """Mappe une `LigneEvenement | LigneReleve | LignePeriodeEnergie`
         (déjà validée côté client, union discriminée sur `type_ligne`) vers
-        les `vals` de `create()` — un seul `getattr` par champ du contrat,
+        les `vals` de `create()` — un seul `getattr` par champe du contrat,
         aucune traduction (même posture que `_amorcer_depuis_meta`)."""
         vals = {
             'souscription_id': souscription.id,
@@ -153,3 +168,74 @@ class SouscriptionChronologieLigne(models.Model):
                 energie_hcb_kwh=ligne.energie_hcb_kwh,
             )
         return vals
+
+
+class Souscription(models.Model):
+    _inherit = 'souscription.souscription'
+
+    chronologie_ligne_ids = fields.One2many('souscription.chronologie.ligne', 'souscription_id', string='Chronologie')
+
+    def action_ouvrir_chronologie(self):
+        """Bouton « Chronologie » (#200) : tire la frise electricore au grain
+        RSC pour `self`, purge les lignes déjà affichées pour cette
+        Souscription et les recrée, puis ouvre la vue liste domainée dessus.
+
+        Sans RSC : `UserError` actionnable renvoyant vers la résolution RSC —
+        jamais de repli `pdl` (une Souscription *en instance* n'a pas de
+        tenure de contrat à tirer ; la vue point restera une action séparée
+        si un jour nécessaire pour diagnostiquer les charnières)."""
+        self.ensure_one()
+        if not self.ref_situation_contractuelle:
+            raise UserError(
+                "Impossible d'afficher la chronologie : cette Souscription n'a pas encore de RSC "
+                "(référence de situation contractuelle) — c'est le grain requis par la frise "
+                'electricore. Résolvez la RSC (bouton « Résoudre la RSC maintenant ») puis '
+                'réessayez.'
+            )
+        self._tirer_chronologie()
+        return self._action_chronologie()
+
+    def _tirer_chronologie(self):
+        """Acquiert le client (fabrique `souscription.electricore.client`,
+        ADR 0024), tire la frise complète du flux `chronologie` pour la RSC
+        de `self`, puis purge/recrée les lignes de `self` en un seul geste
+        transactionnel. Le flux est matérialisé en `vals` **avant** toute
+        écriture : une erreur réseau/contrat en cours de flux n'efface jamais
+        les lignes déjà affichées d'un clic précédent."""
+        self.ensure_one()
+        client = self.env['souscription.electricore.client'].client()
+        Ligne = self.env['souscription.chronologie.ligne']
+
+        vals_list = []
+        try:
+            with self._ouvrir_flux(client, self.ref_situation_contractuelle) as stream:
+                for ligne in stream:
+                    vals_list.append(Ligne._vals_depuis_ligne(self, ligne))
+        except IngestionEnCours:
+            raise UserError("L'ingestion electricore est en cours (verrou base) : réessayez plus tard.")
+        except PreconditionNonRemplie as exc:
+            raise UserError(f'Précondition non remplie côté electricore : {exc}')
+        except ContractVersionError as exc:
+            raise UserError(f'Contrat electricore obsolète : {exc}')
+
+        Ligne.search([('souscription_id', '=', self.id)]).unlink()
+        if vals_list:
+            Ligne.create(vals_list)
+
+    def _ouvrir_flux(self, client, rsc):
+        """Point de transport unique : ouvre le flux `chronologie` (context
+        manager) au grain RSC. Seul endroit qui parle réseau — c'est la
+        couture patchée en tests (réponses en boîte, rien d'autre n'est
+        mocké)."""
+        return client.chronologie(rsc=rsc)
+
+    def _action_chronologie(self):
+        """Vue liste transitoire domainée sur `self`, group-by `type_ligne`,
+        triée par date (défaut du modèle `_order`)."""
+        self.ensure_one()
+        action = self.env['ir.actions.act_window']._for_xml_id(
+            'souscriptions_odoo.action_souscription_chronologie_ligne'
+        )
+        action['domain'] = [('souscription_id', '=', self.id)]
+        action['context'] = {'search_default_group_type_ligne': 1}
+        return action

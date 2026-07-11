@@ -42,7 +42,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-FAC-05 ✅ pull des méta-périodes electricore, idempotent — preuve: tests/test_pull_meta_periodes.py · #77
 - REQ-FAC-06 ✅ énergie par cadran en cascade selon le calendrier de comptage — preuve: tests/test_periode_energie.py · #26
 - REQ-FAC-07 ✅ période mensuelle unique, snapshot figé à la facturation — preuve: tests/test_periode_snapshot.py::test_periode_figee_des_la_facturation · #14
-- REQ-FAC-08 ✅ relevés d'index : verrou de facturation + bloc justificatif sur la facture — preuve: tests/test_releve.py · #54
+- REQ-FAC-08 ✅ relevés d'index : verrou de facturation + bloc justificatif (colonnes = union des familles réellement relevées) — preuve: tests/test_releve.py · #54, #138
 - REQ-FAC-09 ✅ composition des lignes : prorata, cadrans, TURPE, pro, solidaire, régime — preuve: tests/test_periode_composition.py · #74
 - REQ-FAC-10 ✅ facture d'énergie PDF sur template dédié — preuve: tests/test_invoice_template.py, tests/test_ui.py::test_facture_energie_pdf
 - REQ-FAC-11 ⚠️ prestations F15 synchronisées puis refacturées (TVA par nature) — preuve: tests/test_sync_prestations.py, tests/test_refacturation.py · #147

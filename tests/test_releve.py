@@ -110,6 +110,109 @@ class TestReleveModel(SouscriptionsTestCase):
 
 
 @tagged('souscriptions', 'souscriptions_releve', 'post_install', '-at_install')
+class TestReleveColonnesUnionFamilles(SouscriptionsTestCase):
+    """`releve_colonnes()` = union des familles de cadrans réellement relevées
+    (#138, amende ADR 0015) — plus une lecture directe de `config_cadrans`."""
+
+    def test_une_seule_famille_ignore_config_cadrans_declare(self):
+        """Période déclarée hp_hc dont l'unique relevé porte les 4 cadrans
+        (compteur remplacé) : seules les colonnes 4 cadrans apparaissent —
+        aucune colonne HP/HC parasite à zéro."""
+        self.souscription_hphc.config_cadrans = 'hp_hc'
+        periode = self.create_test_periode(self.souscription_hphc)
+        self.env['souscription.releve'].create(
+            {
+                'periode_id': periode.id,
+                'date': date(2024, 1, 1),
+                'nature': 'reel',
+                'index_hph': 1000,
+                'index_hpb': 2000,
+                'index_hch': 3000,
+                'index_hcb': 4000,
+            }
+        )
+
+        self.assertEqual(
+            [c['field'] for c in periode.releve_colonnes()],
+            ['index_hph', 'index_hpb', 'index_hch', 'index_hcb'],
+        )
+
+    def test_deux_familles_union_ordonnee_superficiel_a_profond(self):
+        """Changement de compteur HP/HC → 4 cadrans en cours de période : union
+        ordonnée [HP, HC, HPH, HPB, HCH, HCB], chaque relevé ne remplissant que
+        les registres de son propre compteur (diff visuel de la transition)."""
+        self.souscription_hphc.config_cadrans = 'hp_hc'
+        periode = self.create_test_periode(self.souscription_hphc)
+        Releve = self.env['souscription.releve']
+        Releve.create(
+            {'periode_id': periode.id, 'date': date(2024, 1, 1), 'nature': 'reel', 'index_hp': 8000, 'index_hc': 4000}
+        )
+        Releve.create(
+            {
+                'periode_id': periode.id,
+                'date': date(2024, 1, 31),
+                'nature': 'reel',
+                'index_hph': 10,
+                'index_hpb': 20,
+                'index_hch': 30,
+                'index_hcb': 40,
+            }
+        )
+
+        self.assertEqual(
+            [c['field'] for c in periode.releve_colonnes()],
+            ['index_hp', 'index_hc', 'index_hph', 'index_hpb', 'index_hch', 'index_hcb'],
+        )
+
+    def test_aucun_relevé_replie_sur_config_cadrans_declare(self):
+        """Aucun relevé du tout : repli sur le config_cadrans déclaré — la
+        saisie manuelle (#12) garde des colonnes où écrire."""
+        self.souscription_hphc.config_cadrans = 'hp_hc'
+        periode = self.create_test_periode(self.souscription_hphc)
+        self.assertFalse(periode.releve_ids)
+
+        self.assertEqual([c['field'] for c in periode.releve_colonnes()], ['index_hp', 'index_hc'])
+
+    def test_releves_sans_aucun_index_replie_sur_config_cadrans_declare(self):
+        """Des relevés existent mais aucun n'a d'index renseigné (tous à 0) :
+        même repli sur config_cadrans que l'absence totale de relevé."""
+        self.souscription_hphc.config_cadrans = '4_cadrans'
+        periode = self.create_test_periode(self.souscription_hphc)
+        self.env['souscription.releve'].create({'periode_id': periode.id, 'date': date(2024, 1, 1), 'nature': 'estime'})
+
+        self.assertEqual(
+            [c['field'] for c in periode.releve_colonnes()],
+            ['index_hph', 'index_hpb', 'index_hch', 'index_hcb'],
+        )
+
+    def test_booleens_releve_show_gatent_le_formulaire_backend(self):
+        """`releve_show_base/hphc/4cadrans` (gating XML, `column_invisible` ne
+        pouvant appeler une méthode) reflètent l'union — plusieurs peuvent être
+        vrais simultanément, impossible à représenter par une Selection."""
+        self.souscription_hphc.config_cadrans = 'hp_hc'
+        periode = self.create_test_periode(self.souscription_hphc)
+        Releve = self.env['souscription.releve']
+        Releve.create(
+            {'periode_id': periode.id, 'date': date(2024, 1, 1), 'nature': 'reel', 'index_hp': 100, 'index_hc': 50}
+        )
+        Releve.create(
+            {
+                'periode_id': periode.id,
+                'date': date(2024, 1, 31),
+                'nature': 'reel',
+                'index_hph': 10,
+                'index_hpb': 20,
+                'index_hch': 30,
+                'index_hcb': 40,
+            }
+        )
+
+        self.assertFalse(periode.releve_show_base)
+        self.assertTrue(periode.releve_show_hphc)
+        self.assertTrue(periode.releve_show_4cadrans)
+
+
+@tagged('souscriptions', 'souscriptions_releve', 'post_install', '-at_install')
 class TestReleveVerrou(SouscriptionsTestCase):
     """Verrou de facturation étendu à l'enfant (#56 / ADR 0014-0015) : dès qu'une
     Période est facturée, create / write / unlink d'un relevé sont rejetés."""
@@ -251,6 +354,38 @@ class TestReleveFacturePDF(SouscriptionsTestCase):
         html = self._render_facture(facture)
         for jalon in ('01/01/2024', '15/01/2024', '31/01/2024'):
             self.assertIn(jalon, html)
+
+    def test_swap_compteur_deux_familles_affiche_union_sur_le_pdf(self):
+        """Facturée Base mais relevée par deux familles (swap de compteur en
+        cours de période, #138) : le PDF affiche l'union des colonnes — Base ET
+        HPH/HPB/HCH/HCB — pas seulement Base comme le ferait config_cadrans lu
+        directement. Même source (releve_colonnes()) que le portail et le
+        formulaire backend."""
+        periode = self.create_test_periode(self.souscription_base)
+        self.assertEqual(periode.config_cadrans, 'base')
+        Releve = self.env['souscription.releve']
+        Releve.create({'periode_id': periode.id, 'date': date(2024, 1, 1), 'nature': 'reel', 'index_base': 88801})
+        Releve.create(
+            {
+                'periode_id': periode.id,
+                'date': date(2024, 1, 31),
+                'nature': 'reel',
+                'index_hph': 711,
+                'index_hpb': 622,
+                'index_hch': 533,
+                'index_hcb': 444,
+            }
+        )
+        facture = periode._creer_facture()
+
+        html = self._render_facture(facture)
+        # Les deux familles sont rendues : la valeur d'index_base (relevé avant
+        # swap) ET les 4 index HPH/HPB/HCH/HCB (relevé après swap) apparaissent
+        # — l'ancienne lecture directe de config_cadrans n'aurait affiché que
+        # la colonne Base, jamais ces 4 valeurs.
+        self.assertIn('88801', html)
+        for valeur in ('711', '622', '533', '444'):
+            self.assertIn(valeur, html)
 
 
 @tagged('souscriptions', 'souscriptions_releve', 'post_install', '-at_install')

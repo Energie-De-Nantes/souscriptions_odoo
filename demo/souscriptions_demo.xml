@@ -153,6 +153,24 @@
             <field name="turpe_variable">13.75</field>
         </record>
 
+        <!-- Période juin 2026 - Particulier BASE, SWAP DE COMPTEUR (#138). Facturée
+             Base (config_cadrans hérité 'base'), mais le compteur est remplacé en
+             cours de mois par un compteur 4 cadrans : le relevé de début ne porte
+             qu'un index_base, celui de fin porte les 4 cadrans (index_base resté à
+             0, non renseigné sur ce compteur). Non-régression #138 : le justificatif
+             doit afficher l'UNION (Base + HPH/HPB/HCH/HCB), pas seulement Base — cf.
+             les relevés plus bas, `demo_releve_juin_2026_*`. -->
+        <record id="demo_periode_juin_2026_swap_compteur" model="souscription.periode">
+            <field name="souscription_id" ref="demo_souscription_particulier_base"/>
+            <field name="date_debut">2026-06-01</field>
+            <field name="date_fin">2026-06-30</field>
+            <field name="type_periode">mensuelle</field>
+            <field name="provision_base_kwh">280</field>
+            <field name="energie_base_kwh">270</field>
+            <field name="turpe_fixe">8.50</field>
+            <field name="turpe_variable">13.10</field>
+        </record>
+
         <!-- Période mars 2024 - Particulier HP/HC -->
         <record id="demo_periode_mars_hphc" model="souscription.periode">
             <field name="souscription_id" ref="demo_souscription_particulier_hphc"/>
@@ -351,6 +369,28 @@
             <field name="date">2024-02-29</field>
             <field name="nature">reel</field>
             <field name="index_base">135</field>
+        </record>
+
+        <!-- Période NON facturée — juin 2026, SWAP DE COMPTEUR ENTRE FAMILLES
+             (#138, non-régression). Base facturée (config_cadrans 'base'), mais le
+             1er relevé vient de l'ancien compteur mono-index (index_base) et le 2e
+             du nouveau compteur 4 cadrans (index_hph/hpb/hch/hcb) — index_base y
+             reste à 0 : c'est le diff visuel de la transition. Le justificatif doit
+             afficher Base ET HPH/HPB/HCH/HCB (union), pas Base seule. -->
+        <record id="demo_releve_juin_2026_avant_swap" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_juin_2026_swap_compteur"/>
+            <field name="date">2026-06-01</field>
+            <field name="nature">reel</field>
+            <field name="index_base">20000</field>
+        </record>
+        <record id="demo_releve_juin_2026_apres_swap" model="souscription.releve">
+            <field name="periode_id" ref="demo_periode_juin_2026_swap_compteur"/>
+            <field name="date">2026-06-30</field>
+            <field name="nature">reel</field>
+            <field name="index_hph">100</field>
+            <field name="index_hpb">80</field>
+            <field name="index_hch">60</field>
+            <field name="index_hcb">40</field>
         </record>
 
         <!-- Période FACTURÉE & POSTÉE — Admin janvier (4 cadrans). Visible sur le

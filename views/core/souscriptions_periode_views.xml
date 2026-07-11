@@ -56,6 +56,13 @@
                         </group>
                         <group string="Contrat (historisé)">
                             <field name="config_cadrans"/>
+                            <!-- Gating des colonnes du justificatif de relevés
+                                 (#138) : booléens calculés, jamais affichés
+                                 tels quels, juste chargés pour parent.X plus
+                                 bas dans le sous-formulaire releve_ids. -->
+                            <field name="releve_show_base" invisible="1"/>
+                            <field name="releve_show_hphc" invisible="1"/>
+                            <field name="releve_show_4cadrans" invisible="1"/>
                             <field name="type_tarif_periode"/>
                             <field name="puissance_souscrite_periode"/>
                             <field name="lisse_periode"/>
@@ -115,30 +122,31 @@
                         </group>
                     </group>
 
-                    <!-- Relevés d'index utilisés (ADR 0015) : justificatif légal du
-                         calcul d'énergie, saisi à la main par le·la facturiste.
-                         Forme large par cadran réseau ; les colonnes d'index
-                         suivent le calendrier de comptage (config_cadrans). -->
+                    <!-- Relevés d'index utilisés (ADR 0015, amendé #138) : justificatif
+                         légal du calcul d'énergie, saisi à la main par le·la facturiste.
+                         Forme large par cadran réseau ; les colonnes affichées suivent
+                         l'UNION des familles réellement relevées (releve_show_*,
+                         calculés depuis _familles_relevees()) — pas config_cadrans
+                         directement, qui ne sert plus que de repli (aucun index saisi). -->
                     <group string="Relevés d'index utilisés">
                         <field name="releve_ids" nolabel="1" colspan="2">
                             <list editable="bottom">
-                                <field name="config_cadrans" column_invisible="1"/>
                                 <field name="date"/>
                                 <field name="nature"/>
                                 <field name="index_base"
-                                       column_invisible="parent.config_cadrans != 'base'"/>
+                                       column_invisible="not parent.releve_show_base"/>
                                 <field name="index_hp"
-                                       column_invisible="parent.config_cadrans != 'hp_hc'"/>
+                                       column_invisible="not parent.releve_show_hphc"/>
                                 <field name="index_hc"
-                                       column_invisible="parent.config_cadrans != 'hp_hc'"/>
+                                       column_invisible="not parent.releve_show_hphc"/>
                                 <field name="index_hph"
-                                       column_invisible="parent.config_cadrans != '4_cadrans'"/>
+                                       column_invisible="not parent.releve_show_4cadrans"/>
                                 <field name="index_hpb"
-                                       column_invisible="parent.config_cadrans != '4_cadrans'"/>
+                                       column_invisible="not parent.releve_show_4cadrans"/>
                                 <field name="index_hch"
-                                       column_invisible="parent.config_cadrans != '4_cadrans'"/>
+                                       column_invisible="not parent.releve_show_4cadrans"/>
                                 <field name="index_hcb"
-                                       column_invisible="parent.config_cadrans != '4_cadrans'"/>
+                                       column_invisible="not parent.releve_show_4cadrans"/>
                                 <field name="releve_externe_id"/>
                                 <field name="origine"/>
                             </list>

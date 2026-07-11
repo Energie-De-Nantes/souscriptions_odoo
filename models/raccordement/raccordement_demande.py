@@ -566,10 +566,14 @@ class RaccordementDemande(models.Model):
             partner = self._create_partner()
             self.partner_id = partner
 
-            # 2. Créer le compte bancaire si nécessaire
+            # 2. Créer le compte bancaire si nécessaire, puis le mandat SEPA
+            # (#187) : la garde IBAN (_verifier_garde_iban_acceptation,
+            # exécutée avant l'écriture qui déclenche _create_odoo_entries)
+            # garantit déjà un IBAN valide ici en mode prélèvement.
             if self.bank_iban and self.mode_paiement == 'prelevement':
                 partner_bank = self._create_partner_bank(partner)
                 self.partner_bank_id = partner_bank
+                self._creer_mandat_sepa(partner, partner_bank)
 
             # 3. Créer la souscription
             souscription = self._create_souscription(partner)
@@ -662,6 +666,94 @@ class RaccordementDemande(models.Model):
                 bank_vals['bank_id'] = bank.id
 
         return self.env['res.partner.bank'].create(bank_vals)
+
+    # --- Pont vers le mandat SEPA (#187, CONTEXT.md « Mandat de
+    # prélèvement (SEPA) », PRD #183) ---
+    #
+    # Le modèle de mandat (`sdd.mandate`) vit dans le module Enterprise
+    # « Direct Debit » : absent en Community/CI, jamais dans les
+    # `depends` du manifeste (décision PRD #183 — pas de dépendance à un
+    # module privé). Garde runtime au point d'entrée unique
+    # (_creer_mandat_sepa) : idem l'idiome de dépendance molle
+    # d'electricore-client (ADR 0024), mais sur le *registre* de modèles
+    # plutôt que sur un *import* Python.
+
+    def _creer_mandat_sepa(self, partner, partner_bank):
+        """Crée le mandat SEPA, actif d'emblée, à l'acceptation d'une
+        demande en mode prélèvement (#187). L'acceptation est la porte
+        humaine (IBAN vérifié par _verifier_garde_iban_acceptation, mandat
+        signé exigé côté saisie) : pas de second circuit de validation
+        (CONTEXT.md « Mandat de prélèvement »).
+
+        No-op silencieux si `sdd.mandate` est absent du registre (Community/
+        CI) : le reste de l'acceptation se déroule à l'identique."""
+        self.ensure_one()
+        if 'sdd.mandate' not in self.env:
+            return
+        journal = self._resoudre_journal_sdd()
+        mandat = self.env['sdd.mandate'].create(self._mandat_sepa_vals(partner, partner_bank, journal))
+        # Traçable depuis la demande sans nouveau champ relationnel vers un
+        # modèle absent en Community (un Many2one déclaré ici casserait
+        # l'install Community à l'_auto_init) : on recopie la référence
+        # (RUM, saisie ou générée par l'outillage) sur le champ existant, et
+        # on trace le rattachement au chatter.
+        self.sepa_mandate_ref = mandat.name
+        self.message_post(body=f'Mandat SEPA créé et actif (RUM : {mandat.name}, journal : {journal.name}).')
+
+    def _resoudre_journal_sdd(self):
+        """Résout dynamiquement le journal comptable portant la méthode de
+        paiement SDD (prélèvement SEPA) — jamais configuré en dur (#187).
+        Erreur explicite si aucun journal ne l'expose ou si plusieurs le
+        font : pas de mandat silencieusement rattaché au mauvais journal."""
+        self.ensure_one()
+        journaux = self.env['account.journal'].search(
+            [
+                ('company_id', '=', self.company_id.id),
+                ('inbound_payment_method_line_ids.code', '=', 'sdd'),
+            ]
+        )
+        if not journaux:
+            raise UserError(
+                "Aucun journal comptable n'expose la méthode de paiement SDD (prélèvement SEPA) : "
+                "configurez-en un dans l'outillage comptable avant d'accepter une demande en prélèvement."
+            )
+        if len(journaux) > 1:
+            raise UserError(
+                'Plusieurs journaux comptables exposent la méthode de paiement SDD (prélèvement SEPA), '
+                f'ambiguïté à résoudre avant acceptation : {", ".join(journaux.mapped("name"))}.'
+            )
+        return journaux
+
+    def _mandat_sepa_vals(self, partner, partner_bank, journal):
+        """Construction pure des valeurs du mandat SEPA (#187) — seule
+        couture nouvelle du chantier, sans accès au registre ni à la base :
+        testable en CI Community sans le modèle Enterprise `sdd.mandate`.
+
+        RUM = référence saisie sur la demande si présente, sinon absente du
+        dict pour laisser le défaut de l'outillage la générer. Date de
+        début = date de signature du mandat si saisie, sinon aujourd'hui.
+        Schéma CORE, actif d'emblée (l'acceptation est la porte humaine).
+
+        ponytail : noms de champs (`payment_journal_id`, `scheme`, `state`)
+        alignés sur le module Enterprise `account_sepa_direct_debit` d'après
+        sa documentation publique — invérifiables ici (pas de source
+        Enterprise, pas de réseau en sandbox). À confronter au modèle réel
+        avant premier usage en instance Enterprise ; un nom erroné lève une
+        erreur explicite au `create()`, jamais un mandat silencieusement
+        faux.
+        """
+        self.ensure_one()
+        vals = {
+            'partner_id': partner.id,
+            'partner_bank_id': partner_bank.id,
+            'payment_journal_id': journal.id,
+            'start_date': self.sepa_mandate_date or fields.Date.context_today(self),
+            'state': 'active',
+            'scheme': 'CORE',
+        }
+        if self.sepa_mandate_ref:
+            vals['name'] = self.sepa_mandate_ref
+        return vals
 
     def _create_souscription(self, partner):
         """Crée une souscription"""

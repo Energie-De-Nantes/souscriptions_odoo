@@ -24,6 +24,7 @@ from . import (
     test_pull_meta_periodes,
     test_raccordement,
     test_raccordement_kanban_faits,
+    test_raccordement_mandat_sepa,
     test_refacturation,
     test_releve,
     test_releve_demo,

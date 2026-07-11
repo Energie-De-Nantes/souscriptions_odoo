@@ -68,3 +68,24 @@ class TestReleveDemoLive(TransactionCase):
     def test_changement_compteur_trois_releves(self):
         periode = self._ref('demo_periode_fevrier_base')
         self.assertEqual(len(periode.releve_ids), 3)
+
+    def test_juin_2026_swap_compteur_affiche_union_base_et_4_cadrans(self):
+        """Non-régression #138 : période démo « Juin 2026 » — Base facturée
+        (config_cadrans hérité 'base'), mais relevée par deux familles (swap de
+        compteur en cours de mois). Le justificatif doit afficher l'union
+        (Base + HPH/HPB/HCH/HCB), pas Base seule comme le ferait l'ancienne
+        lecture directe de config_cadrans."""
+        periode = self._ref('demo_periode_juin_2026_swap_compteur')
+        if not periode:
+            self.skipTest('Données de démo non chargées sur cette base')
+        self.assertEqual(periode.config_cadrans, 'base')
+
+        self.assertEqual(
+            [c['field'] for c in periode.releve_colonnes()],
+            ['index_base', 'index_hph', 'index_hpb', 'index_hch', 'index_hcb'],
+        )
+        # Diff visuel de la transition : le relevé post-swap ne renseigne pas
+        # index_base, qui reste donc à 0 sur cette ligne.
+        releve_apres_swap = periode.releve_ids.sorted('date')[-1]
+        self.assertEqual(releve_apres_swap.index_base, 0)
+        self.assertEqual(releve_apres_swap.index_hph, 100)

@@ -124,9 +124,17 @@ refacturé ligne à ligne (ADR 0002). Porte le prix d'abonnement **affine** — 
 coefficient par kVA supplémentaire (ADR 0018) — et le prix de l'énergie par cadran facturé.
 Chaque grille appartient à un *régime de prix* ; elle est sélectionnée par le régime de la
 *Souscription* et les dates d'une *Période*, ce qui permet de facturer une *régularisation* aux prix
-historiques.
+historiques. C'est aussi l'unique **moteur de prix** : la règle qui assemble barème et configuration
+— abonnement affine, prix par cadran facturé, *Majoration PRO*, choix du *Produit de facturation*
+(standard ou solidaire) — n'a qu'une implémentation, portée par la grille, que la *Facture* et les
+*conditions particulières* **projettent** chacune avec **sa** grille : historique (aux dates de la
+*Période*) pour la Facture, engagée (à la date de début) pour la CP. Les **valeurs** divergent donc
+dans le temps — c'est le domaine ; la **règle**, jamais. Une grille incapable de prixer une
+configuration **échoue bruyamment** — jamais de prix nul par défaut sur un document.
 _Éviter_ : tarif (collision avec la FTA / tarif d'acheminement réseau), barème ; « prix par palier »
-(l'abonnement est **affine**, pas tabulé par puissance).
+(l'abonnement est **affine**, pas tabulé par puissance) ; « aligner » les prix de la CP sur les
+factures (la divergence de **valeurs** est voulue — seule la **règle** est unique) ; un prix à 0
+quand la grille est incomplète (échec bruyant).
 
 **Régime de prix** :
 L'axe qui désigne **quel barème** s'applique à une *Souscription* : **standard** ou **Moulin**.

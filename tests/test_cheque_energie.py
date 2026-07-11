@@ -108,3 +108,11 @@ class TestChequeEnergieModel(SouscriptionsTestCase):
         self._new_cheque(numero='CHQ-DUP')
         with self.assertRaises(ValidationError):
             self._new_cheque(numero='CHQ-DUP')
+
+    def test_cheques_projetes_sur_la_souscription_par_partner(self):
+        """La fiche souscription projette les chèques de son partner, pas ceux
+        des autres (rattachement par partner_id, ADR 0026)."""
+        du_souscripteur = self._new_cheque(numero='CHQ-PROJ-1')
+        self._new_cheque(numero='CHQ-PROJ-2', partner_id=self.partner_company.id)
+
+        self.assertEqual(self.souscription_base.cheque_energie_ids, du_souscripteur)

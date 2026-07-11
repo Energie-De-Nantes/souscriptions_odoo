@@ -48,6 +48,8 @@
                                 <field name="provision_hc_kwh" invisible="not lisse or type_tarif != 'hphc'" string="Provision HC (kWh)"/>
                                 <field name="tarif_solidaire"/>
                                 <field name="regime_prix"/>
+                                <field name="partner_is_company" invisible="1"/>
+                                <field name="coeff_pro" string="Majoration PRO (%)" invisible="not partner_is_company"/>
                             </group>
                         </div>
                         <div class="col-lg-6">
@@ -59,7 +61,18 @@
                             </group>
                             <group string="Paiement">
                                 <field name="mode_paiement"/>
-                                <field name="coeff_pro" string="Majoration PRO (%)"/>
+                                <separator string="Chèques énergie" colspan="2"/>
+                                <field name="cheque_energie_ids" nolabel="1" colspan="2" readonly="1">
+                                    <list>
+                                        <field name="numero"/>
+                                        <field name="montant"/>
+                                        <field name="date_expiration"/>
+                                        <field name="state" widget="badge"
+                                               decoration-success="state == 'valide'"
+                                               decoration-danger="state in ('rejete', 'expire')"/>
+                                        <field name="solde"/>
+                                    </list>
+                                </field>
                             </group>
                         </div>
                     </div>

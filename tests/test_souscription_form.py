@@ -67,6 +67,18 @@ class TestSouscriptionFormRefonte(SouscriptionsTestCase):
         self.assertIsNotNone(groupe, 'Groupe « Point de livraison » absent (renommage de « Infos »)')
         self.assertTrue(groupe.findall(".//field[@name='pdl']"))
 
+    def test_majoration_pro_dans_caracteristiques_cachee_si_pas_pro(self):
+        caracteristiques = self.arch.find(".//group[@string='Caractéristiques facturantes']")
+        coeff = caracteristiques.find(".//field[@name='coeff_pro']")
+        self.assertIsNotNone(coeff, 'coeff_pro doit être dans « Caractéristiques facturantes »')
+        self.assertEqual(coeff.get('invisible'), 'not partner_is_company')
+        paiement = self.arch.find(".//group[@string='Paiement']")
+        self.assertIsNone(paiement.find(".//field[@name='coeff_pro']"))
+
+    def test_cheques_energie_dans_paiement(self):
+        paiement = self.arch.find(".//group[@string='Paiement']")
+        self.assertIsNotNone(paiement.find(".//field[@name='cheque_energie_ids']"))
+
     def test_onglet_electricore_porte_les_cinq_champs_identite(self):
         page = self.arch.find(".//page[@string='Électricore']")
         self.assertIsNotNone(page)

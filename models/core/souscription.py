@@ -134,6 +134,29 @@ class Souscription(models.Model):
         help='Majoration en % appliquée au tarif de base (0% pour les particuliers)',
         tracking=True,
     )
+
+    # Critère « pro » du repo (cf. _prix_engages) — exposé pour l'invisibilité
+    # de coeff_pro dans la vue formulaire.
+    partner_is_company = fields.Boolean(related='partner_id.is_company')
+
+    # Chèques énergie du·de la souscripteur·rice : rattachés au partner, pas à
+    # la Souscription (ADR 0026, l'imputation FIFO cherche par partner_id) —
+    # projection lecture seule pour la fiche.
+    cheque_energie_ids = fields.Many2many(
+        'souscription.cheque_energie',
+        string='Chèques énergie',
+        compute='_compute_cheque_energie_ids',
+        help='Chèques énergie du·de la souscripteur·rice (rattachés au partner, ADR 0026).',
+    )
+
+    @api.depends('partner_id')
+    def _compute_cheque_energie_ids(self):
+        Cheque = self.env['souscription.cheque_energie']
+        for souscription in self:
+            souscription.cheque_energie_ids = (
+                Cheque.search([('partner_id', '=', souscription.partner_id.id)]) if souscription.partner_id else Cheque
+            )
+
     ## Informations
     ref_compteur = fields.Char(string='Référence compteur')
     numero_depannage = fields.Char(string='Numéro de dépannage')

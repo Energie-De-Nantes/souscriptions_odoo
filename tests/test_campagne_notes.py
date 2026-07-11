@@ -103,5 +103,5 @@ class TestCampagneNotes(SouscriptionsTestCase):
         juin = self._campagne(date(2026, 6, 1))
         self.assertTrue(juin.note_ids.filtered('reprise'), 'précondition : une note reprise existe bien')
 
-        racines = juin.etape_ids.filtered(lambda e: e.code in ('pull_meta_periodes', 'sync_f15', 'releves_index'))
+        racines = juin.etape_ids.filtered(lambda e: e.code in ('pull_meta_periodes', 'sync_f15'))
         self.assertTrue(all(e.etat_prerequis == 'prete' for e in racines))

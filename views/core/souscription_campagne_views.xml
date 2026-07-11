@@ -31,15 +31,15 @@
                                     <field name="etat_prerequis" widget="badge"
                                            decoration-success="etat_prerequis == 'prete'"
                                            decoration-warning="etat_prerequis == 'bloquee'"/>
-                                    <field name="valide" widget="boolean_toggle" invisible="type_etape == 'derive'"/>
+                                    <field name="valide" widget="boolean_toggle" invisible="type_etape != 'porte'"/>
                                     <field name="valide_par_id" readonly="1" invisible="not valide"/>
                                     <field name="valide_le" readonly="1" invisible="not valide"/>
                                     <field name="nb_reste_a_faire" invisible="type_etape != 'derive'"/>
                                     <field name="fait" widget="boolean" readonly="1"/>
                                     <!-- Étapes dérivées/action (#158) : un seul bouton générique qui
                                          dispatche vers l'action de la Campagne (pull/sync/créer/émettre).
-                                         Portes de vérif ET sync F15 se valident via la case `valide`
-                                         ci-dessus (sync F15 : on tire, puis on coche « fait »). -->
+                                         Seules les portes se valident via la case `valide` ci-dessus ;
+                                         sync F15 (action) est « faite » dès son lancement (`lance`). -->
                                     <button name="action_executer" type="object" string="Lancer"
                                             class="btn-link" invisible="type_etape == 'porte'"/>
                                     <button name="action_drill_down" type="object" string="Voir" icon="fa-search"/>

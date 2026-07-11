@@ -109,7 +109,6 @@
                                 Mode de paiement retenu :
                                 <strong>
                                     <t t-if="souscription.mode_paiement == 'prelevement'">Prélèvement automatique</t>
-                                    <t t-elif="souscription.mode_paiement == 'cheque_energie'">Chèque énergie</t>
                                     <t t-elif="souscription.mode_paiement == 'monnaie_locale'">Monnaie locale</t>
                                     <t t-elif="souscription.mode_paiement == 'especes'">Espèces</t>
                                     <t t-elif="souscription.mode_paiement == 'virement'">Virement</t>

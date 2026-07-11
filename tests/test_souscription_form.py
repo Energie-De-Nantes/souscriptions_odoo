@@ -27,7 +27,13 @@ class TestSouscriptionFormRefonte(SouscriptionsTestCase):
 
         sheet = self.arch.find('sheet')
         self.assertIsNotNone(sheet)
-        self.assertFalse(sheet.findall(".//field[@name='etat']"), 'etat ne doit plus figurer dans le corps de la fiche')
+        # Les listes embarquées (refacturations, journal des actes) portent leur
+        # propre champ `etat` : on ne compte que ceux du modèle souscription,
+        # hors sous-vues (non descendants d'un <field>).
+        etat_souscription = [
+            f for f in sheet.findall(".//field[@name='etat']") if not any(a.tag == 'field' for a in f.iterancestors())
+        ]
+        self.assertFalse(etat_souscription, 'etat ne doit plus figurer dans le corps de la fiche')
 
     def test_header_ne_garde_que_resoudre_rsc(self):
         header = self.arch.find('header')

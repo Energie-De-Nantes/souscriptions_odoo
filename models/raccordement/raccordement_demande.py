@@ -734,13 +734,13 @@ class RaccordementDemande(models.Model):
         début = date de signature du mandat si saisie, sinon aujourd'hui.
         Schéma CORE, actif d'emblée (l'acceptation est la porte humaine).
 
-        ponytail : noms de champs (`payment_journal_id`, `scheme`, `state`)
-        alignés sur le module Enterprise `account_sepa_direct_debit` d'après
-        sa documentation publique — invérifiables ici (pas de source
-        Enterprise, pas de réseau en sandbox). À confronter au modèle réel
-        avant premier usage en instance Enterprise ; un nom erroné lève une
-        erreur explicite au `create()`, jamais un mandat silencieusement
-        faux.
+        Noms de champs confrontés au `sdd.mandate` réel de la prod
+        Enterprise (via MCP, 2026-07-11) : `payment_journal_id`,
+        `sdd_scheme`, `state`, `partner_bank_id`, `start_date` confirmés ;
+        `company_id` non requis. Omettre `name` (RUM) est le bon geste :
+        l'action serveur prod créait ses ~1000 mandats sans le passer, le
+        défaut de l'outillage le génère (un nom erroné lèverait au
+        `create()`, jamais un mandat silencieusement faux).
         """
         self.ensure_one()
         vals = {
@@ -749,7 +749,7 @@ class RaccordementDemande(models.Model):
             'payment_journal_id': journal.id,
             'start_date': self.sepa_mandate_date or fields.Date.context_today(self),
             'state': 'active',
-            'scheme': 'CORE',
+            'sdd_scheme': 'CORE',
         }
         if self.sepa_mandate_ref:
             vals['name'] = self.sepa_mandate_ref

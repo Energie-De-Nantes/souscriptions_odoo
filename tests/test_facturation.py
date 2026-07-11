@@ -16,13 +16,6 @@ class TestFacturation(TransactionCase):
             }
         )
 
-        self.etat_actif = self.env['souscription.etat'].create(
-            {
-                'name': 'Actif',
-                'sequence': 1,
-            }
-        )
-
         # Grille de test résolue par date (get_grille_active), pas par drapeau.
         self.grille_prix = self.env['grille.prix'].create(
             {
@@ -48,7 +41,6 @@ class TestFacturation(TransactionCase):
                 'pdl': 'PDL_TEST_001',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_actif.id,
                 'date_debut': date(2024, 1, 1),
                 'provision_mensuelle_kwh': 300.0,
             }
@@ -118,7 +110,6 @@ class TestFacturation(TransactionCase):
                 'pdl': 'PDL_HPHC_001',
                 'puissance_souscrite': '9',
                 'type_tarif': 'hphc',
-                'etat_facturation_id': self.etat_actif.id,
             }
         )
 
@@ -206,7 +197,6 @@ class TestFacturation(TransactionCase):
                 'pdl': 'PDL_HPHC_TEST',
                 'puissance_souscrite': '9',
                 'type_tarif': 'hphc',
-                'etat_facturation_id': self.etat_actif.id,
                 'date_debut': date(2024, 1, 1),
                 'provision_mensuelle_kwh': 320.0,  # Utiliser provision_mensuelle_kwh à la place
             }

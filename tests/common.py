@@ -121,14 +121,6 @@ class SouscriptionsTestMixin:
             }
         )
 
-        # État de facturation
-        cls.etat_facturation = cls.env['souscription.etat'].create(
-            {
-                'name': 'Test État',
-                'sequence': 10,
-            }
-        )
-
         # Grille de prix active avec lignes, pour que la facturation
         # fonctionne sans dépendre des données de démo. La grille est résolue
         # par date (get_grille_active), jamais par un drapeau (ADR 0018).
@@ -155,7 +147,6 @@ class SouscriptionsTestMixin:
                 'pdl': 'PDL_TEST_STANDARD',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': cls.etat_facturation.id,
                 'date_debut': date(2024, 1, 1),
                 'provision_mensuelle_kwh': 300.0,
                 'ref_compteur': 'COMP_TEST_001',
@@ -169,7 +160,6 @@ class SouscriptionsTestMixin:
                 'pdl': 'PDL_TEST_HPHC',
                 'puissance_souscrite': '9',
                 'type_tarif': 'hphc',
-                'etat_facturation_id': cls.etat_facturation.id,
                 'date_debut': date(2024, 1, 1),
                 'provision_hp_kwh': 200.0,  # Provision HP mensuelle
                 'provision_hc_kwh': 120.0,  # Provision HC mensuelle

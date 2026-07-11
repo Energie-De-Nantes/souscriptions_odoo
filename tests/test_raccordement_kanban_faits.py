@@ -244,7 +244,6 @@ class TestKanbanPiloteParLesFaits(SouscriptionsTestMixin, TransactionCase):
                 'pdl': 'PDL_MANUEL',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
             }
         )
         souscription.write({'ref_situation_contractuelle': 'RSC-MANUEL'})

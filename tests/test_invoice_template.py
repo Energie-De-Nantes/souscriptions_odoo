@@ -23,14 +23,6 @@ class TestInvoiceTemplate(TransactionCase):
             }
         )
 
-        # Créer un état de facturation
-        self.etat_actif = self.env['souscription.etat'].create(
-            {
-                'name': 'À facturer',
-                'sequence': 1,
-            }
-        )
-
         # Créer une grille de prix
         self.grille_prix = self.env['grille.prix'].create(
             {
@@ -48,7 +40,6 @@ class TestInvoiceTemplate(TransactionCase):
                 'pdl': 'PDL_TEMPLATE_BASE',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_actif.id,
                 'date_debut': date(2024, 1, 1),
                 'provision_mensuelle_kwh': 280.0,
                 'ref_compteur': 'COMP123456',
@@ -63,7 +54,6 @@ class TestInvoiceTemplate(TransactionCase):
                 'pdl': 'PDL_TEMPLATE_HPHC',
                 'puissance_souscrite': '9',
                 'type_tarif': 'hphc',
-                'etat_facturation_id': self.etat_actif.id,
                 'date_debut': date(2024, 1, 1),
                 'provision_hp_kwh': 200.0,
                 'provision_hc_kwh': 120.0,
@@ -79,7 +69,6 @@ class TestInvoiceTemplate(TransactionCase):
                 'pdl': 'PDL_TEMPLATE_SOLIDAIRE',
                 'puissance_souscrite': '3',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_actif.id,
                 'date_debut': date(2024, 1, 1),
                 'provision_mensuelle_kwh': 180.0,
                 'ref_compteur': 'COMP345678',

@@ -57,7 +57,6 @@ class TestSouscriptionsSecurity(SouscriptionsTestMixin, TransactionCase):
                 'pdl': 'PDL_SEC',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
                 'date_debut': date(2024, 1, 1),
             }
         )

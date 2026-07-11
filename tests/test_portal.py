@@ -119,7 +119,6 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
                 'pdl': 'PDL_APERCU_TOKEN',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
             }
         )
         url = autre.get_portal_url()  # /my/souscription/<id>?access_token=...
@@ -232,7 +231,6 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
                 'pdl': 'PDL_EMPTY_TEST',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
             }
         )
         self.authenticate(self.portal_user.login, self.portal_user.login)
@@ -279,7 +277,6 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
                 'pdl': 'PDL_OTHER_USER',
                 'puissance_souscrite': '3',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
             }
         )
 

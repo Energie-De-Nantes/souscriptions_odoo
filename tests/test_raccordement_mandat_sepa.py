@@ -108,9 +108,10 @@ class TestResoudreJournalSdd(SouscriptionsTestMixin, TransactionCase):
         return self.env['raccordement.demande'].create(defaults)
 
     def _donner_methode_sdd(self, journal):
-        method = self.env['account.payment.method'].create(
-            {'name': 'SDD Test', 'code': 'sdd', 'payment_type': 'inbound'}
-        )
+        # (code, payment_type) est unique : une seule méthode sdd, partagée
+        method = self.env['account.payment.method'].search(
+            [('code', '=', 'sdd'), ('payment_type', '=', 'inbound')], limit=1
+        ) or self.env['account.payment.method'].create({'name': 'SDD Test', 'code': 'sdd', 'payment_type': 'inbound'})
         self.env['account.payment.method.line'].create(
             {'name': 'SDD', 'payment_method_id': method.id, 'journal_id': journal.id}
         )

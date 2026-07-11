@@ -34,5 +34,6 @@ from . import (
     test_security,
     test_souscription,
     test_souscription_etat,
+    test_souscription_form,
     test_sync_prestations,
 )

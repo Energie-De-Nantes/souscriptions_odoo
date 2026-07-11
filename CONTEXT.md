@@ -10,7 +10,7 @@ accise, CTA, périmètre, événements C15) est calculé par
 
 Le vocabulaire métier neutre — **PDL, RSC, affaire / id_Affaire, cadran, HP/HC/Base, FTA,
 TURPE, accise, CTA, méta-période, provision d'énergie, contrat lissé, facturation calendaire,
-régularisation** —
+régularisation, chronologie** —
 est défini dans le glossaire core d'electricore (`electricore/core/CONTEXT.md`). Ce fichier
 ne redéfinit aucun de ces termes ; il ne définit que les notions propres à la représentation
 Odoo et au rôle fournisseur.

@@ -36,6 +36,7 @@ class Souscription(models.Model):
     facture_ids = fields.One2many(
         'account.move', compute='_compute_factures_via_periodes', string='Factures', store=False
     )
+    facture_count = fields.Integer(string='Nombre de factures', compute='_compute_facture_count')
     periode_ids = fields.One2many('souscription.periode', 'souscription_id', string='Périodes de facturation')
     refacturation_ids = fields.One2many('souscription.refacturation', 'souscription_id', string='Refacturations')
     consentement_ids = fields.One2many('souscription.consentement', 'souscription_id', string='Journal des actes')
@@ -133,6 +134,29 @@ class Souscription(models.Model):
         help='Majoration en % appliquée au tarif de base (0% pour les particuliers)',
         tracking=True,
     )
+
+    # Critère « pro » du repo (cf. _prix_engages) — exposé pour l'invisibilité
+    # de coeff_pro dans la vue formulaire.
+    partner_is_company = fields.Boolean(related='partner_id.is_company')
+
+    # Chèques énergie du·de la souscripteur·rice : rattachés au partner, pas à
+    # la Souscription (ADR 0026, l'imputation FIFO cherche par partner_id) —
+    # projection lecture seule pour la fiche.
+    cheque_energie_ids = fields.Many2many(
+        'souscription.cheque_energie',
+        string='Chèques énergie',
+        compute='_compute_cheque_energie_ids',
+        help='Chèques énergie du·de la souscripteur·rice (rattachés au partner, ADR 0026).',
+    )
+
+    @api.depends('partner_id')
+    def _compute_cheque_energie_ids(self):
+        Cheque = self.env['souscription.cheque_energie']
+        for souscription in self:
+            souscription.cheque_energie_ids = (
+                Cheque.search([('partner_id', '=', souscription.partner_id.id)]) if souscription.partner_id else Cheque
+            )
+
     ## Informations
     ref_compteur = fields.Char(string='Référence compteur')
     numero_depannage = fields.Char(string='Numéro de dépannage')
@@ -298,6 +322,25 @@ class Souscription(models.Model):
             'type': 'ir.actions.act_url',
             'url': self.get_portal_url(),
             'target': 'new',
+        }
+
+    @api.depends('facture_ids')
+    def _compute_facture_count(self):
+        for sous in self:
+            sous.facture_count = len(sous.facture_ids)
+
+    def action_voir_factures(self):
+        """Bouton stat « N Factures » de la button box (#199) : ouvre la liste
+        des factures d'énergie liées à cette Souscription via ses Périodes
+        (`facture_ids`, ADR 0004 — la Période porte le lien unique vers la
+        Facture)."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Factures',
+            'res_model': 'account.move',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', self.facture_ids.ids)],
         }
 
     _MESSAGE_RSC_RESTREINTE = (

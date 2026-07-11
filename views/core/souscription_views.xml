@@ -6,70 +6,64 @@
         <field name="arch" type="xml">
             <form string="Souscription">
                 <header>
-                    <button name="%(action_souscription_conditions_particulieres)d"
-                            string="Conditions particulières"
-                            type="action"
-                            class="btn-primary"/>
-                    <button name="%(action_souscription_attestation)d"
-                            string="Attestation de fourniture"
-                            type="action"/>
                     <button name="action_resoudre_rsc_maintenant"
                             string="Résoudre la RSC maintenant"
                             type="object"
                             invisible="etat == 'en_service'"/>
-                    <button name="action_apercu_portail"
-                            string="Aperçu portail"
-                            type="object"
-                            icon="fa-external-link"/>
+                    <field name="etat" widget="statusbar" readonly="1"/>
                 </header>
                 <sheet>
                     <widget name="web_ribbon" title="Archivée" bg_color="text-bg-danger" invisible="active"/>
                     <field name="active" invisible="1"/>
-                    <group>
-                        <field name="name" />
-                        <field name="partner_id" />
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object" name="action_voir_factures" icon="fa-pencil-square-o">
+                            <field name="facture_count" widget="statinfo" string="Factures"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_apercu_portail" icon="fa-globe">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Aperçu portail</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name"/>
+                        </h1>
+                        <field name="partner_id"/>
                         <field name="cotitulaires" widget="many2many_tags" options="{'no_create': True}"/>
-                        <field name="etat" widget="badge"
-                               decoration-warning="etat == 'en_instance'"
-                               decoration-success="etat == 'en_service'"
-                               decoration-danger="etat == 'resiliee'"/>
+                    </div>
+                    <group>
                         <field name="date_debut"/>
                         <field name="date_fin"/>
                     </group>
-                    <group string="Caractéristiques facturantes">
-                        <field name="pdl"/>
-                        <field name="puissance_souscrite"/>
-                        <field name="type_tarif"/>
-                        <field name="config_cadrans"/>
-                        <field name="lisse"/>
-                        <field name="provision_mensuelle_kwh" invisible="not lisse or type_tarif != 'base'" string="Provision mensuelle Base (kWh)"/>
-                        <field name="provision_hp_kwh" invisible="not lisse or type_tarif != 'hphc'" string="Provision HP (kWh)"/>
-                        <field name="provision_hc_kwh" invisible="not lisse or type_tarif != 'hphc'" string="Provision HC (kWh)"/>
-                        <field name="tarif_solidaire"/>
-                        <field name="regime_prix"/>
-                    </group>
-                    <group string="Paiement">
-                        <field name="mode_paiement"/>
-                        <field name="coeff_pro" string="Majoration PRO (%)"/>
-                    </group>
-
-                    <group string="Infos">
-                        <field name="ref_compteur"/>
-                        <field name="numero_depannage" widget="phone"/>
-                        <field name="adresse_pdl"/>
-                    </group>
-
-                    <!-- Identité electricore (ADR 0010/0020/0021) : RSC = clé d'articulation
-                         du pull de méta-périodes, acquise par le poll quotidien ou l'action
-                         manuelle (#88/#89) ; id_affaire = amorce de réconciliation, recopié
-                         du raccordement, corrigeable (rattrapage de typo). -->
-                    <group string="Identité électricore">
-                        <field name="ref_situation_contractuelle"/>
-                        <field name="id_affaire"/>
-                        <field name="id_affaire_date_saisie"/>
-                        <field name="motif_resolution_rsc" invisible="not motif_resolution_rsc"/>
-                        <field name="date_derniere_resolution_rsc" invisible="not date_derniere_resolution_rsc"/>
-                    </group>
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <group string="Caractéristiques facturantes">
+                                <field name="puissance_souscrite"/>
+                                <field name="type_tarif"/>
+                                <field name="config_cadrans"/>
+                                <field name="lisse"/>
+                                <field name="provision_mensuelle_kwh" invisible="not lisse or type_tarif != 'base'" string="Provision mensuelle Base (kWh)"/>
+                                <field name="provision_hp_kwh" invisible="not lisse or type_tarif != 'hphc'" string="Provision HP (kWh)"/>
+                                <field name="provision_hc_kwh" invisible="not lisse or type_tarif != 'hphc'" string="Provision HC (kWh)"/>
+                                <field name="tarif_solidaire"/>
+                                <field name="regime_prix"/>
+                                <field name="partner_is_company" invisible="1"/>
+                                <field name="coeff_pro" string="Majoration PRO (%)" invisible="not partner_is_company"/>
+                            </group>
+                        </div>
+                        <div class="col-lg-6">
+                            <group string="Point de livraison">
+                                <field name="pdl"/>
+                                <field name="adresse_pdl"/>
+                                <field name="ref_compteur"/>
+                                <field name="numero_depannage" widget="phone"/>
+                            </group>
+                            <group string="Paiement">
+                                <field name="mode_paiement"/>
+                            </group>
+                        </div>
+                    </div>
 
                     <notebook>
                         <page string="Périodes de facturation">
@@ -77,7 +71,7 @@
                                 <list editable="bottom" decoration-info="facture_legacy_ref and not facture_id">
                                     <field name="mois_annee"/>
                                     <field name="type_periode"/>
-                                    <field name="type_tarif_periode"/>
+                                    <field name="type_tarif_periode" optional="hide"/>
                                     <field name="energie_base_kwh" invisible="type_tarif_periode != 'base'"/>
                                     <field name="provision_base_kwh" invisible="type_tarif_periode != 'base'"/>
                                     <field name="energie_hp_kwh" invisible="type_tarif_periode == 'base'"/>
@@ -90,7 +84,7 @@
                                     <field name="facture_id"/>
                                     <!-- Période d'ouverture (#107) : backfill lié à une
                                          facture legacy plutôt qu'à un account.move. -->
-                                    <field name="facture_legacy_ref"/>
+                                    <field name="facture_legacy_ref" optional="hide"/>
                                 </list>
                             </field>
                         </page>
@@ -121,6 +115,37 @@
                                     <field name="version_texte"/>
                                     <field name="source"/>
                                     <field name="date_retrait"/>
+                                </list>
+                            </field>
+                        </page>
+                        <!-- Identité electricore (ADR 0010/0020/0021) : RSC = clé d'articulation
+                             du pull de méta-périodes, acquise par le poll quotidien ou l'action
+                             manuelle (#88/#89) ; id_affaire = amorce de réconciliation, recopié
+                             du raccordement, corrigeable (rattrapage de typo). -->
+                        <page string="Électricore" name="electricore">
+                            <group>
+                                <field name="ref_situation_contractuelle"/>
+                                <field name="id_affaire"/>
+                                <field name="id_affaire_date_saisie"/>
+                                <field name="motif_resolution_rsc" invisible="not motif_resolution_rsc"/>
+                                <field name="date_derniere_resolution_rsc" invisible="not date_derniere_resolution_rsc"/>
+                            </group>
+                        </page>
+                        <page string="Chèques énergie" name="cheque_energie">
+                            <field name="cheque_energie_ids" readonly="1">
+                                <list default_order="date_expiration">
+                                    <field name="numero"/>
+                                    <field name="montant" sum="Total"/>
+                                    <field name="date_reception"/>
+                                    <field name="date_expiration"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'valide'"
+                                           decoration-danger="state in ('rejete', 'expire')"/>
+                                    <field name="etat_solde" widget="badge"
+                                           decoration-success="etat_solde == 'non_entame'"
+                                           decoration-warning="etat_solde == 'en_cours'"
+                                           decoration-danger="etat_solde == 'epuise'"/>
+                                    <field name="solde" sum="Solde restant"/>
                                 </list>
                             </field>
                         </page>

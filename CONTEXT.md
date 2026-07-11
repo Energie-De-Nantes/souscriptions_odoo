@@ -57,7 +57,8 @@ lissage/provisions, mode de paiement — **et porte ses déclarations/consenteme
 adhésion association, acceptation CGV, courbe de charge, renonciation rétractation) **et la
 signature électronique**. Il **complète** les *conditions générales* (CGV — cadre légal générique,
 **référencées** et non reproduites), pas l'inverse. C'est une **projection** de la *Souscription*
-(les consentements et la date de signature sont **portés par la *Souscription***), jamais un
+(les actes — consentements, acceptation CGV, renonciation, signature — sont **portés par le
+*Journal des actes*** de la *Souscription*), jamais un
 enregistrement distinct ni un acte de vente. Lève l'ambiguïté du terme « contrat » : le cadre
 contractuel = *CGV* + *conditions particulières* ; l'enregistrement = la *Souscription*.
 _Éviter_ : « contrat » seul (préciser *conditions particulières*, *CGV* ou *Souscription*) ;
@@ -225,13 +226,29 @@ facturation* existe en deux exemplaires parallèles — standard et solidaire �
 sélectionne le bon selon ce drapeau (ADR 0013).
 _Éviter_ : réduire le solidaire à une **remise** (ce n'est pas qu'un prix : c'est une comptabilité isolée).
 
+**Journal des actes** :
+Le registre **append-only** possédé par la *Souscription* (`souscription.consentement` — le nom
+technique reste, le vocabulaire vivant est *Journal des actes*, ADR 0027) où chaque **Acte** du·de
+la *souscripteur·rice* est tracé : une ligne = une **finalité**, un **horodatage**, la **version du
+texte montré**, une **source/canal**. Deux **natures** d'actes :
+- **consentement RGPD** (cf. *Consentement (données de consommation)*) — **révocable** : le retrait
+  **ajoute** une ligne, n'écrase rien ;
+- **acte d'adhésion** (acceptation CGV, renonciation au délai de rétractation) — **irrévocable**
+  (one-shot contractuel : on ne « retire » pas une signature) : le journal **refuse** le retrait ;
+  l'horodatage **est** la date de signature.
+L'état courant d'une finalité est sa **dernière** ligne ; l'**absence de ligne** est la seule
+représentation du « non » (pas d'acte = pas de preuve). Les *conditions particulières* lisent le
+journal, jamais des champs plats.
+_Éviter_ : « journal de consentement » pour l'ensemble (le consentement RGPD n'est qu'une des deux
+natures) ; un booléen ou une date plate comme preuve d'un acte ; fabriquer une ligne sans acte réel.
+
 **Consentement (données de consommation)** :
 La base légale RGPD (art. 6-1-a) par laquelle un·e *souscripteur·rice* autorise EDN à faire
 **collecter auprès d'*Enedis*** ses données de consommation **plus fines que l'index de
 facturation** (consommations quotidiennes transmises au fournisseur, courbe de charge). Distinct de
 l'**acceptation contractuelle** (CGV / *conditions particulières*) et du **mandat SEPA**. Capté par
 un **acte positif** au *raccordement* (formulaire public, cases **non** pré-cochées, **par
-finalité**), tracé dans un **journal append-only** possédé par la *Souscription* — preuve opposable
+finalité**), tracé dans le *Journal des actes* — preuve opposable
 (*accountability*, art. 7-1) à la CNIL **et** à Enedis (à qui EDN **déclare** détenir le
 consentement), retrait compris (art. 7-3). L'**index** seul, pour facturer, relève de l'**exécution
 du contrat** (art. 6-1-b) et **ne requiert pas** de consentement.
@@ -342,8 +359,9 @@ Les étapes à entrée **factuelle** (id_Affaire saisi, RSC acquise) avancent se
 forcent pas : on corrige le fait, la carte suit. Chaque colonne du kanban dit qui doit agir :
 **action attendue** (un humain), **attente externe** (personne — le poll veille), **fait**.
 C'est le point de **capture** des données
-saisies à l'adhésion — **dont les consentements et la signature** (équivalent du *LSD* de
-prod) —, **recopiées** sur la *Souscription* qui en devient **propriétaire** (système de
+saisies à l'adhésion — **dont les actes** (consentements, acceptation CGV, renonciation —
+équivalent du *LSD* de prod) —, **journalisées** dans le *Journal des actes* de la *Souscription*
+qui en devient **propriétaire** (système de
 référence) ; la *demande* reste un intake transitoire. Les *conditions particulières* lisent ces
 données sur la *Souscription*, jamais sur la demande.
 _Éviter_ : confondre la **demande de raccordement** (intake) et la *Souscription* (l'enregistrement

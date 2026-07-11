@@ -20,6 +20,11 @@
         <t t-call="web.html_container">
             <t t-foreach="docs" t-as="souscription">
                 <t t-set="prix" t-value="souscription._prix_documents()"/>
+                <!-- Actes d'adhésion irrévocables (Journal des actes, ADR 0027) : lus
+                     depuis la dernière ligne par finalité, jamais depuis des champs
+                     plats. Absence de ligne = pas de mention (pas d'acte = pas de preuve). -->
+                <t t-set="acceptation_cgv" t-value="souscription._dernier_acte('acceptation_cgv')"/>
+                <t t-set="renonciation_retractation" t-value="souscription._dernier_acte('renonciation_retractation')"/>
                 <t t-call="web.external_layout">
                     <div class="page fe_wrap">
                         <!-- Styles `fe_*` : bundle de marque partagé (report_brand.scss). -->
@@ -117,7 +122,7 @@
                                 </strong>.
                             </li>
                             <li t-if="souscription.lisse">J'opte pour le paiement mensualisé (lissé), avec régularisation périodique.</li>
-                            <li t-if="souscription.renonce_retractation">
+                            <li t-if="renonciation_retractation">
                                 Je demande l'exécution du contrat avant la fin du délai de rétractation de 14 jours
                                 et je renonce expressément à ce délai de rétractation.
                             </li>
@@ -147,8 +152,8 @@
                         <!-- ===== Signature ===== -->
                         <div class="fe_section">Signature</div>
                         <div class="fe_kv">
-                            <t t-if="souscription.date_validation">
-                                Adhésion validée le <strong><span t-field="souscription.date_validation" t-options="{'widget': 'date'}"/></strong>,
+                            <t t-if="acceptation_cgv">
+                                Adhésion validée le <strong><span t-field="acceptation_cgv.date_consentement" t-options="{'widget': 'date'}"/></strong>,
                                 par signature électronique.
                             </t>
                             <t t-else="">Signature électronique en attente.</t>

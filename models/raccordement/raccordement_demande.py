@@ -766,10 +766,10 @@ class RaccordementDemande(models.Model):
             'tarif_solidaire': self.tarif_solidaire,
             'mode_paiement': self.mode_paiement,
             'lisse': True,  # Activer le lissage par défaut
-            # Déclarations contractuelles captées à l'adhésion → la Souscription
-            # en devient propriétaire (ADR 0016).
-            'date_validation': self.date_validation,
-            'renonce_retractation': self.renonce_retractation,
+            # Cotitulaires captés à l'adhésion → la Souscription en devient
+            # propriétaire (ADR 0016). Les actes d'adhésion (acceptation CGV,
+            # renonciation) ne sont plus recopiés en champs plats : ils sont
+            # journalisés ci-dessous (ADR 0027).
             'cotitulaires': [(6, 0, self.cotitulaires.ids)],
             # Identité electricore (ADR 0010/0021) : id_Affaire recopié comme
             # amorce de réconciliation, avec sa date de saisie (grâce du poll #89).
@@ -792,14 +792,29 @@ class RaccordementDemande(models.Model):
         # l'invitation à activer son espace usager·ère (Odoo ne le fait pas seul).
         souscription._octroyer_acces_portail()
 
-        # Journal de consentement (ADR 0017) : une finalité cochée = un acte
-        # 'donné'. Capture back-office (preuve faible), tracée comme telle ; l'acte
-        # réel du·de la souscripteur·rice viendra du formulaire public (#62).
+        # Journal des actes (ADR 0017/0027) : capture back-office (preuve
+        # faible), tracée comme telle ; l'acte réel du·de la souscripteur·rice
+        # viendra du formulaire public (#62).
         source = f'Raccordement {self.name} (back-office)'
+
+        # Consentements RGPD : une finalité cochée = un acte 'donné'.
         if self.consent_conso_quotidienne:
             souscription.enregistrer_consentement('conso_quotidienne', source=source)
         if self.consent_courbe_charge:
             souscription.enregistrer_consentement('courbe_charge', source=source)
+
+        # Actes d'adhésion irrévocables : journalisés (pas recopiés en champs
+        # plats, ADR 0027) — l'horodatage de la ligne EST la date de signature
+        # saisie sur la demande. Sans date de signature, aucun acte n'est
+        # journalisé (pas d'acte = pas de preuve) : une demande peut être close
+        # avant que l'adhésion soit signée.
+        if self.date_validation:
+            horodatage = fields.Datetime.to_datetime(self.date_validation)
+            souscription.enregistrer_consentement('acceptation_cgv', source=source, date_consentement=horodatage)
+            if self.renonce_retractation:
+                souscription.enregistrer_consentement(
+                    'renonciation_retractation', source=source, date_consentement=horodatage
+                )
 
         return souscription
 

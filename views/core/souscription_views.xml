@@ -71,11 +71,6 @@
                         <field name="date_derniere_resolution_rsc" invisible="not date_derniere_resolution_rsc"/>
                     </group>
 
-                    <group string="Adhésion (captée au raccordement)">
-                        <field name="date_validation"/>
-                        <field name="renonce_retractation"/>
-                    </group>
-
                     <notebook>
                         <page string="Périodes de facturation">
                             <field name="periode_ids">
@@ -115,7 +110,7 @@
                                 </list>
                             </field>
                         </page>
-                        <page string="Journal de consentement" name="consentement">
+                        <page string="Journal des actes" name="consentement">
                             <field name="consentement_ids">
                                 <list>
                                     <field name="date_consentement"/>

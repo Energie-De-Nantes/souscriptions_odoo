@@ -27,20 +27,6 @@ class Souscription(models.Model):
     )
     active = fields.Boolean(string='Active', default=True)
 
-    # Déclarations contractuelles captées au Raccordement puis recopiées ici à la
-    # création (ADR 0016) : la Souscription en est propriétaire, les rapports les
-    # lisent sur elle, jamais sur la demande.
-    date_validation = fields.Date(
-        string='Date de signature',
-        help="Date de l'acte d'adhésion (signature électronique) sur support durable.",
-    )
-    renonce_retractation = fields.Boolean(
-        string='Renonce au délai de rétractation',
-        default=False,
-        help='Le·la souscripteur·rice a demandé une exécution avant la fin du délai '
-        'de rétractation de 14 jours et y renonce expressément.',
-    )
-
     date_debut = fields.Date(string='Début de la souscription')
     date_fin = fields.Date(string='Fin de la souscription')
     # facture_ids = fields.One2many(
@@ -52,7 +38,7 @@ class Souscription(models.Model):
     )
     periode_ids = fields.One2many('souscription.periode', 'souscription_id', string='Périodes de facturation')
     refacturation_ids = fields.One2many('souscription.refacturation', 'souscription_id', string='Refacturations')
-    consentement_ids = fields.One2many('souscription.consentement', 'souscription_id', string='Journal de consentement')
+    consentement_ids = fields.One2many('souscription.consentement', 'souscription_id', string='Journal des actes')
     # Données métier
 
     ## Utiles facturation
@@ -587,23 +573,32 @@ class Souscription(models.Model):
             'mensualite': mensualite if self.lisse else 0.0,
         }
 
-    def etat_consentement(self, finalite):
-        """État courant d'une finalité de *Consentement* = état de sa **dernière**
-        ligne de journal (ADR 0017). Retourne ``'donne'`` / ``'retire'`` / ``False``
-        si la finalité n'a jamais été tracée. Source unique pour les rapports et le
-        portail (le retrait n'écrase pas, il ajoute une ligne)."""
+    def _dernier_acte(self, finalite):
+        """La **dernière** ligne de journal pour une finalité (Journal des actes,
+        ADR 0027) — recordset vide si la finalité n'a jamais été tracée. Source
+        unique pour les rapports et le portail : l'absence de ligne est la seule
+        représentation du « non » (pas d'acte = pas de preuve)."""
         self.ensure_one()
-        ligne = self.env['souscription.consentement'].search(
+        return self.env['souscription.consentement'].search(
             [('souscription_id', '=', self.id), ('finalite', '=', finalite)],
             order='date_consentement desc, id desc',
             limit=1,
         )
-        return ligne.etat if ligne else False
 
-    def enregistrer_consentement(self, finalite, etat='donne', source=None, date_retrait=None):
-        """Ajoute une ligne au journal de consentement append-only (ne réécrit
-        jamais une ligne existante). La version du texte est figée par défaut du
-        modèle (intégrité texte ↔ preuve, ADR 0017)."""
+    def etat_consentement(self, finalite):
+        """État courant d'une finalité = état de sa **dernière** ligne de journal
+        (ADR 0017). Retourne ``'donne'`` / ``'retire'`` / ``False`` si la finalité
+        n'a jamais été tracée."""
+        self.ensure_one()
+        return self._dernier_acte(finalite).etat or False
+
+    def enregistrer_consentement(self, finalite, etat='donne', source=None, date_retrait=None, date_consentement=None):
+        """Ajoute une ligne au journal des actes append-only (ne réécrit jamais
+        une ligne existante). La version du texte est figée par défaut du modèle
+        (intégrité texte ↔ preuve, ADR 0017). ``date_consentement`` permet de
+        journaliser à une date antérieure à « maintenant » (l'horodatage d'un
+        acte d'adhésion **est** sa date de signature, ADR 0027) ; sans lui, le
+        défaut du modèle (maintenant) s'applique — cas des consentements RGPD."""
         self.ensure_one()
         vals = {
             'souscription_id': self.id,
@@ -611,6 +606,8 @@ class Souscription(models.Model):
             'etat': etat,
             'source': source,
         }
+        if date_consentement:
+            vals['date_consentement'] = date_consentement
         if date_retrait:
             vals['date_retrait'] = date_retrait
         return self.env['souscription.consentement'].create(vals)

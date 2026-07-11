@@ -173,6 +173,19 @@ _Éviter_ : confondre « facturée » (une facture existe) et « émise » (fact
 Aide de l'État versée **au fournisseur à la place** du·de la *souscripteur·rice* (`souscription.cheque_energie`). C'est un **tiers-payeur**, **jamais une remise** : la fourniture n'est pas moins chère, une partie est payée par l'État — le **chiffre d'affaires et la TVA de la _Facture_ restent intacts**. Sur la *Facture*, il apparaît en **« payé / reste à payer »**, pas en ligne négative. Porte une **valeur nominale**, un **numéro** (unique), une **date d'expiration** (~mars N+1) et un **cycle de vie** : **reçu** (saisi, sans effet) → **validé** (la **porte** : saisie *à la main* sur le site étatique par le·la *facturiste* — aucun signal dérivable — qui le rend **imputable**) → **rejeté / expiré**. Rattaché au·à la *souscripteur·rice* (nominatif à la personne, pas au contrat) ; s'impute sur ses *Factures* **à leur création**, à hauteur de `min(solde, total)` sans jamais rendre la facture négative, **FIFO par expiration** quand la personne en détient plusieurs (renouvellement annuel). Le **solde** (portion non encore imputée) est **dérivé**, pas saisi. Un rejet/expiration *après* imputation se corrige **à la main** (pas d'automatisme). Le modèle **possède** l'identité et le cycle de vie ; la mécanique de solde et de lettrage est **déléguée** (cf. ADR 0026), non réimplémentée.
 _Éviter_ : **« remise »** ou ligne négative sur la *Facture* (c'est un paiement tiers, pas une minoration du prix ni de la TVA) ; imputer un chèque **non validé** (le site étatique est la porte) ; « solde saisi » (il est dérivé).
 
+**Mode de paiement** :
+La façon dont le·la *souscripteur·rice* règle le **solde** de ses *Factures*, portée par la
+**Souscription** (c'est le contrat qui fait foi, pas la personne : deux *Souscriptions* d'une même
+personne peuvent avoir des modes différents). Valeur **exclusive** parmi : prélèvement, monnaie
+locale (Moneko), espèces, virement, chèque. Sépare les factures en deux circuits de règlement :
+**prélèvement** (fichier SEPA en masse, adossé à un mandat) et **saisie manuelle** (tous les
+autres). Ne concerne que les factures à **reste à payer non nul** — une facture soldée (chèque
+énergie, 0 €) ne déclenche aucun règlement.
+_Éviter_ : le *Chèque énergie* comme mode de paiement (c'est un **tiers-payeur** qui s'impute
+avant règlement, le reste dû suit le mode de paiement normal) ; les **étiquettes** partenaire
+comme source de vérité du mode (non exclusives, non historisées, rattachées à la personne et non
+au contrat).
+
 **Configuration Enedis** :
 La configuration *réseau* d'un PDL — FTA, calendrier distributeur, puissance réseau, cadrans
 réseau — propriété d'electricore (source : C15). Détermine le coût d'acheminement (TURPE).

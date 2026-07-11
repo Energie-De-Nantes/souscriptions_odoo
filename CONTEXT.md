@@ -208,6 +208,16 @@ tarif** fournisseur (qui ne fait que *regrouper* en cadrans **facturés**) : un 
 `type_tarif` HP/HC peut correspondre à un compteur 2 registres *ou* 4 cadrans, que seul le
 calendrier de comptage distingue.
 
+**Calendrier distributeur** :
+L'identifiant **autoritatif** côté electricore du *calendrier de comptage* d'un PDL (source C15,
+propriété de la *Configuration Enedis*) — distinct de `config_cadrans`, sa copie **snapshottée à
+la main** côté Odoo tant que le contrat d'intégration manque (#12, ADR 0005). Consommé **à terme**
+pour remplacer la saisie manuelle par un pull ; en attendant, le justificatif des *Relevés*
+**infère** les familles de cadrans réellement présentes depuis les index saisis, avec repli sur
+`config_cadrans` déclaré si aucun index n'est renseigné (ADR 0015 amendé, #138).
+_Éviter_ : confondre avec `config_cadrans` (la copie Odoo, aujourd'hui déclarative et sujette à
+repli, pas encore reliée à ce calendrier autoritatif).
+
 **Configuration fournisseur** :
 La configuration *commerciale* portée par la *Souscription* : formule tarifaire fournisseur
 (cadrans **facturés** : Base, ou HP/HC), lissage, provisions, mode de paiement. **Orthogonale

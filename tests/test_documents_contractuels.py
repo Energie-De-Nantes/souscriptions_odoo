@@ -111,7 +111,6 @@ class TestConditionsParticulieres(SouscriptionsTestMixin, HttpCase):
                 'pdl': 'PDL_CP_PART',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': cls.etat_facturation.id,
                 'date_debut': date(2024, 1, 1),
                 'date_validation': date(2025, 3, 14),
                 'renonce_retractation': True,
@@ -127,7 +126,6 @@ class TestConditionsParticulieres(SouscriptionsTestMixin, HttpCase):
                 'pdl': 'PDL_CP_SOC',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': cls.etat_facturation.id,
                 'date_debut': date(2024, 1, 1),
                 'mode_paiement': 'virement',
             }

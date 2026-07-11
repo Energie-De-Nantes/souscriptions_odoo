@@ -202,7 +202,6 @@ class TestPeriodeComposition(SouscriptionsTestCase):
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
                 'tarif_solidaire': True,
-                'etat_facturation_id': self.souscription_base.etat_facturation_id.id,
                 'date_debut': date(2024, 1, 1),
             }
         )
@@ -247,7 +246,6 @@ class TestPeriodeComposition(SouscriptionsTestCase):
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
                 'regime_prix': 'moulin',
-                'etat_facturation_id': self.souscription_base.etat_facturation_id.id,
                 'date_debut': date(2024, 1, 1),
             }
         )
@@ -285,7 +283,6 @@ class TestPeriodeComposition(SouscriptionsTestCase):
                 'regime_prix': 'moulin',
                 'tarif_solidaire': True,
                 'coeff_pro': 10.0,
-                'etat_facturation_id': self.souscription_base.etat_facturation_id.id,
                 'date_debut': date(2024, 1, 1),
             }
         )

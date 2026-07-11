@@ -19,6 +19,3 @@ class TestBasic(TransactionCase):
 
         # Test modèle grille prix
         self.assertIn('grille.prix', self.env)
-
-        # Test modèle état
-        self.assertIn('souscription.etat', self.env)

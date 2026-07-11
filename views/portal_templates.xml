@@ -105,11 +105,6 @@
                                 </t>
                             </div>
 
-                            <div class="mb-3">
-                                <small class="text-muted d-block">État de facturation</small>
-                                <span t-out="souscription.etat_facturation_id.name" class="badge rounded-pill text-bg-primary"/>
-                            </div>
-
                             <div>
                                 <small class="text-muted d-block">Mode de paiement</small>
                                 <t t-if="souscription.mode_paiement">

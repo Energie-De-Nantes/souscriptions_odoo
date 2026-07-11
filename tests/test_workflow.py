@@ -35,7 +35,6 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
                 'pdl': 'PDL_WORKFLOW_001',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
                 'date_debut': date(2024, 1, 1),
                 'provision_mensuelle_kwh': 250.0,
                 'ref_compteur': 'COMP_WORKFLOW_001',
@@ -90,7 +89,6 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
                 'pdl': 'PDL_MIGRATION_001',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
                 'date_debut': date(2024, 1, 1),
                 'provision_mensuelle_kwh': 280.0,
             }
@@ -145,7 +143,6 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
                 'pdl': 'PDL_LISSAGE_001',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
                 'date_debut': date(2024, 1, 1),
                 'lisse': True,
                 'provision_mensuelle_kwh': 300.0,
@@ -198,7 +195,6 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
                 'pdl': 'PDL_ERROR_001',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
                 'date_debut': date(2024, 1, 1),
             }
         )
@@ -232,7 +228,6 @@ class TestWorkflow(SouscriptionsTestMixin, SavepointCase):
                     'pdl': f'PDL_BATCH_{i:03d}',
                     'puissance_souscrite': '6',
                     'type_tarif': 'base',
-                    'etat_facturation_id': self.etat_facturation.id,
                     'date_debut': date(2024, 1, 1),
                     'provision_mensuelle_kwh': 280.0,
                 }

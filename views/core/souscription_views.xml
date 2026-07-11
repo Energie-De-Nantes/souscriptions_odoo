@@ -32,7 +32,6 @@
                                decoration-warning="etat == 'en_instance'"
                                decoration-success="etat == 'en_service'"
                                decoration-danger="etat == 'resiliee'"/>
-                        <field name="etat_facturation_id"/>
                         <field name="date_debut"/>
                         <field name="date_fin"/>
                     </group>
@@ -175,29 +174,6 @@
             records.ajouter_periodes_mensuelles()
         </field>
     </record>
-    <record id="view_souscription_kanban" model="ir.ui.view">
-        <field name="name">souscription.kanban</field>
-        <field name="model">souscription.souscription</field>
-        <field name="type">kanban</field>
-        <field name="arch" type="xml">
-            <kanban default_group_by="etat_facturation_id">
-                <field name="etat_facturation_id"/>
-                <field name="etat"/>
-                <templates>
-                    <t t-name="card">
-                        <div class="oe_kanban_global_click">
-                            <strong><field name="name"/></strong><br/>
-                            <span><field name="etat_facturation_id"/></span><br/>
-                            <span t-attf-class="badge #{record.etat.raw_value == 'en_service' ? 'text-bg-success' : record.etat.raw_value == 'resiliee' ? 'text-bg-danger' : 'text-bg-warning'}">
-                                <field name="etat"/>
-                            </span>
-                        </div>
-                    </t>
-                </templates>
-            </kanban>
-        </field>
-    </record>
-
     <!-- Vue recherche : RSC/id_Affaire recherchables, état filtrable/groupable
          (#87) — dont le filtre « en instance sans id_Affaire », les invisibles
          du poll quotidien (#89). -->
@@ -221,7 +197,6 @@
                 <filter string="Archivée" name="inactive" domain="[('active', '=', False)]"/>
                 <group>
                     <filter string="État" name="group_etat" context="{'group_by': 'etat'}"/>
-                    <filter string="État de facturation" name="group_etat_facturation" context="{'group_by': 'etat_facturation_id'}"/>
                 </group>
             </search>
         </field>
@@ -230,7 +205,7 @@
     <record id="action_souscription" model="ir.actions.act_window">
         <field name="name">Souscriptions</field>
         <field name="res_model">souscription.souscription</field>
-        <field name="view_mode">kanban,list,form</field>
+        <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_souscription_search"/>
         <field name="view_ids" eval="[(5, 0, 0),
             (0, 0, {'view_mode': 'list', 'view_id': ref('view_souscription_list')}),

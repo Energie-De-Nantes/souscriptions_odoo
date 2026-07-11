@@ -19,13 +19,6 @@ class TestIntegration(TransactionCase):
             }
         )
 
-        self.etat_actif = self.env['souscription.etat'].create(
-            {
-                'name': 'Actif',
-                'sequence': 1,
-            }
-        )
-
         # Grille de test résolue par date (get_grille_active), pas par drapeau.
         self.grille = self.env['grille.prix'].create(
             {
@@ -54,7 +47,6 @@ class TestIntegration(TransactionCase):
                 'pdl': 'PDL_INTEG_BASE',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_actif.id,
                 'date_debut': date(2024, 1, 1),
                 'coeff_pro': 0.0,  # Particulier
             }
@@ -112,7 +104,6 @@ class TestIntegration(TransactionCase):
                 'pdl': 'PDL_INTEG_HPHC',
                 'puissance_souscrite': '9',
                 'type_tarif': 'hphc',
-                'etat_facturation_id': self.etat_actif.id,
                 'date_debut': date(2024, 2, 1),
                 'coeff_pro': 15.0,  # PRO +15%
             }
@@ -160,7 +151,6 @@ class TestIntegration(TransactionCase):
                 'pdl': 'PDL_SOLIDAIRE',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_actif.id,
                 'tarif_solidaire': True,
             }
         )
@@ -203,7 +193,6 @@ class TestIntegration(TransactionCase):
                     'pdl': f'PDL_MULTI_{i + 1}',
                     'puissance_souscrite': '6',
                     'type_tarif': 'base',
-                    'etat_facturation_id': self.etat_actif.id,
                 }
             )
             souscriptions.append(sous)
@@ -241,7 +230,6 @@ class TestIntegration(TransactionCase):
                 'pdl': 'PDL_ERREUR',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_actif.id,
             }
         )
 

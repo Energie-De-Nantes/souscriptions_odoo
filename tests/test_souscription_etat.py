@@ -202,7 +202,6 @@ class TestRscUnique(SouscriptionsTestCase):
                     'pdl': pdl,
                     'puissance_souscrite': '6',
                     'type_tarif': 'base',
-                    'etat_facturation_id': self.etat_facturation.id,
                     'date_debut': date(2024, 1, 1),
                     'ref_situation_contractuelle': rsc,
                 }

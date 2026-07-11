@@ -75,7 +75,6 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
                 'pdl': 'PDL_DEJA_SERVICE',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
                 'id_affaire': 'AFF-DEJA-SERVICE',
             }
         )
@@ -87,7 +86,6 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
                 'pdl': 'PDL_ARCHIVEE',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
                 'id_affaire': 'AFF-ARCHIVEE',
                 'active': False,
             }
@@ -205,7 +203,6 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
                 'pdl': 'PDL_SANS_DEMANDE',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_facturation.id,
                 'id_affaire': 'AFF-SANS-DEMANDE',
             }
         )

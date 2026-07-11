@@ -695,11 +695,6 @@ class RaccordementDemande(models.Model):
             souscription_vals['provision_hp_kwh'] = self.provision_hp_kwh
             souscription_vals['provision_hc_kwh'] = self.provision_hc_kwh
 
-        # Définir l'état de facturation initial
-        etat_initial = self.env['souscription.etat'].search([], order='sequence', limit=1)
-        if etat_initial:
-            souscription_vals['etat_facturation_id'] = etat_initial.id
-
         souscription = self.env['souscription.souscription'].create(souscription_vals)
 
         # Accès portail donné dès l'onboarding : le·la souscripteur·trice reçoit

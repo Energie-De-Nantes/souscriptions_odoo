@@ -14,13 +14,6 @@ class TestSouscription(TransactionCase):
             }
         )
 
-        self.etat_actif = self.env['souscription.etat'].create(
-            {
-                'name': 'Actif',
-                'sequence': 1,
-            }
-        )
-
     def test_souscription_creation(self):
         """Test création basique d'une souscription"""
         souscription = self.env['souscription.souscription'].create(
@@ -29,7 +22,6 @@ class TestSouscription(TransactionCase):
                 'pdl': 'PDL123456',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_actif.id,
                 'date_debut': date(2024, 1, 1),
             }
         )
@@ -47,7 +39,6 @@ class TestSouscription(TransactionCase):
                 'pdl': 'PDL789',
                 'puissance_souscrite': '9',
                 'type_tarif': 'hphc',
-                'etat_facturation_id': self.etat_actif.id,
                 'provision_mensuelle_kwh': 500.0,
             }
         )
@@ -64,7 +55,6 @@ class TestSouscription(TransactionCase):
                 'pdl': 'PDL_REPARTITION',
                 'puissance_souscrite': '9',
                 'type_tarif': 'hphc',
-                'etat_facturation_id': self.etat_actif.id,
                 'provision_mensuelle_kwh': 500.0,
             }
         )
@@ -85,7 +75,6 @@ class TestSouscription(TransactionCase):
                 'pdl': 'PDL_EXPLICITE',
                 'puissance_souscrite': '9',
                 'type_tarif': 'hphc',
-                'etat_facturation_id': self.etat_actif.id,
                 'provision_hp_kwh': 200.0,
                 'provision_hc_kwh': 120.0,
             }
@@ -104,7 +93,6 @@ class TestSouscription(TransactionCase):
                 'pdl': 'PDL456',
                 'puissance_souscrite': '12',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_actif.id,
                 'coeff_pro': 15.5,
             }
         )
@@ -119,7 +107,6 @@ class TestSouscription(TransactionCase):
                 'pdl': 'PDL999',
                 'puissance_souscrite': '3',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_actif.id,
                 'tarif_solidaire': True,
             }
         )
@@ -136,7 +123,6 @@ class TestSouscription(TransactionCase):
                 'pdl': 'PDL_RSC',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_actif.id,
                 'ref_situation_contractuelle': 'RSC0001234',
                 'id_affaire': 'AFF-56789',
             }
@@ -155,7 +141,6 @@ class TestSouscription(TransactionCase):
                 'pdl': 'PDL_ADRESSE',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
-                'etat_facturation_id': self.etat_actif.id,
                 'adresse_pdl': '12 rue de la Paix\n44000 Nantes',
             }
         )

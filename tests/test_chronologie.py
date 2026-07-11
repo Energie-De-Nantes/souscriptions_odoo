@@ -196,12 +196,12 @@ class TestActionOuvrirChronologie(SouscriptionsTestCase):
         self.addCleanup(patcher_exc.stop)
         self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
 
-    def _cliquer_avec_client(self, client):
+    def _cliquer_avec_client(self, client, souscription=None):
         """Clique le bouton avec un client factice fourni directement par la
         fabrique (ADR 0024) : la garde paquet/config de la fabrique est
         testée une fois dans test_electricore_client_fabrique.py, pas ici."""
         with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
-            return self.souscription_base.action_ouvrir_chronologie()
+            return (souscription or self.souscription_base).action_ouvrir_chronologie()
 
     def test_sans_rsc_leve_userror_actionnable(self):
         """AC : sans RSC, UserError actionnable renvoyant vers la résolution
@@ -255,7 +255,10 @@ class TestActionOuvrirChronologie(SouscriptionsTestCase):
         pas les lignes déjà affichées pour `B`."""
         autre = self.souscription_hphc
         autre.ref_situation_contractuelle = 'RSC-00000000000099'
-        self._cliquer_avec_client(_fake_client([_ligne_evenement(ref_situation_contractuelle='RSC-00000000000099')]))
+        self._cliquer_avec_client(
+            _fake_client([_ligne_evenement(ref_situation_contractuelle='RSC-00000000000099')]),
+            souscription=autre,
+        )
         ligne_autre = self.env['souscription.chronologie.ligne'].search([('souscription_id', '=', autre.id)])
         self.assertEqual(len(ligne_autre), 1)
 

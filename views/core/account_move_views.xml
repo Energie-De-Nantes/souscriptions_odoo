@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- « Règlements en attente » (#185, PRD #183) : l'endroit unique où la
+         facturiste voit ce qui reste à encaisser hors prélèvement — postées,
+         reste-à-payer > 0, mode ≠ prélèvement, groupe « (vide) » compris
+         (souscription sans mode renseigné, à compléter, jamais deviné). Une
+         facture soldée (chèque énergie, 0 €) sort du domaine d'elle-même.
+         Aucune vue dédiée : les vues liste/formulaire natives de la
+         Facturation portent déjà l'action « Enregistrer un paiement » sur la
+         sélection — aucun wizard maison. -->
+    <record id="action_facture_reglements_attente" model="ir.actions.act_window">
+        <field name="name">Règlements en attente</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('is_facture_energie', '=', True), ('state', '=', 'posted'), ('amount_residual', '>', 0), '|', ('mode_paiement', '!=', 'prelevement'), ('mode_paiement', '=', False)]</field>
+        <field name="context">{'group_by': 'mode_paiement'}</field>
+    </record>
+
+    <menuitem
+        id="menu_facture_reglements_attente"
+        name="Règlements en attente"
+        parent="menu_souscription_root"
+        action="action_facture_reglements_attente"
+        sequence="45"/>
+</odoo>

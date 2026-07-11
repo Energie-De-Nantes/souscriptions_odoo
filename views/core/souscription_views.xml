@@ -61,18 +61,6 @@
                             </group>
                             <group string="Paiement">
                                 <field name="mode_paiement"/>
-                                <separator string="Chèques énergie" colspan="2"/>
-                                <field name="cheque_energie_ids" nolabel="1" colspan="2" readonly="1">
-                                    <list>
-                                        <field name="numero"/>
-                                        <field name="montant"/>
-                                        <field name="date_expiration"/>
-                                        <field name="state" widget="badge"
-                                               decoration-success="state == 'valide'"
-                                               decoration-danger="state in ('rejete', 'expire')"/>
-                                        <field name="solde"/>
-                                    </list>
-                                </field>
                             </group>
                         </div>
                     </div>
@@ -142,6 +130,24 @@
                                 <field name="motif_resolution_rsc" invisible="not motif_resolution_rsc"/>
                                 <field name="date_derniere_resolution_rsc" invisible="not date_derniere_resolution_rsc"/>
                             </group>
+                        </page>
+                        <page string="Chèques énergie" name="cheque_energie">
+                            <field name="cheque_energie_ids" readonly="1">
+                                <list default_order="date_expiration">
+                                    <field name="numero"/>
+                                    <field name="montant" sum="Total"/>
+                                    <field name="date_reception"/>
+                                    <field name="date_expiration"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'valide'"
+                                           decoration-danger="state in ('rejete', 'expire')"/>
+                                    <field name="etat_solde" widget="badge"
+                                           decoration-success="etat_solde == 'non_entame'"
+                                           decoration-warning="etat_solde == 'en_cours'"
+                                           decoration-danger="etat_solde == 'epuise'"/>
+                                    <field name="solde" sum="Solde restant"/>
+                                </list>
+                            </field>
                         </page>
                     </notebook>
                 </sheet>

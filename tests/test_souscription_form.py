@@ -75,9 +75,10 @@ class TestSouscriptionFormRefonte(SouscriptionsTestCase):
         paiement = self.arch.find(".//group[@string='Paiement']")
         self.assertIsNone(paiement.find(".//field[@name='coeff_pro']"))
 
-    def test_cheques_energie_dans_paiement(self):
-        paiement = self.arch.find(".//group[@string='Paiement']")
-        self.assertIsNotNone(paiement.find(".//field[@name='cheque_energie_ids']"))
+    def test_cheques_energie_dans_leur_onglet(self):
+        page = self.arch.find(".//page[@string='Chèques énergie']")
+        self.assertIsNotNone(page)
+        self.assertIsNotNone(page.find(".//field[@name='cheque_energie_ids']"))
 
     def test_onglet_electricore_porte_les_cinq_champs_identite(self):
         page = self.arch.find(".//page[@string='Électricore']")
@@ -99,7 +100,10 @@ class TestSouscriptionFormRefonte(SouscriptionsTestCase):
         notebook = self.arch.find('.//notebook')
         self.assertIsNotNone(notebook)
         libelles = [p.get('string') for p in notebook.findall('page')]
-        self.assertEqual(libelles, ['Périodes de facturation', 'Refacturations', 'Journal des actes', 'Électricore'])
+        self.assertEqual(
+            libelles,
+            ['Périodes de facturation', 'Refacturations', 'Journal des actes', 'Électricore', 'Chèques énergie'],
+        )
 
     def test_colonnes_periodes_masquees_par_defaut(self):
         periode_list = self.arch.find(".//field[@name='periode_ids']//list")

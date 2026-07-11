@@ -1,9 +1,11 @@
-"""Documents contractuels & consentement (#63).
+"""Documents contractuels & Journal des actes (#63, ADR 0027).
 
-Couvre la chaîne « capter au *Raccordement* → posséder sur la *Souscription* →
-projeter dans les rapports » (ADR 0016) : les déclarations/consentements et la
-date de signature sont saisis sur la demande de raccordement, recopiés à la
-création de la Souscription, puis rendus par les *Conditions particulières* et
+Couvre la chaîne « capter au *Raccordement* → journaliser sur la *Souscription*
+→ projeter dans les rapports » (ADR 0016/0027) : les déclarations/consentements
+et les actes d'adhésion (acceptation CGV, renonciation au délai de
+rétractation) sont saisis sur la demande de raccordement, journalisés (Journal
+des actes, append-only) à la création de la Souscription — jamais recopiés en
+champs plats —, puis rendus par les *Conditions particulières* et
 l'*Attestation de fourniture*.
 """
 
@@ -11,6 +13,7 @@ import os
 from datetime import date, timedelta
 
 from lxml import etree
+from odoo import fields
 from odoo.tests.common import HttpCase, TransactionCase, tagged
 
 from .common import SouscriptionsTestMixin, build_grille_lignes
@@ -18,7 +21,9 @@ from .common import SouscriptionsTestMixin, build_grille_lignes
 
 @tagged('souscriptions', 'souscriptions_documents', 'post_install', '-at_install')
 class TestCaptureConsentement(SouscriptionsTestMixin, TransactionCase):
-    """Les déclarations captées au Raccordement sont recopiées sur la Souscription."""
+    """Les déclarations captées au Raccordement sont journalisées sur la
+    Souscription (ADR 0027) : cotitulaires recopiés, actes d'adhésion écrits au
+    Journal des actes, jamais recopiés en champs plats."""
 
     @classmethod
     def setUpClass(cls):
@@ -45,9 +50,11 @@ class TestCaptureConsentement(SouscriptionsTestMixin, TransactionCase):
         defaults.update(kwargs)
         return self.env['raccordement.demande'].create(defaults)
 
-    def test_declarations_recopiees_sur_souscription(self):
-        """date_validation / renonce_retractation / cotitulaires passent de la
-        demande à la Souscription créée à la clôture du Raccordement."""
+    def test_actes_adhesion_journalises_sur_souscription(self):
+        """Signature + renonciation saisies sur la demande produisent des lignes
+        de Journal des actes sur la Souscription créée à la clôture du
+        Raccordement — horodatage = la date de signature, plus de recopie de
+        champs plats (ADR 0027)."""
         cotitulaire = self.env['res.partner'].create({'name': 'Cotitulaire Test'})
         signature = date.today()
 
@@ -60,20 +67,42 @@ class TestCaptureConsentement(SouscriptionsTestMixin, TransactionCase):
 
         souscription = demande.souscription_id
         self.assertTrue(souscription, 'Souscription devrait être créée')
-        self.assertEqual(souscription.date_validation, signature)
-        self.assertTrue(souscription.renonce_retractation)
         self.assertEqual(souscription.cotitulaires, cotitulaire)
 
+        acceptation = souscription._dernier_acte('acceptation_cgv')
+        renonciation = souscription._dernier_acte('renonciation_retractation')
+        self.assertTrue(acceptation, "L'acceptation CGV devrait être journalisée")
+        self.assertTrue(renonciation, 'La renonciation devrait être journalisée')
+        self.assertEqual(acceptation.date_consentement.date(), signature)
+        self.assertEqual(renonciation.date_consentement.date(), signature)
+        self.assertIn(demande.name, acceptation.source)
+
+        # Plus de champs plats sur la Souscription (ADR 0027).
+        self.assertNotIn('date_validation', souscription._fields)
+        self.assertNotIn('renonce_retractation', souscription._fields)
+
     def test_declarations_par_defaut_vides(self):
-        """Sans capture, la Souscription naît sans déclaration ni cotitulaire :
-        une demande peut être close avant que la rétractation soit tranchée."""
+        """Sans capture, la Souscription naît sans acte d'adhésion journalisé ni
+        cotitulaire : une demande peut être close avant que la rétractation soit
+        tranchée. Absence de ligne = pas de mention (ADR 0027)."""
         demande = self._demande()
         demande.stage_id = self.stage_final
 
         souscription = demande.souscription_id
-        self.assertFalse(souscription.renonce_retractation)
-        self.assertFalse(souscription.date_validation)
+        self.assertFalse(souscription._dernier_acte('acceptation_cgv'))
+        self.assertFalse(souscription._dernier_acte('renonciation_retractation'))
         self.assertFalse(souscription.cotitulaires)
+
+    def test_renonciation_seule_sans_signature_non_journalisee(self):
+        """La renonciation n'a de sens qu'ancrée à une date de signature : sans
+        date_validation, aucun acte n'est journalisé même si renonce_retractation
+        est coché (pas d'horodatage fiable, pas de preuve, ADR 0027)."""
+        demande = self._demande(renonce_retractation=True)
+        demande.stage_id = self.stage_final
+
+        souscription = demande.souscription_id
+        self.assertFalse(souscription._dernier_acte('acceptation_cgv'))
+        self.assertFalse(souscription._dernier_acte('renonciation_retractation'))
 
 
 CP_URL = '/report/html/souscriptions_odoo.souscription_conditions_particulieres_document/%s'
@@ -112,12 +141,17 @@ class TestConditionsParticulieres(SouscriptionsTestMixin, HttpCase):
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
                 'date_debut': date(2024, 1, 1),
-                'date_validation': date(2025, 3, 14),
-                'renonce_retractation': True,
                 'lisse': True,
                 'provision_mensuelle_kwh': 300.0,
                 'mode_paiement': 'prelevement',
             }
+        )
+        # Actes d'adhésion journalisés (ADR 0027) : plus de champs plats sur la
+        # Souscription — la CP les lit depuis le Journal des actes.
+        signature = fields.Datetime.to_datetime('2025-03-14 09:00:00')
+        cls.cp_particulier.enregistrer_consentement('acceptation_cgv', source='test', date_consentement=signature)
+        cls.cp_particulier.enregistrer_consentement(
+            'renonciation_retractation', source='test', date_consentement=signature
         )
         # Société : prix affichés HT.
         cls.cp_societe = cls.env['souscription.souscription'].create(
@@ -158,14 +192,24 @@ class TestConditionsParticulieres(SouscriptionsTestMixin, HttpCase):
 
     def test_declarations_signature_et_support_durable(self):
         html = self._html(self.cp_particulier)
-        # Renonciation au délai de rétractation captée.
+        # Renonciation au délai de rétractation journalisée.
         self.assertIn('rétractation', html.lower())
         # Lissage et mode de paiement déclarés.
         self.assertIn('Prélèvement', html)
-        # Signature : l'année de date_validation (2025), distincte de date_debut (2024).
+        # Signature : l'année de la ligne acceptation_cgv (2025), distincte de
+        # date_debut (2024).
         self.assertIn('2025', html)
         # Mention de la confirmation sur support durable.
         self.assertIn('support durable', html.lower())
+
+    def test_sans_acte_journalise_aucune_mention(self):
+        """Une Souscription sans ligne de journal n'imprime aucune mention
+        d'adhésion ni de renonciation : absence de ligne = pas de preuve, donc
+        pas de mention (ADR 0027) — la société de test n'a aucun acte journalisé."""
+        html = self._html(self.cp_societe)
+        self.assertIn('en attente', html.lower())
+        self.assertNotIn('Adhésion validée le', html)
+        self.assertNotIn('rétractation', html.lower())
 
     def test_mensualite_affichee_si_lisse(self):
         """Contrat lissé → une mensualité estimée figure sur la CP."""
@@ -259,7 +303,9 @@ class TestAttestationFourniture(SouscriptionsTestMixin, HttpCase):
 
 @tagged('souscriptions', 'souscriptions_documents', 'post_install', '-at_install')
 class TestJournalConsentement(SouscriptionsTestMixin, TransactionCase):
-    """Journal de consentement append-only possédé par la Souscription (ADR 0017)."""
+    """Journal des actes append-only possédé par la Souscription (ADR 0017/0027) :
+    consentements RGPD (révocables) et actes d'adhésion contractuels
+    (irrévocables), au sein du même journal (`souscription.consentement`)."""
 
     @classmethod
     def setUpClass(cls):
@@ -334,6 +380,52 @@ class TestJournalConsentement(SouscriptionsTestMixin, TransactionCase):
         souscription = demande.souscription_id
         self.assertEqual(souscription.etat_consentement('courbe_charge'), 'donne')
         self.assertFalse(souscription.etat_consentement('conso_quotidienne'))
+
+    def test_retrait_refuse_sur_acceptation_cgv(self):
+        """Le journal refuse un retrait sur une finalité contractuelle
+        irrévocable (ADR 0027) : on ne « retire » pas une signature."""
+        from odoo.exceptions import UserError
+
+        with self.assertRaises(UserError):
+            self._ligne(self.souscription_base, finalite='acceptation_cgv', etat='retire')
+
+    def test_retrait_refuse_sur_renonciation_retractation(self):
+        """Même garde pour la renonciation au délai de rétractation."""
+        from odoo.exceptions import UserError
+
+        with self.assertRaises(UserError):
+            self._ligne(self.souscription_base, finalite='renonciation_retractation', etat='retire')
+
+    def test_retrait_rgpd_fonctionne_inchange(self):
+        """Le garde d'irrévocabilité ne s'applique qu'aux deux finalités
+        contractuelles : les retraits RGPD existants continuent de fonctionner."""
+        ligne = self._ligne(self.souscription_base, finalite='courbe_charge', etat='retire')
+        self.assertEqual(ligne.etat, 'retire')
+
+    def test_don_accepte_sur_acte_irrevocable(self):
+        """Un acte irrévocable peut être *donné* (c'est la signature elle-même) :
+        seul le retrait est refusé."""
+        ligne = self._ligne(self.souscription_base, finalite='acceptation_cgv', etat='donne')
+        self.assertEqual(ligne.etat, 'donne')
+
+    def test_dernier_acte_retourne_la_derniere_ligne(self):
+        """`_dernier_acte` retourne l'enregistrement (pas seulement l'état) de la
+        dernière ligne par finalité, vide si aucun acte."""
+        self._ligne(self.souscription_base, finalite='acceptation_cgv', etat='donne')
+        acte = self.souscription_base._dernier_acte('acceptation_cgv')
+        self.assertTrue(acte)
+        self.assertEqual(acte.finalite, 'acceptation_cgv')
+        self.assertFalse(self.souscription_base._dernier_acte('renonciation_retractation'))
+
+    def test_enregistrer_consentement_accepte_horodatage_explicite(self):
+        """`enregistrer_consentement` accepte un horodatage explicite (date de
+        signature) au lieu du défaut « maintenant » — nécessaire pour journaliser
+        un acte d'adhésion à la date réelle de signature (ADR 0027)."""
+        signature = fields.Datetime.to_datetime('2025-03-14 09:00:00')
+        ligne = self.souscription_base.enregistrer_consentement(
+            'acceptation_cgv', source='test', date_consentement=signature
+        )
+        self.assertEqual(ligne.date_consentement, signature)
 
 
 @tagged('souscriptions', 'souscriptions_documents', 'post_install', '-at_install')

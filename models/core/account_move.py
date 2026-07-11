@@ -15,6 +15,17 @@ class AccountMove(models.Model):
 
     is_facture_energie = fields.Boolean(string="Facture d'énergie", compute='_compute_is_facture_energie', store=True)
 
+    # Plomberie dérivée (#185, PRD #183) : la Souscription est l'unique source
+    # de vérité du Mode de paiement (CONTEXT.md) — jamais saisi sur la
+    # Facture. related stocké pour rester filtrable/groupable (vue
+    # « Règlements en attente ») ; se recalcule quand la Souscription change.
+    mode_paiement = fields.Selection(
+        related='souscription_id.mode_paiement',
+        string='Mode de paiement',
+        store=True,
+        readonly=True,
+    )
+
     @api.depends('periode_id', 'souscription_id')
     def _compute_is_facture_energie(self):
         """Détermine si c'est une facture d'énergie (souscription électricité)"""

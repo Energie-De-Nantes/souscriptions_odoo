@@ -314,3 +314,131 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
         etape.action_executer()
 
         self.assertEqual(periode.facture_id.state, 'posted')
+
+
+@tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
+class TestCampagneEtapePreparerPrelevements(SouscriptionsTestCase):
+    """#186, PRD #183 : étape après « Émettre factures », son domaine
+    s'appuie sur `account.move.mode_paiement` porté par la Facture (#185,
+    slice 1 de cette même PR)."""
+
+    MOIS = date(2024, 3, 1)
+    FIN_MOIS = date(2024, 3, 31)
+
+    def setUp(self):
+        super().setUp()
+        # Comme TestCampagneEtapeEmettreFactures : seule souscription_base
+        # est RSC-acquise (en_service), donc seule facturable — hphc reste
+        # en_instance, hors du décompte « emettre_factures ».
+        self.souscription_base.with_context(rsc_automatisme=True).write(
+            {'ref_situation_contractuelle': 'RSC-CAMPAGNE-PRELEV'}
+        )
+        self.campagne = self.env['souscription.campagne.facturation'].create({'mois': self.MOIS})
+
+    def _etape(self):
+        return self.campagne.etape_ids.filtered(lambda e: e.code == 'preparer_prelevements')
+
+    def _emettre_factures_du_mois(self):
+        """Amène `emettre_factures` à « fait » (prérequis de l'étape testée)
+        en postant la facture du mois de souscription_base."""
+        periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        facture = periode._creer_facture()
+        facture.action_post()
+        self.campagne.etape_ids.invalidate_recordset()
+        return facture
+
+    def test_etape_apparait_apres_emettre_factures_avec_prerequis(self):
+        """AC : dans le DAG, après « Émettre factures », gated dessus."""
+        codes = list(self.env['souscription.campagne.etape']._selection_code())
+        codes_ordonnes = [c for c, _ in codes]
+        self.assertEqual(codes_ordonnes[-1], 'preparer_prelevements')
+        self.assertEqual(codes_ordonnes[-2], 'emettre_factures')
+
+        etape = self._etape()
+        self.assertEqual(etape.etat_prerequis, 'bloquee', 'emettre_factures pas encore faite')
+
+        self._emettre_factures_du_mois()
+        etape.invalidate_recordset()
+        self.assertEqual(etape.etat_prerequis, 'prete')
+
+    def test_action_bloquee_si_emettre_factures_pas_faite(self):
+        with self.assertRaises(UserError):
+            self.campagne.action_preparer_prelevements()
+
+    def test_bouton_retourne_une_liste_postees_residu_positif_mode_prelevement(self):
+        """AC : postées, résidu > 0, mode = prélèvement, TOUTES périodes
+        (pas seulement le mois de la campagne)."""
+        self.souscription_base.mode_paiement = 'prelevement'
+        facture_mois = self._emettre_factures_du_mois()
+
+        # Facture d'un mois antérieur, restée due : doit apparaître (le batch
+        # mensuel embarque les rattrapages, comme en prod).
+        periode_janvier = self.create_test_periode(
+            self.souscription_base, date_debut=date(2024, 1, 1), date_fin=date(2024, 1, 31)
+        )
+        facture_janvier = periode_janvier._creer_facture()
+        facture_janvier.action_post()
+
+        action = self.campagne.action_preparer_prelevements()
+        self.assertEqual(action['res_model'], 'account.move')
+        resultat = self.env['account.move'].search(
+            action['domain'] + [('id', 'in', (facture_mois | facture_janvier).ids)]
+        )
+        self.assertEqual(set(resultat.ids), {facture_mois.id, facture_janvier.id})
+
+    def test_facture_mode_vide_ou_soldee_jamais_dans_la_liste(self):
+        """AC : le mode vide n'entre jamais dans ce domaine (il relève de la
+        vue « Règlements en attente », #185) ; une facture soldée (chèque
+        énergie, 0 €) non plus."""
+        # mode_paiement vide (jamais mis à prélèvement) -> exclue malgré
+        # résidu > 0.
+        facture_mois = self._emettre_factures_du_mois()
+        self.assertFalse(self.souscription_base.mode_paiement)
+
+        action = self.campagne.action_preparer_prelevements()
+        resultat = self.env['account.move'].search(action['domain'] + [('id', '=', facture_mois.id)])
+        self.assertFalse(resultat, 'mode vide : jamais dans ce domaine')
+
+    def test_fait_reste_a_faire_tant_quun_residu_positif_sans_paiement(self):
+        """AC : « fait » dérivé des factures DU MOIS et de leurs paiements —
+        aucun champ de verrou. Reste à faire tant qu'une facture prélèvement
+        du mois a un résidu > 0 ; fait une fois le paiement enregistré."""
+        self.souscription_base.mode_paiement = 'prelevement'
+        facture_mois = self._emettre_factures_du_mois()
+        etape = self._etape()
+
+        self.assertGreater(facture_mois.amount_residual, 0.0)
+        self.assertFalse(etape.fait)
+        self.assertEqual(etape.nb_reste_a_faire, 1)
+
+        journal = self.env['account.journal'].search([('type', '=', 'bank')], limit=1)
+        wizard = (
+            self.env['account.payment.register']
+            .with_context(active_model='account.move', active_ids=facture_mois.ids)
+            .create({'journal_id': journal.id})
+        )
+        wizard._create_payments()
+        facture_mois.invalidate_recordset(['amount_residual'])
+        etape.invalidate_recordset()
+
+        self.assertAlmostEqual(facture_mois.amount_residual, 0.0, places=2)
+        self.assertTrue(etape.fait)
+        self.assertEqual(etape.nb_reste_a_faire, 0)
+
+    def test_bouton_generique_dispatch_vers_preparer_prelevements(self):
+        self.souscription_base.mode_paiement = 'prelevement'
+        self._emettre_factures_du_mois()
+        etape = self._etape()
+
+        action = etape.action_executer()
+
+        self.assertEqual(action['type'], 'ir.actions.act_window')
+        self.assertEqual(action['res_model'], 'account.move')
+
+    def test_aucun_champ_verrou_ajoute_sur_periode_ou_facture(self):
+        """AC (esprit ADR 0025) : aucun nouveau champ de verrou sur Période ni
+        sur account.move au-delà du related `mode_paiement` (#185, plomberie
+        dérivée, jamais un verrou)."""
+        for modele in ('souscription.periode', 'account.move'):
+            for nom_champ in self.env[modele]._fields:
+                self.assertNotIn('prelevement', nom_champ.lower(), f'{modele}.{nom_champ} : champ inattendu')

@@ -36,6 +36,7 @@ class Souscription(models.Model):
     facture_ids = fields.One2many(
         'account.move', compute='_compute_factures_via_periodes', string='Factures', store=False
     )
+    facture_count = fields.Integer(string='Nombre de factures', compute='_compute_facture_count')
     periode_ids = fields.One2many('souscription.periode', 'souscription_id', string='Périodes de facturation')
     refacturation_ids = fields.One2many('souscription.refacturation', 'souscription_id', string='Refacturations')
     consentement_ids = fields.One2many('souscription.consentement', 'souscription_id', string='Journal des actes')
@@ -298,6 +299,25 @@ class Souscription(models.Model):
             'type': 'ir.actions.act_url',
             'url': self.get_portal_url(),
             'target': 'new',
+        }
+
+    @api.depends('facture_ids')
+    def _compute_facture_count(self):
+        for sous in self:
+            sous.facture_count = len(sous.facture_ids)
+
+    def action_voir_factures(self):
+        """Bouton stat « N Factures » de la button box (#199) : ouvre la liste
+        des factures d'énergie liées à cette Souscription via ses Périodes
+        (`facture_ids`, ADR 0004 — la Période porte le lien unique vers la
+        Facture)."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Factures',
+            'res_model': 'account.move',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', self.facture_ids.ids)],
         }
 
     _MESSAGE_RSC_RESTREINTE = (

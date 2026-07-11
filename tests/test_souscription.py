@@ -2,6 +2,8 @@ from datetime import date
 
 from odoo.tests.common import TransactionCase, tagged
 
+from .common import SouscriptionsTestCase
+
 
 @tagged('souscriptions', 'post_install', '-at_install')
 class TestSouscription(TransactionCase):
@@ -162,3 +164,24 @@ class TestSouscription(TransactionCase):
             ['prelevement', 'monnaie_locale', 'especes', 'virement', 'cheque'],
         )
         self.assertNotIn('cheque_energie', valeurs)
+
+
+@tagged('souscriptions', 'post_install', '-at_install')
+class TestSouscriptionFactureCount(SouscriptionsTestCase):
+    """Bouton stat « N Factures » de la button box (#199) : facture_count
+    compte les factures d'énergie liées via les Périodes (ADR 0004) et
+    action_voir_factures ouvre la liste filtrée sur ces factures."""
+
+    def test_facture_count_zero_sans_facture(self):
+        self.assertEqual(self.souscription_base.facture_count, 0)
+
+    def test_facture_count_compte_les_factures_liees(self):
+        periode, facture = self.create_test_invoice(self.souscription_base)
+        self.assertEqual(self.souscription_base.facture_count, 1)
+        self.assertEqual(self.souscription_base.facture_ids, facture)
+
+    def test_action_voir_factures_ouvre_la_liste_filtree(self):
+        periode, facture = self.create_test_invoice(self.souscription_base)
+        action = self.souscription_base.action_voir_factures()
+        self.assertEqual(action['res_model'], 'account.move')
+        self.assertEqual(action['domain'], [('id', 'in', facture.ids)])

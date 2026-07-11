@@ -276,7 +276,10 @@ par souscription** dérivé à **zéro champ** (à tirer → à facturer → fac
 bloquant)** de la campagne suivante à sa création — les validations manuelles et ces notes sont
 le seul état vraiment **persisté**, l'historique n'étant que la liste des campagnes passées. Le
 DAG est pensé pour être **rejouable par un automate** (facturation automatique suivant les mêmes
-étapes qu'un humain).
+étapes qu'un humain). L'ancien champ stocké « État de facturation » (`etat_facturation_id`,
+modèle `souscription.etat`) est supprimé (#180) : c'était un reliquat pré-Campagne, jamais
+transitionné par la logique métier — le statut dérivé ci-dessus est désormais le seul vocabulaire
+vivant.
 _Éviter_ : **cycle de facturation** pour l'instance (c'est la *récurrence* / le nom du menu, pas
 l'enregistrement mensuel) ; **pipeline linéaire** (les étapes forment un DAG) ; instrumenter les
 *Périodes* / *Refacturations* d'un drapeau « vérifiée » (la vérif est une porte à la maille

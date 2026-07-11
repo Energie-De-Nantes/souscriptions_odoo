@@ -1,6 +1,6 @@
 {
     'name': 'Souscriptions Électricité',
-    'version': '19.0.1.11.0',
+    'version': '19.0.1.12.0',
     'depends': ['base', 'mail', 'contacts', 'account', 'portal'],
     'author': 'Virgile Daugé',
     'category': 'Energy',
@@ -58,6 +58,7 @@ vit dans models/wizard/ et ne lève qu'au clic sur l'action du wizard.
         'reports/facture_energie_template.xml',
         'data/mail_templates_bienvenue.xml',
         'views/core/souscription_views.xml',
+        'views/core/souscription_chronologie_views.xml',
         'views/core/res_partner_views.xml',
         'views/core/grille_prix_views.xml',
         'views/wizard/souscription_pull_meta_periodes_wizard_views.xml',

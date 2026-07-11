@@ -7,6 +7,7 @@ from . import (
     souscription,
     souscription_campagne,
     souscription_cheque_energie,
+    souscription_chronologie,
     souscription_consentement,
     souscription_periode,
     souscription_produit,

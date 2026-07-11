@@ -1,0 +1,73 @@
+<odoo>
+    <record id="view_souscription_chronologie_ligne_list" model="ir.ui.view">
+        <field name="name">souscription.chronologie.ligne.list</field>
+        <field name="model">souscription.chronologie.ligne</field>
+        <field name="arch" type="xml">
+            <list string="Chronologie" create="0" edit="0" delete="0" default_order="date">
+                <field name="date"/>
+                <field name="type_ligne"/>
+                <field name="pdl" optional="hide"/>
+                <field name="ref_situation_contractuelle" optional="hide"/>
+                <!-- evenement -->
+                <field name="source" optional="hide"/>
+                <field name="type_fait" optional="hide"/>
+                <field name="evenement_declencheur" optional="hide"/>
+                <field name="puissance_souscrite_kva" optional="hide"/>
+                <field name="formule_tarifaire_acheminement" optional="hide"/>
+                <field name="niveau_ouverture_services" optional="hide"/>
+                <field name="impacte_abonnement" optional="hide"/>
+                <field name="resume_modification" optional="hide"/>
+                <!-- releve -->
+                <field name="releve_id" optional="hide"/>
+                <field name="nature_index" optional="hide"/>
+                <field name="origine_releve" optional="hide"/>
+                <field name="ordre_index" optional="hide"/>
+                <field name="index_base_kwh" optional="hide"/>
+                <field name="index_hp_kwh" optional="hide"/>
+                <field name="index_hc_kwh" optional="hide"/>
+                <field name="index_hph_kwh" optional="hide"/>
+                <field name="index_hch_kwh" optional="hide"/>
+                <field name="index_hpb_kwh" optional="hide"/>
+                <field name="index_hcb_kwh" optional="hide"/>
+                <!-- periode_energie -->
+                <field name="debut" optional="hide"/>
+                <field name="fin" optional="hide"/>
+                <field name="nb_jours" optional="hide"/>
+                <field name="qualite" optional="hide"/>
+                <field name="statut_communication" optional="hide"/>
+                <field name="energie_base_kwh" optional="hide"/>
+                <field name="energie_hp_kwh" optional="hide"/>
+                <field name="energie_hc_kwh" optional="hide"/>
+                <field name="energie_hph_kwh" optional="hide"/>
+                <field name="energie_hch_kwh" optional="hide"/>
+                <field name="energie_hpb_kwh" optional="hide"/>
+                <field name="energie_hcb_kwh" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_souscription_chronologie_ligne_search" model="ir.ui.view">
+        <field name="name">souscription.chronologie.ligne.search</field>
+        <field name="model">souscription.chronologie.ligne</field>
+        <field name="arch" type="xml">
+            <search string="Chronologie">
+                <field name="souscription_id"/>
+                <field name="ref_situation_contractuelle"/>
+                <field name="pdl"/>
+                <filter string="Événements" name="filter_evenement" domain="[('type_ligne', '=', 'evenement')]"/>
+                <filter string="Relevés" name="filter_releve" domain="[('type_ligne', '=', 'releve')]"/>
+                <filter string="Périodes d'énergie" name="filter_periode_energie" domain="[('type_ligne', '=', 'periode_energie')]"/>
+                <group>
+                    <filter string="Type de ligne" name="group_type_ligne" context="{'group_by': 'type_ligne'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_souscription_chronologie_ligne" model="ir.actions.act_window">
+        <field name="name">Chronologie</field>
+        <field name="res_model">souscription.chronologie.ligne</field>
+        <field name="view_mode">list</field>
+        <field name="search_view_id" ref="view_souscription_chronologie_ligne_search"/>
+    </record>
+</odoo>

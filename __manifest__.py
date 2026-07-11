@@ -46,7 +46,6 @@ vit dans models/wizard/ et ne lève qu'au clic sur l'action du wizard.
         'security/ir.model.access.csv',
         'security/security_rules.xml',
         'data/souscription_sequence.xml',
-        'data/souscription_etat_data.xml',
         'data/produits_abonnement_simple.xml',
         'data/produits_energie.xml',
         'data/produits_prestation.xml',

@@ -7,16 +7,6 @@ from odoo.exceptions import AccessError, UserError
 _logger = logging.getLogger(__name__)
 
 
-class SouscriptionEtat(models.Model):
-    _name = 'souscription.etat'
-    _description = 'États de facturation'
-    _order = 'sequence'
-
-    name = fields.Char('Nom', required=True)
-    sequence = fields.Integer('Ordre', default=10)
-    color = fields.Integer('Couleur')
-
-
 class Souscription(models.Model):
     _name = 'souscription.souscription'
     _description = 'Souscription Électricité'
@@ -53,7 +43,6 @@ class Souscription(models.Model):
 
     date_debut = fields.Date(string='Début de la souscription')
     date_fin = fields.Date(string='Fin de la souscription')
-    etat_facturation_id = fields.Many2one('souscription.etat', string='État de facturation', required=True)
     # facture_ids = fields.One2many(
     #     'account.move',
     #     'souscription_id',

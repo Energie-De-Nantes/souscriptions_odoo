@@ -35,6 +35,13 @@ from odoo.exceptions import UserError
 # Les deux « vrais pulls » (méta-périodes + F15) gatent chacun leur porte de
 # vérif. Les relevés d'index NE sont PAS une étape : ils arrivent avec le pull
 # des périodes (enfants souscription.releve, cf. _amorcer_depuis_meta).
+#
+# « Préparer les prélèvements » (#186, PRD #183) : étape 'action' dont le
+# bouton ouvre une liste (SDD, préparation seulement — aucun paiement/batch/
+# fichier créé par le module, cf. action_preparer_prelevements). Contrairement
+# à sync F15, son « fait » n'est PAS le lancement (`lance`) mais un signal
+# dérivé (cf. _compute_fait/_compute_nb_reste_a_faire) — aucun champ de
+# verrou ajouté sur Période/Facture (esprit ADR 0025).
 ETAPES_CAMPAGNE = {
     'pull_meta_periodes': {
         'label': 'Pull méta-périodes',
@@ -65,6 +72,11 @@ ETAPES_CAMPAGNE = {
         'label': 'Émettre factures',
         'type': 'derive',
         'prerequis': ('creer_factures',),
+    },
+    'preparer_prelevements': {
+        'label': 'Préparer les prélèvements',
+        'type': 'action',
+        'prerequis': ('emettre_factures',),
     },
 }
 
@@ -264,6 +276,44 @@ class SouscriptionCampagneFacturation(models.Model):
             campagne.nb_factures_creees = len(factures)
             campagne.nb_factures_emises = len(factures.filtered(lambda f: f.state == 'posted'))
 
+    # --- Préparer les prélèvements (#186, PRD #183) : domaine partagé entre
+    # le bouton (toutes périodes) et le signal dérivé « fait » (mois de la
+    # campagne seulement) — mode explicitement `prelevement` uniquement,
+    # jamais le mode vide (qui relève de la vue « Règlements en attente »,
+    # #185). ---
+
+    _DOMAINE_FACTURES_PRELEVEMENT_DUES = [
+        ('is_facture_energie', '=', True),
+        ('state', '=', 'posted'),
+        ('amount_residual', '>', 0),
+        ('mode_paiement', '=', 'prelevement'),
+    ]
+
+    def _factures_prelevement_dues_du_mois(self):
+        """Factures prélèvement du mois de la campagne encore dues (#186) —
+        `amount_residual > 0` encode déjà « aucun paiement (complet) en
+        face » : pas de champ de verrou dédié, recalculé à chaque lecture
+        (esprit ADR 0025)."""
+        self.ensure_one()
+        return self._factures_du_mois().filtered_domain(self._DOMAINE_FACTURES_PRELEVEMENT_DUES)
+
+    def action_preparer_prelevements(self):
+        """Bouton (#158) : ouvre la liste de TOUTES les factures prélèvement
+        dues, toutes périodes confondues (le batch mensuel embarque les
+        rattrapages, comme en prod) — pas seulement le mois de la campagne.
+        Le module ne crée ni paiement, ni batch, ni fichier (décision PRD
+        #183) : de là, le geste reste l'outillage comptable (sélection ->
+        « Enregistrer un paiement » SDD -> batch -> pain.008)."""
+        self.ensure_one()
+        self._verifier_gate('preparer_prelevements')
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Préparer les prélèvements'),
+            'res_model': 'account.move',
+            'view_mode': 'list,form',
+            'domain': self._DOMAINE_FACTURES_PRELEVEMENT_DUES,
+        }
+
     # --- Boutons d'étape (#158) : délèguent aux actions déjà couvertes par
     # ailleurs (test_pull_meta_periodes.py, test_periode_facture.py...) —
     # aucune nouvelle couture réseau, `_ouvrir_flux`/`_tirer_prestations`
@@ -336,6 +386,9 @@ class SouscriptionCampagneFacturation(models.Model):
         self.ensure_one()
         self._verifier_gate('emettre_factures')
         self._factures_du_mois().filtered(lambda f: f.state == 'draft').action_post()
+
+    # action_preparer_prelevements (#186) : déclarée plus haut, aux côtés du
+    # domaine partagé avec le signal dérivé « fait ».
 
 
 class SouscriptionCampagneEtape(models.Model):
@@ -411,27 +464,34 @@ class SouscriptionCampagneEtape(models.Model):
             vals.setdefault('valide_le', fields.Datetime.now())
         return super().write(vals)
 
-    @api.depends('type_etape', 'campagne_id.mois')
+    @api.depends('type_etape', 'code', 'campagne_id.mois')
     def _compute_nb_reste_a_faire(self):
         """#157 : délègue à `campagne_id._reste_a_faire(code)` — recompté à
         chaque lecture (pas de relation ORM déclarée vers période/facture,
-        donc pas d'invalidation de cache automatique inter-modèles, ADR 0025)."""
+        donc pas d'invalidation de cache automatique inter-modèles, ADR 0025).
+
+        « Préparer les prélèvements » (#186) : même esprit dérivé, mais sur
+        les factures du mois plutôt que sur les souscriptions
+        (`_factures_prelevement_dues_du_mois`, pas `_reste_a_faire`)."""
         for etape in self:
-            if etape.type_etape == 'derive' and etape.campagne_id:
+            if etape.code == 'preparer_prelevements' and etape.campagne_id:
+                etape.nb_reste_a_faire = len(etape.campagne_id._factures_prelevement_dues_du_mois())
+            elif etape.type_etape == 'derive' and etape.campagne_id:
                 etape.nb_reste_a_faire = len(etape.campagne_id._reste_a_faire(etape.code))
             else:
                 etape.nb_reste_a_faire = 0
 
-    @api.depends('valide', 'type_etape', 'nb_reste_a_faire', 'lance')
+    @api.depends('valide', 'type_etape', 'code', 'nb_reste_a_faire', 'lance')
     def _compute_fait(self):
         for etape in self:
             if etape.type_etape == 'porte':
                 etape.fait = etape.valide
-            elif etape.type_etape == 'derive':
+            elif etape.type_etape == 'derive' or etape.code in self._CODES_ACTION_DERIVEE:
                 etape.fait = etape.nb_reste_a_faire == 0
             else:
-                # 'action' : pas de backlog dérivable (sync F15 tire tout,
-                # ADR 0009 §2) — « faite » une fois lancée pour la campagne.
+                # 'action' restante (sync F15) : pas de backlog dérivable
+                # (tire tout, ADR 0009 §2) — « faite » une fois lancée pour
+                # la campagne.
                 etape.fait = etape.lance
 
     @api.depends('code', 'valide', 'type_etape', 'campagne_id.etape_ids.fait')
@@ -475,7 +535,13 @@ class SouscriptionCampagneEtape(models.Model):
         'sync_f15': 'action_sync_f15',
         'creer_factures': 'action_creer_factures',
         'emettre_factures': 'action_emettre_factures',
+        'preparer_prelevements': 'action_preparer_prelevements',
     }
+
+    # Étapes 'action' dont le « fait » est un signal dérivé (#186) plutôt que
+    # le lancement (`lance`, cf. sync F15) — cf. _compute_fait/
+    # _compute_nb_reste_a_faire.
+    _CODES_ACTION_DERIVEE = ('preparer_prelevements',)
 
     def action_executer(self):
         self.ensure_one()

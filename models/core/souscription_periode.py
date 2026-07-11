@@ -188,6 +188,14 @@ class SouscriptionPeriode(models.Model):
     # la main par le·la facturiste tant que le pull electricore manque (#12).
     releve_ids = fields.One2many('souscription.releve', 'periode_id', string="Relevés d'index utilisés")
 
+    # Gating XML des colonnes du formulaire backend (#138) : `column_invisible`
+    # ne peut pas appeler une méthode, et l'union des familles (_familles_relevees)
+    # exige plusieurs booléens vrais simultanément — impossible avec une seule
+    # Selection. Calculés, jamais stockés (source unique : releve_colonnes()).
+    releve_show_base = fields.Boolean(compute='_compute_releve_show_familles')
+    releve_show_hphc = fields.Boolean(compute='_compute_releve_show_familles')
+    releve_show_4cadrans = fields.Boolean(compute='_compute_releve_show_familles')
+
     # Lien Période ↔ Facture : `account.move.periode_id` est l'unique source de
     # vérité (ADR 0004). `facture_id` en est dérivé — calculé/stocké, non écrit.
     move_ids = fields.One2many('account.move', 'periode_id', string='Documents liés', readonly=True)
@@ -355,8 +363,8 @@ class SouscriptionPeriode(models.Model):
         return super().write(vals)
 
     # Mapping cadran réseau → colonne d'index, source unique pour le justificatif
-    # PDF (#55) et portail (#57) — ADR 0015. Suit le calendrier de comptage
-    # (ADR 0005) ; point d'extension nommé pour Tempo/EJP (hors périmètre).
+    # PDF (#55), portail (#57) et formulaire backend (#138) — ADR 0015 (amendé
+    # #138). Point d'extension nommé pour Tempo/EJP (hors périmètre).
     _RELEVE_COLONNES = {
         'base': [{'label': 'Base', 'field': 'index_base'}],
         'hp_hc': [{'label': 'HP', 'field': 'index_hp'}, {'label': 'HC', 'field': 'index_hc'}],
@@ -368,13 +376,56 @@ class SouscriptionPeriode(models.Model):
         ],
     }
 
+    # Ordre superficiel → profond, pour l'union ordonnée quand plusieurs
+    # familles cohabitent (changement de compteur en cours de période).
+    _FAMILLES = ['base', 'hp_hc', '4_cadrans']
+
+    def _famille_non_vide(self, releve, famille):
+        """Un relevé `releve` porte-t-il au moins un index non nul de `famille` ?"""
+        return any(releve[champ['field']] for champ in self._RELEVE_COLONNES[famille])
+
+    def _familles_relevees(self):
+        """Familles de cadrans (`base`/`hp_hc`/`4_cadrans`) réellement portées
+        par les relevés de cette Période, ordonnées superficiel → profond
+        (#138). Un changement de compteur en cours de période peut faire
+        cohabiter deux familles ; chaque relevé ne remplit que les registres de
+        *son* compteur. Repli sur le `config_cadrans` déclaré si aucun relevé ne
+        porte le moindre index (saisie manuelle #12, qui doit garder des
+        colonnes où écrire)."""
+        self.ensure_one()
+        presentes = [f for f in self._FAMILLES if any(self._famille_non_vide(r, f) for r in self.releve_ids)]
+        return presentes or [self.config_cadrans or 'base']
+
     def releve_colonnes(self):
         """Colonnes d'index réseau (`label`, `field`) à afficher pour le
-        justificatif des relevés de cette Période, selon son calendrier de
-        comptage. Itérées par les rendus PDF et portail — un seul endroit où vit
-        le mapping cadran→colonne (ADR 0015)."""
+        justificatif des relevés de cette Période : l'**union** des familles de
+        cadrans réellement présentes dans `releve_ids` (#138, amende ADR 0015 —
+        ne suit plus `config_cadrans` directement). Itérées par les rendus PDF,
+        portail et formulaire backend — un seul endroit où vit le mapping
+        cadran→colonne."""
         self.ensure_one()
-        return self._RELEVE_COLONNES.get(self.config_cadrans, [])
+        return [colonne for famille in self._familles_relevees() for colonne in self._RELEVE_COLONNES[famille]]
+
+    @api.depends(
+        'config_cadrans',
+        'releve_ids.index_base',
+        'releve_ids.index_hp',
+        'releve_ids.index_hc',
+        'releve_ids.index_hph',
+        'releve_ids.index_hpb',
+        'releve_ids.index_hch',
+        'releve_ids.index_hcb',
+    )
+    def _compute_releve_show_familles(self):
+        """Booléens calculés pour le gating XML du formulaire backend (#138) :
+        `column_invisible` ne peut pas appeler une méthode, et l'union peut
+        rendre **plusieurs** familles vraies simultanément — impossible à
+        représenter par une Selection unique."""
+        for periode in self:
+            familles = periode._familles_relevees()
+            periode.releve_show_base = 'base' in familles
+            periode.releve_show_hphc = 'hp_hc' in familles
+            periode.releve_show_4cadrans = '4_cadrans' in familles
 
     @api.depends('date_debut', 'date_fin')
     def _compute_jours(self):

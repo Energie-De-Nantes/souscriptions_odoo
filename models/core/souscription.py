@@ -523,12 +523,6 @@ class Souscription(models.Model):
         for sous in self:
             sous.facture_ids = sous.periode_ids.mapped('facture_id')
 
-    # Cadrans facturés par type de tarif : (code grille, libellé document).
-    _CADRANS_DOCUMENTS = {
-        'base': [('base', 'Base')],
-        'hphc': [('hp', 'Heures pleines'), ('hc', 'Heures creuses')],
-    }
-
     def _provisions_cadrans(self):
         """Provision mensuelle par cadran facturé ('base'/'hp'/'hc') — source
         unique (#73). HP/HC explicites (`provision_hp_kwh`/`provision_hc_kwh`)
@@ -551,21 +545,28 @@ class Souscription(models.Model):
     def _prix_documents(self, a_date=None):
         """Prix engagés à projeter sur les *Conditions particulières* (ADR 0016).
 
-        Résout les tarifs depuis la *Grille de prix* en vigueur à ``a_date``
-        (défaut : ``date_debut``) : abonnement de la puissance souscrite et
-        énergie des cadrans facturés. Rendus **TTC pour un particulier** (la TVA
-        est portée par le *Produit de facturation*), **HT pour une société** —
-        choix piloté par ``partner_id.is_company``. Pour un contrat lissé, calcule
-        la mensualité estimée. Le rapport ne fait que projeter ce dict, il ne
-        recalcule aucun prix (module profond, interface étroite).
+        Résout les tarifs via ``grille.composants()`` — l'unique règle
+        d'assemblage (ADR 0029) — sur la *Grille de prix* en vigueur à
+        ``a_date`` (défaut : ``date_debut``, la grille **engagée** ; la facture
+        prixe, elle, avec la grille historique de chaque Période — les valeurs
+        divergent dans le temps, la règle jamais). Rendus **TTC pour un
+        particulier** (la TVA est portée par le *Produit de facturation*),
+        **HT pour une société** — choix piloté par ``partner_id.is_company``.
+        Pour un contrat lissé, calcule la mensualité estimée. Le rapport ne
+        fait que projeter ce dict, il ne recalcule aucun prix (module profond,
+        interface étroite).
         """
         self.ensure_one()
-        produit = self.env['souscription.produit']
         a_date = a_date or self.date_debut or fields.Date.today()
         grille = self.env['grille.prix'].get_grille_active(a_date, regime=self.regime_prix)
         is_company = bool(self.partner_id.is_company)
-        is_sol = self.tarif_solidaire
-        prix_grille = grille.get_prix_dict()
+
+        composants = grille.composants(
+            self.type_tarif,
+            self.puissance_souscrite,
+            coeff_pro=self.coeff_pro,
+            tarif_solidaire=self.tarif_solidaire,
+        )
 
         def affiche(product, montant_ht):
             """HT tel quel pour une société ; TTC via la TVA du produit sinon."""
@@ -580,14 +581,9 @@ class Souscription(models.Model):
             )
             return taxes['total_included']
 
-        # Majoration PRO appliquée à toute la fourniture — abonnement ET énergie
-        # (#67, ADR 0018) ; même facteur que la facture (souscription_periode.py),
-        # jamais à la refacturation. L'abonnement l'absorbe via get_prix_abonnement.
-        majoration_pro = 1 + self.coeff_pro / 100.0
-
         # Abonnement (€/an et €/mois) pour la puissance souscrite.
-        abo_product = produit.produit_abonnement(is_sol)
-        abo_jour_ht = grille.get_prix_abonnement(self.puissance_souscrite, self.coeff_pro, is_sol)
+        abo_product = composants['abonnement']['produit']
+        abo_jour_ht = composants['abonnement']['prix_jour']
         abo_an = affiche(abo_product, abo_jour_ht * 365.0)
         abo_mois = affiche(abo_product, abo_jour_ht * 365.0 / 12.0)
 
@@ -597,11 +593,10 @@ class Souscription(models.Model):
 
         energies = []
         mensualite = abo_mois
-        for code, libelle in self._CADRANS_DOCUMENTS[self.type_tarif]:
-            energie_product = produit.produit_energie(code, is_sol)
-            prix_kwh = affiche(energie_product, prix_grille.get(energie_product.id, 0.0) * majoration_pro)
-            energies.append({'code': code, 'label': libelle, 'prix_kwh': prix_kwh})
-            mensualite += provisions.get(code, 0.0) * prix_kwh
+        for composant in composants['energies']:
+            prix_kwh = affiche(composant['produit'], composant['prix_kwh'])
+            energies.append({'code': composant['cadran'], 'label': composant['libelle'], 'prix_kwh': prix_kwh})
+            mensualite += provisions.get(composant['cadran'], 0.0) * prix_kwh
 
         return {
             'grille': grille,

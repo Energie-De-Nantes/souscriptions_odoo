@@ -75,43 +75,52 @@ class TestGrillePrix(TransactionCase):
             self.grille,
         )
 
-    def test_get_prix_dict(self):
-        prix_dict = self.grille.get_prix_dict()
-        produit_base = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
+    # === composants() — l'unique règle d'assemblage des prix (ADR 0029) ===
+
+    def _prix_energie(self, composants, cadran):
+        return next(c['prix_kwh'] for c in composants['energies'] if c['cadran'] == cadran)
+
+    def test_composants_prix_energie_par_cadran(self):
+        """Chaque cadran facturé sort avec son produit résolu et son prix grille."""
+        base = self.grille.composants('base', 6.0)
+        self.assertEqual(self._prix_energie(base, 'base'), 0.2276)
+
+        hphc = self.grille.composants('hphc', 6.0)
+        self.assertEqual([c['cadran'] for c in hphc['energies']], ['hp', 'hc'])
+        self.assertEqual(self._prix_energie(hphc, 'hp'), 0.2516)
+        self.assertEqual(self._prix_energie(hphc, 'hc'), 0.2032)
         produit_hp = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hp')
-        produit_hc = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hc')
-        self.assertEqual(prix_dict[produit_base.id], 0.2276)
-        self.assertEqual(prix_dict[produit_hp.id], 0.2516)
-        self.assertEqual(prix_dict[produit_hc.id], 0.2032)
+        self.assertEqual(hphc['energies'][0]['produit'], produit_hp)
 
     def test_abonnement_affine_a_3kva(self):
         """À 3 kVA, le tarif vaut exactement la base (terme coef nul)."""
-        prix_journalier = self.grille.get_prix_abonnement(puissance_kva=3.0, coeff_pro=0.0, is_solidaire=False)
-        self.assertAlmostEqual(prix_journalier, ABO_BASE_3KVA_STD / 365.0, places=4)
+        composants = self.grille.composants('base', 3.0)
+        self.assertAlmostEqual(composants['abonnement']['prix_jour'], ABO_BASE_3KVA_STD / 365.0, places=4)
 
     def test_abonnement_affine_puissance_non_3kva(self):
         """Au-dessus de 3 kVA : base + coef * (P - 3), proratisé au jour."""
-        prix_journalier = self.grille.get_prix_abonnement(puissance_kva=9.0, coeff_pro=0.0, is_solidaire=False)
+        composants = self.grille.composants('base', 9.0)
         attendu_annuel = ABO_BASE_3KVA_STD + ABO_COEF_KVA_STD * (9.0 - 3.0)
-        self.assertAlmostEqual(prix_journalier, attendu_annuel / 365.0, places=4)
+        self.assertAlmostEqual(composants['abonnement']['prix_jour'], attendu_annuel / 365.0, places=4)
 
     def test_abonnement_affine_lineaire_dans_la_puissance(self):
         """L'écart entre deux puissances vaut coef * Δkva / 365 (forme affine)."""
-        prix_6 = self.grille.get_prix_abonnement(6.0)
-        prix_9 = self.grille.get_prix_abonnement(9.0)
+        prix_6 = self.grille.composants('base', 6.0)['abonnement']['prix_jour']
+        prix_9 = self.grille.composants('base', 9.0)['abonnement']['prix_jour']
         self.assertAlmostEqual(prix_9 - prix_6, ABO_COEF_KVA_STD * 3.0 / 365.0, places=6)
 
-    def test_abonnement_affine_pro(self):
-        """La majoration PRO s'applique au tarif affine journalier."""
-        prix_journalier = self.grille.get_prix_abonnement(puissance_kva=9.0, coeff_pro=15.0, is_solidaire=False)
+    def test_composants_pro_majore_abonnement_et_energie(self):
+        """La majoration PRO s'applique à toute la fourniture — un seul site (ADR 0029)."""
+        composants = self.grille.composants('base', 9.0, coeff_pro=15.0)
         attendu_annuel = ABO_BASE_3KVA_STD + ABO_COEF_KVA_STD * (9.0 - 3.0)
-        self.assertAlmostEqual(prix_journalier, (attendu_annuel / 365.0) * 1.15, places=4)
+        self.assertAlmostEqual(composants['abonnement']['prix_jour'], (attendu_annuel / 365.0) * 1.15, places=4)
+        self.assertAlmostEqual(self._prix_energie(composants, 'base'), 0.2276 * 1.15, places=6)
 
     def test_abonnement_affine_solidaire(self):
         """Le solidaire lit sa propre ligne (base + coef) via le produit du catalogue."""
-        prix_journalier = self.grille.get_prix_abonnement(puissance_kva=12.0, coeff_pro=0.0, is_solidaire=True)
+        composants = self.grille.composants('base', 12.0, tarif_solidaire=True)
         attendu_annuel = ABO_BASE_3KVA_SOL + ABO_COEF_KVA_SOL * (12.0 - 3.0)
-        self.assertAlmostEqual(prix_journalier, attendu_annuel / 365.0, places=4)
+        self.assertAlmostEqual(composants['abonnement']['prix_jour'], attendu_annuel / 365.0, places=4)
 
     def test_abonnement_sans_ligne(self):
         """Sans ligne d'abonnement pour l'univers, l'erreur est claire."""
@@ -119,7 +128,14 @@ class TestGrillePrix(TransactionCase):
             lambda l: l.type_produit == 'abonnement' and 'solidaire' not in l.product_id.name.lower()
         ).unlink()
         with self.assertRaises(UserError):
-            self.grille.get_prix_abonnement(6.0, is_solidaire=False)
+            self.grille.composants('base', 6.0)
+
+    def test_composants_prix_energie_manquant_leve(self):
+        """Grille incomplète → échec bruyant, jamais un prix nul par défaut (ADR 0029)."""
+        produit_hc = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hc')
+        self.grille.ligne_ids.filtered(lambda l: l.product_id == produit_hc).unlink()
+        with self.assertRaises(UserError):
+            self.grille.composants('hphc', 6.0)
 
     def test_chevauchement_grilles_interdit(self):
         """Deux grilles aux périodes qui se chevauchent sont refusées."""

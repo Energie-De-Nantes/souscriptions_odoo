@@ -61,9 +61,15 @@ class TestPeriodeOuverture(SouscriptionsTestCase):
         self.assertEqual(periode.jours, 30)
 
         grille = self.env['grille.prix'].get_grille_active(periode.date_fin, regime=periode.regime_prix_periode)
-        prix = grille.get_prix_dict()
-        produit_base = self.env['souscription.produit'].produit_energie('base', periode.tarif_solidaire_periode)
-        self.assertIn(produit_base.id, prix, 'Le prix appliqué se résout via la grille, comme toute Période')
+        composants = grille.composants(
+            periode.type_tarif_periode,
+            periode.puissance_souscrite_periode,
+            tarif_solidaire=periode.tarif_solidaire_periode,
+        )
+        self.assertTrue(
+            any(c['cadran'] == 'base' for c in composants['energies']),
+            'Le prix appliqué se résout via la grille, comme toute Période',
+        )
 
     def test_porte_provision_hp_hc(self):
         """AC2 (HP/HC) : provision facturée par cadran, HP et HC."""

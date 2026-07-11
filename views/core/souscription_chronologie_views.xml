@@ -57,7 +57,7 @@
                 <filter string="Événements" name="filter_evenement" domain="[('type_ligne', '=', 'evenement')]"/>
                 <filter string="Relevés" name="filter_releve" domain="[('type_ligne', '=', 'releve')]"/>
                 <filter string="Périodes d'énergie" name="filter_periode_energie" domain="[('type_ligne', '=', 'periode_energie')]"/>
-                <group expand="1" string="Regrouper par">
+                <group>
                     <filter string="Type de ligne" name="group_type_ligne" context="{'group_by': 'type_ligne'}"/>
                 </group>
             </search>

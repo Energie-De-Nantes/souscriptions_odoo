@@ -737,9 +737,10 @@ class RaccordementDemande(models.Model):
         Noms de champs confrontés au `sdd.mandate` réel de la prod
         Enterprise (via MCP, 2026-07-11) : `payment_journal_id`,
         `sdd_scheme`, `state`, `partner_bank_id`, `start_date` confirmés ;
-        `company_id` non requis. Attention : `name` (RUM) est requis et la
-        prod ne porte aucune séquence sdd — sans référence saisie, le
-        `create()` lève (bruyant, jamais un mandat silencieusement faux).
+        `company_id` non requis. Omettre `name` (RUM) est le bon geste :
+        l'action serveur prod créait ses ~1000 mandats sans le passer, le
+        défaut de l'outillage le génère (un nom erroné lèverait au
+        `create()`, jamais un mandat silencieusement faux).
         """
         self.ensure_one()
         vals = {

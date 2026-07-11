@@ -23,9 +23,19 @@ tout le paramétrage conteneur vit dans `docker-compose.yml`.
 
 ```bash
 ../scripts/dev.sh                  # mode demo (défaut) : souscriptions_demo + données de démo
-../scripts/dev.sh --data=prod      # souscriptions_prodlocal, module installé sans démo
+../scripts/dev.sh --data=prod      # souscriptions_prodlocal, module installé sans démo,
+                                    # peuplée de vraies souscriptions via ../souscriptions_migration
+                                    # (dernier snapshot déjà présent, hors-ligne, sans secret)
+../scripts/dev.sh --data=prod --fresh  # idem + extract prod frais au préalable (requiert
+                                    # PROD__URL/PROD__DB/PROD__LOGIN/PROD__PASSWORD en env)
 ../scripts/dev.sh --reset          # repart d'une base vierge (mode courant uniquement)
 ```
+
+Le mode `prod` pilote le dépôt **voisin** `souscriptions_migration` (jetable, ADR
+0003/0023 — jamais fusionné ici) en shell-out : `transform` puis `load --cible
+vierge` (base fraîche : rien à `bind`). Garde-fous fail-closed vérifiés avant/après
+chargement : crons coupés, aucun mail sortant (`ir.mail_server` vide), aucun
+règlement SEPA groupé — une base non conforme arrête `dev.sh`.
 
 Le service `odoo` unique tourne sur l'image **construite** (`docker/Dockerfile`,
 `electricore-client` inclus), montage rw, hot reload (`--dev=reload,xml,qweb`),

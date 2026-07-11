@@ -500,18 +500,9 @@ class SouscriptionPeriode(models.Model):
     # La Période compose ses lignes de facture à partir de son snapshot figé
     # (puissance, tarif, coeff PRO, solidaire, quantités) et de la grille passée
     # en paramètre. Aucun repli sur l'état live de la souscription : le snapshot
-    # fait autorité (ADR 0006). Les prix restent l'affaire de la grille (ADR 0002,
-    # « référencer, pas recopier »).
-
-    # Cadrans facturés par type de tarif (snapshot `type_tarif_periode`) : pilote
-    # la boucle de composition des lignes d'énergie (#74, prefactoring en vue de
-    # l'abonnement pricé sur la puissance moyenne, #78). Même partition que
-    # `souscription._CADRANS_DOCUMENTS` (Conditions particulières) : Base = un
-    # seul cadran ; HP/HC = toujours les deux, même à 0.
-    _CADRANS_FACTURES = {
-        'base': ['base'],
-        'hphc': ['hp', 'hc'],
-    }
+    # fait autorité (ADR 0006). Les prix restent l'affaire de la grille — la
+    # règle d'assemblage vit dans grille.composants(), la Période n'en est
+    # qu'une projection (ADR 0002 « référencer, pas recopier », ADR 0029).
 
     def _quantite_facturee(self, cadran):
         """Quantité d'énergie à facturer pour un cadran facturé ('base'/'hp'/'hc').
@@ -537,36 +528,34 @@ class SouscriptionPeriode(models.Model):
     def _composer_lignes(self, grille):
         """Compose les lignes de facture (``[(0, 0, vals)]``) de cette période.
 
-        Lit le snapshot figé de la période et la ``grille`` passée pour les prix.
-        Ne crée aucun ``account.move`` : la liste renvoyée est la surface de test
-        des règles de facturation.
+        Lit le snapshot figé de la période, résout les prix via
+        ``grille.composants()`` — l'unique règle d'assemblage (ADR 0029) — et
+        ne garde que la projection : quantités du snapshot, sections, notes.
+        Ne crée aucun ``account.move``.
         """
         self.ensure_one()
-        prix_dict = grille.get_prix_dict()
 
         # Snapshot figé typé — ADR 0006 (pas de repli sur la souscription live)
         # et #14 (valeurs typées : aucun parsing à la facturation).
         puissance_kva = self.puissance_souscrite_periode
-        tarif_solidaire = self.tarif_solidaire_periode
-        type_tarif = self.type_tarif_periode
+        coeff_pro_historise = self.coeff_pro_periode
 
         if not puissance_kva:
             raise UserError(f'Aucune puissance définie pour la période {self.mois_annee}')
+
+        composants = grille.composants(
+            self.type_tarif_periode,
+            puissance_kva,
+            coeff_pro=coeff_pro_historise,
+            tarif_solidaire=self.tarif_solidaire_periode,
+        )
 
         lines_vals = []
 
         # Section Abonnement
         lines_vals.append((0, 0, {'display_type': 'line_section', 'name': 'Abonnement'}))
 
-        coeff_pro_historise = self.coeff_pro_periode
-        # Majoration PRO appliquée à toute la fourniture — abonnement ET énergie
-        # (#67, ADR 0018) ; jamais à la refacturation (pur transit Enedis).
-        majoration_pro = 1 + coeff_pro_historise / 100.0
-        produit_abo = self.env['souscription.produit'].produit_abonnement(tarif_solidaire)
-        prix_abo_journalier = grille.get_prix_abonnement(
-            puissance_kva, coeff_pro=coeff_pro_historise, is_solidaire=tarif_solidaire
-        )
-
+        produit_abo = composants['abonnement']['produit']
         type_client = 'PRO' if coeff_pro_historise > 0 else 'PART'
         puissance_desc = f'{puissance_kva:g} kVA'  # :g supprime les .0 inutiles
 
@@ -578,7 +567,7 @@ class SouscriptionPeriode(models.Model):
                     'product_id': produit_abo.id,
                     'name': f'{produit_abo.name} {puissance_desc} {type_client}',
                     'quantity': self.jours,
-                    'price_unit': prix_abo_journalier,
+                    'price_unit': composants['abonnement']['prix_jour'],
                 },
             )
         )
@@ -590,23 +579,16 @@ class SouscriptionPeriode(models.Model):
         # Section Énergie
         lines_vals.append((0, 0, {'display_type': 'line_section', 'name': 'Énergie'}))
 
-        # type_tarif historisé typé (#14) : clé de sélection, comparaison directe.
-        # Un seul bloc générique, piloté par les cadrans facturés du type de tarif
-        # (#74) — Base : un cadran ; HP/HC : toujours les deux, même à 0.
-        for cadran in self._CADRANS_FACTURES[type_tarif]:
-            produit_energie = self.env['souscription.produit'].produit_energie(cadran, tarif_solidaire)
-            prix_cadran = prix_dict.get(produit_energie.id)
-            if prix_cadran is None:
-                raise UserError(f'Prix non trouvé dans la grille pour le produit : {produit_energie.name}')
+        for composant in composants['energies']:
             lines_vals.append(
                 (
                     0,
                     0,
                     {
-                        'product_id': produit_energie.id,
-                        'name': produit_energie.name,
-                        'quantity': self._quantite_facturee(cadran),
-                        'price_unit': prix_cadran * majoration_pro,
+                        'product_id': composant['produit'].id,
+                        'name': composant['produit'].name,
+                        'quantity': self._quantite_facturee(composant['cadran']),
+                        'price_unit': composant['prix_kwh'],
                     },
                 )
             )

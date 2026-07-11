@@ -1,5 +1,9 @@
 # Tarif d'abonnement affine (base 3 kVA + coefficient par kVA) au lieu d'un prix par palier
 
+*Note (juillet 2026) : amendé par [ADR-0029](0029-grille-moteur-prix-unique-composants-projections.md) —
+la majoration PRO quitte la formule ci-dessous (elle n'a plus qu'un site, `grille.composants()`) ;
+la forme affine et ses deux paramètres restent inchangés.*
+
 La *Grille de prix* tarifait l'abonnement par un **prix indépendant par palier de puissance**
 (9 valeurs/univers, invariant verrouillé par `test_prix_independant_par_puissance`). On le remplace
 par un **tarif affine** : `prix_base_3kva + coef_kva × (puissance − 3)`, soit **2 paramètres** par

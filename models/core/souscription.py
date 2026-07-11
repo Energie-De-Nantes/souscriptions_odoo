@@ -130,7 +130,6 @@ class Souscription(models.Model):
     mode_paiement = fields.Selection(
         [
             ('prelevement', 'Prélèvement'),
-            ('cheque_energie', 'Chèque énergie'),
             ('monnaie_locale', 'Monnaie locale'),
             ('especes', 'Espèces'),
             ('virement', 'Virement'),

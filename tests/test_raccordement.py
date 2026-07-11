@@ -53,6 +53,17 @@ class TestRaccordementBasic(SouscriptionsTestMixin, TransactionCase):
         self.assertIn('raccordement.demande', self.env)
         self.assertIn('raccordement.stage', self.env)
 
+    def test_mode_paiement_selection_verrouillee(self):
+        """Selection jumelle de celle de la Souscription (#184, CONTEXT.md
+        « Mode de paiement ») : le chèque énergie est un tiers-payeur, pas un
+        mode de règlement, il ne doit plus apparaître."""
+        valeurs = [key for key, _ in self.env['raccordement.demande']._fields['mode_paiement'].selection]
+        self.assertEqual(
+            valeurs,
+            ['prelevement', 'monnaie_locale', 'especes', 'virement', 'cheque'],
+        )
+        self.assertNotIn('cheque_energie', valeurs)
+
     def test_sequence_generation(self):
         """Test que la séquence de référence fonctionne"""
         demande = self.env['raccordement.demande'].create(

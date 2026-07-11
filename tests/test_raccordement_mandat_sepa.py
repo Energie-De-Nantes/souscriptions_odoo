@@ -89,7 +89,7 @@ class TestMandatSepaValsPur(SouscriptionsTestMixin, TransactionCase):
         demande = self.create_demande()
         vals = demande._mandat_sepa_vals(self.partner, self.partner_bank, self.journal)
         self.assertEqual(vals['state'], 'active')
-        self.assertEqual(vals['scheme'], 'CORE')
+        self.assertEqual(vals['sdd_scheme'], 'CORE')
 
 
 @tagged('souscriptions', 'souscriptions_raccordement', 'post_install', '-at_install')

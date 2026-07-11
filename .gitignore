@@ -64,3 +64,6 @@ odoo-server.log
 
 # Rendered diagram previews (keep the .excalidraw source, not the heavy PNG)
 docs/diagrams/*.png
+
+# Snapshot éphémère du skill story-map (jamais commité)
+FEATURES.report.html

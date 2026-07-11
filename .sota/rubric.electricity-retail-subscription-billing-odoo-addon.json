@@ -1,0 +1,25 @@
+{
+  "domain": "electricity-retail-subscription-billing-odoo-addon",
+  "version": 1,
+  "note": "In-scope axis for an Odoo 19 addon owning contract/subscription mgmt, price grids, legal invoicing, customer portal, and connection (raccordement) onboarding. Usage metering / Enedis flux / TURPE are delegated to electricore and deliberately EXCLUDED from this rubric.",
+  "capabilities": [
+    { "id": "recurring-invoice-generation", "tier": "table-stakes", "test": "generate legal invoices from a contract on a recurring schedule" },
+    { "id": "time-varying-historical-pricing", "tier": "table-stakes", "test": "bill/rebill a past period at the price that was in effect during that period" },
+    { "id": "mid-cycle-plan-change", "tier": "table-stakes", "test": "change price/plan/tariff during the contract lifecycle" },
+    { "id": "proration", "tier": "table-stakes", "test": "prorate partial billing periods (days) on entry/exit/change" },
+    { "id": "cancellation-termination", "tier": "table-stakes", "test": "cleanly terminate/cancel a contract with final billing" },
+    { "id": "dunning-collections", "tier": "table-stakes", "test": "automated reminders / payment retries / collections on unpaid invoices" },
+    { "id": "self-service-portal", "tier": "table-stakes", "test": "customer portal to view contracts, invoices, consumption history" },
+    { "id": "online-payment-portal", "tier": "table-stakes", "test": "customer pays an invoice / manages payment method online in the portal" },
+    { "id": "tax-compliant-invoicing", "tier": "table-stakes", "test": "correct VAT + legally compliant invoice; for FR: Factur-X / e-reporting" },
+    { "id": "credit-notes-refunds", "tier": "table-stakes", "test": "issue credit notes / refunds / negative adjustments" },
+    { "id": "invoice-pdf-templating", "tier": "table-stakes", "test": "branded invoice PDF generation" },
+    { "id": "leveled-smoothed-billing", "tier": "edge", "test": "budget/levelized (lissage) billing with retroactive true-up/regularization" },
+    { "id": "onboarding-provisioning-workflow", "tier": "edge", "test": "onboarding/provisioning pipeline (connection request) driving contract creation" },
+    { "id": "gdpr-consent-audit-trail", "tier": "edge", "test": "append-only consent journal with timestamp + text version + withdrawal" },
+    { "id": "revenue-analytics-mrr", "tier": "edge", "test": "revenue/MRR/margin analytics dashboards" },
+    { "id": "webhooks-events-api", "tier": "edge", "test": "emit outbound events/webhooks or an integration API for downstream systems" },
+    { "id": "coupons-discounts", "tier": "edge", "test": "general coupon/discount/promotion engine" },
+    { "id": "test-suite-ci", "tier": "edge", "test": "automated test suite + CI" }
+  ]
+}

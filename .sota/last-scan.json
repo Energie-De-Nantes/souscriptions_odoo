@@ -1,0 +1,38 @@
+{
+  "date": "2026-07-03",
+  "mode": "exhaustive",
+  "domains": ["electricity-retail-subscription-billing-odoo-addon"],
+  "rubric_version": 1,
+  "field": [
+    { "repo": "OCA/contract", "type": "canonical", "stars": 215, "pushed": "2026-07-02" },
+    { "repo": "getlago/lago", "type": "technically advanced", "stars": 10168, "pushed": "2026-06-29" },
+    { "repo": "killbill/killbill", "type": "canonical", "stars": 5612, "pushed": "2026-07-01" },
+    { "repo": "odoo/odoo", "type": "canonical", "stars": 52799, "pushed": "2026-07-03" },
+    { "repo": "openmeterio/openmeter", "type": "technically advanced", "stars": 2090, "pushed": "2026-07-03" },
+    { "repo": "FOSSBilling/FOSSBilling", "type": "popular", "stars": 1623, "pushed": "2026-07-03" },
+    { "repo": "navariltd/utility-billing", "type": "niche-relevant", "stars": 56, "pushed": "2026-07-03" }
+  ],
+  "matrix": [
+    { "id": "recurring-invoice-generation", "us": "met", "tier": "table-stakes" },
+    { "id": "time-varying-historical-pricing", "us": "met", "tier": "table-stakes" },
+    { "id": "mid-cycle-plan-change", "us": "met", "tier": "table-stakes" },
+    { "id": "proration", "us": "partial", "tier": "table-stakes" },
+    { "id": "cancellation-termination", "us": "missing", "tier": "table-stakes" },
+    { "id": "dunning-collections", "us": "missing", "tier": "table-stakes" },
+    { "id": "self-service-portal", "us": "met", "tier": "table-stakes" },
+    { "id": "online-payment-portal", "us": "missing", "tier": "table-stakes" },
+    { "id": "tax-compliant-invoicing", "us": "partial", "tier": "table-stakes" },
+    { "id": "credit-notes-refunds", "us": "partial", "tier": "table-stakes" },
+    { "id": "invoice-pdf-templating", "us": "met", "tier": "table-stakes" },
+    { "id": "leveled-smoothed-billing", "us": "met", "tier": "edge" },
+    { "id": "onboarding-provisioning-workflow", "us": "met", "tier": "edge" },
+    { "id": "gdpr-consent-audit-trail", "us": "met", "tier": "edge" },
+    { "id": "revenue-analytics-mrr", "us": "partial", "tier": "edge" },
+    { "id": "webhooks-events-api", "us": "missing", "tier": "edge" },
+    { "id": "coupons-discounts", "us": "partial", "tier": "edge" },
+    { "id": "test-suite-ci", "us": "met", "tier": "edge" }
+  ],
+  "coverage": { "met": 5, "total": 11, "pct": 45 },
+  "tier": "LAGGING",
+  "gaps_total": 6
+}

@@ -107,7 +107,7 @@
             <field name="provision_mensuelle_kwh">150</field>
             <field name="lisse">True</field>
             <field name="tarif_solidaire">True</field>
-            <field name="mode_paiement">cheque_energie</field>
+            <field name="mode_paiement">virement</field>
             <field name="ref_compteur">85111222</field>
         </record>
 

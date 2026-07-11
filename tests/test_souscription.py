@@ -151,3 +151,14 @@ class TestSouscription(TransactionCase):
         """L'adresse du PDL est exposée au formulaire Souscription (#106)."""
         view = self.env['souscription.souscription'].get_view(view_type='form')
         self.assertIn('adresse_pdl', view['arch'])
+
+    def test_mode_paiement_selection_verrouillee(self):
+        """Le chèque énergie est un tiers-payeur, pas un mode de règlement
+        (#184, CONTEXT.md « Mode de paiement ») : il ne doit plus apparaître
+        parmi les valeurs possibles."""
+        valeurs = [key for key, _ in self.env['souscription.souscription']._fields['mode_paiement'].selection]
+        self.assertEqual(
+            valeurs,
+            ['prelevement', 'monnaie_locale', 'especes', 'virement', 'cheque'],
+        )
+        self.assertNotIn('cheque_energie', valeurs)

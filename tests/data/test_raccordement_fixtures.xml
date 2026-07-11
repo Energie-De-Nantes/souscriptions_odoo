@@ -8,14 +8,14 @@
             <field name="color">1</field>
             <field name="description">Étape de test pour nouvelles demandes</field>
         </record>
-        
+
         <record id="test_stage_validated" model="raccordement.stage">
             <field name="name">Test Validée</field>
             <field name="sequence">20</field>
             <field name="color">3</field>
             <field name="description">Étape de test pour demandes validées</field>
         </record>
-        
+
         <record id="test_stage_final" model="raccordement.stage">
             <field name="name">Test Souscrite</field>
             <field name="sequence">99</field>
@@ -24,7 +24,7 @@
             <field name="is_close">True</field>
             <field name="description">Étape finale de test</field>
         </record>
-        
+
         <!-- Demandes de raccordement de test -->
         <record id="test_demande_base" model="raccordement.demande">
             <field name="name">TEST-RACC-001</field>
@@ -48,7 +48,7 @@
             <field name="stage_id" ref="test_stage_new"/>
             <field name="notes">Demande de test pour tarif base</field>
         </record>
-        
+
         <record id="test_demande_hphc" model="raccordement.demande">
             <field name="name">TEST-RACC-002</field>
             <field name="pdl">PDL_TEST_RACC_002</field>
@@ -75,7 +75,7 @@
             <field name="stage_id" ref="test_stage_validated"/>
             <field name="notes">Demande de test pour tarif HP/HC</field>
         </record>
-        
+
         <record id="test_demande_solidaire" model="raccordement.demande">
             <field name="name">TEST-RACC-003</field>
             <field name="pdl">PDL_TEST_RACC_003</field>
@@ -91,11 +91,11 @@
             <field name="contact_street">789 place du Test</field>
             <field name="contact_zip">54321</field>
             <field name="contact_city">TestVille Solidaire</field>
-            <field name="mode_paiement">cheque_energie</field>
+            <field name="mode_paiement">virement</field>
             <field name="stage_id" ref="test_stage_new"/>
             <field name="notes">Demande de test pour tarif solidaire</field>
         </record>
-        
+
         <record id="test_demande_invalid_iban" model="raccordement.demande">
             <field name="name">TEST-RACC-004</field>
             <field name="pdl">PDL_TEST_RACC_004</field>
@@ -118,6 +118,6 @@
             <field name="notes">Demande de test avec IBAN invalide</field>
             <field name="kanban_state">blocked</field>
         </record>
-        
+
     </data>
 </odoo>

@@ -186,6 +186,16 @@ avant règlement, le reste dû suit le mode de paiement normal) ; les **étiquet
 comme source de vérité du mode (non exclusives, non historisées, rattachées à la personne et non
 au contrat).
 
+**Mandat de prélèvement (SEPA)** :
+L'autorisation signée par le·la *souscripteur·rice* de débiter son compte, identifiée par un
+**RUM** unique, adossée à un IBAN et à l'ICS du fournisseur. Préalable obligatoire à tout
+*Mode de paiement* « prélèvement ». Le cycle de vie (actif → clos/révoqué, séquences, fichier
+SEPA) est **délégué à l'outillage comptable**, non réimplémenté ; le module ne fait que le
+**créer, actif d'emblée**, à l'acceptation d'un *raccordement* en prélèvement — l'acceptation
+est la porte humaine (IBAN vérifié, mandat signé exigé), pas de re-validation ensuite.
+_Éviter_ : un second circuit de validation du mandat (l'acceptation de la demande est la porte) ;
+prélever sans mandat actif ; re-saisir à la main ce que la demande de raccordement porte déjà.
+
 **Configuration Enedis** :
 La configuration *réseau* d'un PDL — FTA, calendrier distributeur, puissance réseau, cadrans
 réseau — propriété d'electricore (source : C15). Détermine le coût d'acheminement (TURPE).

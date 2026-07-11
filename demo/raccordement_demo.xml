@@ -157,7 +157,7 @@
             <field name="contact_street">5 rue des Écoles</field>
             <field name="contact_zip">59000</field>
             <field name="contact_city">Lille</field>
-            <field name="mode_paiement">cheque_energie</field>
+            <field name="mode_paiement">virement</field>
             <field name="situation_entree">mes</field>
             <field name="id_affaire">DEMO-AFFAIRE-MENSU</field>
             <field name="id_affaire_date_saisie" eval="(DateTime.today() - relativedelta(days=20)).strftime('%Y-%m-%d')"/>

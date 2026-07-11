@@ -23,11 +23,12 @@
                             icon="fa-external-link"/>
                 </header>
                 <sheet>
+                    <widget name="web_ribbon" title="Archivée" bg_color="text-bg-danger" invisible="active"/>
+                    <field name="active" invisible="1"/>
                     <group>
                         <field name="name" />
                         <field name="partner_id" />
                         <field name="cotitulaires" widget="many2many_tags" options="{'no_create': True}"/>
-                        <field name="active" />
                         <field name="etat" widget="badge"
                                decoration-warning="etat == 'en_instance'"
                                decoration-success="etat == 'en_service'"
@@ -148,7 +149,6 @@
                    decoration-danger="etat == 'resiliee'"/>
             <field name="id_affaire" optional="hide"/>
             <field name="ref_situation_contractuelle" optional="hide"/>
-            <field name="active"/>
           </list>
         </field>
     </record>

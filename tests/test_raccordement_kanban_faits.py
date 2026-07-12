@@ -7,8 +7,9 @@ interdit sur les étapes factuelles, pas de recul, non-régression de la
 création à « Abonnement Validé »."""
 
 from datetime import date, timedelta
+from unittest.mock import patch
 
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
 
 from .common import SouscriptionsTestMixin
@@ -266,6 +267,32 @@ class TestKanbanPiloteParLesFaits(SouscriptionsTestMixin, TransactionCase):
         demande.stage_id = self.stage_abonnement_valide
         self.assertFalse(demande.souscription_id)
         self.assertFalse(demande.partner_id)
+
+    # --- #218 : plus de try/except nu, erreur d'origine propagée, pas de
+    # semi-naissance ---
+
+    def test_echec_a_la_naissance_propage_lerreur_dorigine_et_ne_deplace_pas_la_carte(self):
+        """Le `try/except Exception` nu qui enveloppait l'acceptation est
+        supprimé (#218) : une erreur survenant pendant la naissance (ici
+        simulée sur `naitre_depuis_demande`) remonte **typée, avec son
+        message d'origine** — pas enveloppée dans un UserError générique. La
+        transaction du write annule tout : la carte reste à l'étape de
+        départ, aucune Souscription n'est liée."""
+        demande = self.create_demande('faits_echec218@example.com', mode_paiement='virement')
+        Souscription = type(self.env['souscription.souscription'])
+
+        with (
+            patch.object(
+                Souscription, 'naitre_depuis_demande', side_effect=ValidationError("Message d'erreur d'origine")
+            ),
+            self.assertRaises(ValidationError) as cm,
+            self.cr.savepoint(),
+        ):
+            demande.stage_id = self.stage_accepte_iban_verifie
+
+        self.assertEqual(str(cm.exception), "Message d'erreur d'origine")
+        self.assertEqual(demande.stage_id, self.stage_nouveau, 'La carte ne doit pas avoir bougé')
+        self.assertFalse(demande.souscription_id)
 
     # --- Garde bloquante IBAN à l'acceptation (#101) ---
 

@@ -531,38 +531,44 @@ class RaccordementDemande(models.Model):
             template.send_mail(self.souscription_id.id, force_send=False)
 
     def _create_odoo_entries(self):
-        """Crée automatiquement les entrées Odoo (contact, banque, souscription)"""
+        """Orchestration mince de l'acceptation (#218, PRD #215 tranche 3/3) :
+        crée le contact (dédup email inchangée), la banque et le mandat SEPA
+        en prélèvement, fait naître la Souscription — tous les invariants de
+        naissance (mapping, provisions, actes...) vivent désormais sur
+        `souscription.souscription.naitre_depuis_demande` — puis lie et trace
+        au chatter.
+
+        Plus de `try/except` nu : une erreur (journal SDD absent, IBAN
+        refusé, échec de naissance...) remonte **typée, avec son message
+        d'origine** — la transaction du write qui a déclenché cette méthode
+        annule tout, la carte ne bouge pas, rien de semi-né.
+        """
         self.ensure_one()
 
-        try:
-            # 1. Créer le contact
-            partner = self._create_partner()
-            self.partner_id = partner
+        # 1. Créer le contact
+        partner = self._create_partner()
+        self.partner_id = partner
 
-            # 2. Créer le compte bancaire si nécessaire, puis le mandat SEPA
-            # (#187) : la garde IBAN (_verifier_garde_iban_acceptation,
-            # exécutée avant l'écriture qui déclenche _create_odoo_entries)
-            # garantit déjà un IBAN valide ici en mode prélèvement.
-            if self.bank_iban and self.mode_paiement == 'prelevement':
-                partner_bank = self._create_partner_bank(partner)
-                self.partner_bank_id = partner_bank
-                self._creer_mandat_sepa(partner_bank)
+        # 2. Créer le compte bancaire si nécessaire, puis le mandat SEPA
+        # (#187) : la garde IBAN (_verifier_garde_iban_acceptation,
+        # exécutée avant l'écriture qui déclenche _create_odoo_entries)
+        # garantit déjà un IBAN valide ici en mode prélèvement.
+        if self.bank_iban and self.mode_paiement == 'prelevement':
+            partner_bank = self._create_partner_bank(partner)
+            self.partner_bank_id = partner_bank
+            self._creer_mandat_sepa(partner_bank)
 
-            # 3. Créer la souscription
-            souscription = self._create_souscription(partner)
-            self.souscription_id = souscription
+        # 3. Faire naître la souscription (#218)
+        souscription = self.env['souscription.souscription'].naitre_depuis_demande(self)
+        self.souscription_id = souscription
 
-            # Message de succès
-            self.message_post(
-                body=f"""Entrées Odoo créées avec succès :
-                - Contact : {partner.name} (ID: {partner.id})
-                - Souscription : {souscription.name} (ID: {souscription.id})
-                """
-            )
-
-        except Exception as e:
-            _logger.error(f'Erreur lors de la création des entrées Odoo : {e}')
-            raise UserError(f'Erreur lors de la création des entrées : {str(e)}')
+        # Message de succès
+        self.message_post(
+            body=f"""Entrées Odoo créées avec succès :
+            - Contact : {partner.name} (ID: {partner.id})
+            - Souscription : {souscription.name} (ID: {souscription.id})
+            """
+        )
 
     def _create_partner(self):
         """Crée un contact res.partner (particulier ou société selon le champ pro)"""
@@ -669,69 +675,6 @@ class RaccordementDemande(models.Model):
         # on trace le rattachement au chatter.
         self.sepa_mandate_ref = mandat.name
         self.message_post(body=f'Mandat SEPA créé et actif (RUM : {mandat.name}).')
-
-    def _create_souscription(self, partner):
-        """Crée une souscription"""
-        souscription_vals = {
-            'partner_id': partner.id,
-            'pdl': self.pdl,
-            'date_debut': self.date_debut_souhaitee,
-            'puissance_souscrite': self.puissance_souscrite,
-            'type_tarif': self.type_tarif,
-            'tarif_solidaire': self.tarif_solidaire,
-            'mode_paiement': self.mode_paiement,
-            'lisse': True,  # Activer le lissage par défaut
-            # Cotitulaires captés à l'adhésion → la Souscription en devient
-            # propriétaire (ADR 0016). Les actes d'adhésion (acceptation CGV,
-            # renonciation) ne sont plus recopiés en champs plats : ils sont
-            # journalisés ci-dessous (ADR 0027).
-            'cotitulaires': [(6, 0, self.cotitulaires.ids)],
-            # Identité electricore (ADR 0010/0021) : id_Affaire recopié comme
-            # amorce de réconciliation, avec sa date de saisie (grâce du poll #89).
-            'id_affaire': self.id_affaire,
-            'id_affaire_date_saisie': self.id_affaire_date_saisie,
-            # Majoration PRO négociée par le Collège (#101, ADR 0022 §7).
-            'coeff_pro': self.coeff_pro,
-        }
-
-        # Ajouter les provisions selon le type de tarif
-        if self.type_tarif == 'base':
-            souscription_vals['provision_mensuelle_kwh'] = self.provision_mensuelle_kwh
-        else:  # HP/HC
-            souscription_vals['provision_hp_kwh'] = self.provision_hp_kwh
-            souscription_vals['provision_hc_kwh'] = self.provision_hc_kwh
-
-        souscription = self.env['souscription.souscription'].create(souscription_vals)
-
-        # Accès portail donné dès l'onboarding : le·la souscripteur·trice reçoit
-        # l'invitation à activer son espace usager·ère (Odoo ne le fait pas seul).
-        souscription._octroyer_acces_portail()
-
-        # Journal des actes (ADR 0017/0027) : capture back-office (preuve
-        # faible), tracée comme telle ; l'acte réel du·de la souscripteur·rice
-        # viendra du formulaire public (#62).
-        source = f'Raccordement {self.name} (back-office)'
-
-        # Consentements RGPD : une finalité cochée = un acte 'donné'.
-        if self.consent_conso_quotidienne:
-            souscription.enregistrer_consentement('conso_quotidienne', source=source)
-        if self.consent_courbe_charge:
-            souscription.enregistrer_consentement('courbe_charge', source=source)
-
-        # Actes d'adhésion irrévocables : journalisés (pas recopiés en champs
-        # plats, ADR 0027) — l'horodatage de la ligne EST la date de signature
-        # saisie sur la demande. Sans date de signature, aucun acte n'est
-        # journalisé (pas d'acte = pas de preuve) : une demande peut être close
-        # avant que l'adhésion soit signée.
-        if self.date_validation:
-            horodatage = fields.Datetime.to_datetime(self.date_validation)
-            souscription.enregistrer_consentement('acceptation_cgv', source=source, date_consentement=horodatage)
-            if self.renonce_retractation:
-                souscription.enregistrer_consentement(
-                    'renonciation_retractation', source=source, date_consentement=horodatage
-                )
-
-        return souscription
 
     # --- Estimation des provisions (#121, GET /provision/estimation) ---
     #

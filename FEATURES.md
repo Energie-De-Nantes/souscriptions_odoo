@@ -5,7 +5,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 ## Parcours : demande de raccordement → mise en service
 
 - REQ-RAC-01 ✅ demande kanban : routage particulier/pro à la création — preuve: tests/test_raccordement_kanban_faits.py::test_routage_creation_particulier_vers_nouveau · #100
-- REQ-RAC-02 ✅ validation IBAN (mod 97) et SIRET à la saisie — preuve: tests/test_raccordement.py::test_iban_modulo97_algorithm
+- REQ-RAC-02 ✅ validation IBAN (base_iban) et SIRET à la saisie — preuve: tests/test_raccordement.py::test_iban_validation_checksum_invalide · #216
 - REQ-RAC-03 ✅ garde d'identité : partner existant réutilisé sans écrasement — preuve: tests/test_raccordement.py::test_existing_partner_reused_without_identity_overwrite · #75
 - REQ-RAC-04 ✅ naissance de la souscription à l'acceptation (garde IBAN, coeff pro) — preuve: tests/test_raccordement_kanban_faits.py::test_naissance_a_laccepte_iban_verifie · #101
 - REQ-RAC-05 ✅ étapes pilotées par les faits : auto-move id_affaire/RSC, drag-in interdit — preuve: tests/test_raccordement_kanban_faits.py::test_auto_move_vers_f120_mes · #90

@@ -1,7 +1,7 @@
 {
     'name': 'Souscriptions Électricité',
-    'version': '19.0.1.12.0',
-    'depends': ['base', 'mail', 'contacts', 'account', 'portal'],
+    'version': '19.0.1.13.0',
+    'depends': ['base', 'mail', 'contacts', 'account', 'base_iban', 'portal'],
     'author': 'Virgile Daugé',
     'category': 'Energy',
     'license': 'AGPL-3',

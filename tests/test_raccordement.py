@@ -3,6 +3,8 @@ Tests pour le module de gestion des raccordements.
 """
 
 from datetime import date, timedelta
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase, tagged
 
@@ -458,6 +460,31 @@ class TestRaccordementWorkflow(SouscriptionsTestMixin, TransactionCase):
         self.assertTrue(demande.partner_id, 'Contact devrait être créé')
         self.assertFalse(demande.partner_bank_id, 'Compte bancaire ne devrait pas être créé')
         self.assertTrue(demande.souscription_id, 'Souscription devrait être créée')
+
+    def test_creer_mandat_sepa_delegue_au_service_et_recopie_le_rum(self):
+        """#217 : la demande ne porte plus aucune logique mandat — elle
+        appelle le service `souscription.sepa.mandat` (jamais le registre
+        `sdd.mandate` directement), recopie le RUM du mandat retourné et
+        trace au chatter. Le service est mocké (retour en boîte) : cette
+        couture ne dépend pas du modèle Enterprise."""
+        demande = self.create_complete_demande(contact_email='mandat-delegue@example.com', sepa_mandate_ref=False)
+        mandat_retourne = SimpleNamespace(name='FR00SEPA000000000001')
+
+        with patch.object(
+            type(self.env['souscription.sepa.mandat']), 'creer', return_value=mandat_retourne
+        ) as mock_creer:
+            demande.stage_id = self.stage_final
+
+        mock_creer.assert_called_once()
+        _args, kwargs = mock_creer.call_args
+        self.assertEqual(_args[0], demande.partner_bank_id)
+        self.assertEqual(kwargs['rum'], False)
+        self.assertEqual(demande.sepa_mandate_ref, 'FR00SEPA000000000001')
+        messages = demande.message_ids.mapped('body')
+        self.assertTrue(
+            any('FR00SEPA000000000001' in body for body in messages),
+            'Le RUM du mandat devrait être tracé au chatter',
+        )
 
     def test_existing_partner_reused_without_identity_overwrite(self):
         """Un partner existant (même nature pro/particulier) est réutilisé,

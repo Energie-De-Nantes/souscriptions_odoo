@@ -6,7 +6,7 @@ Brancher le seam décidé : l'addon consomme le paquet `electricore-client`
 la fabrique unique `souscription.electricore.client` (ADR 0024) : ce module
 ne porte plus ni garde d'import du client, ni drapeau de disponibilité, ni
 lecture de config — seuls son propre appel d'endpoint (`meta_periodes` en
-flux) et son mapping d'exceptions.
+flux) et son mapping d'exceptions, ré-exportées par la fabrique (#222).
 """
 
 from __future__ import annotations
@@ -16,23 +16,7 @@ from datetime import timedelta
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
-# Garde d'import minimale (ADR 0024) : seules les exceptions du mapping de ce
-# wizard sont importées ici — la construction du client (garde + drapeau +
-# config) vit dans la fabrique. Si le paquet est absent, la fabrique lève
-# avant qu'aucune de ces exceptions ne puisse être levée.
-try:
-    from electricore_client import ContractVersionError, IngestionEnCours
-    from electricore_client.exceptions import PreconditionNonRemplie
-except ImportError:  # pragma: no cover - paquet optionnel ; la fabrique lève avant tout mapping
-
-    class ContractVersionError(Exception):
-        """Repli si `electricore_client` est absent : jamais levée en pratique."""
-
-    class IngestionEnCours(Exception):
-        """Repli si `electricore_client` est absent : jamais levée en pratique."""
-
-    class PreconditionNonRemplie(Exception):
-        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+from ..core.electricore_client_fabrique import ContractVersionError, IngestionEnCours, PreconditionNonRemplie
 
 
 class SouscriptionPullMetaPeriodesWizard(models.TransientModel):

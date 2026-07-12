@@ -661,6 +661,8 @@ class SouscriptionPeriode(models.Model):
             'origine': releve.evenement or releve.origine_releve,
         }
 
+    # Underscore délibéré : ferme la porte RPC externe, même idiome que
+    # `sale.order._create_invoices` (décision du grill, amende la revue d'architecture).
     def _creer_facture(self):
         """Émet la facture (``account.move``) de cette période.
 

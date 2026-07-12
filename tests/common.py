@@ -312,13 +312,3 @@ class SouscriptionsFormTestCase(SouscriptionsTestMixin, TransactionCase):
             return Model.browse(res_id)
         else:
             return Model.new()
-
-    def assert_field_visible(self, form, field_name):
-        """Vérifier qu'un champ est visible dans le formulaire."""
-        # TODO: Implémenter selon les besoins
-        pass
-
-    def assert_field_readonly(self, form, field_name):
-        """Vérifier qu'un champ est en lecture seule."""
-        # TODO: Implémenter selon les besoins
-        pass

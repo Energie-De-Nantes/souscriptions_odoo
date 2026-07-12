@@ -30,6 +30,7 @@ from . import (
     test_poll_affaires_enedis,
     test_portal,
     test_pull_meta_periodes,
+    test_pull_sorties,
     test_raccordement,
     test_raccordement_kanban_faits,
     test_refacturation,

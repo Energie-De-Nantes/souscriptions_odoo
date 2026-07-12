@@ -1,7 +1,7 @@
 import logging
 from datetime import date, timedelta
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError
 
 _logger = logging.getLogger(__name__)
@@ -523,6 +523,40 @@ class Souscription(models.Model):
                 sous.message_post(body=f'RSC résolue par electricore : {resultat.ref_situation_contractuelle}')
             else:
                 sous.write({'motif_resolution_rsc': resultat.error, 'date_derniere_resolution_rsc': today})
+
+    # --- Pull des sorties C15 (#246, ADR 0031 décisions 1-2) ---
+
+    def action_tirer_sorties_c15(self):
+        """Bouton autonome (motif sync F15, cf.
+        `souscription.refacturation.synchroniser_depuis_electricore`) : pull
+        des sorties C15 sur toutes les Souscriptions non résiliées à RSC
+        résolue, quelle que soit la sélection de la liste — même
+        indépendance au recordset appelant que le pull des prestations F15.
+        `date_fin` en sort à auteur unique (ADR 0031), jamais saisie à la
+        main. Le câblage dans l'ordre de la campagne relève de la tranche 3
+        du chantier #21."""
+        perimetre = self.search([('etat', '!=', 'resiliee'), ('ref_situation_contractuelle', '!=', False)])
+        ecrites, corrigees, inchangees, erreurs = self.env['souscription.pull.meta.periodes.service'].pull_sorties(
+            perimetre
+        )
+        message = _(
+            'Sorties C15 : %(ecrites)s date(s) de fin écrite(s), %(corrigees)s corrigée(s), '
+            '%(inchangees)s inchangée(s), %(erreurs)s en erreur.',
+            ecrites=len(ecrites),
+            corrigees=len(corrigees),
+            inchangees=len(inchangees),
+            erreurs=len(erreurs),
+        )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Sync sorties C15'),
+                'message': message,
+                'type': 'warning' if erreurs else 'success',
+                'sticky': False,
+            },
+        }
 
     # --- Poll quotidien des affaires Enedis (#89, ADR 0021 §3-4) ---
 

@@ -35,6 +35,13 @@ class TestSouscriptionFormRefonte(SouscriptionsTestCase):
         ]
         self.assertFalse(etat_souscription, 'etat ne doit plus figurer dans le corps de la fiche')
 
+    def test_date_fin_readonly_dans_le_formulaire(self):
+        """AC4 (#246, ADR 0031) : `date_fin` à auteur unique — le fait C15,
+        jamais de saisie manuelle depuis les vues."""
+        date_fin_fields = self.arch.findall(".//field[@name='date_fin']")
+        self.assertEqual(len(date_fin_fields), 1)
+        self.assertEqual(date_fin_fields[0].get('readonly'), '1')
+
     def test_header_ne_garde_que_resoudre_rsc(self):
         header = self.arch.find('header')
         noms = [b.get('name') for b in header.findall('button')]

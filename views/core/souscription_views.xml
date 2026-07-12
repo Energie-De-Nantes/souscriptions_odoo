@@ -40,7 +40,9 @@
                     </div>
                     <group>
                         <field name="date_debut"/>
-                        <field name="date_fin"/>
+                        <!-- À auteur unique (ADR 0031) : seul le pull des sorties C15
+                             écrit date_fin, jamais de saisie manuelle depuis les vues. -->
+                        <field name="date_fin" readonly="1"/>
                     </group>
                     <div class="row">
                         <div class="col-lg-6">
@@ -166,6 +168,13 @@
         <field name="model">souscription.souscription</field>
         <field name="arch" type="xml">
           <list string="Souscriptions">
+            <!-- Pull des sorties C15 (#246, ADR 0031) : déclencheur manuel,
+                 même motif que la sync F15 (souscription.refacturation) —
+                 le câblage dans l'ordre de la campagne relève de la tranche 3. -->
+            <header>
+                <button name="action_tirer_sorties_c15" type="object"
+                        string="Tirer les sorties C15" class="btn-primary" display="always"/>
+            </header>
             <field name="name"/>
             <field name="partner_id"/>
             <field name="lisse"/>

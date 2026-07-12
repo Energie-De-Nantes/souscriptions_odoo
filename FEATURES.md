@@ -40,7 +40,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-FAC-02 ✅ signaux : statut par souscription, reste-à-faire, drill-down — preuve: tests/test_campagne_signaux.py · #157
 - REQ-FAC-03 ✅ boutons d'étape : pulls, créer puis émettre les factures — preuve: tests/test_campagne_etapes_actions.py · #158
 - REQ-FAC-04 ✅ notes de campagne reportées au mois suivant — preuve: tests/test_campagne_notes.py · #159
-- REQ-FAC-05 ✅ pull des méta-périodes electricore, idempotent — preuve: tests/test_pull_meta_periodes.py · #77
+- REQ-FAC-05 ✅ pull des méta-périodes electricore, idempotent — propriétaire durable extrait en service (`souscription.pull.meta.periodes.service`), wizard/Campagne en coquilles minces — preuve: tests/test_pull_meta_periodes.py · #77, #233
 - REQ-FAC-06 ✅ énergie par cadran en cascade selon le calendrier de comptage — preuve: tests/test_periode_energie.py · #26
 - REQ-FAC-07 ✅ période mensuelle unique, snapshot figé à la facturation — preuve: tests/test_periode_snapshot.py::test_periode_figee_des_la_facturation · #14
 - REQ-FAC-08 ✅ relevés d'index : verrou de facturation + bloc justificatif (colonnes = union des familles réellement relevées) — preuve: tests/test_releve.py · #54, #138

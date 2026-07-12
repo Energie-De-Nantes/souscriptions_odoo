@@ -23,7 +23,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-SOU-03 ✅ identité Enedis : RSC unique, id_affaire, recherche — preuve: tests/test_souscription_etat.py::test_rsc_dupliquee_refusee · #15
 - REQ-SOU-04 ✅ estimation automatique des provisions (electricore) — preuve: tests/test_estimation_provisions.py · #121
 - REQ-SOU-05 ✅ journal de consentement append-only — preuve: tests/test_documents_contractuels.py::test_journal_est_append_only_en_ecriture
-- REQ-SOU-06 ✅ conditions particulières et attestation PDF — preuve: tests/test_documents_contractuels.py, tests/test_ui.py::test_report_souscription_contrat
+- REQ-SOU-06 ✅ conditions particulières et attestation PDF — preuve: tests/test_documents_contractuels.py
 - REQ-SOU-07 ✅ droits resserrés user/manager sur souscriptions et grilles — preuve: tests/test_security.py · #17
 
 ## Parcours : grilles de prix & catalogue
@@ -45,7 +45,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-FAC-07 ✅ période mensuelle unique, snapshot figé à la facturation — preuve: tests/test_periode_snapshot.py::test_periode_figee_des_la_facturation · #14
 - REQ-FAC-08 ✅ relevés d'index : verrou de facturation + bloc justificatif (colonnes = union des familles réellement relevées) — preuve: tests/test_releve.py · #54, #138
 - REQ-FAC-09 ✅ composition des lignes : prorata, cadrans, TURPE, pro, solidaire, régime — preuve: tests/test_periode_composition.py · #74
-- REQ-FAC-10 ✅ facture d'énergie PDF sur template dédié — preuve: tests/test_invoice_template.py, tests/test_ui.py::test_facture_energie_pdf
+- REQ-FAC-10 ✅ facture d'énergie PDF sur template dédié — preuve: tests/test_invoice_template.py, tests/test_facture_document.py::test_facture_energie_pdf
 - REQ-FAC-11 ✅ prestations F15 synchronisées puis refacturées (TVA par nature) — preuve: tests/test_sync_prestations.py, tests/test_refacturation.py · #147
 - REQ-FAC-12 ✅ chèques énergie : imputation FIFO à la facturation — preuve: tests/test_periode_facture.py::test_fifo_par_expiration_le_plus_proche_consomme_en_premier, tests/test_cheque_energie.py · #172
 

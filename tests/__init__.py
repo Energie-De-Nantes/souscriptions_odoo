@@ -11,6 +11,7 @@ from . import (
     test_electricore_client_fabrique,
     test_estimation_provisions,
     test_facturation,
+    test_facture_document,
     test_grille_prix,
     test_integration,
     test_invoice_template,

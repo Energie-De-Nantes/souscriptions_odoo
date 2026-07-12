@@ -3,6 +3,7 @@ import re
 
 import requests
 from odoo import api, fields, models
+from odoo.addons.base_iban.models.res_partner_bank import validate_iban
 from odoo.exceptions import UserError, ValidationError
 
 _logger = logging.getLogger(__name__)
@@ -272,48 +273,20 @@ class RaccordementDemande(models.Model):
 
     @api.depends('bank_iban')
     def _compute_iban_valide(self):
-        """Valide le format de l'IBAN"""
+        """IBAN validé au sens de base_iban (#216, ADR 0022 §2) : même
+        vérité que la création du compte bancaire à l'acceptation — plus
+        d'algorithme maison susceptible de diverger."""
         for record in self:
             record.iban_valide = self._validate_iban(record.bank_iban)
 
     def _validate_iban(self, iban):
-        """Validation complète du format IBAN avec vérification modulo 97"""
-        if not iban:
-            return False
-
-        # Nettoyer l'IBAN
-        iban = re.sub(r'\s', '', iban.upper())
-
-        # Vérifier la longueur minimale
-        if len(iban) < 15:
-            return False
-
-        # Vérifier le format de base (2 lettres + 2 chiffres + reste)
-        if not re.match(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]+$', iban):
-            return False
-
-        # Vérification modulo 97 (norme ISO 13616)
-        return self._check_iban_modulo(iban)
-
-    def _check_iban_modulo(self, iban):
-        """Vérifie la validité IBAN selon l'algorithme modulo 97"""
-        # Déplacer les 4 premiers caractères à la fin
-        rearranged = iban[4:] + iban[:4]
-
-        # Convertir les lettres en chiffres (A=10, B=11, ..., Z=35)
-        numeric_string = ''
-        for char in rearranged:
-            if char.isdigit():
-                numeric_string += char
-            else:
-                # A=10, B=11, ..., Z=35
-                numeric_string += str(ord(char) - ord('A') + 10)
-
-        # Calculer le modulo 97
+        """Enveloppe base_iban.validate_iban (ValidationError -> faux) :
+        seul point de vérité de l'IBAN, utilisé par le champ calculé et par
+        la garde bloquante d'acceptation (#216)."""
         try:
-            remainder = int(numeric_string) % 97
-            return remainder == 1
-        except ValueError:
+            validate_iban(iban)
+            return True
+        except ValidationError:
             return False
 
     @api.constrains('pro', 'siret')

@@ -2,203 +2,167 @@
 
 [![Tests](https://github.com/Energie-De-Nantes/souscriptions_odoo/actions/workflows/tests.yml/badge.svg)](https://github.com/Energie-De-Nantes/souscriptions_odoo/actions/workflows/tests.yml)
 
-Un addon libre pour Odoo 19 qui aide à gérer les abonnements électriques en France. Créé par [Virgile Daugé](https://github.com/virgiledauge), partagé sous licence AGPL-3 pour permettre l'émergence d'autres communs de l'électricité.
+Un addon libre pour **Odoo 19** qui gère les contrats de fourniture d'électricité en France.
+Créé par [Virgile Daugé](https://github.com/virgiledauge) pour
+[Énergie de Nantes](https://github.com/Energie-De-Nantes), partagé sous licence **AGPL-3**
+pour permettre l'émergence d'autres communs de l'électricité.
 
 ## Pourquoi ce projet existe ?
 
 Parce que gérer un contrat d'électricité, c'est pas pareil que vendre des chaussettes !
 
-Les abonnements électriques en France ont des spécificités que le module standard d'Odoo ne gère pas du tout :
-- Les prix changent en cours de contrat (merci les fluctuations du marché et des taxes...)
-- Il faut facturer avec les anciens prix quand on fait des régularisations
-- Le lissage mensuel avec rattrapage, c'est un cauchemar avec les outils classiques
-- Les tarifs heures pleines/creuses, les PDL, les trucs Enedis... bref, c'est complexe
+Le module d'abonnement standard d'Odoo ne sait pas :
 
-Ce module remplace le système d'abonnement standard d'Odoo par quelque chose qui comprend vraiment comment fonctionne la fourniture d'électricité en France.
+- changer les prix en cours de contrat (fluctuations du marché, des taxes…) ;
+- facturer une régularisation aux **prix historiques** de chaque période ;
+- gérer le **lissage mensuel** avec rattrapage ;
+- parler le langage du métier : PDL, cadrans HP/HC, TURPE, flux Enedis…
 
-## État actuel du projet
+Ce module remplace donc le système d'abonnement standard par un modèle qui comprend
+vraiment la fourniture d'électricité : la **Souscription** (le contrat), ses **Périodes**
+mensuelles de facturation, des **Grilles de prix** datées, la facture légale et le portail
+usager.
 
-🚧 **Phase d'exploration** - On découvre encore ce dont les gens ont vraiment besoin !
+## Architecture : Odoo + electricore
 
-**Ce qui fonctionne déjà (Phase 1) :**
-- ✅ Gestion des contrats avec facturation mensuelle
-- ✅ Support des tarifs HP/HC et Base
-- ✅ Lissage des factures avec régularisation
-- ✅ Intégration propre dans Odoo (facturation, comptabilité, etc.)
-- ✅ Module de demandes de raccordement
-- ✅ Interface utilisateur pour les abonnés (portail web)
+La responsabilité est volontairement coupée en deux :
 
-**Ce qui arrive bientôt (Phase 2) :**
-- 🔄 Import automatique des données Enedis (historique, index, etc.)
-- 🔄 Rapports avancés avec tout l'historique
+- **[electricore](https://github.com/Energie-De-Nantes/electricore)** porte tout le savoir
+  métier *réseau* : ingestion des flux Enedis, périmètre, énergies par cadran, TURPE,
+  accise, CTA. Il est déployé avec une API REST.
+- **Ce module Odoo** garde le rôle *fournisseur* : contrat, grilles de prix, facturation
+  légale, comptabilité, paiements, portail client et workflow de raccordement. Il consomme
+  l'API d'electricore (via le paquet [`electricore-client`](https://pypi.org/project/electricore-client/))
+  pour alimenter ses périodes de facturation.
 
-## Architecture du projet
+Le vocabulaire du domaine (Souscription, Période, Relevé, Grille de prix, Campagne de
+facturation…) est défini dans [CONTEXT.md](CONTEXT.md) ; les décisions d'architecture sont
+tracées dans [docs/adr/](docs/adr/).
 
-```mermaid
-graph TD
-    A[Addon Souscriptions Électriques] --> B[Module Core/Souscriptions]
-    A --> C[Module Métier - DÉSACTIVÉ]
-    A --> D[Module Raccordement]
+## Fonctionnalités
 
-    B --> E[Gestion des contrats]
-    B --> F[Facturation HP/HC]
-    B --> G[Lissage & régularisation]
-    B --> H[Intégration Odoo]
+L'état détaillé, capacité par capacité avec sa preuve (test + issue), est tenu dans la
+story map [FEATURES.md](FEATURES.md). En résumé, par parcours :
 
-    C --> I[Import données Enedis]
-    C --> J[Historique consommation]
-    C --> K[Données PDL]
+**Raccordement (l'entrée)** — un kanban piloté par les faits, conduit par l'accueilliste :
+routage particulier/pro, validation IBAN/SIRET, création de la Souscription à
+l'acceptation, suivi automatique des affaires Enedis (poll quotidien, résolution de la
+RSC), mails de rassurage et pack de bienvenue avec conditions particulières en pièce
+jointe.
 
-    D --> L[Demandes raccordement]
-    D --> M[Suivi des étapes]
-    D --> N[Documents associés]
-```
+**Contrat & documents** — souscriptions Base ou HP/HC, tarif solidaire (isolation
+comptable complète), majoration PRO, estimation automatique des provisions, journal des
+actes append-only (consentements RGPD, acceptation CGV), conditions particulières et
+attestation de fourniture en PDF.
 
-## Installation rapide
+**Grilles de prix** — barèmes fournisseur datés et versionnés, sélectionnés par régime
+(standard ou Moulin) et par date — ce qui permet de facturer une régularisation aux prix
+de l'époque. Abonnement affine (base 3 kVA + coefficient par kVA), TURPE absorbé, moteur
+de prix unique projeté par la facture comme par les conditions particulières.
 
-### Avec Docker (recommandé pour tester)
+**Cycle mensuel de facturation** — la Campagne de facturation, tableau de bord du
+facturiste : pull des méta-périodes electricore (idempotent), sync des prestations F15 à
+refacturer, périodes mensuelles figées à la facturation (snapshot + relevés d'index
+justificatifs), composition des lignes (prorata, cadrans, pro, solidaire), imputation FIFO
+des chèques énergie, facture d'énergie PDF sur template dédié.
+
+**Portail usager** — accès sécurisé et cloisonné, historique de consommation et bloc
+justificatif des relevés — uniquement sur les factures **émises**, un brouillon ne fuite
+jamais.
+
+**Reprise de l'existant** — backfill des périodes d'ouverture liées aux factures legacy,
+champs d'atterrissage pour la migration (pilotée par le dépôt `souscriptions_migration`).
+
+## Démarrage rapide
+
+### Instance locale avec Docker (recommandé)
 
 ```bash
-# Cloner le projet
-git clone https://github.com/votre-repo/souscriptions_odoo.git
+git clone https://github.com/Energie-De-Nantes/souscriptions_odoo.git
 cd souscriptions_odoo
-
-# Lancer avec des données d'exemple (image construite, electricore-client inclus)
 ./scripts/dev.sh
-
-# Accéder à Odoo : http://localhost:8069
-# Compte admin : admin / admin
+# puis ouvrir http://localhost:8069   (identifiants : admin / admin)
 ```
+
+Le script construit l'image (`docker/Dockerfile`, `electricore-client` inclus) et lance
+Odoo 19 avec le hot reload (`--dev=reload,xml,qweb`) : une modification de vue ou de
+rapport QWeb est visible sans reconstruire. Par défaut, mode **demo** : base
+`souscriptions_demo` avec des données d'exemple, persistée entre deux lancements.
+
+- `./scripts/dev.sh --reset` — repart d'une base vierge ;
+- `./scripts/dev.sh --data=prod` — mode **prod local** : base `souscriptions_prodlocal`,
+  sans données de démo, avec de vraies données synchronisées depuis electricore.
+
+À explorer dans l'instance de démo :
+
+- **Souscriptions** : contrats d'exemple (Base, HP/HC, solidaire, pro) ;
+- **Souscriptions → Grilles de Prix** : le barème avec abonnement affine ;
+- **Souscriptions → Facturation** : campagnes de facturation mensuelles ;
+- **Raccordements** : le kanban de demandes à différentes étapes ;
+- le **portail** sur `/my` : donner un accès portail à un contact de démo
+  (Contacts → *Action → Accorder l'accès au portail*), puis se connecter avec ce compte.
 
 ### Installation manuelle
 
-**Prérequis :**
-- Odoo 19 installé
-- PostgreSQL qui tourne
-- Python 3.13+
+Prérequis : Odoo 19, PostgreSQL, et le paquet `electricore-client` (voir
+`requirements.txt` — le module s'installe sans lui, seule l'action de pull le réclame).
 
 ```bash
-# Créer une base de données et installer l'addon (nom technique : souscriptions_odoo)
-createdb votre_base_souscriptions
-odoo -d votre_base_souscriptions -i souscriptions_odoo
-
-# Lancer Odoo en mode développement
-odoo -d votre_base_souscriptions --dev=reload,qweb,werkzeug,xml
+createdb votre_base
+odoo -d votre_base -i souscriptions_odoo
 ```
 
-## Comment ça marche ?
+## Tests
 
-### 1. Créer un contrat de souscription
+La suite (TransactionCase + HttpCase) tourne sur `odoo:19` + PostgreSQL via Docker, sans
+installation locale d'Odoo :
 
-Dans Odoo, allez dans **Souscriptions > Contrats** et créez un nouveau contrat :
-- Choisissez votre contact/client
-- Définissez le Point de Livraison (PDL)
-- Configurez le type de facturation (Base ou HP/HC)
-- Activez le lissage si vous voulez lisser les factures
+```bash
+./scripts/run-tests.sh                    # toute la suite
+TEST_TAGS=mon_tag ./scripts/run-tests.sh  # une sélection
+```
 
-### 2. Configurer les tarifs
-
-Les prix sont gérés par des **grilles de prix** dans **Souscriptions > Configuration > Grilles de prix** :
-- Prix de l'abonnement mensuel
-- Prix du kWh (Base ou HP/HC séparément)
-- Historique des changements de prix automatique
-
-### 3. Générer les factures
-
-Les factures se créent automatiquement selon la périodicité configurée. Le système :
-- Calcule automatiquement les montants HP/HC
-- Gère le lissage avec régularisation
-- S'intègre avec la comptabilité Odoo
-- Génère les PDF avec le bon template
-
-### 4. Interface utilisateur (portail)
-
-Vos abonnés peuvent se connecter sur le portail Odoo pour :
-- Voir leurs contrats en cours
-- Consulter leurs factures
-- Télécharger les documents
-- Faire des demandes de raccordement
-
-## Technologies utilisées
-
-- **Odoo 18+** avec le nouveau framework OWL
-- **uv** pour gérer proprement les dépendances Python
-- **Docker** pour faciliter les tests et déploiements
-- **PostgreSQL** pour stocker toutes les données
-- **Pandas/FastParquet** pour traiter les gros fichiers de données Enedis (Phase 2)
+Le script démarre PostgreSQL, installe le module, lance la suite, nettoie les conteneurs
+et renvoie le bon code de sortie. Détails (commande manuelle, CI, dépannage) :
+[tests/README.md](tests/README.md). La même suite tourne en CI à chaque push (badge en
+haut).
 
 ## Structure du projet
 
 ```
 souscriptions_odoo/
-├── models/           # Toute la logique métier
-│   ├── core/         # Contrats, facturation, tarifs
-│   ├── metier/       # Données Enedis (Phase 2)
-│   └── raccordement/ # Demandes de raccordement
-├── views/            # Interfaces utilisateur Odoo
-├── data/             # Configuration par défaut
-├── demo/             # Données d'exemple pour tester
-├── tests/            # Tests pour vérifier que ça marche
-├── docker/           # Configuration Docker
-└── reports/          # Templates de factures et rapports
+├── models/
+│   ├── core/         # Souscription, périodes, grilles, campagne, chèque énergie,
+│   │                 # refacturation, relevés, journal des actes, account.move
+│   ├── raccordement/ # Workflow kanban des demandes de raccordement
+│   └── wizard/       # Assistants (pull des méta-périodes electricore…)
+├── controllers/      # Routes du portail usager
+├── views/            # Vues Odoo (core, raccordement, wizard, portail)
+├── reports/          # Facture d'énergie, conditions particulières, attestation (QWeb)
+├── data/             # Configuration par défaut (produits, séquences, crons, mails)
+├── demo/             # Données de démo
+├── security/         # Groupes, droits d'accès, règles
+├── tests/            # Suite de tests
+├── scripts/          # dev.sh (instance locale), run-tests.sh
+└── docker/           # Image et compose de développement
 ```
 
-## Explorer l'interface (instance vivante)
+## Documentation
 
-Pour lancer une instance Odoo 19 complète avec des données d'exemple et cliquer
-dans l'interface :
-
-```bash
-./scripts/dev.sh
-# puis ouvrir http://localhost:8069   (identifiants : admin / admin)
-```
-
-Le script lance `docker compose` sur l'image **construite** (`docker/Dockerfile`,
-`electricore-client` inclus), avec le hot reload actif (`--dev=reload,xml,qweb`) :
-une modification de vue ou de rapport QWeb est visible sans reconstruire l'image.
-Par défaut, mode **demo** : base `souscriptions_demo`, module installé avec les
-données de démo (`demo/*.xml`). La base est persistée : les modifications faites
-dans l'UI sont conservées entre deux lancements. `Ctrl-C` arrête le serveur ;
-`./scripts/dev.sh --reset` repart d'une base vierge.
-
-Un mode **prod local** existe aussi (`./scripts/dev.sh --data=prod`, base
-`souscriptions_prodlocal`, module installé sans démo) : il pose le socle pour
-le pilotage de `souscriptions_migration`, qui arrive dans une tranche suivante.
-
-Vous y trouverez :
-- **Souscriptions** (menu principal) : 5 contrats d'exemple (Base, HP/HC, solidaire, pro)
-- **Souscriptions → Grilles de Prix** : grille tarifaire avec un prix par puissance
-- **Raccordements** : tableau kanban de demandes de raccordement à différentes étapes
-- Le **portail client** sur `/my` : pour le tester, donnez un accès portail à un
-  contact de démo (Contacts → sélectionner un client → *Action → Accorder l'accès au portail*),
-  définissez-lui un mot de passe, puis connectez-vous avec ce compte.
-
-## Lancer les tests automatisés
-
-La suite (91 tests) tourne sur `odoo:19` + PostgreSQL via Docker, sans
-installation locale d'Odoo. Le plus simple :
-
-```bash
-./scripts/run-tests.sh
-```
-
-Le script démarre PostgreSQL, installe le module, lance la suite, nettoie les
-conteneurs et renvoie le bon code de sortie. Pour la commande Docker manuelle,
-la sélection par tag, la CI et le dépannage : [tests/README.md](tests/README.md).
-La même suite s'exécute automatiquement en CI à chaque push et PR (badge en haut).
+| Document | Contenu |
+|---|---|
+| [CONTEXT.md](CONTEXT.md) | Le vocabulaire du domaine — la référence des termes métier |
+| [FEATURES.md](FEATURES.md) | Story map : chaque capacité avec statut et preuve |
+| [COOKBOOK.md](COOKBOOK.md) | Les routines du dépôt : lancer l'instance, tester, inspecter les données |
+| [docs/adr/](docs/adr/) | Les décisions d'architecture (ADR) |
+| [AUDIT_REFONTE.md](AUDIT_REFONTE.md) | L'audit qui a guidé la refonte Odoo 19 |
 
 ## Compatibilité et dépendances
 
-**Version Odoo requise :** 19
+**Odoo 19** — modules requis : `base`, `mail`, `contacts`, `account`, `portal`.
 
-**Modules Odoo nécessaires :**
-- `base` (obligatoire)
-- `mail` (gestion des messages)
-- `contacts` (clients/fournisseurs)
-- `account` (facturation)
-- `portal` (interface utilisateur)
+**Dépendances Python** (hors framework) :
 
-**Dépendances Python :**
-- `pandas` et `fastparquet` (pour la Phase 2)
-- `babel` (dates en français)
-- `psycopg2` (base de données)
+- `electricore-client` (épinglé dans `requirements.txt`) — client fin vers l'API
+  electricore ; dépendance *molle* : son absence n'empêche pas l'installation du module ;
+- `babel` — dates en français.

@@ -484,10 +484,12 @@ class Souscription(models.Model):
     def action_resoudre_rsc_maintenant(self):
         """Bouton « résoudre la RSC maintenant » (#88) : résout la RSC des
         Souscriptions sélectionnées via le service electricore, en un seul
-        appel batch même pour une seule Souscription. Idempotent : une
-        Souscription déjà *en service* n'est jamais re-ciblée — aucun appel
+        appel batch même pour une seule Souscription. Idempotent : seule une
+        Souscription *en instance* est ciblée — une Souscription déjà *en
+        service* ou *résiliée* n'est jamais re-ciblée, même en lot depuis la
+        vue liste (#136, même garde que le poll quotidien #89) — aucun appel
         si le lot filtré est vide."""
-        cibles = self.filtered(lambda s: s.etat != 'en_service')
+        cibles = self.filtered(lambda s: s.etat == 'en_instance')
         if not cibles:
             return
         sans_affaire = cibles.filtered(lambda s: not s.id_affaire)

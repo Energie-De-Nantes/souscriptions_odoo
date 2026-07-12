@@ -12,7 +12,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-RAC-06 ✅ mails de rassurage à l'entrée des branches F120/F130 — preuve: tests/test_mails_raccordement.py::test_entree_f120_envoie_mail_rassurage · #102
 - REQ-RAC-07 ✅ pack de bienvenue automatique à « Abonnement Validé » — preuve: tests/test_mails_raccordement.py::test_drag_en_abonnement_valide_envoie_pack_bienvenue_avec_cp_en_piece_jointe · #103
 - REQ-RAC-08 ✅ poll quotidien des affaires Enedis, alertes sans spam — preuve: tests/test_poll_affaires_enedis.py · #89
-- REQ-RAC-09 ✅ résolution RSC à la demande via electricore — preuve: tests/test_rsc_service.py · #88
+- REQ-RAC-09 ✅ résolution RSC à la demande via electricore, bouton + garde serveur limités à *en instance* (jamais résiliée/en service, même en lot) — preuve: tests/test_rsc_service.py::test_souscription_resiliee_jamais_reciblee · #88, #136
 - REQ-RAC-10 ✅ état du contrat calculé : en instance / en service / résiliée — preuve: tests/test_souscription_etat.py::test_bascule_en_service_a_lecriture_de_la_rsc · #87
 - REQ-RAC-11 ✅ mandat SEPA créé actif d'emblée via le service `souscription.sepa.mandat` (garde registre `sdd.mandate`, no-op Community) — preuve: tests/test_sepa_mandat.py, tests/test_raccordement.py::test_creer_mandat_sepa_delegue_au_service_et_recopie_le_rum · #187, #217
 

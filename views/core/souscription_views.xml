@@ -9,7 +9,7 @@
                     <button name="action_resoudre_rsc_maintenant"
                             string="Résoudre la RSC maintenant"
                             type="object"
-                            invisible="etat == 'en_service'"/>
+                            invisible="etat != 'en_instance'"/>
                     <field name="etat" widget="statusbar" readonly="1"/>
                 </header>
                 <sheet>

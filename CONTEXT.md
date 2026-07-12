@@ -34,16 +34,24 @@ remplace, le terme pipeline d'electricore, la catégorie produit « Abonnements 
 **commande**, `sale.order` (explicitement non utilisés : pas de cycle de vente) ; contrat
 (trop générique).
 
-**En instance / En service** :
+**En instance / En service / En attente de clôture / Résiliée** :
 États de cycle de vie de la *Souscription*, **calculés depuis les faits**, jamais saisis.
 **En instance** : née à l'**acceptation** de la demande de *raccordement* (signée, consentements
 journalisés) mais **sans RSC** : non facturable, ignorée du pull de facturation. **En service** :
 la RSC est acquise — le C15 d'effectivité est arrivé, la mise en service est réelle (ADR 0022) —
-facturable. La correction passe par le **fait** (la RSC), jamais par l'état. La résiliation
-est un chantier distinct.
+facturable. **En attente de clôture** : une sortie C15 (`RES`/`CFNS`, symétriques pour nous) a
+posé la date de fin — **dernier jour servi** (le fait C15, demi-ouvert, est converti à la
+couture ; la *Période*, elle, reste bornée en demi-ouvert), champ à **auteur unique**, jamais
+saisi (ADR 0031) — et la clôture n'est pas encore soldée. **Résiliée** : clôture soldée — la
+*Période* contenant la date de fin est facturée **et** la *Régularisation* de clôture est émise
+(ou rien à solder : non-lissés, résiliés migrés « régularisée »). La **file d'attente des sorties
+à traiter est la vue « en attente de clôture »** — aucun statut de traitement à la main. La
+correction passe par le **fait** (la RSC, le C15 de sortie), jamais par l'état.
 _Éviter_ : **brouillon** (la Souscription est conclue et signée ; « brouillon » est réservé à
 la *Période* et à la *Facture*) ; « active » (collision avec l'archivage Odoo) ;
-« raccordement effectué » comme bascule manuelle (l'état découle de la RSC, ADR 0021).
+« raccordement effectué » comme bascule manuelle (l'état découle de la RSC, ADR 0021) ;
+**date de fin saisie à la main** (anticipation et ratés vivent hors mécanisme : process de
+demande sortante, geste commercial — ADR 0031).
 
 **Souscripteur·rice** :
 La personne ou l'organisation titulaire d'une *Souscription*. Désigné·e *usager·ère* dans le

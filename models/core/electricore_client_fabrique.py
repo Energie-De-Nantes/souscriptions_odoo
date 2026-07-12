@@ -18,6 +18,13 @@ Chaque appelant garde son propre appel d'endpoint (`resoudre_rsc` en lot ↔
 `meta_periodes` en flux) et son propre mapping d'exceptions : cette fabrique
 s'arrête à « rends-moi un client configuré » (ADR 0024 §4, option écartée
 « fabrique de transport complète »).
+
+Ré-export des exceptions du contrat (#222, tranche 2 du PRD #219) : les
+quatre appelants (résolution RSC, pull méta-périodes, refacturation F15,
+chronologie) important `ContractVersionError`/`IngestionEnCours`/
+`PreconditionNonRemplie` depuis **ce** module plutôt que de porter chacun sa
+propre garde d'import + ses propres stubs de repli — un seul point d'origine,
+réel si le paquet est présent, stub sinon.
 """
 
 from __future__ import annotations
@@ -28,11 +35,27 @@ from odoo import models
 from odoo.exceptions import UserError
 
 try:
-    from electricore_client import ElectricoreClient
+    from electricore_client import ContractVersionError, ElectricoreClient, IngestionEnCours
+    from electricore_client.exceptions import PreconditionNonRemplie
 
     ELECTRICORE_CLIENT_DISPONIBLE = True
 except ImportError:  # pragma: no cover - exercé par test_electricore_client_fabrique
     ELECTRICORE_CLIENT_DISPONIBLE = False
+
+    # Même repli que les exceptions : le symbole existe dans les deux mondes
+    # (patchable par les tests), la garde ELECTRICORE_CLIENT_DISPONIBLE
+    # échoue avant toute construction réelle.
+    ElectricoreClient = None
+
+    class ContractVersionError(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique — la fabrique
+        (`souscription.electricore.client`) échoue avant tout appel qui pourrait la lever."""
+
+    class IngestionEnCours(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
+    class PreconditionNonRemplie(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
 
 
 class SouscriptionElectricoreClient(models.AbstractModel):

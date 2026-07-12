@@ -1,24 +1,24 @@
 """Tests #147 — sync electricore des prestations : pull-tout, insert-si-absente.
 
-Couture de test : `_tirer_prestations` (transport JSONL) est patchée avec des
-lignes en boîte (contrat v1 `PrestationF15`, dicts plats) ; la fabrique client
-est patchée pour rendre un MagicMock (sa garde paquet/config est testée dans
-test_electricore_client_fabrique.py). Résolution RSC, mapping nature et
-insert-si-absente restent réels. Aucun HTTP.
+Couture de test (socle commun #222) : `_tirer_prestations` (transport JSONL)
+est patchée avec des lignes en boîte (contrat v1 `PrestationF15`, dicts
+plats) ; la fabrique client est patchée pour rendre un MagicMock (sa garde
+paquet/config est testée dans test_electricore_client_fabrique.py).
+Résolution RSC, mapping nature et insert-si-absente restent réels. Aucun
+HTTP.
 
 Décisions du grill 2026-07-08 (cf. issue #147) : résolution par RSC seule
 (pas de repli PDL, ADR 0010 §4), insert-si-absente (pas de chemin d'update —
 la *Référence de contenu* EST le contenu), `montant_ht` ignoré.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from odoo.addons.souscriptions_odoo.models.core import electricore_client_fabrique as fabrique_module
 from odoo.addons.souscriptions_odoo.models.core import souscription_refacturation as refacturation_module
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
-from .common import SouscriptionsTestCase
+from .common import SouscriptionsTestCase, patcher_client_fabrique, patcher_transport
 
 
 def _ligne(**overrides):
@@ -48,7 +48,7 @@ class TestSyncPrestations(SouscriptionsTestCase):
     def setUp(self):
         super().setUp()
         self.fake_client = MagicMock(url='https://electricore.example.test', api_key='fake-api-key')
-        patcher = patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=self.fake_client)
+        patcher = patcher_client_fabrique(self.fake_client)
         patcher.start()
         self.addCleanup(patcher.stop)
         self.souscription_base.with_context(rsc_automatisme=True).write(
@@ -57,7 +57,9 @@ class TestSyncPrestations(SouscriptionsTestCase):
         self.Refacturation = self.env['souscription.refacturation']
 
     def _sync(self, lignes):
-        with patch.object(refacturation_module.SouscriptionRefacturation, '_tirer_prestations', return_value=lignes):
+        with patcher_transport(
+            refacturation_module.SouscriptionRefacturation, '_tirer_prestations', return_value=lignes
+        ):
             return self.Refacturation.synchroniser_depuis_electricore()
 
     def _prestas(self, reference):
@@ -193,7 +195,7 @@ class TestSyncPrestations(SouscriptionsTestCase):
     def test_contract_version_error_mappee_en_userror(self):
         """Contrat obsolète -> erreur dure actionnable (UserError), pas de
         traceback brut pour le·la facturiste."""
-        with patch.object(
+        with patcher_transport(
             refacturation_module.SouscriptionRefacturation,
             '_tirer_prestations',
             side_effect=refacturation_module.ContractVersionError('serveur v0 < attendu v1'),

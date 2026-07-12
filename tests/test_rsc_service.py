@@ -2,32 +2,28 @@
 « résoudre la RSC maintenant » (ADR 0021 §3, contrat figé
 `docs/contrat-rsc.md`).
 
-Couture de test du module (réutilisée par #89) : on patche `_appeler`, la
-méthode transport du service, avec des réponses en boîte mirant les quatre
-motifs du contrat RSC. Rien d'autre n'est mocké : pas de mock
-d'`electricore_client` lui-même, pas de HTTP, pas de mock du temps.
+Couture de test du module (réutilisée par #89, socle commun #222) : on
+patche `_appeler`, la méthode transport du service, avec des réponses en
+boîte mirant les quatre motifs du contrat RSC. Rien d'autre n'est mocké :
+pas de mock d'`electricore_client` lui-même, pas de HTTP, pas de mock du
+temps.
 """
 
 from datetime import date
-from types import SimpleNamespace
-from unittest.mock import patch
 
 from odoo.addons.souscriptions_odoo.models.core import electricore_rsc_service as service_module
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
-from .common import SouscriptionsTestCase
+from .common import SouscriptionsTestCase, patcher_transport, resultat_rsc
 
 _SERVICE_MODEL = 'souscription.rsc.service'
 
 
-class _FakeContractVersionError(Exception):
-    pass
-
-
-def _resultat(id_affaire, rsc=None, error=None):
-    """Stub duck-typé de `ResultatResolutionRsc` (xor rsc/error)."""
-    return SimpleNamespace(id_affaire=id_affaire, ref_situation_contractuelle=rsc, error=error)
+def _patch_appeler(return_value=None, side_effect=None):
+    return patcher_transport(
+        service_module.SouscriptionRscService, '_appeler', return_value=return_value, side_effect=side_effect
+    )
 
 
 @tagged('souscriptions', 'souscriptions_rsc_service', 'post_install', '-at_install')
@@ -36,13 +32,8 @@ class TestServiceRscTransport(SouscriptionsTestCase):
     lot vide, version de contrat. La garde d'import/config de la fabrique
     (ADR 0024) est testée une fois dans test_electricore_client_fabrique.py."""
 
-    def _patch_appeler(self, return_value=None, side_effect=None):
-        return patch.object(
-            service_module.SouscriptionRscService, '_appeler', return_value=return_value, side_effect=side_effect
-        )
-
     def test_lot_vide_naboutit_pas_a_un_appel(self):
-        with self._patch_appeler() as mock_appeler:
+        with _patch_appeler() as mock_appeler:
             resultat = self.env[_SERVICE_MODEL].resoudre([])
         self.assertEqual(resultat, {})
         mock_appeler.assert_not_called()
@@ -51,10 +42,10 @@ class TestServiceRscTransport(SouscriptionsTestCase):
         """Le lot est apparié par id_affaire, jamais par position : la
         réponse renvoyée dans le désordre reste correctement appariée."""
         reponse_desordonnee = [
-            _resultat('B', rsc='RSC-B'),
-            _resultat('A', rsc='RSC-A'),
+            resultat_rsc('B', rsc='RSC-B'),
+            resultat_rsc('A', rsc='RSC-A'),
         ]
-        with self._patch_appeler(return_value=reponse_desordonnee):
+        with _patch_appeler(return_value=reponse_desordonnee):
             resultat = self.env[_SERVICE_MODEL].resoudre(['A', 'B'])
         self.assertEqual(resultat['A'].ref_situation_contractuelle, 'RSC-A')
         self.assertEqual(resultat['B'].ref_situation_contractuelle, 'RSC-B')
@@ -63,18 +54,18 @@ class TestServiceRscTransport(SouscriptionsTestCase):
         """Les quatre motifs du contrat RSC (succès + 3 erreurs) traversent
         le service sans traduction, xor rsc/error."""
         reponse = [
-            _resultat('OK', rsc='RSC-001'),
-            _resultat('INCONNUE', error='Affaire inconnue : INCONNUE'),
-            _resultat(
+            resultat_rsc('OK', rsc='RSC-001'),
+            resultat_rsc('INCONNUE', error='Affaire inconnue : INCONNUE'),
+            resultat_rsc(
                 'SANS-C15',
                 error='Affaire connue (X12) sans situation contractuelle C15 '
                 '(précurseur en cours ou affaire non contractuelle).',
             ),
-            _resultat(
+            resultat_rsc(
                 'AMBIGUE', error="Résolution ambiguë : 2 situations contractuelles pour l'affaire AMBIGUE (X, Y)."
             ),
         ]
-        with self._patch_appeler(return_value=reponse):
+        with _patch_appeler(return_value=reponse):
             resultat = self.env[_SERVICE_MODEL].resoudre(['OK', 'INCONNUE', 'SANS-C15', 'AMBIGUE'])
 
         self.assertEqual(resultat['OK'].ref_situation_contractuelle, 'RSC-001')
@@ -87,10 +78,9 @@ class TestServiceRscTransport(SouscriptionsTestCase):
         """AC2 : version de contrat inattendue -> signalée (UserError), le
         service n'écrit jamais de donnée (l'exception interrompt l'appel
         avant tout accès au résultat)."""
-        with patch.object(service_module, 'ContractVersionError', _FakeContractVersionError):
-            with self._patch_appeler(side_effect=_FakeContractVersionError('serveur v2 < attendu v3')):
-                with self.assertRaises(UserError) as cm:
-                    self.env[_SERVICE_MODEL].resoudre(['A'])
+        with _patch_appeler(side_effect=service_module.ContractVersionError('serveur v2 < attendu v3')):
+            with self.assertRaises(UserError) as cm:
+                self.env[_SERVICE_MODEL].resoudre(['A'])
         self.assertIn('Contrat electricore obsolète', str(cm.exception))
 
 
@@ -98,14 +88,9 @@ class TestServiceRscTransport(SouscriptionsTestCase):
 class TestActionResoudreRscMaintenant(SouscriptionsTestCase):
     """Le bouton « résoudre la RSC maintenant » sur la Souscription."""
 
-    def _patch_appeler(self, return_value=None, side_effect=None):
-        return patch.object(
-            service_module.SouscriptionRscService, '_appeler', return_value=return_value, side_effect=side_effect
-        )
-
     def test_succes_ecrit_la_rsc_et_trace_au_chatter(self):
         self.souscription_base.id_affaire = '38233180'
-        with self._patch_appeler(return_value=[_resultat('38233180', rsc='RSC-9001')]):
+        with _patch_appeler(return_value=[resultat_rsc('38233180', rsc='RSC-9001')]):
             self.souscription_base.action_resoudre_rsc_maintenant()
 
         self.assertEqual(self.souscription_base.ref_situation_contractuelle, 'RSC-9001')
@@ -117,7 +102,7 @@ class TestActionResoudreRscMaintenant(SouscriptionsTestCase):
 
     def test_affaire_inconnue_stocke_le_motif_et_la_date(self):
         self.souscription_base.id_affaire = 'ZZZ999'
-        with self._patch_appeler(return_value=[_resultat('ZZZ999', error='Affaire inconnue : ZZZ999')]):
+        with _patch_appeler(return_value=[resultat_rsc('ZZZ999', error='Affaire inconnue : ZZZ999')]):
             self.souscription_base.action_resoudre_rsc_maintenant()
 
         self.assertFalse(self.souscription_base.ref_situation_contractuelle)
@@ -135,11 +120,11 @@ class TestActionResoudreRscMaintenant(SouscriptionsTestCase):
             'Affaire connue (X12) sans situation contractuelle C15 (précurseur en cours ou affaire non contractuelle).'
         )
         reponse = [
-            _resultat('AFF-HPHC', error=motif_sans_c15),
-            _resultat('AFF-BASE', rsc='RSC-BASE-1'),
+            resultat_rsc('AFF-HPHC', error=motif_sans_c15),
+            resultat_rsc('AFF-BASE', rsc='RSC-BASE-1'),
         ]
         souscriptions = self.souscription_base + self.souscription_hphc
-        with self._patch_appeler(return_value=reponse) as mock_appeler:
+        with _patch_appeler(return_value=reponse) as mock_appeler:
             souscriptions.action_resoudre_rsc_maintenant()
 
         mock_appeler.assert_called_once_with(['AFF-BASE', 'AFF-HPHC'])
@@ -152,23 +137,22 @@ class TestActionResoudreRscMaintenant(SouscriptionsTestCase):
         self.souscription_base.with_context(rsc_automatisme=True).write({'ref_situation_contractuelle': 'RSC-DEJA'})
         self.assertEqual(self.souscription_base.etat, 'en_service')
 
-        with self._patch_appeler() as mock_appeler:
+        with _patch_appeler() as mock_appeler:
             self.souscription_base.action_resoudre_rsc_maintenant()
         mock_appeler.assert_not_called()
 
     def test_id_affaire_manquant_leve_userror_sans_appel(self):
         self.assertFalse(self.souscription_base.id_affaire)
-        with self._patch_appeler() as mock_appeler:
+        with _patch_appeler() as mock_appeler:
             with self.assertRaises(UserError):
                 self.souscription_base.action_resoudre_rsc_maintenant()
         mock_appeler.assert_not_called()
 
     def test_version_inattendue_naucune_ecriture(self):
         self.souscription_base.id_affaire = '38233180'
-        with patch.object(service_module, 'ContractVersionError', _FakeContractVersionError):
-            with self._patch_appeler(side_effect=_FakeContractVersionError('serveur v2 < attendu v3')):
-                with self.assertRaises(UserError):
-                    self.souscription_base.action_resoudre_rsc_maintenant()
+        with _patch_appeler(side_effect=service_module.ContractVersionError('serveur v2 < attendu v3')):
+            with self.assertRaises(UserError):
+                self.souscription_base.action_resoudre_rsc_maintenant()
 
         self.assertFalse(self.souscription_base.ref_situation_contractuelle)
         self.assertFalse(self.souscription_base.motif_resolution_rsc)

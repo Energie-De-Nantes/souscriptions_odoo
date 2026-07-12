@@ -11,16 +11,13 @@ Deux tranches, même découpage que `test_pull_meta_periodes.py` :
 Fixtures RSC/PDL : identifiants factices (jamais des vrais échantillons).
 """
 
-from contextlib import contextmanager
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
-from odoo.addons.souscriptions_odoo.models.core import electricore_client_fabrique as fabrique_module
 from odoo.addons.souscriptions_odoo.models.core import souscription_chronologie as chronologie_module
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
-from .common import SouscriptionsTestCase
+from .common import SouscriptionsTestCase, client_flux_factice, patcher_client_fabrique
 
 
 def _ligne_evenement(**kwargs):
@@ -147,68 +144,30 @@ class TestValsDepuisLigne(SouscriptionsTestCase):
 
 # === Bouton « Chronologie » : client mocké ===
 #
-# Exceptions factices mirant exactement les noms/sémantiques d'
-# electricore_client.exceptions (le paquet réel peut être absent du sandbox
-# d'exécution des tests ; le module ne les utilise que par leur nom importé,
-# patché ci-dessous).
-
-
-class _FakeIngestionEnCours(Exception):
-    pass
-
-
-class _FakePreconditionNonRemplie(Exception):
-    pass
-
-
-class _FakeContractVersionError(Exception):
-    pass
-
-
-@contextmanager
-def _stream(lignes):
-    """Mime `JsonlStream` : context manager itérable."""
-    yield iter(lignes)
-
-
-def _fake_client(lignes=(), *, leve=None):
-    """Client factice : `.chronologie(rsc=)` renvoie un flux (context
-    manager) qui itère `lignes`, ou lève `leve` à l'ouverture."""
-    client = MagicMock()
-    if leve is not None:
-        client.chronologie.side_effect = leve
-    else:
-        client.chronologie.return_value = _stream(lignes)
-    return client
+# Les exceptions levées sont les vraies classes du module chronologie
+# (réelles si electricore_client est présent, stubs de la fabrique sinon,
+# ADR 0024/#222) : aucun échange de symbole par patch.
 
 
 @tagged('souscriptions', 'souscriptions_chronologie', 'post_install', '-at_install')
 class TestActionOuvrirChronologie(SouscriptionsTestCase):
     def setUp(self):
         super().setUp()
-        patcher_exc = patch.multiple(
-            chronologie_module,
-            IngestionEnCours=_FakeIngestionEnCours,
-            PreconditionNonRemplie=_FakePreconditionNonRemplie,
-            ContractVersionError=_FakeContractVersionError,
-        )
-        patcher_exc.start()
-        self.addCleanup(patcher_exc.stop)
         self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
 
     def _cliquer_avec_client(self, client, souscription=None):
         """Clique le bouton avec un client factice fourni directement par la
         fabrique (ADR 0024) : la garde paquet/config de la fabrique est
         testée une fois dans test_electricore_client_fabrique.py, pas ici."""
-        with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
+        with patcher_client_fabrique(client):
             return (souscription or self.souscription_base).action_ouvrir_chronologie()
 
     def test_sans_rsc_leve_userror_actionnable(self):
         """AC : sans RSC, UserError actionnable renvoyant vers la résolution
         RSC — pas de repli pdl (aucun appel au client)."""
         self.souscription_base.ref_situation_contractuelle = False
-        client = _fake_client([])
-        with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
+        client = client_flux_factice('chronologie', [])
+        with patcher_client_fabrique(client):
             with self.assertRaises(UserError) as cm:
                 self.souscription_base.action_ouvrir_chronologie()
         self.assertIn('RSC', str(cm.exception))
@@ -218,7 +177,7 @@ class TestActionOuvrirChronologie(SouscriptionsTestCase):
         """AC : les 3 types de lignes sont créés, scopés sur la souscription,
         au grain RSC (jamais pdl)."""
         lignes = [_ligne_evenement(), _ligne_releve(), _ligne_periode_energie()]
-        client = _fake_client(lignes)
+        client = client_flux_factice('chronologie', lignes)
 
         action = self._cliquer_avec_client(client)
 
@@ -236,7 +195,7 @@ class TestActionOuvrirChronologie(SouscriptionsTestCase):
         """AC : chaque clic purge et recrée les lignes de la souscription —
         pas de doublons, l'ancien contenu disparaît."""
         premier_lot = [_ligne_evenement(date='2024-01-01')]
-        self._cliquer_avec_client(_fake_client(premier_lot))
+        self._cliquer_avec_client(client_flux_factice('chronologie', premier_lot))
         premiere_ligne = self.env['souscription.chronologie.ligne'].search(
             [('souscription_id', '=', self.souscription_base.id)]
         )
@@ -244,7 +203,7 @@ class TestActionOuvrirChronologie(SouscriptionsTestCase):
         premier_id = premiere_ligne.id
 
         second_lot = [_ligne_releve(date='2024-02-01'), _ligne_periode_energie(date='2024-02-01')]
-        self._cliquer_avec_client(_fake_client(second_lot))
+        self._cliquer_avec_client(client_flux_factice('chronologie', second_lot))
 
         apres = self.env['souscription.chronologie.ligne'].search([('souscription_id', '=', self.souscription_base.id)])
         self.assertEqual(len(apres), 2, 'Le premier lot doit avoir été purgé, pas cumulé')
@@ -256,13 +215,13 @@ class TestActionOuvrirChronologie(SouscriptionsTestCase):
         autre = self.souscription_hphc
         autre.ref_situation_contractuelle = 'RSC-00000000000099'
         self._cliquer_avec_client(
-            _fake_client([_ligne_evenement(ref_situation_contractuelle='RSC-00000000000099')]),
+            client_flux_factice('chronologie', [_ligne_evenement(ref_situation_contractuelle='RSC-00000000000099')]),
             souscription=autre,
         )
         ligne_autre = self.env['souscription.chronologie.ligne'].search([('souscription_id', '=', autre.id)])
         self.assertEqual(len(ligne_autre), 1)
 
-        self._cliquer_avec_client(_fake_client([_ligne_releve()]))
+        self._cliquer_avec_client(client_flux_factice('chronologie', [_ligne_releve()]))
 
         self.assertEqual(
             self.env['souscription.chronologie.ligne'].search_count([('souscription_id', '=', autre.id)]),
@@ -271,19 +230,23 @@ class TestActionOuvrirChronologie(SouscriptionsTestCase):
         )
 
     def test_ingestion_en_cours_mappee_en_userror_reessayable(self):
-        client = _fake_client(leve=_FakeIngestionEnCours('verrou'))
+        client = client_flux_factice('chronologie', leve=chronologie_module.IngestionEnCours('verrou'))
         with self.assertRaises(UserError) as cm:
             self._cliquer_avec_client(client)
         self.assertIn('plus tard', str(cm.exception))
 
     def test_precondition_non_remplie_mappee_en_userror_actionnable(self):
-        client = _fake_client(leve=_FakePreconditionNonRemplie('réconciliez les RSC avant de facturer'))
+        client = client_flux_factice(
+            'chronologie', leve=chronologie_module.PreconditionNonRemplie('réconciliez les RSC avant de facturer')
+        )
         with self.assertRaises(UserError) as cm:
             self._cliquer_avec_client(client)
         self.assertIn('réconciliez les RSC', str(cm.exception))
 
     def test_contract_version_error_mappee_en_userror(self):
-        client = _fake_client(leve=_FakeContractVersionError('serveur v2 < attendu v3'))
+        client = client_flux_factice(
+            'chronologie', leve=chronologie_module.ContractVersionError('serveur v2 < attendu v3')
+        )
         with self.assertRaises(UserError) as cm:
             self._cliquer_avec_client(client)
         self.assertIn('v2', str(cm.exception))
@@ -291,14 +254,16 @@ class TestActionOuvrirChronologie(SouscriptionsTestCase):
     def test_erreur_ne_purge_pas_les_lignes_dun_clic_precedent(self):
         """Le flux est matérialisé avant toute écriture (#200) : une erreur
         réseau/contrat n'efface jamais un affichage déjà réussi."""
-        self._cliquer_avec_client(_fake_client([_ligne_evenement()]))
+        self._cliquer_avec_client(client_flux_factice('chronologie', [_ligne_evenement()]))
         avant = self.env['souscription.chronologie.ligne'].search_count(
             [('souscription_id', '=', self.souscription_base.id)]
         )
         self.assertEqual(avant, 1)
 
         with self.assertRaises(UserError):
-            self._cliquer_avec_client(_fake_client(leve=_FakeIngestionEnCours('verrou')))
+            self._cliquer_avec_client(
+                client_flux_factice('chronologie', leve=chronologie_module.IngestionEnCours('verrou'))
+            )
 
         apres = self.env['souscription.chronologie.ligne'].search_count(
             [('souscription_id', '=', self.souscription_base.id)]

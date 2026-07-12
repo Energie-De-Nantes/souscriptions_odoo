@@ -122,13 +122,23 @@ fi
 
 assert_garde_fous() {
     # Garde-fous fail-closed niveau base (charte migration : aucun mail sortant, aucun SEPA
-    # généré sur une cible qui porte de vraies données). `to_regclass` rend le compte SEPA
-    # robuste à un `account_batch_payment` absent (module non chargé) sans faire échouer la requête.
-    local mail_servers sepa_batches
+    # généré sur une cible qui porte de vraies données). Le compte SEPA se fait en deux temps :
+    # Postgres résout TOUTES les tables d'une requête au parsing, donc un `CASE to_regclass(...)`
+    # dans la même requête ne protège pas d'un `account_batch_payment` absent (module Enterprise,
+    # jamais présent sur l'image community). Table absente = aucun SEPA possible = 0.
+    local mail_servers sepa_table sepa_batches
     mail_servers=$("${COMPOSE[@]}" exec -T db psql -U odoo -d "$DB" -tAc \
         "SELECT count(*) FROM ir_mail_server" 2>/dev/null || echo ERR)
-    sepa_batches=$("${COMPOSE[@]}" exec -T db psql -U odoo -d "$DB" -tAc \
-        "SELECT CASE WHEN to_regclass('public.account_batch_payment') IS NULL THEN 0 ELSE (SELECT count(*) FROM account_batch_payment) END" 2>/dev/null || echo ERR)
+    sepa_table=$("${COMPOSE[@]}" exec -T db psql -U odoo -d "$DB" -tAc \
+        "SELECT to_regclass('public.account_batch_payment')" 2>/dev/null || echo ERR)
+    if [ "$sepa_table" = "ERR" ]; then
+        sepa_batches=ERR
+    elif [ -z "$sepa_table" ]; then
+        sepa_batches=0
+    else
+        sepa_batches=$("${COMPOSE[@]}" exec -T db psql -U odoo -d "$DB" -tAc \
+            "SELECT count(*) FROM account_batch_payment" 2>/dev/null || echo ERR)
+    fi
     if [ "$mail_servers" != "0" ]; then
         echo "Garde-fou violé ($1) : ir.mail_server non vide sur '$DB' (mail sortant configuré)." >&2
         exit 1

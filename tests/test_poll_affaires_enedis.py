@@ -2,17 +2,19 @@
 motifs, grâce de 3 jours, alertes sans spam, résolution en cours de vie,
 échec réseau silencieux (ADR 0021 §3-4).
 
-Réutilise la couture de #88 (socle commun #222) : on patche `_appeler`, la
-méthode transport du service RSC, avec des réponses en boîte. La grâce est
-testée en antidatant `id_affaire_date_saisie` — pas de mock du temps.
+Réutilise la couture de #88 : on patche `_appeler`, la méthode transport du
+service RSC, avec des réponses en boîte. La grâce est testée en antidatant
+`id_affaire_date_saisie` — pas de mock du temps.
 """
 
 from datetime import date, timedelta
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from odoo.addons.souscriptions_odoo.models.core import electricore_rsc_service as service_module
 from odoo.tests.common import tagged
 
-from .common import SouscriptionsTestCase, patcher_transport, resultat_rsc
+from .common import SouscriptionsTestCase
 
 _SERVICE = service_module.SouscriptionRscService
 
@@ -21,12 +23,15 @@ _MOTIF_SANS_C15 = (
 )
 
 
-def _patch_appeler(return_value=None, side_effect=None):
-    return patcher_transport(_SERVICE, '_appeler', return_value=return_value, side_effect=side_effect)
+def _resultat(id_affaire, rsc=None, error=None):
+    return SimpleNamespace(id_affaire=id_affaire, ref_situation_contractuelle=rsc, error=error)
 
 
 @tagged('souscriptions', 'souscriptions_poll_rsc', 'post_install', '-at_install')
 class TestPollAffairesEnedis(SouscriptionsTestCase):
+    def _patch_appeler(self, return_value=None, side_effect=None):
+        return patch.object(_SERVICE, '_appeler', return_value=return_value, side_effect=side_effect)
+
     def create_demande_avec_souscription(self, id_affaire=None, email='poll-rsc@example.com'):
         """Demande complète menée jusqu'à « Accepté et IBAN vérifié » (#101 —
         naissance de la Souscription) : mode virement, pas de garde IBAN à
@@ -86,10 +91,10 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
             }
         )
 
-        with _patch_appeler(
+        with self._patch_appeler(
             return_value=[
-                resultat_rsc('AFF-CIBLE-1', error=_MOTIF_SANS_C15),
-                resultat_rsc('AFF-CIBLE-2', error=_MOTIF_SANS_C15),
+                _resultat('AFF-CIBLE-1', error=_MOTIF_SANS_C15),
+                _resultat('AFF-CIBLE-2', error=_MOTIF_SANS_C15),
             ]
         ) as mock_appeler:
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
@@ -104,7 +109,7 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
     def test_lot_vide_naboutit_pas_a_un_appel(self):
         self.assertFalse(self.souscription_base.id_affaire)
         self.assertFalse(self.souscription_hphc.id_affaire)
-        with _patch_appeler() as mock_appeler:
+        with self._patch_appeler() as mock_appeler:
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
         mock_appeler.assert_not_called()
 
@@ -115,7 +120,7 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
         demande = self.create_demande_avec_souscription(id_affaire='AFF-SILENCE')
         souscription = demande.souscription_id
 
-        with _patch_appeler(return_value=[resultat_rsc('AFF-SILENCE', error=_MOTIF_SANS_C15)]):
+        with self._patch_appeler(return_value=[_resultat('AFF-SILENCE', error=_MOTIF_SANS_C15)]):
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
 
         self.assertEqual(souscription.motif_resolution_rsc, _MOTIF_SANS_C15)
@@ -128,7 +133,7 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
         demande = self.create_demande_avec_souscription(id_affaire='AFF-AMBIGUE')
         motif = "Résolution ambiguë : 2 situations contractuelles pour l'affaire AFF-AMBIGUE (X, Y)."
 
-        with _patch_appeler(return_value=[resultat_rsc('AFF-AMBIGUE', error=motif)]):
+        with self._patch_appeler(return_value=[_resultat('AFF-AMBIGUE', error=motif)]):
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
 
         self.assertEqual(demande.kanban_state, 'blocked')
@@ -140,7 +145,7 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
         souscription = demande.souscription_id
         souscription.write({'id_affaire_date_saisie': date.today() - timedelta(days=3)})
 
-        with _patch_appeler(return_value=[resultat_rsc('AFF-GRACE', error='Affaire inconnue : AFF-GRACE')]):
+        with self._patch_appeler(return_value=[_resultat('AFF-GRACE', error='Affaire inconnue : AFF-GRACE')]):
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
 
         self.assertEqual(demande.kanban_state, 'normal')
@@ -152,8 +157,8 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
         souscription = demande.souscription_id
         souscription.write({'id_affaire_date_saisie': date.today() - timedelta(days=4)})
 
-        with _patch_appeler(
-            return_value=[resultat_rsc('AFF-GRACE-EXPIREE', error='Affaire inconnue : AFF-GRACE-EXPIREE')]
+        with self._patch_appeler(
+            return_value=[_resultat('AFF-GRACE-EXPIREE', error='Affaire inconnue : AFF-GRACE-EXPIREE')]
         ):
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
 
@@ -166,7 +171,7 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
         demande = self.create_demande_avec_souscription(id_affaire='AFF-SPAM')
         motif = "Résolution ambiguë : 2 situations contractuelles pour l'affaire AFF-SPAM (X, Y)."
 
-        with _patch_appeler(return_value=[resultat_rsc('AFF-SPAM', error=motif)]):
+        with self._patch_appeler(return_value=[_resultat('AFF-SPAM', error=motif)]):
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
 
@@ -179,12 +184,12 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
         souscription = demande.souscription_id
         motif = "Résolution ambiguë : 2 situations contractuelles pour l'affaire AFF-RESOUT (X, Y)."
 
-        with _patch_appeler(return_value=[resultat_rsc('AFF-RESOUT', error=motif)]):
+        with self._patch_appeler(return_value=[_resultat('AFF-RESOUT', error=motif)]):
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
         self.assertEqual(demande.kanban_state, 'blocked')
         self.assertEqual(len(demande.activity_ids), 1)
 
-        with _patch_appeler(return_value=[resultat_rsc('AFF-RESOUT', rsc='RSC-RESOLUE')]):
+        with self._patch_appeler(return_value=[_resultat('AFF-RESOUT', rsc='RSC-RESOLUE')]):
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
 
         self.assertEqual(souscription.ref_situation_contractuelle, 'RSC-RESOLUE')
@@ -203,7 +208,7 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
         )
         motif = "Résolution ambiguë : 2 situations contractuelles pour l'affaire AFF-SANS-DEMANDE (X, Y)."
 
-        with _patch_appeler(return_value=[resultat_rsc('AFF-SANS-DEMANDE', error=motif)]):
+        with self._patch_appeler(return_value=[_resultat('AFF-SANS-DEMANDE', error=motif)]):
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
 
         self.assertEqual(len(souscription.activity_ids), 1)
@@ -214,7 +219,7 @@ class TestPollAffairesEnedis(SouscriptionsTestCase):
         demande = self.create_demande_avec_souscription(id_affaire='AFF-RESEAU')
         souscription = demande.souscription_id
 
-        with _patch_appeler(side_effect=ConnectionError('timeout')):
+        with self._patch_appeler(side_effect=ConnectionError('timeout')):
             self.env['souscription.souscription']._cron_poll_affaires_enedis()
 
         self.assertEqual(souscription.etat, 'en_instance')

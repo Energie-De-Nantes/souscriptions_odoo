@@ -8,9 +8,9 @@ Pas de persistance métier : electricore reste autoritaire, on ne re-mirroire
 aucune donnée réseau (CONTEXT.md, ADR 0001/0019).
 
 Grain `rsc` uniquement (pas de repli `pdl` — une seconde action dédiée
-pourrait un jour exposer la vue point, hors périmètre ici). Exceptions du
-mapping ré-exportées par la fabrique (ADR 0024, #222), même posture que le
-wizard de pull des méta-périodes (`souscription_pull_meta_periodes_wizard.py`) :
+pourrait un jour exposer la vue point, hors périmètre ici). Garde d'import +
+mapping d'exceptions locaux à ce module, même posture que le wizard de pull
+des méta-périodes (`souscription_pull_meta_periodes_wizard.py`, ADR 0024) :
 la fabrique s'arrête à « rends-moi un client configuré », chaque appelant
 garde son appel d'endpoint et son propre mapping.
 """
@@ -20,7 +20,23 @@ from __future__ import annotations
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
-from .electricore_client_fabrique import ContractVersionError, IngestionEnCours, PreconditionNonRemplie
+# Garde d'import minimale (ADR 0024) : seules les exceptions du mapping de ce
+# module sont importées ici — la construction du client (garde + drapeau +
+# config) vit dans la fabrique. Si le paquet est absent, la fabrique lève
+# avant qu'aucune de ces exceptions ne puisse être levée.
+try:
+    from electricore_client import ContractVersionError, IngestionEnCours
+    from electricore_client.exceptions import PreconditionNonRemplie
+except ImportError:  # pragma: no cover - paquet optionnel ; la fabrique lève avant tout mapping
+
+    class ContractVersionError(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
+    class IngestionEnCours(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
+    class PreconditionNonRemplie(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
 
 
 class SouscriptionChronologieLigne(models.Model):

@@ -9,15 +9,17 @@ exactement comme dans ces suites. Créer/émettre factures délèguent à
 Dates dans la couverture de la grille de prix fixture (2024, tests/common.py).
 """
 
+from contextlib import contextmanager
 from datetime import date
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
+from odoo.addons.souscriptions_odoo.models.core import electricore_client_fabrique as fabrique_module
 from odoo.addons.souscriptions_odoo.models.core import souscription_refacturation as refacturation_module
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
-from .common import SouscriptionsTestCase, client_flux_factice, patcher_client_fabrique, patcher_transport
+from .common import SouscriptionsTestCase
 
 
 def _periode_meta(**kwargs):
@@ -48,6 +50,21 @@ def _periode_meta(**kwargs):
     return SimpleNamespace(**base)
 
 
+@contextmanager
+def _stream(metas):
+    yield iter(metas)
+
+
+def _fake_electricore_client(metas=()):
+    client = MagicMock()
+    # Un @contextmanager est à usage unique. Le vrai client rend un flux frais à
+    # chaque appel de meta_periodes() ; on le mime avec side_effect (rappelé par
+    # appel) et non return_value (une seule instance réutilisée → le 2e run du
+    # test d'idempotence ré-entrait un CM déjà consommé → AttributeError, #158).
+    client.meta_periodes.side_effect = lambda *args, **kwargs: _stream(metas)
+    return client
+
+
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
     MOIS = date(2024, 3, 1)
@@ -63,8 +80,8 @@ class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
         """AC #176 : le bouton n'ouvre plus de fenêtre — il tire directement
         (Périmètre de campagne du mois) et retourne un toast, pas une
         ouverture de fenêtre."""
-        client = client_flux_factice('meta_periodes', [_periode_meta()])
-        with patcher_client_fabrique(client):
+        client = _fake_electricore_client([_periode_meta()])
+        with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
             action = self.campagne.action_pull_meta_periodes()
 
         self.assertEqual(action['type'], 'ir.actions.client')
@@ -86,8 +103,8 @@ class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
         n'interrompt pas le lot, apparaît au compteur d'erreurs, et rend le
         toast sticky."""
         meta_invalide = _periode_meta(debut=None)  # déclenche une erreur de mapping (Date invalide)
-        client = client_flux_factice('meta_periodes', [meta_invalide])
-        with patcher_client_fabrique(client):
+        client = _fake_electricore_client([meta_invalide])
+        with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
             action = self.campagne.action_pull_meta_periodes()
 
         params = action['params']
@@ -98,9 +115,9 @@ class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
     def test_pull_idempotent_via_la_campagne(self):
         """AC #176 : rejouer le pull deux fois ne double pas la période
         (create-missing-only préservé, #77/#158)."""
-        client = client_flux_factice('meta_periodes', [_periode_meta()])
+        client = _fake_electricore_client([_periode_meta()])
         for _run in range(2):
-            with patcher_client_fabrique(client):
+            with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
                 self.campagne.action_pull_meta_periodes()
 
         periode = self.env['souscription.periode'].search(
@@ -112,8 +129,8 @@ class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
         """`action_executer` de la ligne d'étape « pull » délègue à
         `campagne.action_pull_meta_periodes` — un seul point de dispatch (#158)."""
         etape = self.campagne.etape_ids.filtered(lambda e: e.code == 'pull_meta_periodes')
-        client = client_flux_factice('meta_periodes', [])
-        with patcher_client_fabrique(client):
+        client = _fake_electricore_client([])
+        with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
             action = etape.action_executer()
         self.assertEqual(action['tag'], 'display_notification')
 
@@ -121,8 +138,8 @@ class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
         """Non-régression : le wizard « Récupérer les périodes du mois » et
         son bouton d'en-tête restent inchangés (chemin secondaire, #176)."""
         wizard = self.env['souscription.pull.meta.periodes.wizard'].create({'mois': self.MOIS})
-        client = client_flux_factice('meta_periodes', [_periode_meta()])
-        with patcher_client_fabrique(client):
+        client = _fake_electricore_client([_periode_meta()])
+        with patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client):
             action = wizard.action_lancer()
 
         self.assertEqual(action['type'], 'ir.actions.act_window')
@@ -137,7 +154,7 @@ class TestCampagneEtapeSyncF15(SouscriptionsTestCase):
     def setUp(self):
         super().setUp()
         self.fake_client = MagicMock(url='https://electricore.example.test', api_key='fake-api-key')
-        patcher = patcher_client_fabrique(self.fake_client)
+        patcher = patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=self.fake_client)
         patcher.start()
         self.addCleanup(patcher.stop)
         self.souscription_base.with_context(rsc_automatisme=True).write(
@@ -158,9 +175,7 @@ class TestCampagneEtapeSyncF15(SouscriptionsTestCase):
             'prix_unitaire': 30.37,
             'quantite': 1.0,
         }
-        with patcher_transport(
-            refacturation_module.SouscriptionRefacturation, '_tirer_prestations', return_value=[ligne]
-        ):
+        with patch.object(refacturation_module.SouscriptionRefacturation, '_tirer_prestations', return_value=[ligne]):
             self.campagne.action_sync_f15()
 
         presta = self.env['souscription.refacturation'].search([('reference', '=', 'F15-CAMPAGNE-001')])
@@ -168,7 +183,7 @@ class TestCampagneEtapeSyncF15(SouscriptionsTestCase):
 
     def test_bouton_generique_dispatch_vers_sync_f15(self):
         etape = self.campagne.etape_ids.filtered(lambda e: e.code == 'sync_f15')
-        with patcher_transport(refacturation_module.SouscriptionRefacturation, '_tirer_prestations', return_value=[]):
+        with patch.object(refacturation_module.SouscriptionRefacturation, '_tirer_prestations', return_value=[]):
             action = etape.action_executer()
         self.assertEqual(action['type'], 'ir.actions.client')
 
@@ -180,7 +195,7 @@ class TestCampagneEtapeSyncF15(SouscriptionsTestCase):
         self.assertFalse(sync.fait)
         self.assertEqual(verif.etat_prerequis, 'bloquee')
 
-        with patcher_transport(refacturation_module.SouscriptionRefacturation, '_tirer_prestations', return_value=[]):
+        with patch.object(refacturation_module.SouscriptionRefacturation, '_tirer_prestations', return_value=[]):
             sync.action_executer()
         self.campagne.etape_ids.invalidate_recordset()
 

@@ -5,7 +5,7 @@ Le client electricore est acquis auprès de la fabrique unique
 `souscription.electricore.client` (ADR 0024) : ce module ne porte plus ni
 garde d'import, ni drapeau de disponibilité, ni lecture de config — seul son
 propre appel d'endpoint (`resoudre_rsc` en lot) et son mapping d'exception
-(`ContractVersionError`, ré-exportée par la fabrique — #222).
+(`ContractVersionError`).
 
 C'est l'unique point du module qui parle réseau pour la résolution RSC ; le
 pull des périodes (#12) s'y branchera plus tard.
@@ -16,7 +16,13 @@ from __future__ import annotations
 from odoo import models
 from odoo.exceptions import UserError
 
-from .electricore_client_fabrique import ContractVersionError
+try:
+    from electricore_client import ContractVersionError
+except ImportError:  # pragma: no cover - paquet optionnel (ADR 0024) ; la fabrique lève avant tout mapping
+
+    class ContractVersionError(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique — la fabrique
+        (`souscription.electricore.client`) échoue avant tout appel qui pourrait la lever."""
 
 
 class SouscriptionRscService(models.AbstractModel):

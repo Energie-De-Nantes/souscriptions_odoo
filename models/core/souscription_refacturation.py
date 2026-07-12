@@ -3,10 +3,24 @@ import logging
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
-# Exceptions du mapping de ce module, ré-exportées par la fabrique unique
-# (ADR 0024, #222) : la construction du client (garde + drapeau + config) vit
-# dans la fabrique, seule la correspondance d'exceptions reste ici.
-from .electricore_client_fabrique import ContractVersionError, IngestionEnCours, PreconditionNonRemplie
+# Garde d'import minimale (ADR 0024) : seules les exceptions du mapping de ce
+# module sont importées ici — la construction du client (garde + drapeau +
+# config) vit dans la fabrique. Si le paquet est absent, la fabrique lève
+# avant qu'aucune de ces exceptions ne puisse être levée.
+try:
+    from electricore_client import ContractVersionError, IngestionEnCours
+    from electricore_client.exceptions import PreconditionNonRemplie
+except ImportError:  # pragma: no cover - paquet optionnel ; la fabrique lève avant tout mapping
+
+    class ContractVersionError(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
+    class IngestionEnCours(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
+    class PreconditionNonRemplie(Exception):
+        """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
 
 _logger = logging.getLogger(__name__)
 

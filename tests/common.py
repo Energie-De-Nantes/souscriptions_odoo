@@ -2,64 +2,9 @@
 Helpers et mixins communs pour les tests du module souscriptions.
 """
 
-from contextlib import contextmanager
 from datetime import date
-from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
 
-from odoo.addons.souscriptions_odoo.models.core import electricore_client_fabrique as _fabrique_module
 from odoo.tests.common import TransactionCase
-
-# --- Couture de test electricore (ADR 0024 §6, #222) ---
-#
-# Aucun faux transport complet : on patche soit la méthode de transport
-# NOMMÉE de l'appelant (`_appeler`, `_tirer_prestations`...), soit — pour les
-# endpoints en flux (meta_periodes/chronologie) — le client rendu par la
-# fabrique unique. Partagé par toutes les suites d'endpoint (résolution RSC,
-# pull méta-périodes, sync F15, chronologie).
-
-
-def patcher_transport(model_cls, method_name, *, return_value=None, side_effect=None):
-    """Patch de la méthode de transport nommée d'un appelant — la couture de
-    test décidée par ADR 0024 §6. Seul le point qui parle réseau est
-    remplacé ; mapping et écriture restent réels."""
-    return patch.object(model_cls, method_name, return_value=return_value, side_effect=side_effect)
-
-
-def patcher_client_fabrique(client):
-    """Patch la fabrique unique (`souscription.electricore.client`, ADR 0024)
-    pour qu'elle rende `client` sans construire de vrai client ni lire la
-    config — la garde paquet/config est testée une fois dans
-    test_electricore_client_fabrique.py, jamais re-testée par les suites
-    d'endpoint."""
-    return patch.object(_fabrique_module.SouscriptionElectricoreClient, 'client', return_value=client)
-
-
-@contextmanager
-def flux_electricore(items):
-    """Mime un `JsonlStream` electricore : context manager itérable à usage
-    unique (cf. electricore_client.streaming.JsonlStream)."""
-    yield iter(items)
-
-
-def client_flux_factice(endpoint, items=(), *, leve=None):
-    """Client electricore factice dont l'unique endpoint en flux (`meta_periodes`
-    ou `chronologie`) rend `items`, ou lève `leve` — à l'ouverture, à chaque
-    appel (`side_effect`, jamais `return_value` : un flux est à usage unique,
-    un `MagicMock` en `return_value` casse un 2ᵉ appel, #158)."""
-    client = MagicMock()
-    method = getattr(client, endpoint)
-    if leve is not None:
-        method.side_effect = leve
-    else:
-        method.side_effect = lambda *args, **kwargs: flux_electricore(items)
-    return client
-
-
-def resultat_rsc(id_affaire, rsc=None, error=None):
-    """Stub duck-typé de `ResultatResolutionRsc` (contrat RSC, xor rsc/error)."""
-    return SimpleNamespace(id_affaire=id_affaire, ref_situation_contractuelle=rsc, error=error)
-
 
 # Tarif d'abonnement affine (ADR 0018) : base 3 kVA + coefficient par kVA.
 # prix_an(P) = base + coef * (P - 3)

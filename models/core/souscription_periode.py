@@ -681,6 +681,11 @@ class SouscriptionPeriode(models.Model):
         self.ensure_one()
         if self.lisse_periode:
             return
+        if self.facture_id or self.facture_legacy_ref:
+            # Le facturé gelé (ADR 0030) : une Période encore facturée garde sa
+            # provision scellée — refacturer sans dé-figer compose sur le gelé,
+            # même condition que le verrou de write().
+            return
         self.write(
             {
                 'provision_hp_kwh': self.energie_hp_kwh,

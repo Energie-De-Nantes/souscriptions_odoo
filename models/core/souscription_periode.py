@@ -294,11 +294,22 @@ class SouscriptionPeriode(models.Model):
 
         return super().create(vals_list)
 
-    # Champs facturables figés : dès qu'une facture référence la période, les
+    # Champs **facturés**, gelés : dès qu'une facture référence la période, les
     # réécrire désaccorderait la facture de la période. Le verrou (#14) les
     # protège ; les champs techniques/calculés (facture_id, facture_state,
     # mois_annee, jours…) restent recalculables par l'ORM (passe par _write, pas
     # par ce write public).
+    #
+    # Le **mesuré** — l'atterrissage réseau v3 (énergies par cadran, verdicts,
+    # TURPE fixe/variable, CTA, taux d'accise, puissance moyenne, empreinte) —
+    # est volontairement ABSENT de cette liste (ADR 0030 décision 1, #235) :
+    # exemption chirurgicale du verrou, il redevient réécrivable après
+    # facturation, gardé par l'empreinte côté pull
+    # (`souscription.pull.meta.periodes.service`) et à la main par le·la
+    # facturiste (correction directe). Seul le **facturé** — provisions, jours
+    # (dérivé de date_debut/date_fin, tous deux ici), snapshot contractuel,
+    # relevés-justificatifs (verrou propre, souscription_releve.py) — reste
+    # verrouillé ; aucun canal de pull n'écrit jamais `provision_*`.
     _LOCKED_FIELDS = frozenset(
         {
             'date_debut',
@@ -307,18 +318,9 @@ class SouscriptionPeriode(models.Model):
             'lisse',
             'config_cadrans',
             'type_periode',
-            'energie_hph_kwh',
-            'energie_hpb_kwh',
-            'energie_hch_kwh',
-            'energie_hcb_kwh',
-            'energie_hp_kwh',
-            'energie_hc_kwh',
-            'energie_base_kwh',
             'provision_hp_kwh',
             'provision_hc_kwh',
             'provision_base_kwh',
-            'turpe_fixe',
-            'turpe_variable',
             'type_tarif_periode',
             'tarif_solidaire_periode',
             'regime_prix_periode',
@@ -326,16 +328,10 @@ class SouscriptionPeriode(models.Model):
             'puissance_souscrite_periode',
             'provision_mensuelle_kwh_periode',
             'coeff_pro_periode',
-            # Identité et atterrissage v3 (#76, ADR 0020 §7) : figés au même titre
-            # que le reste du snapshot dès qu'une facture référence la période.
+            # Identité (#76, ADR 0020 §7, ADR 0010) : snapshot au même titre
+            # que le reste du contrat — jamais réécrite par le pull (la clé
+            # (RSC, mois) se lit sur la Souscription courante, pas la Période).
             'ref_situation_contractuelle',
-            'qualite',
-            'statut_communication',
-            'has_changement',
-            'source_hash',
-            'cta_eur',
-            'taux_accise_eur_mwh',
-            'puissance_moyenne_kva',
             # Référence de la facture legacy (#107) : au même titre que
             # facture_id, sa présence fige la période — l'écraser romprait le
             # lien vers la facture prod sans passer par le verrou.
@@ -624,18 +620,7 @@ class SouscriptionPeriode(models.Model):
             'date_debut': fields.Date.to_date(meta.debut),
             'date_fin': fields.Date.to_date(meta.fin),
             'type_periode': 'mensuelle',
-            'puissance_moyenne_kva': meta.puissance_moyenne_kva or 0.0,
-            'energie_base_kwh': meta.energie_base_kwh or 0.0,
-            'energie_hp_kwh': meta.energie_hp_kwh or 0.0,
-            'energie_hc_kwh': meta.energie_hc_kwh or 0.0,
-            'turpe_fixe': meta.turpe_fixe_eur or 0.0,
-            'turpe_variable': meta.turpe_variable_eur or 0.0,
-            'cta_eur': meta.cta_eur or 0.0,
-            'taux_accise_eur_mwh': meta.taux_accise_eur_mwh or 0.0,
-            'has_changement': bool(meta.has_changement),
-            'qualite': meta.qualite or 'incalculable',
-            'statut_communication': meta.statut_communication or False,
-            'source_hash': meta.source_hash,
+            **self._vals_atterrissage_v3(meta),
             'releve_ids': [(0, 0, self._releve_vals_depuis_objet(releve)) for releve in (meta.releves_utilises or [])],
         }
         return self.create(vals)
@@ -658,6 +643,56 @@ class SouscriptionPeriode(models.Model):
             'releve_externe_id': releve.releve_id,
             'origine': releve.evenement or releve.origine_releve,
         }
+
+    # Champs de l'atterrissage v3 rafraîchis EN BLOC par le pull (ADR 0030
+    # décision 1, #235) — jamais d'énergie fraîche sur TURPE périmé : un seul
+    # `write()`. Volontairement absents : `date_debut`/`date_fin`/
+    # `type_periode`/`ref_situation_contractuelle` (identité, jamais réécrite
+    # par le pull) et `provision_*` (le facturé, jamais écrit par aucun canal
+    # de pull).
+    def _vals_atterrissage_v3(self, meta):
+        return {
+            'puissance_moyenne_kva': meta.puissance_moyenne_kva or 0.0,
+            'energie_base_kwh': meta.energie_base_kwh or 0.0,
+            'energie_hp_kwh': meta.energie_hp_kwh or 0.0,
+            'energie_hc_kwh': meta.energie_hc_kwh or 0.0,
+            'turpe_fixe': meta.turpe_fixe_eur or 0.0,
+            'turpe_variable': meta.turpe_variable_eur or 0.0,
+            'cta_eur': meta.cta_eur or 0.0,
+            'taux_accise_eur_mwh': meta.taux_accise_eur_mwh or 0.0,
+            'has_changement': bool(meta.has_changement),
+            'qualite': meta.qualite or 'incalculable',
+            'statut_communication': meta.statut_communication or False,
+            'source_hash': meta.source_hash,
+        }
+
+    def _rafraichir_depuis_meta(self, meta):
+        """Rafraîchit une Période **déjà amorcée** depuis une nouvelle `meta`
+        (#235, ADR 0030 décision 1) : appelée par
+        `souscription.pull.meta.periodes.service` une fois l'empreinte jugée
+        nouvelle et le verdict fiable (`réelle`/`estimée`) — cette méthode
+        écrit **inconditionnellement**, la garde vit chez l'appelant.
+
+        Écrase l'atterrissage réseau v3 **en bloc** (`_vals_atterrissage_v3`) —
+        un seul `write()`, jamais d'énergie fraîche sur TURPE périmé. Passe
+        par `write()` (pas d'écriture directe) : l'exemption ciblée du verrou
+        de facturation (#14, cf. `_LOCKED_FIELDS`) rend cette écriture valide
+        même sur une Période facturée — c'est précisément ce qui réalise « le
+        mesuré vivant » d'ADR 0030.
+
+        Relevés : remplacés **en bloc** (`releve_ids`, le re-pull promis par
+        ADR 0015) **seulement si la Période n'est pas encore facturée** — sur
+        une Période facturée, le relevé-justificatif reste figé (verrou propre
+        de `souscription.releve`, jamais contourné ici) et `releve_ids` est
+        absent des vals, donc intact.
+        """
+        self.ensure_one()
+        vals = self._vals_atterrissage_v3(meta)
+        if not (self.facture_id or self.facture_legacy_ref):
+            vals['releve_ids'] = [(5, 0, 0)] + [
+                (0, 0, self._releve_vals_depuis_objet(releve)) for releve in (meta.releves_utilises or [])
+            ]
+        self.write(vals)
 
     def _tamponner_provision(self):
         """Tamponne ``provision_* := energie_*`` (par cadran facturé) sur une

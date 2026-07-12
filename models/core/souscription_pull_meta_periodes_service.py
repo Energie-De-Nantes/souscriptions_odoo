@@ -37,7 +37,7 @@ Deux scopes partagent cette politique (ADR 0030 conséquences) :
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from odoo import fields, models
 from odoo.exceptions import UserError
@@ -224,3 +224,105 @@ class SouscriptionPullMetaPeriodesService(models.AbstractModel):
         manager). Seul endroit qui parle réseau — c'est la couture patchée en
         tests (réponses en boîte, rien d'autre n'est mocké)."""
         return client.meta_periodes(mois=mois_str, rsc=rsc)
+
+    # === Pull des sorties C15 (#246, ADR 0031 décisions 1-2, tranche 1 du
+    # chantier résiliations #21) : `date_fin` gouvernée par le fait C15, à
+    # auteur unique. Application directe, pas de modèle-file — la sortie
+    # porte deux scalaires qui se projettent intégralement (date -> date_fin,
+    # provenance -> chatter). `sorties()` est un RPC (pas un flux) : une RSC
+    # encore présente ou inconnue n'apparaît simplement pas dans la réponse
+    # (cas nominal « pas sortie »), jamais d'erreur.
+
+    def pull_sorties(self, souscriptions):
+        """Pull des sorties C15 sur toutes les souscriptions non résiliées à
+        RSC de `souscriptions` — périmètre déjà voulu par l'appelant (bouton
+        autonome ; le câblage dans l'ordre de la campagne relève de la
+        tranche 3 du chantier #21).
+
+        Idempotence par comparaison de champ (`_appliquer_une_sortie`) :
+        absente -> écrit + chatter (code C15, date brute) ; identique ->
+        noop strict (aucune écriture, aucune trace) ; différente (Enedis
+        redate) -> corrige + trace. `CFNS` est strictement équivalent à
+        `RES` : le code n'apparaît qu'au message, jamais de branche
+        comportementale.
+
+        Args:
+            souscriptions: le périmètre déjà voulu par l'appelant — seules
+                les souscriptions à RSC résolue participent à l'appel.
+
+        Returns:
+            tuple[list[str], list[str], list[str], list[str]]: `(ecrites,
+            corrigees, inchangees, erreurs)`, quatre listes de libellés
+            consommées par la notification du bouton.
+        """
+        client = self.env['souscription.electricore.client'].client()
+        par_rsc = {s.ref_situation_contractuelle: s for s in souscriptions if s.ref_situation_contractuelle}
+
+        ecrites, corrigees, inchangees, erreurs = [], [], [], []
+        if not par_rsc:
+            return ecrites, corrigees, inchangees, erreurs
+
+        try:
+            lignes = self._appeler_sorties(client, list(par_rsc))
+        except IngestionEnCours:
+            raise UserError("L'ingestion electricore est en cours (verrou base) : réessayez plus tard.")
+        except PreconditionNonRemplie as exc:
+            raise UserError(f'Précondition non remplie côté electricore : {exc}')
+        except ContractVersionError as exc:
+            raise UserError(f'Contrat electricore obsolète : {exc}')
+
+        for ligne in lignes:
+            souscription = par_rsc.get(ligne.ref_situation_contractuelle)
+            if souscription is None:
+                continue  # RSC hors du filtre demandé, ignorée silencieusement
+            try:
+                # Savepoint par élément (skip-and-report, ADR 0011) : une
+                # ligne invalide ne doit ni écrire de résultat partiel ni
+                # casser le curseur pour les lignes suivantes du même lot.
+                with self.env.cr.savepoint():
+                    self._appliquer_une_sortie(
+                        souscription, ligne, ecrites=ecrites, corrigees=corrigees, inchangees=inchangees
+                    )
+            except Exception as exc:
+                erreurs.append(f'{souscription.name} ({ligne.ref_situation_contractuelle}) : {exc}')
+
+        return ecrites, corrigees, inchangees, erreurs
+
+    def _appliquer_une_sortie(self, souscription, ligne, *, ecrites, corrigees, inchangees):
+        """Idempotence par comparaison de champ (ADR 0031 décision 2).
+
+        Convention de borne : le C15 est demi-ouvert (« sortie le J » =
+        absente dès J) -> dernier jour servi, `date_fin = date_sortie - 1
+        jour` — la conversion vit à cette couture et nulle part ailleurs
+        (préserve la lecture inclusive déjà codée par `_compute_etat` et le
+        périmètre de campagne)."""
+        date_fin = ligne.date_sortie - timedelta(days=1)
+        if souscription.date_fin == date_fin:
+            inchangees.append(souscription.name)
+            return  # noop strict : aucune écriture, aucune trace nulle part
+
+        ancienne = souscription.date_fin
+        souscription.date_fin = date_fin
+        if ancienne:
+            souscription.message_post(
+                body=(
+                    f'Sortie C15 ({ligne.evenement_declencheur}) : date de fin corrigée '
+                    f'{ancienne} → {date_fin} (date de sortie Enedis brute : {ligne.date_sortie}).'
+                )
+            )
+            corrigees.append(souscription.name)
+        else:
+            souscription.message_post(
+                body=(
+                    f'Sortie C15 ({ligne.evenement_declencheur}) : date de fin {date_fin} '
+                    f'(date de sortie Enedis brute : {ligne.date_sortie}).'
+                )
+            )
+            ecrites.append(souscription.name)
+
+    def _appeler_sorties(self, client, rsc):
+        """Point de transport unique du pull des sorties C15 : un RPC (pas un
+        flux) sur `sorties(rsc=...)` (`electricore_client` 0.5.0) — rend un
+        sous-ensemble du lot envoyé, jamais plus, ordre non garanti. Seul
+        endroit qui parle réseau pour ce pull ; couture patchée en tests."""
+        return client.sorties(rsc=rsc)

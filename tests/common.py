@@ -61,6 +61,29 @@ def resultat_rsc(id_affaire, rsc=None, error=None):
     return SimpleNamespace(id_affaire=id_affaire, ref_situation_contractuelle=rsc, error=error)
 
 
+def ligne_sortie(ref_situation_contractuelle, date_sortie, *, evenement_declencheur='RES', pdl='14000000000001'):
+    """Stub duck-typé de `LigneSortie` (electricore-client 0.5.0,
+    `electricore_client/models/sorties.py`) : mêmes attributs, jamais
+    l'import réel (garde absente en CI, #246/ADR 0031)."""
+    return SimpleNamespace(
+        ref_situation_contractuelle=ref_situation_contractuelle,
+        pdl=pdl,
+        evenement_declencheur=evenement_declencheur,
+        date_sortie=date_sortie,
+    )
+
+
+def client_sorties_factice(items=(), *, leve=None):
+    """Client electricore factice dont l'unique endpoint utilisé (`sorties`,
+    un RPC — pas un flux) rend la liste `items`, ou lève `leve`."""
+    client = MagicMock()
+    if leve is not None:
+        client.sorties.side_effect = leve
+    else:
+        client.sorties.return_value = list(items)
+    return client
+
+
 # Tarif d'abonnement affine (ADR 0018) : base 3 kVA + coefficient par kVA.
 # prix_an(P) = base + coef * (P - 3)
 ABO_BASE_3KVA_STD = 150.0

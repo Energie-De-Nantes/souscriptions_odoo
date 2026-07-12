@@ -10,6 +10,12 @@ from .electricore_client_fabrique import ContractVersionError, IngestionEnCours,
 
 _logger = logging.getLogger(__name__)
 
+# ponytail: 150 RSC/lot — ceiling arbitraire mais confortable sous les
+# limites usuelles de longueur d'URL (~8 Ko côté proxy/serveur) pour un
+# paramètre `rsc` en query string GET (#245). À relever si le parc grossit
+# au point de multiplier les allers-retours de façon sensible.
+TAILLE_LOT_RSC = 150
+
 
 class SouscriptionRefacturation(models.Model):
     """Refacturation Enedis (#8 / ADR 0009 ; renommée #38 — cf. CONTEXT.md).
@@ -97,14 +103,17 @@ class SouscriptionRefacturation(models.Model):
     # --- Sync electricore : pull-tout des prestations F15 (#147, ADR 0009 §2 amendé) ---
 
     def synchroniser_depuis_electricore(self):
-        """Tire TOUTES les prestations F15 d'electricore, insert-si-absente par `reference`.
+        """Tire les prestations F15 d'electricore sur les RSC de nos souscriptions,
+        insert-si-absente par `reference`.
 
         Pas de fenêtre temporelle : les lignes F15 arrivent en retard, datées dans
         le passé — un curseur de date les manquerait (ADR 0009 §2) ; l'idempotence
         vient de l'insert-si-absente sur la *Référence de contenu* (même référence
         = même contenu par construction, cf. CONTEXT.md) — aucun chemin d'update,
-        le gel des facturées (ADR 0009 §4) est donc automatique. Le client est
-        acquis en tête, avant tout travail (échec rapide et déterministe, ADR 0024 §5).
+        le gel des facturées (ADR 0009 §4) est donc automatique. Filtré par RSC
+        (#245) : le périmètre Enedis peut être partagé entre entités, on ne tire
+        pas sur le fil les prestations d'un tiers. Le client est acquis en tête,
+        avant tout travail (échec rapide et déterministe, ADR 0024 §5).
         """
         client = self.env['souscription.electricore.client'].client()
         try:
@@ -135,9 +144,28 @@ class SouscriptionRefacturation(models.Model):
     def _tirer_prestations(self, client):
         """Couture transport (patchée par les tests) : consomme le flux JSONL typé
         (`PrestationF15`, contrat v1) et rend des dicts plats. Seul endroit qui
-        parle réseau."""
-        with client.prestations() as flux:
-            return [presta.model_dump() for presta in flux]
+        parle réseau.
+
+        Filtre sur les RSC de nos souscriptions (#245) : les périmètres Enedis
+        sont parfois partagés entre entités — sans le filtre, on tirerait sur
+        le fil les prestations d'un tiers pour les jeter à l'insertion
+        (résolution RSC seule, ADR 0010 §4). Chunké par lots de
+        `TAILLE_LOT_RSC` : `rsc` part en query string GET, pas en corps POST
+        (`ElectricoreClient.prestations`, client 0.4.0) — ~1 000 RSC en une
+        seule requête dépasserait les limites usuelles de longueur d'URL.
+        Aucune souscription à RSC résolue -> aucun appel réseau.
+        """
+        rscs = (
+            self.env['souscription.souscription']
+            .search([('ref_situation_contractuelle', '!=', False)])
+            .mapped('ref_situation_contractuelle')
+        )
+        lignes = []
+        for debut in range(0, len(rscs), TAILLE_LOT_RSC):
+            lot = rscs[debut : debut + TAILLE_LOT_RSC]
+            with client.prestations(rsc=lot) as flux:
+                lignes.extend(presta.model_dump() for presta in flux)
+        return lignes
 
     def _inserer_prestations(self, lignes):
         """Insert-si-absente par `reference`, résolution par RSC seule.

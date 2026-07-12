@@ -233,11 +233,6 @@ class SouscriptionPeriode(models.Model):
             factures = periode.move_ids.filtered(lambda m: m.move_type == 'out_invoice')
             periode.facture_id = factures[:1]
 
-    _unique_periode_souscription = models.Constraint(
-        'UNIQUE(souscription_id, date_debut, date_fin)',
-        'Une seule période par souscription et par dates début/fin.',
-    )
-
     def init(self):
         """Unicité `(souscription, mois)` scopée aux périodes **mensuelles**
         (ADR 0020 §2) : support de la clé d'idempotence `(RSC, mois)` du pull

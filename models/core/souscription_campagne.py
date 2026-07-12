@@ -340,22 +340,28 @@ class SouscriptionCampagneFacturation(models.Model):
         cible le Périmètre de campagne (#175) pour `self.mois` — aucun mois
         re-proposé, la scope est déjà celle de la campagne — et délègue au
         propriétaire durable du pull, `souscription.pull.meta.periodes.service`
-        (#233, même couture réseau `_ouvrir_flux`/fabrique client, ADR 0024
-        — partagée avec le wizard ad-hoc). Retourne une notification résumant
-        créées/déjà présentes/erreurs — sticky si des erreurs, auto-dismiss
-        sinon — aucun résumé persisté."""
+        (#233, scope facturation `pull()`, même couture réseau
+        `_ouvrir_flux`/fabrique client, ADR 0024 — partagée avec le wizard
+        ad-hoc). Retourne une notification résumant créées/rafraîchies/
+        conservées/erreurs (politique gardée par l'empreinte, ADR 0030
+        décision 1, #235) — sticky si des erreurs, auto-dismiss sinon — aucun
+        résumé persisté."""
         self.ensure_one()
         cibles = self._souscriptions_facturables()
-        creees, existantes, erreurs = self.env['souscription.pull.meta.periodes.service'].pull(cibles, self.mois)
+        creees, rafraichies, inchangees, conservees, erreurs = self.env['souscription.pull.meta.periodes.service'].pull(
+            cibles, self.mois
+        )
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
             'params': {
                 'title': _('Pull méta-périodes'),
                 'message': _(
-                    'Créées : %(creees)s · Déjà présentes : %(existantes)s · Erreurs : %(erreurs)s',
+                    'Créées : %(creees)s · Rafraîchies : %(rafraichies)s · Conservées : %(conservees)s · '
+                    'Erreurs : %(erreurs)s',
                     creees=len(creees),
-                    existantes=len(existantes),
+                    rafraichies=len(rafraichies),
+                    conservees=len(conservees),
                     erreurs=len(erreurs),
                 ),
                 'type': 'warning' if erreurs else 'success',

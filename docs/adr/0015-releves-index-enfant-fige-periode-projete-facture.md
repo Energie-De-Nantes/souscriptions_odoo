@@ -1,5 +1,16 @@
 # Relevés d'index : enfant figé de la Période, projeté sur la facture (pas de bundle)
 
+*Note (juillet 2026, #235) : le re-pull « non facturée → remplacement en bloc » annoncé plus bas
+(Conséquences) est **réalisé** —
+[ADR-0030](0030-facture-gele-mesure-vivant-regularisation-modele-propre-solde-tampon.md)
+décision 1 le porte dans `souscription.periode._rafraichir_depuis_meta`, appelée par
+`souscription.pull.meta.periodes.service` : empreinte (`source_hash`) nouvelle + verdict fiable
+sur une Période **non facturée** → `releve_ids` remplacé en bloc (exactement la commande
+`[(5, 0, 0), (0, 0, …)]` prévue ici) et `source_hash` mis à jour. Sur une Période **facturée**,
+ce remplacement est refusé — le relevé-justificatif reste figé (cf. « Figé avec le snapshot »
+ci-dessous, verrou inchangé) ; seul le **mesuré** de la Période (énergies, verdicts, TURPE…) est
+rafraîchi, jamais le relevé. La dette de ce paragraphe s'éteint.*
+
 La facture d'énergie doit **afficher tous les index qu'electricore a utilisés** pour son calcul :
 c'est une **obligation légale** et le support de **vérification** par le·la *souscripteur·rice*
 (re-jouer le calcul de conso). Aujourd'hui le module ne porte **aucun** index : la *Période*

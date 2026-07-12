@@ -49,6 +49,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-FAC-11 ✅ prestations F15 synchronisées puis refacturées (TVA par nature) — preuve: tests/test_sync_prestations.py, tests/test_refacturation.py · #147
 - REQ-FAC-12 ✅ chèques énergie : imputation FIFO à la facturation — preuve: tests/test_periode_facture.py::test_fifo_par_expiration_le_plus_proche_consomme_en_premier, tests/test_cheque_energie.py · #172
 - REQ-FAC-13 ✅ Énergie facturée universelle : la provision, tamponnée `provision := energie` à la facturation pour un contrat non lissé (dé-figeage/refacturation re-tamponne), porte uniformément la quantité facturée ; backfill des non-lissées déjà facturées — preuve: tests/test_periode_composition.py::test_creer_facture_tamponne_la_provision_non_lissee, tests/test_migration_energie_facturee.py · #234
+- REQ-FAC-14 ✅ Pull unifié gardé par l'empreinte : `source_hash` inchangé n'écrit rien, empreinte nouvelle + verdict fiable rafraîchit le mesuré v3 en bloc (relevés remplacés en bloc seulement si non facturée), incalculable/mois absent conservé et signalé ; exemption chirurgicale du verrou de facturation sur le mesuré (jamais la provision) ; scope refresh (plage de mois, ne crée rien) pour la Régularisation — preuve: tests/test_pull_meta_periodes.py::TestPullMetaPeriodesService, tests/test_pull_meta_periodes.py::TestPullMetaPeriodesServiceRefresh, tests/test_periode_atterrissage.py::test_champs_atterrissage_reecrivables_apres_facturation · #235
 
 ## Parcours : espace usager (portail)
 

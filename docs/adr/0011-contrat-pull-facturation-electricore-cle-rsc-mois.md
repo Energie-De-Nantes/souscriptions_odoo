@@ -9,7 +9,21 @@ d'electricore — `PeriodeMeta` **v3**, qui fait foi
 le fil pour prixer l'abonnement (#78) ; les énergies arrivent **déjà regroupées** base/HP/HC
 (plus de grain `config_cadrans` sur le fil), le détail par registre survivant dans la trace
 d'index `releves_utilises`. La direction, la clé `(RSC, mois)`, le déclencheur facturiste et
-create-missing-only sont inchangés.*
+la clé de **création** create-missing sont inchangés — la politique de **réécriture**, elle,
+change (cf. note ci-dessous).*
+
+*Note (juillet 2026, #235) : le §3 amendé —
+[ADR-0030](0030-facture-gele-mesure-vivant-regularisation-modele-propre-solde-tampon.md)
+décision 1 **unifie** le pull. Le create-missing-only **strict** meurt : un `(RSC, mois)` déjà
+amorcé n'est plus systématiquement ignoré, il est désormais évalué par l'**empreinte**
+(`source_hash`) — inchangée → rien ne bouge (la protection des corrections manuelles du·de la
+facturiste survit, dans le même esprit) ; nouvelle + verdict `réelle`/`estimée` → le mesuré
+(l'atterrissage v3) est rafraîchi **en bloc**, y compris sur une Période **facturée** (exemption
+chirurgicale du verrou #14, jamais la provision) ; `incalculable`/mois absent du flux → conservé,
+signalé. « L'énergie arrivée en retard se reprend par une re-récupération explicite » (fin du §3)
+est donc caduc : la reprise est désormais automatique, gardée par l'empreinte. Portée par
+`souscription.pull.meta.periodes.service`, deux scopes : `pull` (un mois, crée les manquantes) et
+`refresh` (plage de mois, ne crée rien — pour la Régularisation, tranche 4 du PRD #231).*
 
 [ADR-0001](0001-odoo-systeme-ecriture-electricore-api-read-only.md) a tranché la **direction**
 (Odoo *tire*, electricore *calcule-et-renvoie*, n'écrit jamais le nouveau module). Cet ADR fixe

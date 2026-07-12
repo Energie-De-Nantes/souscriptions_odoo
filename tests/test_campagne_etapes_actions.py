@@ -71,7 +71,7 @@ class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
         self.assertEqual(action['tag'], 'display_notification')
         params = action['params']
         self.assertIn('Créées : 1', params['message'])
-        self.assertIn('Déjà présentes : 0', params['message'])
+        self.assertIn('Rafraîchies : 0', params['message'])
         self.assertIn('Erreurs : 0', params['message'])
         self.assertEqual(params['type'], 'success')
         self.assertFalse(params['sticky'], "pas d'erreur -> toast auto-dismiss")

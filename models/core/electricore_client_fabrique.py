@@ -21,7 +21,7 @@ s'arrête à « rends-moi un client configuré » (ADR 0024 §4, option écarté
 
 Ré-export des exceptions du contrat (#222, tranche 2 du PRD #219) : les
 quatre appelants (résolution RSC, pull méta-périodes, refacturation F15,
-chronologie) important `ContractVersionError`/`IngestionEnCours`/
+chronologie) importent `ContractVersionError`/`IngestionEnCours`/
 `PreconditionNonRemplie` depuis **ce** module plutôt que de porter chacun sa
 propre garde d'import + ses propres stubs de repli — un seul point d'origine,
 réel si le paquet est présent, stub sinon.

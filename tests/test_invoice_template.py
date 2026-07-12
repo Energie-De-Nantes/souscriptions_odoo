@@ -242,9 +242,13 @@ class TestInvoiceTemplate(TransactionCase):
         # Vérifier que ce n'est pas une facture d'énergie
         self.assertFalse(facture_normale.is_facture_energie)
 
-        # Le rendu devrait utiliser le template standard
-        context = {'docs': [facture_normale], 'doc_ids': facture_normale.ids, 'doc_model': 'account.move'}
-        html_content = self.env['ir.qweb']._render('souscriptions_odoo.report_facture_energie', context)
+        # Le rendu devrait utiliser le template standard — via ir.actions.report,
+        # qui injecte le contexte de rendu complet (is_html_empty, company, …)
+        # dont le template account.report_invoice_document a besoin.
+        html_bytes, _ = self.env['ir.actions.report']._render_qweb_html(
+            'souscriptions_odoo.action_report_facture_energie', facture_normale.ids
+        )
+        html_content = html_bytes.decode()
 
         # Ne devrait pas contenir les éléments spécifiques à l'énergie
         self.assertNotIn('Point de livraison', html_content)

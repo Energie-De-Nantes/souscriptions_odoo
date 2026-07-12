@@ -13,4 +13,5 @@ from . import (
     souscription_produit,
     souscription_refacturation,
     souscription_releve,
+    souscription_sepa_mandat,
 )

@@ -186,7 +186,8 @@ class TestEstimationProvisions(SouscriptionsTestCase):
 
     def test_recopie_vers_souscription_inchangee(self):
         """La recopie des provisions vers la Souscription à la validation
-        (`_create_souscription`, ~ligne 673) reste inchangée par #121."""
+        (`souscription.souscription.naitre_depuis_demande`, #218) reste
+        inchangée par #121."""
         demande = self._creer_demande(type_tarif='hphc', provision_hp_kwh=210.0, provision_hc_kwh=95.0)
         demande.stage_id = self.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
 

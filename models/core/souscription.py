@@ -284,13 +284,99 @@ class Souscription(models.Model):
                 vals['id_affaire_date_saisie'] = fields.Date.context_today(self)
         return super().create(vals_list)
 
+    @api.model
+    def naitre_depuis_demande(self, demande):
+        """Naissance d'une Souscription à l'acceptation d'un raccordement
+        (#218, PRD #215 tranche 3/3). CONTEXT.md « Raccordement » : « naître
+        d'une demande » est un événement du domaine — la Souscription en
+        devient propriétaire, la demande reste un intake transitoire. Porte
+        **tous** les invariants de naissance : mapping des champs (provisions
+        selon `type_tarif`, cotitulaires, `id_affaire` + date de saisie,
+        `coeff_pro`), naissance lissée, octroi du portail, journalisation des
+        actes (ADR 0027 : consentements RGPD par finalité, acceptation CGV et
+        renonciation horodatées à la date de signature — pas de date de
+        signature, pas d'acte).
+
+        Hors de `create()` (invariant du #218) : migration et imports créent
+        des Souscriptions sans déclencher ces effets.
+
+        Args:
+            demande: `raccordement.demande` déjà pourvue de son `partner_id`
+                (l'intake — création/dédup du partner, banque, mandat SEPA —
+                reste la responsabilité de l'appelant, cf.
+                `raccordement.demande._create_odoo_entries`).
+
+        Returns:
+            La Souscription créée, en instance.
+        """
+        souscription_vals = {
+            'partner_id': demande.partner_id.id,
+            'pdl': demande.pdl,
+            'date_debut': demande.date_debut_souhaitee,
+            'puissance_souscrite': demande.puissance_souscrite,
+            'type_tarif': demande.type_tarif,
+            'tarif_solidaire': demande.tarif_solidaire,
+            'mode_paiement': demande.mode_paiement,
+            'lisse': True,  # Naissance toujours lissée.
+            # Cotitulaires captés à l'adhésion → la Souscription en devient
+            # propriétaire (ADR 0016). Les actes d'adhésion (acceptation CGV,
+            # renonciation) ne sont plus recopiés en champs plats : ils sont
+            # journalisés ci-dessous (ADR 0027).
+            'cotitulaires': [(6, 0, demande.cotitulaires.ids)],
+            # Identité electricore (ADR 0010/0021) : id_Affaire recopié comme
+            # amorce de réconciliation, avec sa date de saisie (grâce du poll #89).
+            'id_affaire': demande.id_affaire,
+            'id_affaire_date_saisie': demande.id_affaire_date_saisie,
+            # Majoration PRO négociée par le Collège (#101, ADR 0022 §7).
+            'coeff_pro': demande.coeff_pro,
+        }
+
+        # Provisions selon le type de tarif.
+        if demande.type_tarif == 'base':
+            souscription_vals['provision_mensuelle_kwh'] = demande.provision_mensuelle_kwh
+        else:  # HP/HC
+            souscription_vals['provision_hp_kwh'] = demande.provision_hp_kwh
+            souscription_vals['provision_hc_kwh'] = demande.provision_hc_kwh
+
+        souscription = self.create(souscription_vals)
+
+        # Accès portail donné dès l'onboarding : le·la souscripteur·trice reçoit
+        # l'invitation à activer son espace usager·ère (Odoo ne le fait pas seul).
+        souscription._octroyer_acces_portail()
+
+        # Journal des actes (ADR 0017/0027) : capture back-office (preuve
+        # faible), tracée comme telle ; l'acte réel du·de la souscripteur·rice
+        # viendra du formulaire public (#62).
+        source = f'Raccordement {demande.name} (back-office)'
+
+        # Consentements RGPD : une finalité cochée = un acte 'donné'.
+        if demande.consent_conso_quotidienne:
+            souscription.enregistrer_consentement('conso_quotidienne', source=source)
+        if demande.consent_courbe_charge:
+            souscription.enregistrer_consentement('courbe_charge', source=source)
+
+        # Actes d'adhésion irrévocables : journalisés (pas recopiés en champs
+        # plats, ADR 0027) — l'horodatage de la ligne EST la date de signature
+        # saisie sur la demande. Sans date de signature, aucun acte n'est
+        # journalisé (pas d'acte = pas de preuve) : une demande peut être close
+        # avant que l'adhésion soit signée.
+        if demande.date_validation:
+            horodatage = fields.Datetime.to_datetime(demande.date_validation)
+            souscription.enregistrer_consentement('acceptation_cgv', source=source, date_consentement=horodatage)
+            if demande.renonce_retractation:
+                souscription.enregistrer_consentement(
+                    'renonciation_retractation', source=source, date_consentement=horodatage
+                )
+
+        return souscription
+
     def _octroyer_acces_portail(self):
         """Donne l'accès portail au·à la souscripteur·trice.
 
         Odoo ne le fait pas par défaut : un contact n'a aucun login. On réutilise
         le wizard standard « Grant portal access » (crée le user portail + envoie
         l'email d'invitation). Appelé depuis l'onboarding raccordement uniquement
-        (`_create_souscription`), pas depuis `create()` — sinon tests, imports et
+        (`naitre_depuis_demande`), pas depuis `create()` — sinon tests, imports et
         synchro electricore déclencheraient des invitations en masse.
         Idempotent : partenaires déjà portail/interne ignorés (`is_portal`/
         `is_internal`), user portail archivé réactivé, sans email ignoré. Un échec

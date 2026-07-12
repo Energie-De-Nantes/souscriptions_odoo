@@ -12,13 +12,14 @@ Décisions du grill 2026-07-08 (cf. issue #147) : résolution par RSC seule
 la *Référence de contenu* EST le contenu), `montant_ht` ignoré.
 """
 
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from odoo.addons.souscriptions_odoo.models.core import souscription_refacturation as refacturation_module
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
-from .common import SouscriptionsTestCase, patcher_client_fabrique, patcher_transport
+from .common import SouscriptionsTestCase, flux_electricore, patcher_client_fabrique, patcher_transport
 
 
 def _ligne(**overrides):
@@ -41,6 +42,13 @@ def _ligne(**overrides):
     )
     base.update(overrides)
     return base
+
+
+def _presta_stream(*lignes):
+    """Flux factice de `PrestationF15` : objets à `.model_dump()` (contrat v1
+    réel), pas des dicts plats — `_tirer_prestations` appelle `.model_dump()`
+    sur chaque élément du flux."""
+    return flux_electricore([SimpleNamespace(model_dump=lambda l=l: l) for l in lignes])
 
 
 @tagged('souscriptions', 'souscriptions_sync_prestations', 'post_install', '-at_install')
@@ -203,3 +211,66 @@ class TestSyncPrestations(SouscriptionsTestCase):
             with self.assertRaises(UserError) as cm:
                 self.Refacturation.synchroniser_depuis_electricore()
         self.assertIn('v0', str(cm.exception))
+
+
+@tagged('souscriptions', 'souscriptions_sync_prestations', 'post_install', '-at_install')
+class TestTirerPrestations(SouscriptionsTestCase):
+    """`_tirer_prestations` elle-même (#245) : périmètre Enedis potentiellement
+    partagé entre entités — la requête ne doit demander que les RSC de nos
+    souscriptions, chunkée si le lot est gros (le paramètre `rsc` part en
+    query string GET, cf. `ElectricoreClient.prestations`). Client mocké
+    directement (méthode transport, pas la fabrique) : aucun HTTP."""
+
+    def setUp(self):
+        super().setUp()
+        self.Refacturation = self.env['souscription.refacturation']
+        self.souscription_base.with_context(rsc_automatisme=True).write(
+            {'ref_situation_contractuelle': 'RSC_SYNC_BASE'}
+        )
+        self.souscription_hphc.with_context(rsc_automatisme=True).write(
+            {'ref_situation_contractuelle': 'RSC_SYNC_HPHC'}
+        )
+
+    def test_filtre_sur_les_rsc_de_nos_souscriptions(self):
+        """AC1 (#245) : la requête ne demande que les RSC de nos souscriptions
+        — sans le filtre, on tirerait sur le fil les prestations d'un tiers
+        partageant le périmètre Enedis, pour les jeter à l'insertion."""
+        client = MagicMock()
+        client.prestations.side_effect = lambda **kwargs: _presta_stream()
+
+        self.Refacturation._tirer_prestations(client)
+
+        rsc_demandees = client.prestations.call_args.kwargs['rsc']
+        self.assertCountEqual(rsc_demandees, ['RSC_SYNC_BASE', 'RSC_SYNC_HPHC'])
+
+    def test_aucune_rsc_resolue_naboutit_pas_a_un_appel(self):
+        """Aucune souscription à RSC résolue -> aucun round-trip réseau (même
+        fast-fail que le pull méta-périodes, #245)."""
+        (self.souscription_base | self.souscription_hphc).with_context(rsc_automatisme=True).write(
+            {'ref_situation_contractuelle': False}
+        )
+        client = MagicMock()
+
+        lignes = self.Refacturation._tirer_prestations(client)
+
+        client.prestations.assert_not_called()
+        self.assertEqual(lignes, [])
+
+    def test_chunk_le_pull_par_lots_et_fusionne_les_flux(self):
+        """Point d'attention #245 : ~1 000 RSC en query string GET — chunké
+        par lots de `TAILLE_LOT_RSC`, les flux de chaque lot sont fusionnés.
+        Lot forcé à 1 ici pour exercer le chunking sans créer 150+ souscriptions."""
+        lignes_par_rsc = {
+            'RSC_SYNC_BASE': _ligne(reference='ref-base', ref_situation_contractuelle='RSC_SYNC_BASE'),
+            'RSC_SYNC_HPHC': _ligne(reference='ref-hphc', ref_situation_contractuelle='RSC_SYNC_HPHC'),
+        }
+        client = MagicMock()
+        client.prestations.side_effect = lambda *, rsc: _presta_stream(*(lignes_par_rsc[r] for r in rsc))
+
+        with patch.object(refacturation_module, 'TAILLE_LOT_RSC', 1):
+            lignes = self.Refacturation._tirer_prestations(client)
+
+        self.assertEqual(client.prestations.call_count, 2)
+        lots_demandes = [call.kwargs['rsc'] for call in client.prestations.call_args_list]
+        self.assertEqual([len(lot) for lot in lots_demandes], [1, 1])
+        self.assertEqual({ligne['reference'] for ligne in lignes}, {'ref-base', 'ref-hphc'})

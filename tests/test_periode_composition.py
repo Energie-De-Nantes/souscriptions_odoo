@@ -63,21 +63,27 @@ class TestPeriodeComposition(SouscriptionsTestCase):
         self.assertEqual(hp['quantity'], 150.0)
         self.assertEqual(hc['quantity'], 100.0)
 
-    def test_composer_lignes_non_lisse_facture_le_mesure(self):
-        """Contrat non lissé : on facture le mesuré/estimé (energie_*), pas la
-        provision (issue #14 — clarification provision vs réel)."""
+    def test_composer_lignes_facture_toujours_la_provision(self):
+        """Énergie facturée universelle (ADR 0030 décision 2, #234) : la
+        quantité facturée se lit uniformément depuis la provision, lissé ou
+        non — la branche qui lisait le mesuré (energie_*) directement pour un
+        contrat non lissé a disparu de `_quantite_facturee`. Le tampon
+        `provision := energie` est la responsabilité de `_creer_facture` (via
+        `_tamponner_provision`), pas de `_composer_lignes` : appelée seule,
+        comme ici, elle facture la provision telle qu'elle est stockée, même
+        si elle diverge du mesuré."""
         # souscription_base est non lissée ; calendrier de comptage 'base' →
         # energie_base_kwh est saisi directement.
         periode = self._periode(
             self.souscription_base,
             energie_base_kwh=280.0,
-            provision_base_kwh=999.0,  # ne doit PAS être facturée (non lissé)
+            provision_base_kwh=999.0,  # la provision gagne désormais, même non lissé
         )
         self.assertFalse(periode.lisse_periode)
 
         produits = [d for d in self._dicts(periode._composer_lignes(self.grille_prix)) if d.get('product_id')]
         base = next(d for d in produits if d['name'] == 'Énergie Base')
-        self.assertEqual(base['quantity'], 280.0)
+        self.assertEqual(base['quantity'], 999.0)
 
     def test_composer_lignes_note_turpe_uniquement_si_positif(self):
         """Les notes TURPE n'apparaissent que si le montant est > 0."""
@@ -167,6 +173,51 @@ class TestPeriodeComposition(SouscriptionsTestCase):
         self.assertEqual(facture.invoice_date, periode.date_fin)
         # facture_id dérivé de account.move.periode_id (ADR 0004)
         self.assertEqual(periode.facture_id, facture)
+
+    def test_creer_facture_tamponne_la_provision_non_lissee(self):
+        """AC1 (#234, ADR 0030 décision 2) : facturer une Période non lissée
+        tamponne provision_* aux valeurs mesurées du moment (energie_*) —
+        la facture porte ces quantités tamponnées."""
+        periode = self._periode(self.souscription_base, energie_base_kwh=280.0)
+        self.assertFalse(periode.lisse_periode)
+        self.assertEqual(periode.provision_base_kwh, 0.0)  # pas encore tamponnée
+
+        facture = periode._creer_facture()
+
+        self.assertEqual(periode.provision_base_kwh, 280.0)  # tamponnée par _creer_facture
+        ligne = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie Base')
+        self.assertEqual(ligne.quantity, 280.0)
+
+    def test_creer_facture_lissee_ne_touche_pas_la_provision(self):
+        """AC3 (#234) : comportement lissé inchangé — la provision contractuelle
+        fixée à la création n'est pas écrasée par le mesuré à la facturation."""
+        periode = self._periode(self.souscription_hphc, provision_hp_kwh=150.0, provision_hc_kwh=100.0)
+        self.assertTrue(periode.lisse_periode)
+
+        facture = periode._creer_facture()
+
+        self.assertEqual(periode.provision_hp_kwh, 150.0)
+        self.assertEqual(periode.provision_hc_kwh, 100.0)
+        hp = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie HP')
+        self.assertEqual(hp.quantity, 150.0)
+
+    def test_defigeage_puis_refacturation_retamponne(self):
+        """AC2 (#234) : supprimer la facture dé-fige la Période (#14) ;
+        refacturer re-tamponne aux valeurs courantes de energie_* (une mesure
+        raffinée après coup est reprise)."""
+        periode = self._periode(self.souscription_base, energie_base_kwh=280.0)
+        facture_1 = periode._creer_facture()
+        self.assertEqual(periode.provision_base_kwh, 280.0)
+
+        facture_1.unlink()  # dé-figeage
+        self.assertFalse(periode.facture_id)
+        periode.write({'energie_base_kwh': 310.0})  # mesure raffinée par electricore
+
+        facture_2 = periode._creer_facture()
+
+        self.assertEqual(periode.provision_base_kwh, 310.0)
+        ligne = facture_2.invoice_line_ids.filtered(lambda l: l.name == 'Énergie Base')
+        self.assertEqual(ligne.quantity, 310.0)
 
     def test_periode_surface_facture_brouillon(self):
         """Une facture en BROUILLON liée à une période reste visible côté gestion :

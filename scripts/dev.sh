@@ -21,9 +21,10 @@
 # (charte migration) vérifiés avant ET après chargement : crons coupés, aucun mail sortant,
 # aucun règlement SEPA groupé — une base non conforme arrête le script.
 #
-# Secrets electricore (ELECTRICORE_URL / _API_KEY) : injectés depuis Proton Pass —
-#   pr ./scripts/dev.sh              # pass-cli résout .env.pass -> env shell -> pass-through compose -> conteneur
-# Sans `pr` : vars vides -> intégration electricore désactivée (repli, ADR-0024), pas de crash.
+# Secrets electricore (ELECTRICORE_URL / _API_KEY) : injectés depuis Proton Pass.
+# Le script s'auto-wrappe sous `pass-cli run` (.env.pass) quand les vars manquent —
+# plus besoin de préfixer par `pr`. Sans .env.pass ni pass-cli : vars vides ->
+# intégration electricore désactivée (repli, ADR-0024), pas de crash.
 # Voir docs/adr/0026 + electricore ADR-0056.
 #
 # -> http://localhost:8069  (admin / admin)
@@ -38,6 +39,14 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Auto-wrap pass-cli (ADR-0026) : si les secrets electricore manquent et que
+# .env.pass + pass-cli sont là, on se relance sous `pass-cli run` — plus besoin
+# de penser à `pr`. Échec bruyant si la session Proton est verrouillée.
+if [ -z "${ELECTRICORE_URL:-}" ] && [ -f "$REPO_ROOT/.env.pass" ] && command -v pass-cli >/dev/null 2>&1; then
+    exec pass-cli run --env-file "$REPO_ROOT/.env.pass" -- "$0" "$@"
+fi
+
 COMPOSE=(docker compose -f "$REPO_ROOT/docker/docker-compose.yml")
 # Chemin RELATIF au dépôt (contrat de layout : dépôts voisins), jamais celui du
 # worktree courant — cf. commentaire d'en-tête.

@@ -1,6 +1,6 @@
 # Secrets electricore en dev : injectés depuis Proton Pass via pass-through docker-compose — le module reste `ir.config_parameter`
 
-*Statut : proposé (bascule accepté une fois `pr docker compose … config` validé — cf. Raison). Applique la décision parc-wide [electricore ADR-0056](../../../electricore/docs/adr/0056-secrets-dev-proton-pass-par-espace.md) (Proton Pass = secrets de dev consommés par CLI ; SOPS+age = prod) au seul module Odoo, qui en est l'**exception** assumée. Ne re-décide pas [ADR-0024](0024-electricore-dependance-molle-garde-import-fabrique-client-unique.md) : elle fixe déjà que la config (`ELECTRICORE_URL` / `ELECTRICORE_API_KEY`) est une **donnée runtime** lue à l'usage via `ir.config_parameter` avec repli `os.environ`.*
+*Statut : accepté (pass-through validé le 2026-07-12 — `pr docker compose … config` affiche `<concealed by Proton Pass>` pour les deux variables). Applique la décision parc-wide [electricore ADR-0056](../../../electricore/docs/adr/0056-secrets-dev-proton-pass-par-espace.md) (Proton Pass = secrets de dev consommés par CLI ; SOPS+age = prod) au seul module Odoo, qui en est l'**exception** assumée. Ne re-décide pas [ADR-0024](0024-electricore-dependance-molle-garde-import-fabrique-client-unique.md) : elle fixe déjà que la config (`ELECTRICORE_URL` / `ELECTRICORE_API_KEY`) est une **donnée runtime** lue à l'usage via `ir.config_parameter` avec repli `os.environ`.*
 
 Le module consomme electricore via deux secrets — `ELECTRICORE_URL`, `ELECTRICORE_API_KEY` — lus par la fabrique `souscription.electricore.client` : `ICP.get_param('souscriptions.electricore_*') or os.environ.get('ELECTRICORE_*', '')` (ADR-0024 §3b). En dev, le repli `os.environ` était alimenté par un `docker/.env` **en clair sur disque** — la vraie `ELECTRICORE_API_KEY` (= clé `operator` du trousseau API electricore) y traînait. C'était le **seul secret applicatif en clair du parc** (les autres repos sont passés à Proton Pass, ADR-0056 ; la prod est en SOPS+age, ADR-0044 electricore-secrets).
 
@@ -14,7 +14,7 @@ Le module consomme electricore via deux secrets — `ELECTRICORE_URL`, `ELECTRIC
 ## Conséquences
 
 - **Plus aucun secret applicatif en clair sur disque** dans le parc.
-- `pr ./scripts/dev.sh` = intégration electricore active en dev ; **sans** `pr`, les vars sont vides → l'intégration se **désactive proprement** (repli `or ''`, `UserError` actionnable au clic, ADR-0024), pas de crash. Le développeur wrappe quand il en a besoin.
+- Intégration electricore active en dev sans y penser : `dev.sh` s'auto-wrappe sous `pass-cli run` quand `ELECTRICORE_URL` manque et que `.env.pass` + pass-cli sont présents (amendement post-validation : oublier `pr` coûtait un conteneur démarré sans secrets et un redémarrage). Sans `.env.pass` ni pass-cli, les vars restent vides → l'intégration se **désactive proprement** (repli `or ''`, `UserError` actionnable au clic, ADR-0024), pas de crash.
 - `docker/.env.example` (committé, valeurs vides) reste le **template documentaire** des deux variables.
 - La clé `operator` est **dupliquée** dans l'item `souscriptions_odoo` plutôt que référencée cross-vault vers l'item `electricore` : pour deux valeurs, un item dédié évite un token cross-vault (ADR-0056, ergonomie du scope par vault).
 

@@ -59,7 +59,9 @@ class TestIntegration(TransactionCase):
                 'date_debut': date(2024, 1, 1),
                 'date_fin': date(2024, 1, 31),
                 'type_periode': 'mensuelle',
-                # Contrat non lissé : on facture le mesuré (energie_*), pas une provision.
+                # Contrat non lissé : la provision est tamponnée sur le mesuré
+                # (energie_*) à la facturation (#234) — on la facture ensuite,
+                # comme tout contrat (ADR 0030 décision 2).
                 'energie_base_kwh': 280.0,
                 'turpe_fixe': 8.50,
                 'turpe_variable': 12.30,
@@ -116,7 +118,8 @@ class TestIntegration(TransactionCase):
                 'date_debut': date(2024, 2, 1),
                 'date_fin': date(2024, 2, 29),
                 'type_periode': 'mensuelle',
-                # Contrat non lissé : on facture le mesuré. Calendrier 4 cadrans →
+                # Contrat non lissé : provision tamponnée sur le mesuré à la
+                # facturation (#234). Calendrier 4 cadrans →
                 # energie_hp = HPH+HPB (180), energie_hc = HCH+HCB (120).
                 'energie_hph_kwh': 180.0,
                 'energie_hch_kwh': 120.0,

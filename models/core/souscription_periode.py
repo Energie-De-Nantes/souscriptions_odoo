@@ -59,14 +59,17 @@ class SouscriptionPeriode(models.Model):
     energie_hc_kwh = fields.Float(string='Énergie HC (kWh)', compute='_compute_hp_hc', store=True, readonly=False)
     energie_base_kwh = fields.Float(string='Énergie BASE (kWh)', compute='_compute_base', store=True, readonly=False)
 
-    # Provision d'énergie par cadran facturé (#14) — distincte du mesuré/estimé
-    # (energie_*_kwh). C'est CETTE quantité qui est portée sur la facture (voir
-    # _composer_lignes) :
+    # Provision d'énergie par cadran facturé (#14) — l'Énergie facturée
+    # universelle (ADR 0030 décision 2, #234), distincte du mesuré/estimé
+    # (energie_*_kwh). C'est CETTE quantité, et elle seule, qui est portée sur
+    # la facture (voir _quantite_facturee/_composer_lignes) :
     #  - Contrat lissé : provision contractuelle (peuplée à la création depuis la
     #    souscription) ; l'écart avec le mesuré (energie_*_kwh) est suivi par
     #    ecart_*_kwh et soldé en régularisation (ADR 0005).
-    #  - Contrat non lissé : la provision vaut la consommation mesurée/estimée
-    #    (alignée par electricore / le·la facturiste).
+    #  - Contrat non lissé : tamponnée `provision := energie` à la création de
+    #    la facture (_tamponner_provision, appelée par _creer_facture) — la
+    #    meilleure mesure/estimation du moment, gelée dès lors comme le reste
+    #    du snapshot facturé.
     provision_hp_kwh = fields.Float(string='Provision HP (kWh)')
     provision_hc_kwh = fields.Float(string='Provision HC (kWh)')
     provision_base_kwh = fields.Float(string='Provision BASE (kWh)')
@@ -117,7 +120,7 @@ class SouscriptionPeriode(models.Model):
         string='Taux accise (€/MWh)',
         readonly=True,
         help="Taux d'accise servi par electricore ; l'assiette est l'énergie facturée par Odoo "
-        '(la provision si le contrat est lissé) — le montant se calcule côté Odoo.',
+        '(la provision, quel que soit le lissage — ADR 0030) — le montant se calcule côté Odoo.',
     )
     puissance_moyenne_kva = fields.Float(
         string='Puissance moyenne (kVA)',
@@ -502,10 +505,15 @@ class SouscriptionPeriode(models.Model):
     def _quantite_facturee(self, cadran):
         """Quantité d'énergie à facturer pour un cadran facturé ('base'/'hp'/'hc').
 
-        Contrat **lissé** : la *provision* contractuelle (``provision_*_kwh``) ;
-        l'écart avec le mesuré est soldé plus tard en régularisation.
-        Contrat **non lissé** : le *mesuré / estimé* (``energie_*_kwh``) directement.
-        Le choix s'appuie sur le snapshot figé ``lisse_periode`` (ADR 0006).
+        Énergie facturée universelle (ADR 0030 décision 2, #234) : toujours la
+        *provision* (``provision_*_kwh``), lissé ou non — la branche qui lisait
+        le mesuré (``energie_*_kwh``) directement pour un contrat non lissé a
+        disparu. Contrat **lissé** : la provision contractuelle, fixée à la
+        création de la Période. Contrat **non lissé** : la provision est
+        tamponnée ``provision := energie`` à la création de la facture (voir
+        ``_tamponner_provision``, appelée par ``_creer_facture`` avant
+        composition) — elle porte donc déjà la meilleure mesure/estimation du
+        moment quand cette méthode la lit.
         """
         self.ensure_one()
         provision = {
@@ -513,12 +521,7 @@ class SouscriptionPeriode(models.Model):
             'hp': self.provision_hp_kwh,
             'hc': self.provision_hc_kwh,
         }
-        mesure = {
-            'base': self.energie_base_kwh,
-            'hp': self.energie_hp_kwh,
-            'hc': self.energie_hc_kwh,
-        }
-        return provision[cadran] if self.lisse_periode else mesure[cadran]
+        return provision[cadran]
 
     def _composer_lignes(self, grille):
         """Compose les lignes de facture (``[(0, 0, vals)]``) de cette période.
@@ -656,16 +659,54 @@ class SouscriptionPeriode(models.Model):
             'origine': releve.evenement or releve.origine_releve,
         }
 
+    def _tamponner_provision(self):
+        """Tamponne ``provision_* := energie_*`` (par cadran facturé) sur une
+        Période **non lissée**, juste avant sa facturation — Énergie facturée
+        universelle (ADR 0030 décision 2, #234) : la provision devient le
+        facturé pour tout contrat, la branche lissé/non-lissé de
+        ``_quantite_facturee`` meurt. Contrat **lissé** : no-op, la provision
+        contractuelle est déjà fixée à la création (inchangé).
+
+        Doit s'exécuter **avant** ``account.move.create()`` dans
+        ``_creer_facture`` : le verrou de facturation (#14) refuse l'écriture
+        de ``provision_*`` dès qu'une facture référence la Période, donc ce
+        tampon doit précéder le gel. Passe par ``write()`` (pas d'écriture
+        directe), encore autorisé tant que la Période n'est pas facturée.
+
+        Dé-figeage : supprimer la facture dé-fige la Période (#14 write()) ;
+        rappeler ``_creer_facture`` rejoue ce tampon aux valeurs courantes de
+        ``energie_*`` — la future « régularisation des réels » d'un non-lissé
+        rééditée par Enedis emprunte le même mécanisme.
+        """
+        self.ensure_one()
+        if self.lisse_periode:
+            return
+        if self.facture_id or self.facture_legacy_ref:
+            # Le facturé gelé (ADR 0030) : une Période encore facturée garde sa
+            # provision scellée — refacturer sans dé-figer compose sur le gelé,
+            # même condition que le verrou de write().
+            return
+        self.write(
+            {
+                'provision_hp_kwh': self.energie_hp_kwh,
+                'provision_hc_kwh': self.energie_hc_kwh,
+                'provision_base_kwh': self.energie_base_kwh,
+            }
+        )
+
     # Underscore délibéré : ferme la porte RPC externe, même idiome que
     # `sale.order._create_invoices` (décision du grill, amende la revue d'architecture).
     def _creer_facture(self):
         """Émet la facture (``account.move``) de cette période.
 
-        Coquille fine : sélectionne la grille active à la date de fin, compose les
-        lignes (``_composer_lignes``) et crée le move en posant ``periode_id``
-        (source unique du lien Période ↔ Facture, ADR 0004).
+        Tamponne d'abord la provision (``_tamponner_provision``, non-lissé
+        uniquement, no-op sinon), puis sélectionne la grille active à la date
+        de fin, compose les lignes (``_composer_lignes``) et crée le move en
+        posant ``periode_id`` (source unique du lien Période ↔ Facture, ADR
+        0004).
         """
         self.ensure_one()
+        self._tamponner_provision()
         grille = self.env['grille.prix'].get_grille_active(self.date_fin, regime=self.regime_prix_periode)
         facture = self.env['account.move'].create(
             {

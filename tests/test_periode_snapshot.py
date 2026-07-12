@@ -74,8 +74,13 @@ class TestPeriodeSnapshotType(SouscriptionsTestCase):
     def test_periode_figee_des_la_facturation(self):
         """Dès qu'une facture référence la période (brouillon de facture compris),
         ses champs facturables sont figés : toute réécriture est rejetée
-        (UserError), y compris via RPC (#14)."""
-        periode = self._periode(self.souscription_base, provision_base_kwh=100.0)
+        (UserError), y compris via RPC (#14).
+
+        `energie_base_kwh` est aligné sur `provision_base_kwh` : souscription_base
+        est non lissée, donc `_creer_facture` tamponne `provision := energie`
+        (#234) — sans cet alignement le tampon écraserait la provision saisie
+        avant de tester le verrou, ce qui n'est pas le sujet de ce test."""
+        periode = self._periode(self.souscription_base, provision_base_kwh=100.0, energie_base_kwh=100.0)
         periode._creer_facture()  # facture créée (brouillon) → période figée
 
         with self.assertRaises(UserError):

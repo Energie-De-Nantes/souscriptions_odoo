@@ -17,6 +17,7 @@ from . import (
     test_invoice_template,
     test_mails_raccordement,
     test_meta_exhaustivite,
+    test_migration_energie_facturee,
     test_paiements_reglements_attente,
     test_periode_atterrissage,
     test_periode_composition,

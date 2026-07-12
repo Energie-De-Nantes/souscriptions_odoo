@@ -1,12 +1,12 @@
 """Wizard facturiste « Récupérer les périodes du mois » (#77, ADR 0011/0019).
 
-Brancher le seam décidé : l'addon consomme le paquet `electricore-client`
-(httpx + pydantic) et n'implémente que le mapping vers ses propres modèles
-(`souscription.periode._amorcer_depuis_meta`). Le client est acquis auprès de
-la fabrique unique `souscription.electricore.client` (ADR 0024) : ce module
-ne porte plus ni garde d'import du client, ni drapeau de disponibilité, ni
-lecture de config — seuls son propre appel d'endpoint (`meta_periodes` en
-flux) et son mapping d'exceptions, ré-exportées par la fabrique (#222).
+Coquille mince (#233, tranche 1 du PRD #231) : le propriétaire durable du
+pull — méthode de transport nommée, mapping du contrat v3, politique
+create-missing-only/skip-and-report (ADR 0011/0024) — vit désormais dans
+`souscription.pull.meta.periodes.service`. Ce wizard ne fait plus que
+construire le périmètre (toutes les souscriptions, avec/sans RSC), déléguer
+le tirage au service et formater le résumé (créées / déjà existantes / sans
+RSC / erreurs) — zéro changement de comportement observable.
 """
 
 from __future__ import annotations
@@ -14,9 +14,6 @@ from __future__ import annotations
 from datetime import timedelta
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError
-
-from ..core.electricore_client_fabrique import ContractVersionError, IngestionEnCours, PreconditionNonRemplie
 
 
 class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
@@ -44,17 +41,19 @@ class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
         RSC, crée les périodes manquantes (create-missing-only), résume le
         résultat (créées / déjà existantes / sans RSC / erreurs).
 
-        Chemin ad-hoc (mois saisi, portée toutes-RSC) : délègue la boucle de
-        tirage à `_tirer_meta_periodes` (#176), partagée avec le chemin
-        Campagne (`souscription.campagne.facturation.action_pull_meta_periodes`,
-        portée Périmètre de campagne)."""
+        Chemin ad-hoc (mois saisi, portée toutes-RSC) : délègue le tirage au
+        service `souscription.pull.meta.periodes.service` (#233), le même que
+        le chemin Campagne
+        (`souscription.campagne.facturation.action_pull_meta_periodes`,
+        portée Périmètre de campagne) — ce wizard ne fait plus que construire
+        le périmètre et formater le résumé."""
         self.ensure_one()
         Souscription = self.env['souscription.souscription']
 
         avec_rsc = Souscription.search([('ref_situation_contractuelle', '!=', False), ('active', '=', True)])
         sans_rsc = Souscription.search([('ref_situation_contractuelle', '=', False), ('active', '=', True)])
 
-        creees, existantes, erreurs = self._tirer_meta_periodes(avec_rsc, self.mois)
+        creees, existantes, erreurs = self.env['souscription.pull.meta.periodes.service'].pull(avec_rsc, self.mois)
 
         self.resultat = self._formatter_resultat(creees, existantes, sans_rsc, erreurs)
         self.state = 'done'
@@ -65,73 +64,6 @@ class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
             'view_mode': 'form',
             'target': 'new',
         }
-
-    @api.model
-    def _tirer_meta_periodes(self, souscriptions, mois):
-        """Boucle de tirage partagée (#176) : acquiert le client (fabrique
-        `souscription.electricore.client`, ADR 0024), ouvre le flux
-        `meta_periodes` pour `mois` sur les RSC de `souscriptions`, crée les
-        périodes manquantes (create-missing-only) avec savepoint par élément
-        (skip-and-report, ADR 0011) et mappe les exceptions typées electricore
-        en `UserError`. Rend `(creees, existantes, erreurs)` — trois listes de
-        libellés, consommées par le résumé du wizard ad-hoc et par le
-        résultat/toast de la Campagne (#158/#176). `souscriptions` est déjà le
-        périmètre voulu par l'appelant (toutes-RSC pour le wizard, Périmètre
-        de campagne du mois pour la Campagne) : aucun filtre supplémentaire
-        ici."""
-        client = self.env['souscription.electricore.client'].client()
-        Periode = self.env['souscription.periode']
-        par_rsc = {s.ref_situation_contractuelle: s for s in souscriptions if s.ref_situation_contractuelle}
-
-        creees, existantes, erreurs = [], [], []
-
-        if par_rsc:
-            mois_str = fields.Date.to_string(mois)
-            try:
-                with self._ouvrir_flux(client, mois_str, list(par_rsc)) as stream:
-                    for meta in stream:
-                        souscription = par_rsc.get(meta.ref_situation_contractuelle)
-                        if souscription is None:
-                            continue  # RSC hors du filtre demandé, ignorée silencieusement
-                        try:
-                            # Savepoint par élément (skip-and-report, ADR 0011) :
-                            # un échec de mapping/contrainte sur une RSC ne doit
-                            # ni écrire de résultat partiel ni casser le curseur
-                            # pour les RSC suivantes du même lot.
-                            with self.env.cr.savepoint():
-                                self._amorcer_une(Periode, souscription, meta, creees, existantes)
-                        except Exception as exc:
-                            erreurs.append(f'{souscription.name} ({meta.ref_situation_contractuelle}) : {exc}')
-            except IngestionEnCours:
-                raise UserError("L'ingestion electricore est en cours (verrou base) : réessayez plus tard.")
-            except PreconditionNonRemplie as exc:
-                raise UserError(f'Précondition non remplie côté electricore : {exc}')
-            except ContractVersionError as exc:
-                raise UserError(f'Contrat electricore obsolète : {exc}')
-
-        return creees, existantes, erreurs
-
-    def _amorcer_une(self, Periode, souscription, meta, creees, existantes):
-        """Create-missing-only (ADR 0011) : un `(souscription, mois)` déjà
-        amorcé n'est jamais réécrit. Recherche explicite d'abord (lisible,
-        rapide) ; la contrainte unique mensuelle (ADR 0020 §2) reste le
-        garde-fou de dernier recours si deux amorçages se recouvraient malgré
-        tout — remontée comme une erreur normale, absorbée par le savepoint
-        appelant."""
-        mois_cle = fields.Date.to_date(meta.debut).replace(day=1)
-        existante = Periode.search(
-            [
-                ('souscription_id', '=', souscription.id),
-                ('mois', '=', mois_cle),
-                ('type_periode', '=', 'mensuelle'),
-            ],
-            limit=1,
-        )
-        if existante:
-            existantes.append(f'{souscription.name} ({meta.mois_annee})')
-            return
-        Periode._amorcer_depuis_meta(souscription, meta)
-        creees.append(f'{souscription.name} ({meta.mois_annee})')
 
     @staticmethod
     def _formatter_resultat(creees, existantes, sans_rsc, erreurs):
@@ -151,9 +83,3 @@ class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
         if erreurs:
             lignes += ['Erreurs :'] + [f'  - {ligne}' for ligne in erreurs]
         return '\n'.join(lignes)
-
-    def _ouvrir_flux(self, client, mois_str, rsc):
-        """Point de transport unique : ouvre le flux `meta_periodes` (context
-        manager). Seul endroit qui parle réseau — c'est la couture patchée en
-        tests (réponses en boîte, rien d'autre n'est mocké)."""
-        return client.meta_periodes(mois=mois_str, rsc=rsc)

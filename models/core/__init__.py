@@ -11,6 +11,7 @@ from . import (
     souscription_consentement,
     souscription_periode,
     souscription_produit,
+    souscription_pull_meta_periodes_service,
     souscription_refacturation,
     souscription_releve,
     souscription_sepa_mandat,

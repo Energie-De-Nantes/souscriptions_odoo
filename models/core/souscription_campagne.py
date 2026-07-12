@@ -338,17 +338,15 @@ class SouscriptionCampagneFacturation(models.Model):
     def action_pull_meta_periodes(self):
         """Lance le tirage en un clic (#176), sans fenêtre intermédiaire :
         cible le Périmètre de campagne (#175) pour `self.mois` — aucun mois
-        re-proposé, la scope est déjà celle de la campagne — et délègue la
-        boucle de tirage au point partagé avec le wizard ad-hoc
-        (`souscription.pull.meta.periodes.wizard._tirer_meta_periodes`, même
-        couture réseau `_ouvrir_flux`/fabrique client, ADR 0024). Retourne une
-        notification résumant créées/déjà présentes/erreurs — sticky si des
-        erreurs, auto-dismiss sinon — aucun résumé persisté."""
+        re-proposé, la scope est déjà celle de la campagne — et délègue au
+        propriétaire durable du pull, `souscription.pull.meta.periodes.service`
+        (#233, même couture réseau `_ouvrir_flux`/fabrique client, ADR 0024
+        — partagée avec le wizard ad-hoc). Retourne une notification résumant
+        créées/déjà présentes/erreurs — sticky si des erreurs, auto-dismiss
+        sinon — aucun résumé persisté."""
         self.ensure_one()
         cibles = self._souscriptions_facturables()
-        creees, existantes, erreurs = self.env['souscription.pull.meta.periodes.wizard']._tirer_meta_periodes(
-            cibles, self.mois
-        )
+        creees, existantes, erreurs = self.env['souscription.pull.meta.periodes.service'].pull(cibles, self.mois)
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',

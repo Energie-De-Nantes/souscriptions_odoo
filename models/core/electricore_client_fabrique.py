@@ -42,6 +42,11 @@ try:
 except ImportError:  # pragma: no cover - exercé par test_electricore_client_fabrique
     ELECTRICORE_CLIENT_DISPONIBLE = False
 
+    # Même repli que les exceptions : le symbole existe dans les deux mondes
+    # (patchable par les tests), la garde ELECTRICORE_CLIENT_DISPONIBLE
+    # échoue avant toute construction réelle.
+    ElectricoreClient = None
+
     class ContractVersionError(Exception):
         """Repli si `electricore_client` est absent : jamais levée en pratique — la fabrique
         (`souscription.electricore.client`) échoue avant tout appel qui pourrait la lever."""

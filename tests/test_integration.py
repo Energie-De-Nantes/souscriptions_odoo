@@ -218,6 +218,64 @@ class TestIntegration(TransactionCase):
             self.assertTrue(periode.facture_id)
             self.assertEqual(periode.facture_id.partner_id, sous.partner_id)
 
+    def test_migration_tarif_base_vers_hphc(self):
+        """Changement de formule tarifaire en cours de contrat (Base -> HP/HC) :
+        chaque Période garde la formule snapshotée à sa création — la facture
+        Base émise avant la migration reste en Base, celle créée après bascule
+        en HP/HC (seul test à valeur de l'ex test_workflow.py, #221)."""
+        souscription = self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.partner.id,
+                'pdl': 'PDL_MIGRATION_TARIF',
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'date_debut': date(2024, 1, 1),
+            }
+        )
+
+        # Période et facture en Base, avant migration.
+        periode_base = self.env['souscription.periode'].create(
+            {
+                'souscription_id': souscription.id,
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 1, 31),
+                'type_periode': 'mensuelle',
+                'energie_base_kwh': 280.0,
+                'turpe_fixe': 8.5,
+                'turpe_variable': 4.2,
+            }
+        )
+        facture_base = periode_base._creer_facture()
+
+        # Migration vers HP/HC.
+        souscription.write({'type_tarif': 'hphc'})
+
+        # Période et facture en HP/HC, après migration.
+        periode_hphc = self.env['souscription.periode'].create(
+            {
+                'souscription_id': souscription.id,
+                'date_debut': date(2024, 2, 1),
+                'date_fin': date(2024, 2, 29),
+                'type_periode': 'mensuelle',
+                'energie_hph_kwh': 180.0,
+                'energie_hch_kwh': 120.0,
+            }
+        )
+        facture_hphc = periode_hphc._creer_facture()
+
+        self.assertEqual(souscription.type_tarif, 'hphc')
+
+        # Facture Base toujours en formule Base, malgré la migration ultérieure.
+        self.assertTrue(facture_base.is_facture_energie)
+        base_lines = facture_base.invoice_line_ids.filtered(lambda l: l.display_type == 'product')
+        self.assertTrue(any('Base' in l.name for l in base_lines))
+
+        # Facture HP/HC en formule HP/HC.
+        self.assertTrue(facture_hphc.is_facture_energie)
+        hphc_lines = facture_hphc.invoice_line_ids.filtered(lambda l: l.display_type == 'product')
+        self.assertTrue(any('HP' in l.name for l in hphc_lines))
+        self.assertTrue(any('HC' in l.name for l in hphc_lines))
+
     def test_erreur_grille_manquante(self):
         """Test gestion erreur : aucune grille ne couvre la période facturée"""
         # Retirer la grille couvrant 2024 : la période ci-dessous tombe alors

@@ -17,9 +17,8 @@ tests/
 ├── test_integration.py         # Tests d'intégration legacy
 ├── test_invoice_template.py    # Tests du template de facture (TransactionCase)
 ├── test_souscription.py        # Tests des souscriptions (TransactionCase)
-├── test_ui.py                  # Tests d'interface utilisateur (HttpCase)
-├── test_portal.py              # Tests du portal client (HttpCase)
-└── test_workflow.py            # Tests de workflow complexes (SavepointCase)
+├── test_facture_document.py    # Rendu Facture PDF/HTML (HttpCase)
+└── test_portal.py              # Tests du portal client (HttpCase)
 ```
 
 ## 🚀 Lancement des tests
@@ -110,9 +109,10 @@ Les fichiers réellement exécutés sont ceux importés dans
 `test_facturation`, `test_grille_prix`, `test_integration`, `test_portal`,
 `test_raccordement`, `test_security` (91 tests au total).
 
-Les fichiers `test_ui.py`, `test_workflow.py` et `test_invoice_template.py`
-existent mais ne sont pas encore réactivés dans `__init__.py` ; les y rebrancher
-demande d'abord de vérifier leur compatibilité avec le modèle actuel.
+`test_ui.py` et `test_workflow.py` ont été supprimés (#221) : leurs seuls tests
+à valeur ont été portés vers `test_facture_document.py` (rendu Facture
+PDF/HTML) et `test_integration.py` (migration de tarif Base -> HP/HC).
+`test_invoice_template.py` est réactivé.
 
 ## 🧪 Types de tests
 
@@ -139,20 +139,10 @@ demande d'abord de vérifier leur compatibilité avec le modèle actuel.
 - Fallback pour factures non-énergie
 - Tag: `souscriptions_template`
 
-### Tests de workflow (`test_workflow.py`) - SavepointCase
-- Workflows complets avec savepoints
-- Scénarios de migration de tarifs
-- Régularisation de contrats lissés
-- Gestion d'erreurs avec rollback
-- Tests de performance batch
-- Tag: `souscriptions_workflow`
-
-### Tests d'interface (`test_ui.py`) - HttpCase
-- Vues et formulaires web
-- Navigation dans l'interface
-- Génération de rapports PDF
-- Prévisualisation HTML
-- Tag: `souscriptions_ui`, `souscriptions_reports`
+### Tests de facture (`test_facture_document.py`) - HttpCase
+- Génération du rapport PDF de la facture d'énergie
+- Prévisualisation HTML de la facture d'énergie
+- Tag: `souscriptions_facture_document`
 
 ### Tests du portal (`test_portal.py`) - HttpCase
 - Authentification et sécurité portal
@@ -196,15 +186,15 @@ class TestX(SouscriptionsTestMixin, TransactionCase):
 ```python
 @tagged('souscriptions', 'post_install', '-at_install')
 class TestMonModule(TransactionCase):
-    
+
     def setUp(self):
         super().setUp()
         # Setup des données communes
-    
+
     def test_feature_specific(self):
         """Description claire du test"""
         # Arrange
-        # Act  
+        # Act
         # Assert
 ```
 
@@ -257,7 +247,6 @@ lines = records.filtered(lambda r: r.field == value)
 - [ ] Tests de performance
 - [ ] Upsert idempotent des périodes (intégration electricore)
 - [ ] Régularisation des contrats lissés
-- [ ] Réactivation de `test_ui` / `test_workflow` / `test_invoice_template`
 
 ## 🚨 Dépannage
 

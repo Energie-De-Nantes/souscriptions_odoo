@@ -77,14 +77,53 @@ de contrat » au sens du rapport prod (qui est en réalité la CP, pas une attes
 Période mensuelle de facturation d'une *Souscription* (`souscription.periode`). **Brouillon de
 travail facturable** : amorcé par les quantités calculées par electricore (méta-période), puis
 **complété/corrigé par le·la facturiste** avant facturation — saisie manuelle d'estimations quand
-le flux Enedis manque, *gestes commerciaux*, ajustements. À la facturation, ses valeurs (quantités
-par cadran, jours, puissance, taxes) sont **figées** (historisation) et liées à la facture. Porte
+le flux Enedis manque, *gestes commerciaux*, ajustements. À la facturation, son **facturé** —
+l'*énergie facturée* par cadran, jours, puissance, taxes, relevés-justificatifs — est **figé**
+(historisation) et lié à la facture ; son **mesuré** (énergies par cadran, verdicts, coûts réseau
+servis par electricore) reste **vivant** : electricore fait foi et le raffine à tout moment, y
+compris après facturation. Porte
 ce qui est **facturé** — pas une copie du coût réseau ; la marge se calcule à la demande côté
 analytique en rejouant electricore. Elle est la **source analytique** typée : ses champs se lisent
 et s'agrègent **directement**, jamais reconstruits depuis les lignes de facture (`ligne → produit →
 catégorie`) ; la *Facture* en est une **projection** (dérive manuelle bornée tolérée, ADR 0014).
 _Éviter_ : méta-période (concept amont, côté electricore), mois ; « instantané fidèle » (la Période
 est un brouillon facturable, pas une copie figée d'electricore).
+
+**Énergie facturée** :
+La quantité d'énergie, par cadran facturé, que les *Factures* émises ont réellement portée pour
+une *Période* — le « facturé ». **N'évolue que par l'émission d'une facture qui la porte** :
+fixée à la **création** de la Période pour un contrat *lissé* (la provision contractuelle), à la
+**facturation** pour un contrat non lissé (la meilleure mesure/estimation du moment), puis
+déplacée uniquement par l'émission d'une facture de *régularisation* qui solde l'écart — la
+Période reste en permanence la somme exacte de ce que ses factures ont porté (historisation
+**raffinée**, toujours opposable, ADR 0030). Gelée contre tout le reste : pulls, éditions. Se distingue de l'**énergie
+mesurée** — la meilleure connaissance electricore, **vivante**, raffinable même après facturation
+(electricore fait foi). L'**écart** mesuré − facturé, par cadran, est la matière première de toute
+*régularisation* — y compris, à terme, celle d'un contrat non lissé dont les mesures ont été
+rééditées après facturation.
+_Éviter_ : « provision d'énergie » pour le cas non lissé (le terme amont electricore ne couvre que
+l'avance du contrat *lissé* — ici c'est le facturé, quel que soit le lissage) ; figer le mesuré
+(seul le facturé gèle) ; reconstruire le facturé depuis les lignes de facture (la Période reste la
+source analytique typée).
+
+**Régularisation (solde)** :
+Le document par lequel les écarts mesuré − facturé des mois soldables d'une *Souscription* sont
+facturés — ou remboursés par avoir — **aux prix historiques**, ventilés par *Grille de prix*
+(ADR 0030). Un
+**modèle propre**, pas une *Période* (il ne porte aucune énergie mensuelle) — même motif que la
+*Refacturation* : modèle indépendant rassemblé sur une *Facture*. Porte la ventilation **typée**
+(une ligne par grille × cadran : sous-période, écart kWh, prix) dont la facture est la
+**projection** (notes par mois), et les relevés frais en justificatif. Candidats : tous les mois
+facturés à écart non nul dont le mesuré est **connu** (verdict *réelle*/*estimée*) et non déjà
+soldés avant bascule (état « régularisée » migré) — les compteurs
+non communicants relèvent d'un autre processus. Son **émission** solde les mensuelles couvertes :
+leur *énergie facturée* est tamponnée de l'écart, l'écart retombe à zéro, chacune garde la trace
+de la Régularisation qui l'a soldée — relancer une régularisation juste après est un non-événement
+(idempotence), et un mesuré qui bouge encore fait renaître l'écart pour la suivante.
+_Éviter_ : « période de régularisation » (une Régularisation n'est **pas** une Période — champs
+mensuels sans objet) ; la borner par une fenêtre stockée (les candidats se sélectionnent par
+l'écart et le verdict, jamais par des dates de fenêtre) ; « je ne sais pas » qui écrase « je
+savais » (un verdict *incalculable* ou un mois absent du flux ne réécrit jamais un mesuré stocké).
 
 **Relevé (d'index)** :
 Événement de lecture **daté** du compteur, enfant d'une *Période* (`souscription.releve`,

@@ -48,6 +48,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-FAC-10 ✅ facture d'énergie PDF sur template dédié — preuve: tests/test_invoice_template.py, tests/test_facture_document.py::test_facture_energie_pdf
 - REQ-FAC-11 ✅ prestations F15 synchronisées puis refacturées (TVA par nature) — preuve: tests/test_sync_prestations.py, tests/test_refacturation.py · #147
 - REQ-FAC-12 ✅ chèques énergie : imputation FIFO à la facturation — preuve: tests/test_periode_facture.py::test_fifo_par_expiration_le_plus_proche_consomme_en_premier, tests/test_cheque_energie.py · #172
+- REQ-FAC-13 ✅ Énergie facturée universelle : la provision, tamponnée `provision := energie` à la facturation pour un contrat non lissé (dé-figeage/refacturation re-tamponne), porte uniformément la quantité facturée ; backfill des non-lissées déjà facturées — preuve: tests/test_periode_composition.py::test_creer_facture_tamponne_la_provision_non_lissee, tests/test_migration_energie_facturee.py · #234
 
 ## Parcours : espace usager (portail)
 

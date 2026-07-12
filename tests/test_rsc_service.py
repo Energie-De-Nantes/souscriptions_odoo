@@ -9,7 +9,7 @@ pas de mock d'`electricore_client` lui-même, pas de HTTP, pas de mock du
 temps.
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 from odoo.addons.souscriptions_odoo.models.core import electricore_rsc_service as service_module
 from odoo.exceptions import UserError
@@ -136,6 +136,19 @@ class TestActionResoudreRscMaintenant(SouscriptionsTestCase):
         appel si le lot filtré est vide."""
         self.souscription_base.with_context(rsc_automatisme=True).write({'ref_situation_contractuelle': 'RSC-DEJA'})
         self.assertEqual(self.souscription_base.etat, 'en_service')
+
+        with _patch_appeler() as mock_appeler:
+            self.souscription_base.action_resoudre_rsc_maintenant()
+        mock_appeler.assert_not_called()
+
+    def test_souscription_resiliee_jamais_reciblee(self):
+        """#136 : une Souscription résiliée n'est jamais re-ciblée par
+        l'action serveur, même sans RSC (résiliation avant mise en service)
+        et même appelée en lot — aucun appel au service RSC, idempotence
+        conservée (même garde que le poll quotidien #89, `etat ==
+        'en_instance'`)."""
+        self.souscription_base.write({'date_fin': date.today() - timedelta(days=1)})
+        self.assertEqual(self.souscription_base.etat, 'resiliee')
 
         with _patch_appeler() as mock_appeler:
             self.souscription_base.action_resoudre_rsc_maintenant()

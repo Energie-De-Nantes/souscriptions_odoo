@@ -17,8 +17,6 @@ plutôt que sur un import Python. La résolution du journal SDD et la
 construction des valeurs sont internes : l'appelant n'a rien à en connaître.
 """
 
-from __future__ import annotations
-
 from odoo import fields, models
 from odoo.exceptions import UserError
 

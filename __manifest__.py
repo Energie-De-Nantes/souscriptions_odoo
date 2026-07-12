@@ -68,7 +68,6 @@ vit dans models/wizard/ et ne lève qu'au clic sur l'action du wizard.
         'views/core/souscription_campagne_views.xml',
         'views/core/souscription_cheque_energie_views.xml',
         'views/core/account_move_views.xml',
-        'views/core/souscription_portal_menu.xml',
         'views/portal_templates.xml',
         'views/raccordement/raccordement_demande_views.xml',
         'views/raccordement/raccordement_menu.xml',

@@ -1,12 +1,19 @@
 """
 Tests des champs d'atterrissage du contrat PeriodeMeta v3 electricore
-(#76, ADR 0020 §4/§6/§7).
+(#76, ADR 0020 §4/§6/§7 ; exemption chirurgicale du verrou #235, ADR 0030
+décision 1).
 
 `qualite`/`statut_communication` (verdicts jumeaux), `has_changement`,
 `source_hash`, `cta_eur`, `taux_accise_eur_mwh`, `puissance_moyenne_kva`
 atterrissent sur la Période sous le nom du contrat. `releve_externe_id` et
-`origine` portent la provenance du justificatif sur le Relevé. Tous figés dès
-la facturation (ADR 0007), symétrique du verrou existant (#14).
+`origine` portent la provenance du justificatif sur le Relevé.
+
+Depuis #235 (ADR 0030 décision 1), l'atterrissage v3 — le **mesuré** — est
+volontairement EXEMPTÉ du verrou de facturation : il redevient réécrivable
+après facturation (par le pull, gardé par l'empreinte, et par le·la
+facturiste à la main). Seul le **facturé** (provisions, jours, snapshot
+contractuel) reste verrouillé ; les relevés-justificatifs suivent leur propre
+verrou (souscription_releve.py), jamais contourné.
 """
 
 from datetime import date
@@ -56,20 +63,39 @@ class TestPeriodeAtterrissage(SouscriptionsTestCase):
         periode = self._periode(self.souscription_base, qualite='incalculable')
         self.assertEqual(periode.qualite, 'incalculable')
 
-    def test_champs_atterrissage_verrouilles_apres_facturation(self):
-        """Dès qu'une facture référence la période, les champs d'atterrissage
-        sont figés (extension du verrou #14, ADR 0020 §7)."""
-        periode = self._periode(self.souscription_base, provision_base_kwh=100.0, cta_eur=4.2)
+    def test_champs_atterrissage_reecrivables_apres_facturation(self):
+        """AC5 (#235, ADR 0030 décision 1) : exemption chirurgicale du verrou
+        — le mesuré (atterrissage v3) devient réécrivable dès qu'une facture
+        référence la période (le pull le rafraîchit, le·la facturiste peut
+        aussi corriger l'énergie à la main)."""
+        periode = self._periode(self.souscription_base, provision_base_kwh=100.0, energie_base_kwh=100.0, cta_eur=4.2)
+        periode._creer_facture()
+
+        periode.write({'cta_eur': 999.0})
+        periode.write({'qualite': 'réelle'})
+        periode.write({'puissance_moyenne_kva': 12.0})
+        periode.write({'energie_base_kwh': 310.0})  # correction manuelle du·de la facturiste
+
+        self.assertEqual(periode.cta_eur, 999.0)
+        self.assertEqual(periode.qualite, 'réelle')
+        self.assertEqual(periode.puissance_moyenne_kva, 12.0)
+        self.assertEqual(periode.energie_base_kwh, 310.0)
+
+    def test_facture_gele_provisions_jours_et_snapshot_malgre_lexemption(self):
+        """AC5 : le verrou refuse toujours provisions/jours (dérivé des
+        dates)/snapshot contractuel — l'exemption du mesuré ne les concerne
+        pas, aucun canal de pull n'écrit jamais la provision."""
+        periode = self._periode(self.souscription_base, provision_base_kwh=100.0, energie_base_kwh=100.0, cta_eur=4.2)
         periode._creer_facture()
 
         with self.assertRaises(UserError):
-            periode.write({'cta_eur': 999.0})
+            periode.write({'provision_base_kwh': 999.0})
         with self.assertRaises(UserError):
-            periode.write({'qualite': 'réelle'})
+            periode.write({'date_debut': date(2024, 1, 2)})
         with self.assertRaises(UserError):
-            periode.write({'puissance_moyenne_kva': 12.0})
+            periode.write({'type_tarif_periode': 'hphc'})
 
-        self.assertEqual(periode.cta_eur, 4.2)
+        self.assertEqual(periode.provision_base_kwh, 100.0)
 
 
 @tagged('souscriptions', 'souscriptions_atterrissage', 'post_install', '-at_install')

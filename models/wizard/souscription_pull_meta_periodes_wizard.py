@@ -2,11 +2,11 @@
 
 Coquille mince (#233, tranche 1 du PRD #231) : le propriétaire durable du
 pull — méthode de transport nommée, mapping du contrat v3, politique
-create-missing-only/skip-and-report (ADR 0011/0024) — vit désormais dans
-`souscription.pull.meta.periodes.service`. Ce wizard ne fait plus que
+d'écriture gardée par l'empreinte (ADR 0030 décision 1, #235) — vit désormais
+dans `souscription.pull.meta.periodes.service`. Ce wizard ne fait plus que
 construire le périmètre (toutes les souscriptions, avec/sans RSC), déléguer
-le tirage au service et formater le résumé (créées / déjà existantes / sans
-RSC / erreurs) — zéro changement de comportement observable.
+le tirage au service (scope facturation, `pull()`) et formater le résumé
+(créées / rafraîchies / inchangées / conservées / sans RSC / erreurs).
 """
 
 from __future__ import annotations
@@ -38,8 +38,10 @@ class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
 
     def action_lancer(self):
         """Récupère les méta-périodes du mois pour toutes les souscriptions à
-        RSC, crée les périodes manquantes (create-missing-only), résume le
-        résultat (créées / déjà existantes / sans RSC / erreurs).
+        RSC (scope facturation, `pull()`) : crée les périodes manquantes,
+        rafraîchit les existantes selon la politique gardée par l'empreinte
+        (ADR 0030 décision 1, #235), résume le résultat (créées / rafraîchies
+        / inchangées / conservées / sans RSC / erreurs).
 
         Chemin ad-hoc (mois saisi, portée toutes-RSC) : délègue le tirage au
         service `souscription.pull.meta.periodes.service` (#233), le même que
@@ -53,9 +55,11 @@ class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
         avec_rsc = Souscription.search([('ref_situation_contractuelle', '!=', False), ('active', '=', True)])
         sans_rsc = Souscription.search([('ref_situation_contractuelle', '=', False), ('active', '=', True)])
 
-        creees, existantes, erreurs = self.env['souscription.pull.meta.periodes.service'].pull(avec_rsc, self.mois)
+        creees, rafraichies, inchangees, conservees, erreurs = self.env['souscription.pull.meta.periodes.service'].pull(
+            avec_rsc, self.mois
+        )
 
-        self.resultat = self._formatter_resultat(creees, existantes, sans_rsc, erreurs)
+        self.resultat = self._formatter_resultat(creees, rafraichies, inchangees, conservees, sans_rsc, erreurs)
         self.state = 'done'
         return {
             'type': 'ir.actions.act_window',
@@ -66,18 +70,26 @@ class SouscriptionPullMetaPeriodesWizard(models.TransientModel):
         }
 
     @staticmethod
-    def _formatter_resultat(creees, existantes, sans_rsc, erreurs):
+    def _formatter_resultat(creees, rafraichies, inchangees, conservees, sans_rsc, erreurs):
         lignes = [
             f'Créées : {len(creees)}',
-            f'Déjà existantes : {len(existantes)}',
+            f'Rafraîchies : {len(rafraichies)}',
+            f'Inchangées : {len(inchangees)}',
+            f'Conservées (signalées) : {len(conservees)}',
             f'Sans RSC (ignorées) : {len(sans_rsc)}',
             f'Erreurs : {len(erreurs)}',
             '',
         ]
         if creees:
             lignes += ['Périodes créées :'] + [f'  - {ligne}' for ligne in creees] + ['']
-        if existantes:
-            lignes += ['Déjà existantes (non réécrites) :'] + [f'  - {ligne}' for ligne in existantes] + ['']
+        if rafraichies:
+            lignes += ['Rafraîchies (mesuré v3 en bloc) :'] + [f'  - {ligne}' for ligne in rafraichies] + ['']
+        if conservees:
+            lignes += (
+                ['Conservées (empreinte incertaine ou mois absent, signalées) :']
+                + [f'  - {ligne}' for ligne in conservees]
+                + ['']
+            )
         if sans_rsc:
             lignes += ['Souscriptions sans RSC (ignorées) :'] + [f'  - {s.name}' for s in sans_rsc] + ['']
         if erreurs:

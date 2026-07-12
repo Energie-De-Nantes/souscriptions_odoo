@@ -1,15 +1,20 @@
 """
 Tests du pull des méta-périodes (#77, ADR 0011/0019/0020 ; service extrait
-#233, tranche 1 du PRD #231).
+#233, tranche 1 du PRD #231 ; pull unifié gardé par l'empreinte #235, tranche
+2 du PRD #231 — ADR 0030 décision 1).
 
-Trois tranches :
+Quatre tranches :
 - `_amorcer_depuis_meta` / `_releve_vals_depuis_objet` : mapping pur
   `PeriodeMeta`/`ObjetReleve` → `create()`, testé avec des stubs duck-typés
   (aucune dépendance à `electricore_client`, cf. la garde d'import de la
   fabrique).
+- `_rafraichir_depuis_meta` : mapping pur `PeriodeMeta` → `write()` en bloc
+  sur une Période déjà amorcée (#235), relevés remplacés en bloc seulement
+  si non facturée.
 - Le service `souscription.pull.meta.periodes.service` — propriétaire
-  durable du pull (#233) : create-missing-only, skip-and-report, erreurs
-  typées mappées — client mocké.
+  durable du pull (#233), gardé par l'empreinte (#235) : create-missing,
+  écriture gardée par `source_hash`, skip-and-report, erreurs typées
+  mappées, scope refresh — client mocké.
 - Le wizard « Récupérer les périodes du mois », coquille mince (#233) :
   périmètre avec/sans RSC + formatage du résumé, délègue au service.
 
@@ -19,13 +24,14 @@ Fixtures RSC/PDL : identifiants factices (jamais des vrais échantillons).
 import unittest
 from datetime import date, timedelta
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 from odoo.addons.souscriptions_odoo.models.core import electricore_client_fabrique as fabrique_module
 from odoo.addons.souscriptions_odoo.models.core import souscription_pull_meta_periodes_service as service_module
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
-from .common import SouscriptionsTestCase, client_flux_factice, patcher_client_fabrique
+from .common import SouscriptionsTestCase, client_flux_factice, flux_electricore, patcher_client_fabrique
 
 
 def _objet_releve(**kwargs):
@@ -183,25 +189,114 @@ class TestAmorcerDepuisMeta(SouscriptionsTestCase):
                 self.env['souscription.periode']._amorcer_depuis_meta(self.souscription_base, _periode_meta())
 
 
-# === Service « propriétaire durable du pull » (#233) : client mocké ===
+# === `_rafraichir_depuis_meta` : mapping pur PeriodeMeta -> write() en bloc
+# sur une Période déjà amorcée (#235, ADR 0030 décision 1). Appelée par le
+# service une fois l'empreinte/le verdict jugés fiables — la garde vit chez
+# l'appelant (cf. TestPullMetaPeriodesService plus bas) ; ici on vérifie que
+# la méthode écrit inconditionnellement, en bloc, et respecte le facturé gelé.
+
+
+@tagged('souscriptions', 'souscriptions_pull_meta', 'post_install', '-at_install')
+class TestRafraichirDepuisMeta(SouscriptionsTestCase):
+    def test_ecrase_latterrissage_v3_en_bloc(self):
+        """L'énergie, le TURPE, la CTA, l'accise, la puissance moyenne, les
+        verdicts et l'empreinte sont tous écrasés par un seul write()."""
+        periode = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(source_hash='H1', energie_base_kwh=280.0, turpe_fixe_eur=8.5, cta_eur=1.1),
+        )
+        meta = _periode_meta(
+            source_hash='H2',
+            energie_base_kwh=310.0,
+            turpe_fixe_eur=9.0,
+            turpe_variable_eur=4.8,
+            cta_eur=1.3,
+            taux_accise_eur_mwh=22.0,
+            puissance_moyenne_kva=7.0,
+            qualite='estimée',
+            statut_communication='non_communicante',
+            has_changement=True,
+        )
+
+        periode._rafraichir_depuis_meta(meta)
+
+        self.assertEqual(periode.energie_base_kwh, 310.0)
+        self.assertEqual(periode.turpe_fixe, 9.0)
+        self.assertEqual(periode.turpe_variable, 4.8)
+        self.assertEqual(periode.cta_eur, 1.3)
+        self.assertEqual(periode.taux_accise_eur_mwh, 22.0)
+        self.assertEqual(periode.puissance_moyenne_kva, 7.0)
+        self.assertEqual(periode.qualite, 'estimée')
+        self.assertEqual(periode.statut_communication, 'non_communicante')
+        self.assertTrue(periode.has_changement)
+        self.assertEqual(periode.source_hash, 'H2')
+
+    def test_remplace_les_releves_en_bloc_si_non_facturee(self):
+        """AC3 : Période non facturée -> relevés remplacés en bloc (le
+        re-pull promis par ADR 0015)."""
+        periode = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(releves_utilises=[_objet_releve(releve_id='R1', index_base_kwh=1000)]),
+        )
+        self.assertEqual(periode.releve_ids.releve_externe_id, 'R1')
+
+        periode._rafraichir_depuis_meta(
+            _periode_meta(source_hash='H2', releves_utilises=[_objet_releve(releve_id='R2', index_base_kwh=1310)])
+        )
+
+        self.assertEqual(len(periode.releve_ids), 1)
+        self.assertEqual(periode.releve_ids.releve_externe_id, 'R2')
+
+    def test_provisions_et_releves_intacts_si_facturee(self):
+        """AC2/AC5 : Période facturée -> le mesuré est rafraîchi mais la
+        provision (facturé gelé) et le relevé-justificatif restent intacts —
+        exemption chirurgicale du verrou (#14), jamais la provision."""
+        periode = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(
+                releves_utilises=[_objet_releve(releve_id='R1', index_base_kwh=1000)], energie_base_kwh=280.0
+            ),
+        )
+        periode._creer_facture()  # facturée -> tampon provision := energie (#234)
+        self.assertEqual(periode.provision_base_kwh, 280.0)
+
+        periode._rafraichir_depuis_meta(
+            _periode_meta(
+                releves_utilises=[_objet_releve(releve_id='R2', index_base_kwh=1310)],
+                energie_base_kwh=310.0,
+                source_hash='H2',
+                qualite='réelle',
+            )
+        )
+
+        self.assertEqual(periode.energie_base_kwh, 310.0)  # mesuré rafraîchi
+        self.assertEqual(periode.provision_base_kwh, 280.0)  # facturé gelé, intact
+        self.assertEqual(periode.releve_ids.releve_externe_id, 'R1')  # relevé-justificatif intact
+
+
+# === Service « propriétaire durable du pull », gardé par l'empreinte (#233,
+# #235) : client mocké ===
 #
 # `souscription.pull.meta.periodes.service` porte désormais la politique
-# create-missing-only / skip-and-report (ADR 0011) et la méthode de transport
-# nommée `_ouvrir_flux` (ADR 0024 §6). Les exceptions levées sont les vraies
-# classes du module service (réelles si electricore_client est présent, stubs
-# de la fabrique sinon, ADR 0024/#222) : aucun échange de symbole par patch,
-# `except IngestionEnCours` du service attrape exactement ce qui est
-# instancié ici.
+# gardée par l'empreinte (ADR 0030 décision 1, #235 — create-missing pour la
+# création, source_hash/qualite pour l'écriture d'une Période existante) et
+# skip-and-report (ADR 0011), et la méthode de transport nommée `_ouvrir_flux`
+# (ADR 0024 §6). Les exceptions levées sont les vraies classes du module
+# service (réelles si electricore_client est présent, stubs de la fabrique
+# sinon, ADR 0024/#222) : aucun échange de symbole par patch, `except
+# IngestionEnCours` du service attrape exactement ce qui est instancié ici.
 
 
 @tagged('souscriptions', 'souscriptions_pull_meta', 'post_install', '-at_install')
 class TestPullMetaPeriodesService(SouscriptionsTestCase):
     def _pull(self, client, souscriptions, mois=date(2024, 1, 1)):
-        """Appelle le point d'entrée unique du service (#233 AC1), transport
-        patché via la fabrique client (ADR 0024) — jamais de vrai client
-        construit."""
+        """Appelle le point d'entrée unique du scope facturation (#233 AC1),
+        transport patché via la fabrique client (ADR 0024) — jamais de vrai
+        client construit."""
         with patcher_client_fabrique(client):
             return self.env['souscription.pull.meta.periodes.service'].pull(souscriptions, mois)
+
+    # --- Création (create-missing) ---
 
     def test_cree_les_periodes_manquantes_pour_les_souscriptions_a_rsc(self):
         """AC2 : le service crée les périodes manquantes du mois pour les
@@ -214,41 +309,21 @@ class TestPullMetaPeriodesService(SouscriptionsTestCase):
         )
         client = client_flux_factice('meta_periodes', [meta])
 
-        creees, existantes, erreurs = self._pull(client, self.souscription_base)
+        creees, rafraichies, inchangees, conservees, erreurs = self._pull(client, self.souscription_base)
 
         periode = self.env['souscription.periode'].search(
             [('souscription_id', '=', self.souscription_base.id), ('mois', '=', date(2024, 1, 1))]
         )
         self.assertEqual(len(periode), 1)
         self.assertEqual(len(creees), 1)
-        self.assertFalse(existantes)
+        self.assertFalse(rafraichies)
+        self.assertFalse(inchangees)
+        self.assertFalse(conservees)
         self.assertFalse(erreurs)
         client.meta_periodes.assert_called_once_with(mois='2024-01-01', rsc=['RSC-00000000000001'])
 
-    def test_ne_reecrit_jamais_une_periode_existante(self):
-        """AC2/AC3 : create-missing-only — une période déjà amorcée n'est
-        jamais réécrite, même avec des valeurs différentes dans le payload."""
-        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
-        existante = self.create_test_periode(
-            self.souscription_base, date_debut=date(2024, 1, 1), date_fin=date(2024, 2, 1)
-        )
-        existante.cta_eur = 1.23
-
-        meta = _periode_meta(
-            ref_situation_contractuelle='RSC-00000000000001',
-            debut='2024-01-01',
-            fin='2024-02-01',
-            cta_eur=999.0,
-        )
-        creees, existantes, erreurs = self._pull(client_flux_factice('meta_periodes', [meta]), self.souscription_base)
-
-        self.assertEqual(existante.cta_eur, 1.23)
-        self.assertEqual(len(existantes), 1)
-        self.assertFalse(creees)
-        self.assertFalse(erreurs)
-
     def test_releves_crees_avec_identifiant_externe_et_origine(self):
-        """AC4 : relevés créés avec identifiant externe + origine."""
+        """AC4 (#233) : relevés créés avec identifiant externe + origine."""
         self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
         meta = _periode_meta(
             ref_situation_contractuelle='RSC-00000000000001',
@@ -271,10 +346,156 @@ class TestPullMetaPeriodesService(SouscriptionsTestCase):
             debut=None,  # déclenche une erreur de mapping (Date invalide)
             fin='2024-02-01',
         )
-        creees, existantes, erreurs = self._pull(
+        creees, rafraichies, inchangees, conservees, erreurs = self._pull(
             client_flux_factice('meta_periodes', [meta_invalide]), self.souscription_base
         )
         self.assertEqual(len(erreurs), 1)
+
+    # --- Politique d'écriture gardée par l'empreinte (ADR 0030 décision 1, #235) ---
+
+    def test_empreinte_inchangee_naboutit_a_aucune_ecriture(self):
+        """AC1 : `source_hash` inchangé -> rien n'est touché — une correction
+        manuelle du·de la facturiste survit à la relecture de données
+        inchangées."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        existante = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(ref_situation_contractuelle='RSC-00000000000001', source_hash='H1', cta_eur=1.1),
+        )
+        existante.cta_eur = 1.99  # correction manuelle du·de la facturiste
+
+        meta = _periode_meta(ref_situation_contractuelle='RSC-00000000000001', source_hash='H1', cta_eur=999.0)
+        creees, rafraichies, inchangees, conservees, erreurs = self._pull(
+            client_flux_factice('meta_periodes', [meta]), self.souscription_base
+        )
+
+        self.assertEqual(existante.cta_eur, 1.99)  # correction manuelle intacte
+        self.assertEqual(len(inchangees), 1)
+        self.assertFalse(creees)
+        self.assertFalse(rafraichies)
+        self.assertFalse(conservees)
+        self.assertFalse(erreurs)
+
+    def test_empreinte_nouvelle_verdict_fiable_rafraichit_le_mesure_en_bloc(self):
+        """AC2/AC3 : empreinte nouvelle + verdict réelle/estimée -> le mesuré
+        v3 est rafraîchi en bloc sur une Période non facturée."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        existante = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(ref_situation_contractuelle='RSC-00000000000001', source_hash='H1', energie_base_kwh=280.0),
+        )
+        meta = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001',
+            source_hash='H2',
+            energie_base_kwh=310.0,
+            qualite='réelle',
+        )
+        creees, rafraichies, inchangees, conservees, erreurs = self._pull(
+            client_flux_factice('meta_periodes', [meta]), self.souscription_base
+        )
+
+        self.assertEqual(existante.energie_base_kwh, 310.0)
+        self.assertEqual(existante.source_hash, 'H2')
+        self.assertEqual(len(rafraichies), 1)
+        self.assertFalse(creees)
+        self.assertFalse(inchangees)
+        self.assertFalse(conservees)
+        self.assertFalse(erreurs)
+
+    def test_empreinte_nouvelle_periode_facturee_provisions_et_releves_intacts(self):
+        """AC2 : sur une Période facturée, le mesuré est rafraîchi mais les
+        provisions et les relevés-justificatifs restent intacts — exemption
+        chirurgicale du verrou (#14), jamais la provision."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        existante = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(
+                ref_situation_contractuelle='RSC-00000000000001',
+                source_hash='H1',
+                energie_base_kwh=280.0,
+                releves_utilises=[_objet_releve(releve_id='R1', index_base_kwh=1000)],
+            ),
+        )
+        existante._creer_facture()  # facturée -> provision tamponnée (#234)
+        self.assertEqual(existante.provision_base_kwh, 280.0)
+
+        meta = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001',
+            source_hash='H2',
+            energie_base_kwh=310.0,
+            qualite='réelle',
+            releves_utilises=[_objet_releve(releve_id='R2', index_base_kwh=1310)],
+        )
+        creees, rafraichies, inchangees, conservees, erreurs = self._pull(
+            client_flux_factice('meta_periodes', [meta]), self.souscription_base
+        )
+
+        self.assertEqual(existante.energie_base_kwh, 310.0)  # mesuré rafraîchi
+        self.assertEqual(existante.provision_base_kwh, 280.0)  # facturé gelé
+        self.assertEqual(existante.releve_ids.releve_externe_id, 'R1')  # relevé-justificatif intact
+        self.assertEqual(len(rafraichies), 1)
+
+    def test_empreinte_nouvelle_periode_non_facturee_remplace_les_releves_en_bloc(self):
+        """AC3 : sur une Période non facturée, les relevés sont remplacés en
+        bloc — le re-pull promis par ADR 0015, enfin réalisé."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        existante = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(
+                ref_situation_contractuelle='RSC-00000000000001',
+                source_hash='H1',
+                releves_utilises=[_objet_releve(releve_id='R1', index_base_kwh=1000)],
+            ),
+        )
+        meta = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001',
+            source_hash='H2',
+            qualite='réelle',
+            releves_utilises=[_objet_releve(releve_id='R2', index_base_kwh=1310)],
+        )
+        self._pull(client_flux_factice('meta_periodes', [meta]), self.souscription_base)
+
+        self.assertEqual(len(existante.releve_ids), 1)
+        self.assertEqual(existante.releve_ids.releve_externe_id, 'R2')
+
+    def test_qualite_incalculable_conserve_et_signale(self):
+        """AC4 : verdict incalculable -> valeur stockée conservée, signalée
+        au rapport — « je ne sais pas » n'écrase pas « je savais »."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        existante = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(ref_situation_contractuelle='RSC-00000000000001', source_hash='H1', energie_base_kwh=280.0),
+        )
+        meta = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001',
+            source_hash='H2',
+            qualite='incalculable',
+            energie_base_kwh=0.0,
+        )
+        creees, rafraichies, inchangees, conservees, erreurs = self._pull(
+            client_flux_factice('meta_periodes', [meta]), self.souscription_base
+        )
+
+        self.assertEqual(existante.energie_base_kwh, 280.0)  # conservée
+        self.assertEqual(existante.source_hash, 'H1')  # empreinte pas mise à jour non plus
+        self.assertEqual(len(conservees), 1)
+        self.assertFalse(rafraichies)
+
+    def test_mois_absent_du_flux_conserve_et_signale(self):
+        """AC4 : une Période déjà amorcée dont la RSC n'est pas revenue dans
+        le lot est conservée, signalée."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        existante = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(ref_situation_contractuelle='RSC-00000000000001', source_hash='H1', energie_base_kwh=280.0),
+        )
+        creees, rafraichies, inchangees, conservees, erreurs = self._pull(
+            client_flux_factice('meta_periodes', []), self.souscription_base
+        )
+
+        self.assertEqual(existante.energie_base_kwh, 280.0)
+        self.assertEqual(len(conservees), 1)
+        self.assertIn('mois absent', conservees[0])
 
     def test_ingestion_en_cours_mappee_en_userror_reessayable(self):
         """AC5 : IngestionEnCours -> message « réessayer plus tard »."""
@@ -310,11 +531,92 @@ class TestPullMetaPeriodesService(SouscriptionsTestCase):
         ADR 0024 §5 : la construction elle-même n'ouvre aucune socket)."""
         self.assertFalse(self.souscription_hphc.ref_situation_contractuelle)
         client = client_flux_factice('meta_periodes', [])
-        creees, existantes, erreurs = self._pull(client, self.souscription_hphc)
+        creees, rafraichies, inchangees, conservees, erreurs = self._pull(client, self.souscription_hphc)
         client.meta_periodes.assert_not_called()
         self.assertFalse(creees)
-        self.assertFalse(existantes)
+        self.assertFalse(rafraichies)
+        self.assertFalse(inchangees)
+        self.assertFalse(conservees)
         self.assertFalse(erreurs)
+
+
+# === Scope refresh (#235 AC6) : plage de mois, création désactivée — testé à
+# la couture transport (un appel de flux par mois, mêmes arguments que
+# pull()). Consommé par la Régularisation à la tranche 4 du PRD #231.
+
+
+@tagged('souscriptions', 'souscriptions_pull_meta', 'post_install', '-at_install')
+class TestPullMetaPeriodesServiceRefresh(SouscriptionsTestCase):
+    def test_appelle_le_flux_une_fois_par_mois_et_ne_cree_rien(self):
+        """AC6 : un appel de flux par mois de la plage ; aucune création même
+        si le flux renvoie une méta pour un (RSC, mois) sans Période
+        existante — la création reste l'apanage du scope facturation."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        meta_janvier = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001', debut='2024-01-01', fin='2024-02-01'
+        )
+        meta_fevrier = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001', debut='2024-02-01', fin='2024-03-01'
+        )
+        client = MagicMock()
+        client.meta_periodes.side_effect = [flux_electricore([meta_janvier]), flux_electricore([meta_fevrier])]
+
+        with patcher_client_fabrique(client):
+            creees, rafraichies, inchangees, conservees, erreurs = self.env[
+                'souscription.pull.meta.periodes.service'
+            ].refresh(self.souscription_base, date(2024, 1, 1), date(2024, 2, 15))
+
+        self.assertEqual(client.meta_periodes.call_count, 2)
+        client.meta_periodes.assert_any_call(mois='2024-01-01', rsc=['RSC-00000000000001'])
+        client.meta_periodes.assert_any_call(mois='2024-02-01', rsc=['RSC-00000000000001'])
+        self.assertFalse(creees)  # scope refresh : jamais de création
+        periodes = self.env['souscription.periode'].search([('souscription_id', '=', self.souscription_base.id)])
+        self.assertFalse(periodes)
+
+    def test_rafraichit_une_periode_existante_sur_la_plage(self):
+        """AC6 : le scope refresh applique la même politique gardée par
+        l'empreinte que pull() aux Périodes déjà amorcées de la plage."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        existante = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(
+                ref_situation_contractuelle='RSC-00000000000001',
+                debut='2024-01-01',
+                fin='2024-02-01',
+                source_hash='H1',
+                energie_base_kwh=280.0,
+            ),
+        )
+        meta_rafraichie = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001',
+            debut='2024-01-01',
+            fin='2024-02-01',
+            source_hash='H2',
+            energie_base_kwh=310.0,
+            qualite='réelle',
+        )
+        client = MagicMock()
+        client.meta_periodes.side_effect = [flux_electricore([meta_rafraichie])]
+
+        with patcher_client_fabrique(client):
+            creees, rafraichies, inchangees, conservees, erreurs = self.env[
+                'souscription.pull.meta.periodes.service'
+            ].refresh(self.souscription_base, date(2024, 1, 1), date(2024, 1, 31))
+
+        self.assertEqual(existante.energie_base_kwh, 310.0)
+        self.assertEqual(existante.source_hash, 'H2')
+        self.assertEqual(len(rafraichies), 1)
+        self.assertFalse(creees)
+
+    def test_aucune_souscription_a_rsc_naboutit_pas_a_un_appel_de_flux(self):
+        """Même garde fast-fail que pull() : aucune RSC facturable -> aucun
+        flux n'est ouvert, même sur une plage de plusieurs mois."""
+        client = MagicMock()
+        with patcher_client_fabrique(client):
+            self.env['souscription.pull.meta.periodes.service'].refresh(
+                self.souscription_hphc, date(2024, 1, 1), date(2024, 3, 1)
+            )
+        client.meta_periodes.assert_not_called()
 
 
 # === Wizard « Récupérer les périodes du mois » : coquille mince (#233) ===
@@ -341,7 +643,7 @@ class TestWizardPullMetaPeriodes(SouscriptionsTestCase):
 
     def test_delegue_au_service_et_formate_le_resultat(self):
         """AC2 : le wizard délègue au service et formate le résumé (créées /
-        déjà existantes / erreurs) — comportement observable inchangé."""
+        rafraîchies / inchangées / conservées / erreurs)."""
         self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
         meta = _periode_meta(
             ref_situation_contractuelle='RSC-00000000000001',
@@ -360,25 +662,33 @@ class TestWizardPullMetaPeriodes(SouscriptionsTestCase):
         self.assertEqual(wizard.state, 'done')
         client.meta_periodes.assert_called_once_with(mois='2024-01-01', rsc=['RSC-00000000000001'])
 
-    def test_ne_reecrit_jamais_une_periode_existante(self):
-        """AC2 : create-missing-only préservé bout en bout via le wizard —
-        une période déjà amorcée n'est jamais réécrite."""
+    def test_empreinte_inchangee_delegue_correctement(self):
+        """AC1 : empreinte inchangée -> aucune écriture, bout en bout via le
+        wizard — preuve que le wizard ne ré-implémente pas la garde, il la
+        délègue au service (même politique que TestPullMetaPeriodesService)."""
         self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
-        existante = self.create_test_periode(
-            self.souscription_base, date_debut=date(2024, 1, 1), date_fin=date(2024, 2, 1)
+        existante = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(
+                ref_situation_contractuelle='RSC-00000000000001',
+                debut='2024-01-01',
+                fin='2024-02-01',
+                source_hash='H1',
+                cta_eur=1.23,
+            ),
         )
-        existante.cta_eur = 1.23
 
         meta = _periode_meta(
             ref_situation_contractuelle='RSC-00000000000001',
             debut='2024-01-01',
             fin='2024-02-01',
+            source_hash='H1',
             cta_eur=999.0,
         )
         wizard = self._lancer_avec_client(client_flux_factice('meta_periodes', [meta]))
 
         self.assertEqual(existante.cta_eur, 1.23)
-        self.assertIn('Déjà existantes : 1', wizard.resultat)
+        self.assertIn('Inchangées : 1', wizard.resultat)
         self.assertIn('Créées : 0', wizard.resultat)
 
     def test_resume_les_souscriptions_sans_rsc(self):

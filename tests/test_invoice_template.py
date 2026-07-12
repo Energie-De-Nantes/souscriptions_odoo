@@ -2,6 +2,8 @@ from datetime import date
 
 from odoo.tests.common import TransactionCase, tagged
 
+from .common import build_grille_lignes
+
 
 @tagged('souscriptions', 'souscriptions_template', 'post_install', '-at_install')
 class TestInvoiceTemplate(TransactionCase):
@@ -23,7 +25,8 @@ class TestInvoiceTemplate(TransactionCase):
             }
         )
 
-        # Créer une grille de prix
+        # Grille de prix avec lignes (ADR 0029 — grille.composants() lève
+        # bruyamment sans ligne de prix), construite via le socle commun.
         self.grille_prix = self.env['grille.prix'].create(
             {
                 'name': 'Grille Test Template',
@@ -32,6 +35,7 @@ class TestInvoiceTemplate(TransactionCase):
                 'active': True,
             }
         )
+        build_grille_lignes(self.env, self.grille_prix, prix_base=0.15, prix_hp=0.18, prix_hc=0.12)
 
         # Souscription Base
         self.souscription_base = self.env['souscription.souscription'].create(
@@ -136,11 +140,12 @@ class TestInvoiceTemplate(TransactionCase):
 
         # Rendu du template
         context = {'docs': [facture], 'doc_ids': facture.ids, 'doc_model': 'account.move'}
-        html_content = self.env['ir.qweb']._render('souscriptions.report_facture_energie', context)
+        html_content = self.env['ir.qweb']._render('souscriptions_odoo.report_facture_energie', context)
 
-        # Vérifications du contenu HTML
-        self.assertIn("Facture d'Électricité", html_content)
-        self.assertIn('Informations Souscription', html_content)
+        # Vérifications du contenu HTML (cartes Contrat / Point de livraison
+        # du template EDN — reports/facture_energie_template.xml)
+        self.assertIn('Contrat', html_content)
+        self.assertIn('Point de livraison', html_content)
         self.assertIn('Marie Dupont Test', html_content)
         self.assertIn('PDL_TEMPLATE_BASE', html_content)
         self.assertIn('6 kVA', html_content)
@@ -155,8 +160,7 @@ class TestInvoiceTemplate(TransactionCase):
         self.assertIn('Dont turpe fixe: 8.50€', html_content)
         self.assertIn('Dont turpe variable:', html_content)
 
-        # Vérifier les informations réglementaires
-        self.assertIn('Information réglementaire', html_content)
+        # Vérifier la mention réglementaire TURPE (callout, à titre informatif)
         self.assertIn('TURPE', html_content)
 
     def test_template_rendering_hphc(self):
@@ -164,10 +168,10 @@ class TestInvoiceTemplate(TransactionCase):
         periode, facture = self._create_periode_and_invoice(self.souscription_hphc, date(2024, 3, 1), date(2024, 3, 31))
 
         context = {'docs': [facture], 'doc_ids': facture.ids, 'doc_model': 'account.move'}
-        html_content = self.env['ir.qweb']._render('souscriptions.report_facture_energie', context)
+        html_content = self.env['ir.qweb']._render('souscriptions_odoo.report_facture_energie', context)
 
         # Vérifications spécifiques HP/HC
-        self.assertIn('Heures Pleines / Heures Creuses', html_content)
+        self.assertIn('HP/HC', html_content)
         self.assertIn('9 kVA', html_content)
         self.assertIn('PDL_TEMPLATE_HPHC', html_content)
 
@@ -181,10 +185,10 @@ class TestInvoiceTemplate(TransactionCase):
         )
 
         context = {'docs': [facture], 'doc_ids': facture.ids, 'doc_model': 'account.move'}
-        html_content = self.env['ir.qweb']._render('souscriptions.report_facture_energie', context)
+        html_content = self.env['ir.qweb']._render('souscriptions_odoo.report_facture_energie', context)
 
         # Vérifier le badge tarif solidaire
-        self.assertIn('♥ Tarif Solidaire', html_content)
+        self.assertIn('Tarif solidaire', html_content)
         self.assertIn('3 kVA', html_content)
 
     def test_invoice_lines_structure(self):
@@ -240,11 +244,11 @@ class TestInvoiceTemplate(TransactionCase):
 
         # Le rendu devrait utiliser le template standard
         context = {'docs': [facture_normale], 'doc_ids': facture_normale.ids, 'doc_model': 'account.move'}
-        html_content = self.env['ir.qweb']._render('souscriptions.report_facture_energie', context)
+        html_content = self.env['ir.qweb']._render('souscriptions_odoo.report_facture_energie', context)
 
         # Ne devrait pas contenir les éléments spécifiques à l'énergie
-        self.assertNotIn('Informations Souscription', html_content)
-        self.assertNotIn('♥ Tarif Solidaire', html_content)
+        self.assertNotIn('Point de livraison', html_content)
+        self.assertNotIn('Tarif solidaire', html_content)
 
     def test_report_filename(self):
         """Test du nom de fichier personnalisé"""

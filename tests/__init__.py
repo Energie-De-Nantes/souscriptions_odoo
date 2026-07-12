@@ -13,6 +13,7 @@ from . import (
     test_facturation,
     test_grille_prix,
     test_integration,
+    test_invoice_template,
     test_mails_raccordement,
     test_paiements_reglements_attente,
     test_periode_atterrissage,

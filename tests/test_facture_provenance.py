@@ -144,12 +144,15 @@ class TestMigrationProvenanceLignesGenerees(SouscriptionsTestCase):
     def test_backfill_ignore_les_factures_postees(self):
         """Une facture déjà postée n'est pas concernée (l'enforcement doux ne
         s'applique qu'au brouillon ; une facture postée n'est jamais
-        régénérée)."""
+        régénérée). Depuis #266 l'émission recompose et flague ses lignes —
+        on dé-flague après le post pour simuler l'état pré-migration d'une
+        facture émise avant la bascule."""
         _periode, facture = self._periode_facturee_sans_flag(
             self.souscription_base, date_debut=date(2024, 2, 1), date_fin=date(2024, 2, 29)
         )
         facture.action_post()
         lignes = facture.invoice_line_ids.filtered(lambda l: l.display_type in ('product', 'line_section'))
+        lignes.write({'souscription_ligne_generee': False})
 
         self._migrer(self.env.cr)
         lignes.invalidate_recordset()

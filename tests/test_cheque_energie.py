@@ -3,8 +3,9 @@
 Deux niveaux : la config comptable posée par `hooks.setup_cheque_energie_compta`
 (#170 — journal « Chèques énergie » + compte « à recevoir de l'État »), puis le
 modèle propre `souscription.cheque_energie` et son gate `action_valider()`
-(#171 — couture 1). L'imputation FIFO à la facturation (#172) est testée côté
-`test_periode_facture.py`, au point de couture le plus haut (`_creer_facture()`).
+(#171 — couture 1). L'imputation FIFO à l'émission (#172 ; déplacée de la
+création par #265) est testée côté `test_periode_facture.py`, au point de
+couture de l'émission (`account.move._post()`).
 """
 
 from datetime import date

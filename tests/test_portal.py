@@ -440,3 +440,118 @@ class PortalReleveTestCase(SouscriptionsTestMixin, HttpCase):
         self.assertEqual(response.status_code, 200)
 
         self.assertNotIn('99999', response.text)
+
+
+@tagged('post_install', '-at_install', 'portal', 'souscriptions_regularisation')
+class PortalRegularisationTestCase(SouscriptionsTestMixin, HttpCase):
+    """Factures de régularisation ÉMISES au portail (tranche 8 du PRD #231,
+    #240, ADR 0030 conséquences) : même règle que l'historique des périodes
+    — une facture de régul en brouillon ne fuite jamais côté usager·ère, et
+    seul·e le·la souscripteur·rice concerné·e y accède."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setUpSouscriptionsData()
+
+        cls.portal_user = cls.env['res.users'].create(
+            {
+                'name': 'Portal Regul User',
+                'login': 'portal_regul',
+                'email': 'portal_regul@test.com',
+                'group_ids': [(6, 0, [cls.env.ref('base.group_portal').id])],
+            }
+        )
+        cls.partner_test.user_ids = [(6, 0, [cls.portal_user.id])]
+
+        cls.regularisation_emise = cls._creer_regularisation_facturee(
+            cls.souscription_base, date(2024, 1, 1), date(2024, 2, 1), poster=True
+        )
+        cls.regularisation_brouillon = cls._creer_regularisation_facturee(
+            cls.souscription_base, date(2024, 3, 1), date(2024, 4, 1), poster=False
+        )
+
+    @classmethod
+    def _creer_regularisation_facturee(cls, souscription, date_debut, date_fin, ecart_kwh=50.0, poster=True):
+        """Régularisation minimale, sa ligne directement construite (grille ×
+        cadran) — même isolation que test_regularisation_facture.py : la
+        sélection des candidats (`_recalculer`, appel electricore) n'est pas
+        nécessaire pour tester la surface portail."""
+        regularisation = cls.env['souscription.regularisation'].create(
+            {'souscription_id': souscription.id, 'date_debut': date_debut, 'date_fin': date_fin}
+        )
+        cls.env['souscription.regularisation.ligne'].create(
+            {
+                'regularisation_id': regularisation.id,
+                'grille_id': cls.grille_prix.id,
+                'cadran': 'base',
+                'ecart_kwh': ecart_kwh,
+                'prix_kwh': 0.15,
+                'detail': f'{date_debut.strftime("%B %Y")} : {ecart_kwh:.2f} kWh',
+            }
+        )
+        facture = regularisation._creer_facture()
+        if poster:
+            facture.action_post()
+        return regularisation
+
+    def _detail_url(self, souscription=None):
+        souscription = souscription or self.souscription_base
+        return f'/my/souscription/{souscription.id}'
+
+    def test_facture_regularisation_emise_visible_et_telechargeable(self):
+        """Une facture de régularisation émise est listée dans une section
+        dédiée et son lien pointe vers la route de téléchargement portail
+        native, qui répond effectivement."""
+        self.authenticate(self.portal_user.login, self.portal_user.login)
+        response = self.url_open(self._detail_url())
+        self.assertEqual(response.status_code, 200)
+
+        self.assertIn('Factures de régularisation', response.text)
+        facture = self.regularisation_emise.facture_id
+        self.assertEqual(facture.state, 'posted')
+        self.assertIn(facture.name, response.text)
+        self.assertIn(f'/my/invoices/{facture.id}', response.text)
+
+        # Sans suivre les redirections : un 200 après redirect vers /my serait
+        # un refus déguisé, pas un téléchargement.
+        telechargement = self.url_open(f'/my/invoices/{facture.id}', allow_redirects=False)
+        self.assertEqual(telechargement.status_code, 200)
+
+    def test_facture_regularisation_brouillon_invisible(self):
+        """Une régularisation dont la facture reste en brouillon ne fuite pas
+        (ni son lien, ni sa référence) — même garde que les périodes."""
+        facture_brouillon = self.regularisation_brouillon.facture_id
+        self.assertEqual(facture_brouillon.state, 'draft')
+
+        self.authenticate(self.portal_user.login, self.portal_user.login)
+        response = self.url_open(self._detail_url())
+        self.assertEqual(response.status_code, 200)
+
+        self.assertNotIn(f'/my/invoices/{facture_brouillon.id}', response.text)
+
+    def test_acces_facture_regularisation_reserve_au_souscripteur(self):
+        """Un·e autre usager·ère ne voit ni la page de la souscription
+        d'autrui, ni ne peut télécharger sa facture de régularisation."""
+        other_partner = self.env['res.partner'].create({'name': 'Autre Régul', 'email': 'autre_regul@test.com'})
+        other_user = self.env['res.users'].create(
+            {
+                'name': 'Other Regul Portal User',
+                'login': 'other_regul_portal',
+                'email': 'other_regul_portal@test.com',
+                'group_ids': [(6, 0, [self.env.ref('base.group_portal').id])],
+            }
+        )
+        other_partner.user_ids = [(6, 0, [other_user.id])]
+
+        self.authenticate(other_user.login, other_user.login)
+        response = self.url_open(self._detail_url())
+        self.assertEqual(response.status_code, 403)
+
+        # La route portail native ne renvoie pas 403 : sur AccessError elle
+        # REDIRIGE vers /my. C'est la redirection qui est le refus — un 200
+        # direct serait la fuite.
+        facture = self.regularisation_emise.facture_id
+        telechargement = self.url_open(f'/my/invoices/{facture.id}', allow_redirects=False)
+        self.assertIn(telechargement.status_code, (302, 303))
+        self.assertNotIn('/my/invoices', telechargement.headers.get('Location', ''))

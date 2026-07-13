@@ -65,6 +65,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-POR-01 ✅ accès sécurisé : login, token d'aperçu, cloisonnement entre usagers — preuve: tests/test_portal.py::test_securite_autre_usager
 - REQ-POR-02 ✅ historique de consommation inline (factures émises seulement) — preuve: tests/test_portal.py::test_detail_affiche_historique_inline_sans_bouton · #24
 - REQ-POR-03 ✅ bloc justificatif des relevés, brouillons non fuités — preuve: tests/test_portal.py::test_releves_periode_emise_visibles · #57
+- REQ-POR-04 ✅ factures de régularisation émises visibles et téléchargeables, brouillons non fuités, cloisonnées par souscripteur·rice — preuve: tests/test_portal.py::PortalRegularisationTestCase · #240, ADR 0030
 
 ## Parcours : reprise de l'existant
 

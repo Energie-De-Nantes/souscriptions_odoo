@@ -62,9 +62,18 @@ class SouscriptionPortal(CustomerPortal):
             'date_debut', reverse=True
         )
 
+        # Factures de régularisation ÉMISES (tranche 8 du PRD #231, #240,
+        # ADR 0030) : même règle que les périodes — un brouillon ne fuite
+        # jamais côté usager·ère. Pas de fusion avec `periodes` (le group_by
+        # mensuelles/réguls est hors périmètre, ADR 0030) : section propre.
+        regularisations = souscription.regularisation_ids.filtered(
+            lambda r: r.facture_id and r.facture_id.state == 'posted'
+        ).sorted('date_fin', reverse=True)
+
         values = {
             'souscription': souscription,
             'periodes': periodes,
+            'regularisations': regularisations,
             'page_name': 'souscription',
         }
 

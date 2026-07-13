@@ -136,6 +136,11 @@ class SouscriptionRegularisation(models.Model):
                         'ecart': 0.0,
                         'periode_ids': [],
                         'detail': [],
+                        # Snapshot du premier mois du groupe (ADR 0006) : le
+                        # solidaire est structurel à la Souscription (ne
+                        # change pas en cours de route), figé ici pour que la
+                        # projection facture (tranche 5, #237) choisisse le
+                        # bon produit du catalogue sans relire les Périodes.
                         'tarif_solidaire': periode.tarif_solidaire_periode,
                         'coeff_pro': periode.coeff_pro_periode,
                     }
@@ -161,6 +166,7 @@ class SouscriptionRegularisation(models.Model):
                         'prix_kwh': prix,
                         'periode_ids': [(6, 0, groupe['periode_ids'])],
                         'detail': '\n'.join(groupe['detail']),
+                        'tarif_solidaire': groupe['tarif_solidaire'],
                     },
                 )
             )
@@ -202,6 +208,13 @@ class SouscriptionRegularisationLigne(models.Model):
     ecart_kwh = fields.Float(string='Écart (kWh)')
     prix_kwh = fields.Float(string='Prix (€/kWh)', digits=(16, 6))
     montant = fields.Float(string='Montant (€)', compute='_compute_montant', store=True)
+
+    # Snapshot du tarif solidaire (ADR 0013) au moment du calcul des
+    # candidats — le solidaire choisit le *Produit de facturation* (compte +
+    # TVA isolés) à la projection facture (tranche 5, #237) ; figé ici plutôt
+    # que relu sur la Souscription live, même logique de snapshot que la
+    # Période (ADR 0006).
+    tarif_solidaire = fields.Boolean(string='Tarif solidaire (snapshot)', readonly=True)
 
     # Mois agrégés dans cette ligne — support du détail et du signalement
     # « estimation locale » (mois conservé au refresh, ADR 0030 décision 1).

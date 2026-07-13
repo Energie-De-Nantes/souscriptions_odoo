@@ -62,7 +62,7 @@ def _meta_stub(**kwargs):
 class TestRegularisationCandidats(SouscriptionsTestCase):
     """Calcul des candidats et ventilation des lignes (`_recalculer`)."""
 
-    def _souscription_lissee(self, ref='RSC-REGUL', pdl='PDL_REGUL', provision=200.0):
+    def _souscription_lissee(self, ref='RSC-REGUL', pdl='PDL_REGUL', provision=200.0, tarif_solidaire=False):
         return self.env['souscription.souscription'].create(
             {
                 'partner_id': self.partner_test.id,
@@ -74,6 +74,7 @@ class TestRegularisationCandidats(SouscriptionsTestCase):
                 'provision_mensuelle_kwh': provision,
                 'regime_prix': 'moulin',  # regime dédié : n'entre pas en collision
                 'ref_situation_contractuelle': ref,
+                'tarif_solidaire': tarif_solidaire,
             }
         )
 
@@ -137,6 +138,21 @@ class TestRegularisationCandidats(SouscriptionsTestCase):
         self.assertEqual(regularisation.date_debut, date(2024, 1, 1))
         self.assertEqual(regularisation.date_fin, date(2025, 1, 1))
         self.assertAlmostEqual(regularisation.montant_total, 30.0, places=2)
+        self.assertFalse(ligne.tarif_solidaire, 'snapshot standard par défaut')
+
+    def test_ac1bis_tarif_solidaire_snapshotte_sur_la_ligne(self):
+        """Le solidaire (ADR 0013) est figé sur la ligne au calcul des
+        candidats — support du choix du produit de facturation à la
+        projection facture (tranche 5, #237), sans relire la Souscription."""
+        souscription = self._souscription_lissee(ref='RSC-REGUL-AC1BIS', pdl='PDL_REGUL_AC1BIS', tarif_solidaire=True)
+        self._grille_moulin(name='Grille AC1BIS')
+        self._periode_facturee(souscription, 1, energie_base_kwh=220.0)
+
+        regularisation = self.env['souscription.regularisation'].create({'souscription_id': souscription.id})
+        with patcher_client_fabrique(client_flux_factice('meta_periodes', [])):
+            regularisation._recalculer()
+
+        self.assertTrue(regularisation.ligne_ids.tarif_solidaire)
 
     # --- AC2 : changement de grille en cours d'année ---
 

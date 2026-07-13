@@ -107,10 +107,17 @@ class AccountMove(models.Model):
         """Autorise la suppression EN CASCADE des lignes générées (#266) : le
         contexte `souscription_move_unlink` lève la garde `ondelete` de
         `account.move.line` (`_empecher_suppression_directe_ligne_generee`)
-        pour les lignes de CE move — supprimer la facture reste le geste de
-        correction documenté (dé-fige la Période, ADR 0014/0007), la cascade
-        ORM (`account.move.line.move_id`, `ondelete='cascade'`) ne doit jamais
-        être bloquée par cette garde."""
+        pour les lignes de CE move — la cascade ORM (`account.move.line.
+        move_id`, `ondelete='cascade'`) ne doit jamais être bloquée par cette
+        garde.
+
+        Supprimer un brouillon est ANODIN depuis #267 (ADR 0006/0007 amendés,
+        ADR 0032) : rien n'est figé avant l'émission, donc rien à
+        « dé-figer ». `souscription.refacturation.facture_id` (ondelete='set
+        null') remet les Refacturations rassemblées en file, et le statut de
+        facturation de la Souscription (dérivé, ADR 0025 §2) retombe tout
+        seul à « à facturer » — la cascade native suffit, aucun code dédié
+        ici."""
         self = self.with_context(souscription_move_unlink=True)
         return super().unlink()
 

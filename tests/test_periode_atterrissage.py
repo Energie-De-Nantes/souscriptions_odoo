@@ -83,10 +83,11 @@ class TestPeriodeAtterrissage(SouscriptionsTestCase):
 
     def test_facture_gele_provisions_jours_et_snapshot_malgre_lexemption(self):
         """AC5 : le verrou refuse toujours provisions/jours (dérivé des
-        dates)/snapshot contractuel — l'exemption du mesuré ne les concerne
-        pas, aucun canal de pull n'écrit jamais la provision."""
+        dates)/snapshot contractuel une fois la facture ÉMISE (#267) —
+        l'exemption du mesuré ne les concerne pas, aucun canal de pull
+        n'écrit jamais la provision."""
         periode = self._periode(self.souscription_base, provision_base_kwh=100.0, energie_base_kwh=100.0, cta_eur=4.2)
-        periode._creer_facture()
+        periode._creer_facture().action_post()
 
         with self.assertRaises(UserError):
             periode.write({'provision_base_kwh': 999.0})

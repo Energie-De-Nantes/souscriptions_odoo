@@ -67,3 +67,34 @@ maintenir sur `account.move.line`.
 Résout les trois questions ouvertes de
 [#35](https://github.com/Energie-De-Nantes/souscriptions_odoo/issues/35) (verrou à la création/émission ;
 modélisation du geste commercial ; remise vs régularisation).
+
+## Amendement (#266) — de la dérive tolérée à la gouvernance par provenance
+
+Décision re-instruite dans le cadre du PRD #264 (Brouillon gouverné, grillé le 2026-07-13),
+tranche 2. La décision 3 ci-dessus (« dérive tolérée et bornée ») supposait une Facture
+statique une fois créée : toute retouche manuelle, comme toute divergence avec la Période,
+restait acquise jusqu'à l'émission. Cette hypothèse ne tient plus : la Facture vit désormais en
+deux temps (tranche 1, #265 — imputation du chèque énergie déplacée à l'émission ; ce chantier —
+re-génération des lignes à l'émission). Sans distinction de provenance, une re-génération
+écraserait indistinctement les lignes composées **et** les gestes commerciaux du·de la
+facturiste : la dérive resterait tolérée, mais ne serait **plus bornée**.
+
+**Ce qui change.** Un champ de provenance (`souscription_ligne_generee`, `copy=False`) marque
+les lignes **générées** — posé par LA composition, pour toutes les sources (Période, Régularisation,
+Refacturations rassemblées). L'émission re-génère : supprime les lignes flaguées, recompose
+depuis la source, **préserve tout le reste**. Enforcement doux, dans l'esprit de la décision
+initiale (**pas** de verrou dur) : readonly en **vue** sur les lignes flaguées (pas de retouche
+« acceptée puis écrasée en douce ») + garde `ondelete` étroite (pas de suppression directe d'une
+ligne générée). **Toujours aucune surcharge de `write()`** sur `account.move.line` — la raison
+d'être de la décision 2 (éviter de combattre les recomputes ORM sur la table la plus chaude
+d'Odoo) reste entière ; la voie script/RPC reste ouverte, assumée, la re-génération à l'émission
+garantissant la conformité du document final.
+
+**Ce qui ne change pas.** La Période reste la source analytique ; la Facture en reste la
+projection (décision 2, inchangée). La confiance au·à la facturiste (décision 4, geste commercial
+à son jugement) reste entière — elle est désormais **structurée** : une ligne manuelle ajoutée au
+brouillon est identifiable par construction (absence du flag) et survit à toute re-génération,
+au lieu de reposer sur le seul fait qu'aucun mécanisme ne la touche. « Dérive manuelle bornée » —
+le budget d'erreur humaine de la décision 3 — devient donc une **dérive gouvernée par
+provenance** : bornée dans l'espace (une ligne manuelle, jamais une ligne générée) plutôt que
+seulement dans le temps (jusqu'à l'émission).

@@ -60,22 +60,107 @@ class AccountMove(models.Model):
             move.is_facture_energie = bool((move.periode_id or move.regularisation_id) and move.souscription_id)
 
     def _post(self, soft=True):
-        """Point de couture de l'émission — tampon de Régularisation (ADR
+        """Point de couture de l'émission — re-génération préservante des
+        lignes (#266, tranche 2 du PRD #264), tampon de Régularisation (ADR
         0030 décision 4, tranche 6 du PRD #231, #238) **et** imputation du
         chèque énergie (ADR 0026, #172, déplacée de la création à l'émission
-        par la tranche 1 du PRD #264, #265) : les deux effets ne se
-        déclenchent qu'à l'émission RÉELLE (jamais au brouillon).
+        par la tranche 1 du PRD #264, #265).
 
-        `super()._post()` ne rend que les moves réellement passés à l'état
-        posté (les moves programmés dans le futur avec ``soft=True`` restent
-        en brouillon) : filtrer sur son résultat, pas sur ``self``, exclut
-        naturellement ce cas sans logique dédiée."""
+        La re-génération se déclenche AVANT ``super()._post()`` — le move est
+        encore brouillon, ses lignes flaguées éditables — sur ``self`` (pas
+        sur le résultat filtré) : même un move programmé dans le futur
+        (``soft=True``, qui restera en brouillon) doit voir ses lignes
+        rafraîchies. Le tampon et l'imputation, eux, ne se déclenchent qu'à
+        l'émission RÉELLE : filtrer sur le résultat de ``super()._post()``,
+        pas sur ``self``, exclut naturellement les moves soft-programmés sans
+        logique dédiée."""
+        a_regenerer = self.filtered(lambda m: m.is_facture_energie and m.state == 'draft')
+        for move in a_regenerer:
+            move._recomposer_lignes_generees()
+
         posted = super()._post(soft=soft)
         for move in posted.filtered(lambda m: m.regularisation_id):
             move.regularisation_id._solder_provisions()
         for move in posted.filtered(lambda m: m.is_facture_energie):
             move._imputer_cheques_energie()
         return posted
+
+    def unlink(self):
+        """Autorise la suppression EN CASCADE des lignes générées (#266) : le
+        contexte `souscription_move_unlink` lève la garde `ondelete` de
+        `account.move.line` (`_empecher_suppression_directe_ligne_generee`)
+        pour les lignes de CE move — supprimer la facture reste le geste de
+        correction documenté (dé-fige la Période, ADR 0014/0007), la cascade
+        ORM (`account.move.line.move_id`, `ondelete='cascade'`) ne doit jamais
+        être bloquée par cette garde."""
+        self = self.with_context(souscription_move_unlink=True)
+        return super().unlink()
+
+    # === Provenance des lignes (#266, tranche 2 du PRD #264, ADR 0014 amendé) ===
+    #
+    # Point d'entrée unique : composer les lignes GÉNÉRÉES de CE move, résolu
+    # par sa source (periode_id / regularisation_id, jamais les deux —
+    # `_check_source_exclusive`). Chaque composeur par source
+    # (`periode._composer_lignes`, `refacturation._composer_ligne`,
+    # `regularisation._composer_lignes`) pose lui-même le flag de provenance
+    # — ce point d'entrée ne fait qu'agréger, résolu par la source.
+
+    def _composer_lignes_generees(self):
+        """Compose les lignes GÉNÉRÉES de ce move, résolu par sa source.
+
+        Source Période (mensuelle) : ses lignes propres (sections,
+        abonnement, énergie, notes TURPE — snapshot figé, ADR 0006, même
+        grille qu'à la création : ``get_grille_active`` sur ``date_fin``/
+        ``regime_prix_periode``) + les Refacturations actuellement *à
+        refacturer* de la Souscription (ADR 0009) — même règle qu'à la
+        création (`souscription._facturer_refacturations`) : une Refacturation
+        entrée en file après la création du brouillon est donc rassemblée ici
+        si ce move est régénéré à l'émission.
+
+        Source Régularisation : ses lignes projetées (grille × cadran + notes
+        par mois, ADR 0030 décision 3) — pas de rassemblage de Refacturations
+        sur ce chemin (jamais fait aujourd'hui, inchangé).
+
+        Vide si ni l'un ni l'autre (facture hors énergie) : n'est jamais
+        appelée dans ce cas (cf. `_post`/`_recomposer_lignes_generees`, filtre
+        `is_facture_energie`)."""
+        self.ensure_one()
+        if self.periode_id:
+            periode = self.periode_id
+            grille = self.env['grille.prix'].get_grille_active(periode.date_fin, regime=periode.regime_prix_periode)
+            lignes = periode._composer_lignes(grille)
+            prestas = periode.souscription_id._refacturations_a_rassembler(self)
+            return lignes + [presta._composer_ligne() for presta in prestas]
+        if self.regularisation_id:
+            return self.regularisation_id._composer_lignes()
+        return []
+
+    def _recomposer_lignes_generees(self):
+        """Recompose PRÉSERVANTE (#266) : supprime les lignes flaguées
+        existantes de CE move puis les remplace par une composition fraîche
+        depuis la source (`_composer_lignes_generees`) — toute ligne NON
+        flaguée (geste commercial en euros, ligne posée par un autre module :
+        arrondi, escompte…) survit intacte. La facture émise = la source à
+        l'instant T + les lignes manuelles (AC #266).
+
+        Source Période : rassemble aussi les Refacturations fraîches (voir
+        `_composer_lignes_generees`) et pose leur lien (`facture_id`) —
+        même geste que le chemin de création
+        (`souscription._facturer_refacturations`), rejoué ici. Ré-interroger
+        la file *après* avoir recomposé les lignes est correct : composer et
+        rassembler lisent la même file (`_refacturations_a_rassembler`), et
+        rien ne la modifie entre les deux appels dans ce flux synchrone.
+
+        Contexte `souscription_regenere_lignes` : lève la garde `ondelete`
+        (#266) pour la suppression, ici, des lignes flaguées qu'on remplace —
+        seule cette méthode (et `unlink()`, cascade) pose ce contexte."""
+        self.ensure_one()
+        self.invoice_line_ids.filtered('souscription_ligne_generee').with_context(
+            souscription_regenere_lignes=True
+        ).unlink()
+        self.write({'invoice_line_ids': self._composer_lignes_generees()})
+        if self.periode_id:
+            self.periode_id.souscription_id._refacturations_a_rassembler(self).facture_id = self
 
     def _verifier_regularisation_emise_immuable(self):
         """Une facture de régularisation ÉMISE est immuable (grill #259) : le

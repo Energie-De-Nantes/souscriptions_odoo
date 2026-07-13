@@ -904,14 +904,31 @@ class Souscription(models.Model):
             if premiere_facture:
                 souscription._facturer_refacturations(premiere_facture)
 
+    def _refacturations_a_rassembler(self, facture=None):
+        """Prestations *à refacturer* de cette Souscription pour `facture` :
+        non mises en attente (opt-out, ADR 0012) et — sans facture (jamais
+        encore rassemblées) OU déjà rassemblées sur `facture` elle-même.
+
+        Cette seconde branche est ce qui rend la méthode sûre à ré-appeler à
+        la re-génération de l'émission (#266, `account.move._composer_lignes_generees`) :
+        une presta déjà rassemblée sur CE move par le chemin de création
+        (`_facturer_refacturations`) ne doit pas disparaître de la file
+        seulement parce qu'elle porte déjà `facture_id` — sinon la
+        re-génération supprimerait sa ligne (flaguée) sans la recomposer.
+        Sans `facture` (défaut, chemin de création : le move n'existe pas
+        encore), seules les prestas jamais rassemblées comptent — comportement
+        inchangé."""
+        self.ensure_one()
+        return self.refacturation_ids.filtered(
+            lambda p: not p.en_attente and (not p.facture_id or p.facture_id == facture)
+        )
+
     def _facturer_refacturations(self, facture):
         """Ajoute les prestations *à refacturer* comme lignes de `facture` et
         pose leur `facture_id`. Responsabilité de la Souscription, pas de la
-        Période (ADR 0009). Sont *à refacturer* les prestations sans facture et
-        non mises en attente : la mise en attente est un opt-out de la
-        facturation automatique (ADR 0012)."""
+        Période (ADR 0009)."""
         self.ensure_one()
-        prestas = self.refacturation_ids.filtered(lambda p: not p.facture_id and not p.en_attente)
+        prestas = self._refacturations_a_rassembler(facture)
         if not prestas:
             return
         facture.write({'invoice_line_ids': [p._composer_ligne() for p in prestas]})

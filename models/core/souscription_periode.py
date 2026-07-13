@@ -239,11 +239,20 @@ class SouscriptionPeriode(models.Model):
     # lire. Volontairement absent de `_LOCKED_FIELDS` : une Période legacy
     # porte déjà `facture_legacy_ref` (donc verrouillée), et le backfill
     # #208 doit pouvoir écrire ce marqueur après coup sans dé-figer le reste.
+    #
+    # Second auteur (ADR 0031 décision 4, #248) : à l'émission de la
+    # Régularisation de CLÔTURE d'une souscription sortie (`date_fin` posé),
+    # `souscription.regularisation._marquer_regularisee_si_cloture()` pose ce
+    # même marqueur sur TOUS les mois de la souscription — le livre est
+    # fermé, aucun candidat ne renaît même si electricore raffine encore le
+    # mesuré après coup. Le champ garde son nom (pas de renommage) ; les deux
+    # auteurs (migration, clôture) partagent la même sémantique d'exclusion.
     legacy_regularisee = fields.Boolean(
         string='Régularisée (legacy)',
         default=False,
         readonly=True,
-        help='Mois déjà soldé par une régularisation prod avant la bascule (PRD #207/#208) — '
+        help='Mois déjà soldé — par une régularisation prod avant la bascule (PRD #207/#208), '
+        'ou par la Régularisation de clôture de la souscription (ADR 0031 décision 4, #248) — '
         'exclu des candidats de la Régularisation du nouveau système.',
     )
 
@@ -733,13 +742,36 @@ class SouscriptionPeriode(models.Model):
             ]
         self.write(vals)
 
+    def _est_periode_cloture(self):
+        """Cette Période est-elle la Période de clôture de sa Souscription —
+        celle qui contient `date_fin` (dernier jour servi, ADR 0031 décision
+        2) ? Même prédicat de bornes que
+        `souscription.souscription._periode_cloture()` (demi-ouvertes, bornes
+        v3 brutes), vu côté Période plutôt que côté Souscription — évite d'y
+        aller-retour pour une simple comparaison de bornes."""
+        self.ensure_one()
+        sous = self.souscription_id
+        return bool(
+            sous.date_fin and self.date_debut and self.date_fin and self.date_debut <= sous.date_fin < self.date_fin
+        )
+
     def _tamponner_provision(self):
         """Tamponne ``provision_* := energie_*`` (par cadran facturé) sur une
         Période **non lissée**, juste avant sa facturation — Énergie facturée
         universelle (ADR 0030 décision 2, #234) : la provision devient le
         facturé pour tout contrat, la branche lissé/non-lissé de
         ``_quantite_facturee`` meurt. Contrat **lissé** : no-op, la provision
-        contractuelle est déjà fixée à la création (inchangé).
+        contractuelle est déjà fixée à la création — SAUF pour la Période de
+        **clôture** d'une souscription sortie (`date_fin` posé, ADR 0031
+        décision 4, #248) : la dernière mensuelle d'un lissé se facture **au
+        réel** comme n'importe quelle non-lissée — jours exacts et énergie
+        exacte viennent déjà d'electricore (atterris via
+        `_amorcer_depuis_meta`/`_rafraichir_depuis_meta`), la facture porte
+        ses relevés-justificatifs comme toute mensuelle. Si la mensualité
+        pleine est déjà partie (facture existante avant la détection de la
+        sortie), le garde-fou suivant (``facture_id``) s'applique déjà :
+        aucun cas spécial, l'écart du dernier mois ravive le tampon et la
+        Régularisation de clôture l'avale.
 
         Doit s'exécuter **avant** ``account.move.create()`` dans
         ``_creer_facture`` : le verrou de facturation (#14) refuse l'écriture
@@ -753,7 +785,7 @@ class SouscriptionPeriode(models.Model):
         rééditée par Enedis emprunte le même mécanisme.
         """
         self.ensure_one()
-        if self.lisse_periode:
+        if self.lisse_periode and not self._est_periode_cloture():
             return
         if self.facture_id or self.facture_legacy_ref:
             # Le facturé gelé (ADR 0030) : une Période encore facturée garde sa

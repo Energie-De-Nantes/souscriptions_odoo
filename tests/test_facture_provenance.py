@@ -104,7 +104,7 @@ class TestMigrationProvenanceLignesGenerees(SouscriptionsTestCase):
         module['migrate'](cr, None)
 
     def _periode_facturee_sans_flag(self, souscription, **vals):
-        """Périod facturée en brouillon dont les lignes ne portent PAS encore
+        """Période facturée en brouillon dont les lignes ne portent PAS encore
         le flag — l'état pré-#266 que la migration doit réparer. Bâtie
         directement (pas via `_creer_facture`, qui flague déjà)."""
         base = {

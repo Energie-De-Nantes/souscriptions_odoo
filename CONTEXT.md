@@ -127,11 +127,14 @@ soldés avant bascule (état « régularisée » migré) — les compteurs
 non communicants relèvent d'un autre processus. Son **émission** solde les mensuelles couvertes :
 leur *énergie facturée* est tamponnée de l'écart, l'écart retombe à zéro, chacune garde la trace
 de la Régularisation qui l'a soldée — relancer une régularisation juste après est un non-événement
-(idempotence), et un mesuré qui bouge encore fait renaître l'écart pour la suivante.
+(idempotence), et un mesuré qui bouge encore fait renaître l'écart pour la suivante. **Émise, elle
+est immuable** : la correction passe par **compensation** — nouvelle Régularisation ou avoir —
+jamais par mutation du document émis.
 _Éviter_ : « période de régularisation » (une Régularisation n'est **pas** une Période — champs
 mensuels sans objet) ; la borner par une fenêtre stockée (les candidats se sélectionnent par
 l'écart et le verdict, jamais par des dates de fenêtre) ; « je ne sais pas » qui écrase « je
-savais » (un verdict *incalculable* ou un mois absent du flux ne réécrit jamais un mesuré stocké).
+savais » (un verdict *incalculable* ou un mois absent du flux ne réécrit jamais un mesuré stocké) ;
+remettre en brouillon ou annuler une Régularisation émise (le tampon est déjà consommé).
 
 **Relevé (d'index)** :
 Événement de lecture **daté** du compteur, enfant d'une *Période* (`souscription.releve`,

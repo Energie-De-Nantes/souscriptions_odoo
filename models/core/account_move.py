@@ -1,5 +1,5 @@
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 
 
 class AccountMove(models.Model):
@@ -9,11 +9,11 @@ class AccountMove(models.Model):
 
     # Parallèle à periode_id (ADR 0030 décision 5, amende ADR-0004 en « toute
     # facture d'énergie référence sa source : une Période OU une
-    # Régularisation »). Pas encore posé par aucun code de ce système dans
-    # cette tranche — la génération de facture de régularisation est la
-    # tranche 5 (#237) ; seul le lien et sa contrainte d'exclusivité existent
-    # déjà.
-    regularisation_id = fields.Many2one('souscription.regularisation', string='Régularisation liée')
+    # Régularisation »). Posé par `souscription.regularisation._creer_facture`
+    # (tranche 5, #237). `copy=False` : un duplicate ou un avoir (Odoo passe
+    # par `copy_data`) ne doit JAMAIS porter le lien — son post
+    # re-consommerait les écarts figés (double-tampon, grill #259).
+    regularisation_id = fields.Many2one('souscription.regularisation', string='Régularisation liée', copy=False)
 
     @api.constrains('periode_id', 'regularisation_id')
     def _check_source_exclusive(self):
@@ -58,6 +58,46 @@ class AccountMove(models.Model):
         source Période (mensuelle) OU Régularisation (tranche 5, #237)."""
         for move in self:
             move.is_facture_energie = bool((move.periode_id or move.regularisation_id) and move.souscription_id)
+
+    def _post(self, soft=True):
+        """Tampon d'émission (ADR 0030 décision 4, tranche 6 du PRD #231,
+        #238) : à l'émission RÉELLE (jamais au brouillon) d'une facture
+        portant `regularisation_id`, la Régularisation solde ses mensuelles
+        couvertes (`souscription.regularisation._solder_provisions`) —
+        provision += écart figé, trace posée, écart nul par construction.
+
+        `super()._post()` ne rend que les moves réellement passés à l'état
+        posté (les moves programmés dans le futur avec ``soft=True`` restent
+        en brouillon) : filtrer sur son résultat, pas sur ``self``, exclut
+        naturellement ce cas sans logique dédiée."""
+        posted = super()._post(soft=soft)
+        for move in posted.filtered(lambda m: m.regularisation_id):
+            move.regularisation_id._solder_provisions()
+        return posted
+
+    def _verifier_regularisation_emise_immuable(self):
+        """Une facture de régularisation ÉMISE est immuable (grill #259) : le
+        tampon d'émission a déjà soldé les mensuelles couvertes, et ni sa
+        réversion ni celle du marqueur de clôture (#248) ne sont des gestes du
+        métier — un re-post re-consommerait les écarts figés (double-tampon).
+        La correction vit ailleurs : nouvelle Régularisation (le mesuré
+        raffiné fait renaître l'écart) ou avoir (l'avoir ne porte pas le lien,
+        `copy=False`)."""
+        for move in self:
+            if move.regularisation_id and move.state == 'posted':
+                raise UserError(
+                    'Une facture de régularisation émise est immuable : corrigez par une '
+                    "nouvelle régularisation (un mesuré raffiné fait renaître l'écart) "
+                    'ou par un avoir — jamais par remise en brouillon ou annulation.'
+                )
+
+    def button_draft(self):
+        self._verifier_regularisation_emise_immuable()
+        return super().button_draft()
+
+    def button_cancel(self):
+        self._verifier_regularisation_emise_immuable()
+        return super().button_cancel()
 
     def _get_report_base_filename(self):
         """Nom de fichier personnalisé pour les factures d'énergie"""

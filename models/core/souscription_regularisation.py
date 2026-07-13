@@ -3,8 +3,8 @@ from odoo.exceptions import UserError
 
 
 class SouscriptionRegularisation(models.Model):
-    """Régularisation (solde) — CONTEXT.md, ADR 0030 décisions 3-4, tranches 4
-    et 5 du PRD #231. Même motif que la Refacturation (ADR 0009) : modèle
+    """Régularisation (solde) — CONTEXT.md, ADR 0030 décisions 3-4, tranches
+    4, 5 et 6 du PRD #231. Même motif que la Refacturation (ADR 0009) : modèle
     indépendant de la Période, rassemblé sur une Facture.
 
     En-tête par Souscription : dates couvertes **informatives** (dérivées des
@@ -14,7 +14,11 @@ class SouscriptionRegularisation(models.Model):
     mais refuse dès qu'une Facture existe (``facture_id``, tranche 5, #237) :
     l'« état facturée » dérivé du lien **verrouille** le recalcul, faute de
     quoi la Facture divergerait silencieusement des lignes qui l'ont projetée.
-    Le tampon de l'énergie facturée (tranche 6, #238) reste hors périmètre.
+
+    Le tampon (tranche 6, #238) ne se déclenche jamais ici : `_recalculer()`
+    et `_creer_facture()` ne font que figer le split par (ligne, Période) —
+    `_solder_provisions()`, appelée par `account.move._post()` à l'émission,
+    consomme ce gel sans jamais recalculer l'écart.
     """
 
     _name = 'souscription.regularisation'
@@ -31,6 +35,20 @@ class SouscriptionRegularisation(models.Model):
     # recalcul.
     date_debut = fields.Date(string='Début couvert', readonly=True)
     date_fin = fields.Date(string='Fin couverte', readonly=True)
+
+    # Span EXAMINÉ par le dernier `_recalculer()`, écart nul compris (ADR 0030
+    # décision 4) — persisté à part de `date_debut`/`date_fin` (informatifs,
+    # une simple borne min/max) car le tampon d'émission doit poser la trace
+    # (`souscription.periode.regularisation_id`) sur CHAQUE mensuelle
+    # couverte, y compris celles dont l'écart est retombé à zéro et qui,
+    # partant, n'apparaissent dans aucune `ligne_ids` (elles n'ont engendré
+    # aucun groupe grille × cadran). Reconstruit à chaque recalcul, comme
+    # `ligne_ids` — jamais une fenêtre stockée entre deux recalculs.
+    periode_couverte_ids = fields.Many2many(
+        'souscription.periode',
+        string='Périodes couvertes (examinées)',
+        readonly=True,
+    )
 
     ligne_ids = fields.One2many('souscription.regularisation.ligne', 'regularisation_id', string='Lignes')
 
@@ -126,7 +144,9 @@ class SouscriptionRegularisation(models.Model):
             lambda p: p.type_periode == 'mensuelle' and (p.facture_id or p.facture_legacy_ref)
         )
         if not facturees:
-            self.write({'signalements': False, 'date_debut': False, 'date_fin': False})
+            self.write(
+                {'signalements': False, 'date_debut': False, 'date_fin': False, 'periode_couverte_ids': [(5, 0, 0)]}
+            )
             return
 
         signalements = []
@@ -140,7 +160,14 @@ class SouscriptionRegularisation(models.Model):
             signalements.append(
                 f'{souscription.name} : compteur non communicant, régularisation écartée (hors périmètre v1, ADR 0030).'
             )
-            self.write({'signalements': '\n'.join(signalements), 'date_debut': False, 'date_fin': False})
+            self.write(
+                {
+                    'signalements': '\n'.join(signalements),
+                    'date_debut': False,
+                    'date_fin': False,
+                    'periode_couverte_ids': [(5, 0, 0)],
+                }
+            )
             return
 
         # Rafraîchit le mesuré (scope régul de la tranche 2, #235) avant de
@@ -187,6 +214,14 @@ class SouscriptionRegularisation(models.Model):
                         'ecart': 0.0,
                         'periode_ids': [],
                         'detail': [],
+                        # Split figé (ligne, Période) → écart (tranche 6,
+                        # #238) : `detail`/`periode_ids` ci-dessus sont la vue
+                        # humaine (texte formaté, m2m sans montant) ; le
+                        # tampon d'émission a besoin de la vue MACHINE — quel
+                        # écart, sur quelle Période précisément, une ligne
+                        # pouvant agréger plusieurs mois d'une même grille ×
+                        # cadran (ex. AC1 : 12 mensuelles réduites à 1 ligne).
+                        'ecarts_par_periode': [],
                         # Snapshot du premier mois du groupe (ADR 0006) : le
                         # solidaire est structurel à la Souscription (ne
                         # change pas en cours de route), figé ici pour que la
@@ -200,6 +235,7 @@ class SouscriptionRegularisation(models.Model):
                 groupe['ecart'] += ecart
                 groupe['periode_ids'].append(periode.id)
                 groupe['detail'].append(f'{periode.mois_annee} : {ecart:.2f} kWh{note}')
+                groupe['ecarts_par_periode'].append((periode.id, ecart))
 
         lignes_vals = []
         for (grille_id, cadran), groupe in groupes.items():
@@ -218,6 +254,10 @@ class SouscriptionRegularisation(models.Model):
                         'periode_ids': [(6, 0, groupe['periode_ids'])],
                         'detail': '\n'.join(groupe['detail']),
                         'tarif_solidaire': groupe['tarif_solidaire'],
+                        'ecart_periode_ids': [
+                            (0, 0, {'periode_id': periode_id, 'ecart_kwh': ecart})
+                            for periode_id, ecart in groupe['ecarts_par_periode']
+                        ],
                     },
                 )
             )
@@ -228,6 +268,7 @@ class SouscriptionRegularisation(models.Model):
                 'signalements': '\n'.join(signalements),
                 'date_debut': min(couvertes.mapped('date_debut')) if couvertes else False,
                 'date_fin': max(couvertes.mapped('date_fin')) if couvertes else False,
+                'periode_couverte_ids': [(6, 0, couvertes.ids)],
             }
         )
 
@@ -313,6 +354,37 @@ class SouscriptionRegularisation(models.Model):
         facture._imputer_cheques_energie()
         return facture
 
+    # === Tampon d'émission (ADR 0030 décision 4, tranche 6 du PRD #231, #238) ===
+    #
+    # Invariant gravé : la provision n'évolue que par l'émission d'une facture
+    # qui la porte (création pour le lissé, tampon de facturation pour le
+    # non-lissé — #234 — tampon d'émission pour la régul, ici). Appelée par
+    # `account.move._post()` — jamais au brouillon — quand une facture portant
+    # `regularisation_id` vient d'être postée. Ne recalcule RIEN : consomme le
+    # split (ligne, Période) → écart gelé par `_recalculer()`/`_creer_facture()`
+    # (`ecart_periode_ids`), donc exactement ce que LA FACTURE a facturé, même
+    # si le mesuré a bougé depuis (mesuré vivant, ADR 0030 décision 1).
+
+    def _solder_provisions(self):
+        """Tamponne `provision_<cadran>_kwh += écart figé` sur chaque Période
+        représentée dans `ligne_ids.ecart_periode_ids`, puis pose la trace
+        (`regularisation_id`) sur TOUTES les mensuelles couvertes
+        (`periode_couverte_ids`, écart nul compris — tampon +=0, trace quand
+        même). Un mesuré raffiné après ce solde fait renaître l'écart pour une
+        Régularisation suivante ; sa propre émission écrasera la trace (« la
+        trace pointe la dernière »).
+
+        Contourne le verrou de facturation (#14) via le contexte
+        `regularisation_tampon` — seul canal qui réécrit la provision d'une
+        Période déjà facturée (cf. `souscription.periode.write`)."""
+        self.ensure_one()
+        for ligne in self.ligne_ids:
+            champ = f'provision_{ligne.cadran}_kwh'
+            for detail in ligne.ecart_periode_ids:
+                periode = detail.periode_id
+                periode.with_context(regularisation_tampon=True).write({champ: periode[champ] + detail.ecart_kwh})
+        self.periode_couverte_ids.with_context(regularisation_tampon=True).write({'regularisation_id': self.id})
+
     def releve_colonnes(self):
         """Colonnes d'index réseau (`label`, `field`) pour le justificatif des
         relevés **de cette Régularisation** (bi-parent, ADR 0030 décision 5) —
@@ -367,7 +439,40 @@ class SouscriptionRegularisationLigne(models.Model):
     periode_ids = fields.Many2many('souscription.periode', string='Périodes couvertes')
     detail = fields.Text(string='Détail par mois', readonly=True)
 
+    # Split figé (Période → écart), tranche 6 (#238) : `periode_ids` (m2m) ne
+    # porte aucun montant et `detail` n'est qu'un texte formaté (locale,
+    # arrondi à 2 décimales) — ni l'un ni l'autre ne permet de redistribuer
+    # `ecart_kwh` (la somme de la ligne) sur CHACUNE des Périodes agrégées au
+    # tampon d'émission. Cette table est la vue machine, posée une fois pour
+    # toutes par `_recalculer()` et jamais retouchée ensuite (verrouillée dès
+    # qu'une Facture existe, même garde que le reste de la ligne) : le tampon
+    # (`_solder_provisions`) la lit telle quelle, sans recalcul.
+    ecart_periode_ids = fields.One2many(
+        'souscription.regularisation.ligne.ecart', 'ligne_id', string='Écarts figés par mois'
+    )
+
     @api.depends('ecart_kwh', 'prix_kwh')
     def _compute_montant(self):
         for ligne in self:
             ligne.montant = ligne.ecart_kwh * ligne.prix_kwh
+
+
+class SouscriptionRegularisationLigneEcart(models.Model):
+    """Écart figé par (ligne de régularisation, Période) — tranche 6 (#238).
+
+    Une ligne de régularisation (grille × cadran) peut agréger plusieurs
+    Périodes (ex. AC1 de `test_regularisation.py` : 12 mensuelles réduites à
+    une seule ligne). Le tampon d'émission doit ajouter l'écart de CHAQUE mois
+    à la provision de CE mois précisément — jamais la somme de la ligne à un
+    seul mois. Posée par `_recalculer()` en même temps que `periode_ids`/
+    `detail` (mêmes valeurs, vue machine plutôt qu'humaine), jamais modifiée
+    ensuite : gelée par le même verrou que le reste de la ligne."""
+
+    _name = 'souscription.regularisation.ligne.ecart'
+    _description = 'Écart figé par mois pour une ligne de régularisation'
+
+    ligne_id = fields.Many2one(
+        'souscription.regularisation.ligne', required=True, ondelete='cascade', string='Ligne de régularisation'
+    )
+    periode_id = fields.Many2one('souscription.periode', required=True, ondelete='cascade', string='Période')
+    ecart_kwh = fields.Float(string='Écart figé (kWh)')

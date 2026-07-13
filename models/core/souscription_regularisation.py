@@ -231,6 +231,88 @@ class SouscriptionRegularisation(models.Model):
             }
         )
 
+    # === Projection facture (ADR 0030 décision 3, tranche 5 du PRD #231, #237) ===
+    #
+    # La Facture est la PROJECTION des lignes typées, jamais l'inverse (même
+    # motif que la Période, ADR 0006/0029) : une ligne de facture par ligne de
+    # régularisation (grille × cadran — produit résolu par le catalogue,
+    # isolation solidaire respectée, ADR 0013), notes par mois sous chaque
+    # ligne (`detail`, traçabilité gelée dans le document légal). Σ écarts
+    # positif -> facture complémentaire (out_invoice) ; négatif -> avoir
+    # (out_refund) — jamais un document à total négatif posté : les quantités
+    # sont alors inversées pour que le total du document reste positif (le
+    # signe individuel de chaque ligne peut rester négatif, seul le total
+    # compte). Le chèque énergie validé est imputé à la création par la
+    # mécanique partagée avec la mensuelle (`account.move.
+    # _imputer_cheques_energie`, #172).
+
+    def action_creer_facture(self):
+        """Bouton « Facturer » du formulaire brouillon : projette les lignes
+        vers une Facture (ou un avoir) et ouvre le document créé."""
+        self.ensure_one()
+        facture = self._creer_facture()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Facture de régularisation',
+            'res_model': 'account.move',
+            'res_id': facture.id,
+            'view_mode': 'form',
+        }
+
+    def _creer_facture(self):
+        """Émet la Facture (ou l'avoir) de cette Régularisation — projection
+        de `ligne_ids`, une ligne de facture par ligne (grille × cadran),
+        notes par mois sous chacune. Verrouillée dès qu'une Facture existe
+        (même garde que `_recalculer`) ; refuse aussi une Régularisation sans
+        ligne (rien à facturer)."""
+        self.ensure_one()
+        if self.facture_id:
+            raise UserError(f'{self.souscription_id.name} : régularisation déjà facturée.')
+        if not self.ligne_ids:
+            raise UserError(
+                f'{self.souscription_id.name} : aucune ligne à facturer. Recalculez la régularisation avant de facturer.'
+            )
+
+        # Net négatif -> avoir, jamais de document à total négatif posté
+        # (AC #237) : les quantités sont inversées pour que le total du
+        # document reste positif — le signe d'une ligne individuelle peut
+        # rester négatif (deux grilles/cadrans peuvent varier en sens
+        # opposé), seul le total compte.
+        avoir = self.montant_total < 0.0
+        signe = -1.0 if avoir else 1.0
+
+        lignes_vals = [(0, 0, {'display_type': 'line_section', 'name': 'Régularisation'})]
+        Produit = self.env['souscription.produit']
+        for ligne in self.ligne_ids:
+            produit = Produit.produit_energie(ligne.cadran, ligne.tarif_solidaire)
+            lignes_vals.append(
+                (
+                    0,
+                    0,
+                    {
+                        'product_id': produit.id,
+                        'name': produit.name,
+                        'quantity': signe * ligne.ecart_kwh,
+                        'price_unit': ligne.prix_kwh,
+                    },
+                )
+            )
+            for mois_ligne in (ligne.detail or '').splitlines():
+                if mois_ligne:
+                    lignes_vals.append((0, 0, {'display_type': 'line_note', 'name': mois_ligne}))
+
+        facture = self.env['account.move'].create(
+            {
+                'move_type': 'out_refund' if avoir else 'out_invoice',
+                'partner_id': self.souscription_id.partner_id.id,
+                'invoice_date': self.date_fin,
+                'regularisation_id': self.id,
+                'invoice_line_ids': lignes_vals,
+            }
+        )
+        facture._imputer_cheques_energie()
+        return facture
+
 
 class SouscriptionRegularisationLigne(models.Model):
     """Ligne typée de la Régularisation : une par grille × cadran (CONTEXT.md

@@ -202,6 +202,88 @@ class TestRegularisationFactureChequeEnergie(SouscriptionsTestCase):
         self.assertAlmostEqual(cheque.solde, 0.0, places=2)
 
 
+@tagged('souscriptions', 'souscriptions_regularisation', 'souscriptions_provenance', 'post_install', '-at_install')
+class TestRegularisationFactureRegenerationEmission(SouscriptionsTestCase):
+    """#266 (tranche 2 du PRD #264) : le chemin Régularisation est aussi
+    couvert par la re-génération préservante à l'émission — même mécanique
+    que la mensuelle (`test_periode_facture.py`), résolue par
+    `regularisation_id` au lieu de `periode_id`."""
+
+    def _regularisation_avec_ecart(self, montant_ecart=50.0):
+        regularisation = self.env['souscription.regularisation'].create(
+            {
+                'souscription_id': self.souscription_base.id,
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 2, 1),
+            }
+        )
+        self.env['souscription.regularisation.ligne'].create(
+            {
+                'regularisation_id': regularisation.id,
+                'grille_id': self.grille_prix.id,
+                'cadran': 'base',
+                'ecart_kwh': montant_ecart,
+                'prix_kwh': 0.15,
+                'detail': 'Janvier 2024 : 50.00 kWh',
+            }
+        )
+        return regularisation
+
+    def test_lignes_composees_par_la_regularisation_portent_le_flag(self):
+        regularisation = self._regularisation_avec_ecart()
+        lignes = regularisation._composer_lignes()
+        self.assertTrue(lignes)
+        self.assertTrue(all(vals.get('souscription_ligne_generee') is True for _cmd, _id, vals in lignes))
+
+    def test_ligne_manuelle_survit_a_la_regeneration_de_l_emission(self):
+        regularisation = self._regularisation_avec_ecart()
+        facture = regularisation._creer_facture()
+        produit = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
+        facture.write(
+            {
+                'invoice_line_ids': [
+                    (
+                        0,
+                        0,
+                        {
+                            'product_id': produit.id,
+                            'name': 'Geste commercial regul',
+                            'quantity': 1.0,
+                            'price_unit': -2.0,
+                        },
+                    )
+                ]
+            }
+        )
+
+        facture.action_post()
+
+        ligne = facture.invoice_line_ids.filtered(lambda l: l.name == 'Geste commercial regul')
+        self.assertEqual(len(ligne), 1, 'la ligne manuelle survit à la re-génération')
+        self.assertEqual(ligne.price_unit, -2.0)
+
+    def test_lignes_generees_recomposees_a_l_emission(self):
+        regularisation = self._regularisation_avec_ecart()
+        facture = regularisation._creer_facture()
+        ids_avant = set(facture.invoice_line_ids.filtered('souscription_ligne_generee').ids)
+
+        facture.action_post()
+
+        ids_apres = set(facture.invoice_line_ids.filtered('souscription_ligne_generee').ids)
+        self.assertFalse(ids_avant & ids_apres, 'les anciennes lignes générées sont supprimées, pas réutilisées')
+        lignes_produit = facture.invoice_line_ids.filtered(lambda l: l.display_type == 'product')
+        self.assertEqual(len(lignes_produit), 1)
+
+    def test_suppression_directe_ligne_generee_refusee_en_brouillon(self):
+        regularisation = self._regularisation_avec_ecart()
+        facture = regularisation._creer_facture()
+        ligne = facture.invoice_line_ids.filtered('souscription_ligne_generee')[:1]
+        self.assertTrue(ligne)
+
+        with self.assertRaises(Exception):
+            ligne.unlink()
+
+
 @tagged(
     'souscriptions', 'souscriptions_facture_document', 'souscriptions_regularisation', 'post_install', '-at_install'
 )

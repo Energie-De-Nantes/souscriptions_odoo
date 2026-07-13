@@ -6,7 +6,7 @@ la facture est émise (postée) sont visibles ; il n'y a plus de page /periodes.
 
 from datetime import date
 
-from odoo.addons.souscriptions_odoo.tests.common import SouscriptionsTestMixin
+from odoo.addons.souscriptions_odoo.tests.common import SouscriptionsTestMixin, build_grille_lignes
 from odoo.tests.common import HttpCase, tagged
 
 
@@ -64,7 +64,10 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
 
     @classmethod
     def _facture_postee_simple(cls, souscription, periode, invoice_date):
-        """Facture postée minimale (sans dépendre d'une grille de prix)."""
+        """Facture postée minimale. Depuis #266, l'émission recompose les
+        lignes générées depuis la Période : une grille de prix doit couvrir
+        `periode.date_fin` (la ligne bâtie ici, non flaguée, survit en
+        manuelle)."""
         produit = cls.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
         move = cls.env['account.move'].create(
             {
@@ -250,6 +253,15 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
 
     def test_voir_plus_au_dela_de_douze(self):
         """Au-delà de 12 périodes facturées, un bouton « Voir plus » apparaît."""
+        grille_2023 = self.env['grille.prix'].create(
+            {
+                'name': 'Grille Test 2023',
+                'date_debut': date(2023, 1, 1),
+                'date_fin': date(2023, 12, 31),
+                'active': True,
+            }
+        )
+        build_grille_lignes(self.env, grille_2023, prix_base=0.15, prix_hp=0.18, prix_hc=0.12)
         for mois in range(1, 12):  # 11 périodes supplémentaires -> 13 au total
             periode = self.env['souscription.periode'].create(
                 {

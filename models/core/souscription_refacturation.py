@@ -235,6 +235,12 @@ class SouscriptionRefacturation(models.Model):
         choisi par la *nature* et le *tarif solidaire* de la souscription : il
         porte le compte + la TVA (ADR 0009 §5, ADR 0013). La ligne ne surcharge
         que libellé/prix/quantité. Ne crée aucun `account.move`.
+
+        Porte `souscription_ligne_generee = True` (#266, ADR 0014 amendé) :
+        une Refacturation rassemblée est TOUJOURS une ligne générée, jamais
+        une retouche manuelle — posé ici, une fois pour toutes, que le
+        rassemblement se fasse à la création (`souscription._facturer_refacturations`)
+        ou à la re-génération de l'émission (`account.move._composer_lignes_generees`).
         """
         self.ensure_one()
         produit = self.env['souscription.produit'].produit_refacturation(
@@ -248,5 +254,6 @@ class SouscriptionRefacturation(models.Model):
                 'name': self.libelle,
                 'quantity': self.quantite,
                 'price_unit': self.prix,
+                'souscription_ligne_generee': True,
             },
         )

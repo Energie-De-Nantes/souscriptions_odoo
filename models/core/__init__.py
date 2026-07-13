@@ -1,5 +1,6 @@
 from . import (
     account_move,
+    account_move_line,
     electricore_client_fabrique,
     electricore_rsc_service,
     grille_prix,

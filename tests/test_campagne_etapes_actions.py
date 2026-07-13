@@ -338,18 +338,34 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
 
     # --- Isolation d'erreur par facture (#268, tranche 4 du PRD #264) ---
     #
-    # Scénario « grille incapable de prixer » : une souscription en régime
-    # Moulin sans AUCUNE grille Moulin en base (seule la grille standard
-    # existe, fixture commune, tests/common.py) — sa Période ne peut jamais
-    # être prixée à l'émission, `grille.prix.get_grille_active` lève
-    # UserError (ADR 0029 : « échoue bruyamment »). Même scénario que
-    # `_composer_lignes_generees`/`_recomposer_lignes_generees` (#266/#267).
+    # Scénario « grille incapable de prixer » : `_creer_facture()` résout
+    # DÉJÀ la grille à la création (souscription_periode.py) — un régime
+    # Moulin sans grille casserait donc dès « créer factures », pas à
+    # l'émission. Le scénario réaliste d'un échec spécifique à l'ÉMISSION
+    # est la fenêtre brouillon **vivante** (ADR 0032) : la grille Moulin
+    # existe à la création du brouillon, puis disparaît (désactivée) avant
+    # que l'étape « émettre » ne re-résolve la grille en re-générant les
+    # lignes (`_recomposer_lignes_generees`, #266/#267) — `get_grille_active`
+    # lève alors UserError (ADR 0029 : « échoue bruyamment »).
 
-    def _souscription_moulin_sans_grille(self, ref='RSC-CAMPAGNE-MOULIN-KO'):
+    def _creer_grille_moulin(self):
+        grille = self.env['grille.prix'].create(
+            {
+                'name': 'Grille Moulin Test',
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 12, 31),
+                'regime_prix': 'moulin',
+                'active': True,
+            }
+        )
+        build_grille_lignes(self.env, grille, prix_base=0.10, prix_hp=0.12, prix_hc=0.08)
+        return grille
+
+    def _souscription_moulin(self, ref):
         souscription = self.env['souscription.souscription'].create(
             {
                 'partner_id': self.souscription_base.partner_id.id,
-                'pdl': 'PDL_TEST_MOULIN_SANS_GRILLE',
+                'pdl': 'PDL_TEST_MOULIN',
                 'puissance_souscrite': '6',
                 'type_tarif': 'base',
                 'regime_prix': 'moulin',
@@ -360,19 +376,32 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
         souscription.with_context(rsc_automatisme=True).write({'ref_situation_contractuelle': ref})
         return souscription
 
-    def test_lot_partiel_isole_lechec_et_emet_le_reste(self):
-        """AC #268 : une facture en échec (grille incapable de prixer)
-        n'emporte plus le lot — reprend le pattern du cron natif
-        `account.move._autopost_draft_entries` (lot sous savepoint, repli un
-        par un). La facture saine s'émet, l'échec est rapporté (souscription,
-        période, cause) dans la notification, sticky."""
+    def _preparer_lot_avec_un_echec(self):
+        """Deux brouillons créés SAINS (les deux grilles existent encore) :
+        `souscription_base` (régime standard) et `souscription_ko` (régime
+        Moulin). La grille Moulin est ensuite désactivée — la fenêtre
+        brouillon reste vivante, l'échec ne se matérialise qu'à la
+        RE-génération que déclenche l'émission."""
         periode_ok = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
         facture_ok = periode_ok._creer_facture()
 
-        souscription_ko = self._souscription_moulin_sans_grille()
+        grille_moulin = self._creer_grille_moulin()
+        souscription_ko = self._souscription_moulin('RSC-CAMPAGNE-MOULIN-KO')
         periode_ko = self.create_test_periode(souscription_ko, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
         facture_ko = periode_ko._creer_facture()
+        self.assertEqual(facture_ko.state, 'draft', 'création saine : la grille Moulin existe encore ici')
+
+        grille_moulin.active = False  # disparaît avant l'émission
         self.campagne.etape_ids.invalidate_recordset()
+        return facture_ok, facture_ko, souscription_ko, grille_moulin
+
+    def test_lot_partiel_isole_lechec_et_emet_le_reste(self):
+        """AC #268 : une facture en échec n'emporte plus le lot — reprend le
+        pattern du cron natif `account.move._autopost_draft_entries` (lot
+        sous savepoint, repli un par un). La facture saine s'émet, l'échec
+        est rapporté (souscription, période, cause) dans la notification,
+        sticky."""
+        facture_ok, facture_ko, souscription_ko, _grille = self._preparer_lot_avec_un_echec()
 
         action = self.campagne.action_emettre_factures()
 
@@ -390,12 +419,7 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
         """AC #268 : le reste-à-faire dérivé de « émettre factures » (#157)
         ne montre plus que la souscription en échec après un lot partiel —
         aucun champ de suivi ajouté, l'état découle des factures elles-mêmes."""
-        periode_ok = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
-        periode_ok._creer_facture()
-        souscription_ko = self._souscription_moulin_sans_grille()
-        periode_ko = self.create_test_periode(souscription_ko, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
-        periode_ko._creer_facture()
-        self.campagne.etape_ids.invalidate_recordset()
+        _facture_ok, _facture_ko, souscription_ko, _grille = self._preparer_lot_avec_un_echec()
 
         self.campagne.action_emettre_factures()
         self.campagne.etape_ids.invalidate_recordset()
@@ -407,32 +431,16 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
 
     def test_relancer_letape_apres_correction_est_idempotent(self):
         """AC #268 : relancer l'étape après avoir corrigé la cause de
-        l'échec (ici : la grille Moulin manquante est créée) émet la
-        facture restée en échec — sans re-poster celle déjà émise
-        (idempotence : `state == 'draft'` l'exclut du lot, cf.
-        `action_emettre_factures`)."""
-        periode_ok = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
-        facture_ok = periode_ok._creer_facture()
-        souscription_ko = self._souscription_moulin_sans_grille()
-        periode_ko = self.create_test_periode(souscription_ko, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
-        facture_ko = periode_ko._creer_facture()
-        self.campagne.etape_ids.invalidate_recordset()
+        l'échec (ici : la grille Moulin est réactivée) émet la facture
+        restée en échec — sans re-poster celle déjà émise (idempotence :
+        `state == 'draft'` l'exclut du lot, cf. `action_emettre_factures`)."""
+        facture_ok, facture_ko, _souscription_ko, grille_moulin = self._preparer_lot_avec_un_echec()
 
         self.campagne.action_emettre_factures()
         self.assertEqual(facture_ok.state, 'posted')
         self.assertEqual(facture_ko.state, 'draft')
 
-        # Corrige la cause : la grille Moulin manquante apparaît.
-        grille_moulin = self.env['grille.prix'].create(
-            {
-                'name': 'Grille Moulin Test',
-                'date_debut': date(2024, 1, 1),
-                'date_fin': date(2024, 12, 31),
-                'regime_prix': 'moulin',
-                'active': True,
-            }
-        )
-        build_grille_lignes(self.env, grille_moulin, prix_base=0.10, prix_hp=0.12, prix_hc=0.08)
+        grille_moulin.active = True  # corrige la cause
         self.campagne.etape_ids.invalidate_recordset()
 
         action = self.campagne.action_emettre_factures()

@@ -12,6 +12,7 @@ facture qui la porte.
 from datetime import date
 from types import SimpleNamespace
 
+from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
 from .common import SouscriptionsTestCase, build_grille_lignes, client_flux_factice, patcher_client_fabrique
@@ -282,3 +283,42 @@ class TestRegularisationTamponEmission(SouscriptionsTestCase):
         self.assertEqual(periode.provision_base_kwh, 235.0)
         self.assertEqual(periode.ecart_base_kwh, 0.0)
         self.assertEqual(periode.regularisation_id, regularisation2, 'la trace pointe la dernière')
+
+    # --- Émise = immuable (grill #259) : la correction passe par une nouvelle
+    # Régularisation ou par un avoir, jamais par mutation du move émis — sans
+    # quoi un re-post re-consommerait les écarts figés (double-tampon).
+
+    def _regul_emise(self):
+        souscription = self._souscription_lissee(ref='RSC-IMMU', pdl='PDL_TAMPON_IMMU')
+        self._grille_moulin('Grille immuable')
+        periode = self._periode_facturee(souscription, 1, energie_base_kwh=225.0)
+        regularisation = self.env['souscription.regularisation'].create({'souscription_id': souscription.id})
+        with self._sans_appel_reseau():
+            regularisation._recalculer()
+        facture = regularisation._creer_facture()
+        facture.action_post()
+        return periode, regularisation, facture
+
+    def test_remise_en_brouillon_dune_regul_emise_refusee(self):
+        periode, _regularisation, facture = self._regul_emise()
+        self.assertEqual(periode.provision_base_kwh, 225.0)
+        with self.assertRaises(UserError):
+            facture.button_draft()
+        self.assertEqual(facture.state, 'posted')
+        self.assertEqual(periode.provision_base_kwh, 225.0, 'provision intacte après la tentative')
+
+    def test_annulation_dune_regul_emise_refusee(self):
+        periode, _regularisation, facture = self._regul_emise()
+        with self.assertRaises(UserError):
+            facture.button_cancel()
+        self.assertEqual(facture.state, 'posted')
+        self.assertEqual(periode.provision_base_kwh, 225.0)
+
+    def test_copie_dune_regul_emise_ne_porte_pas_la_regularisation(self):
+        """`copy=False` : un duplicate — et l'avoir Odoo, qui passe par
+        `copy_data` — ne porte pas `regularisation_id`, donc son post ne
+        re-tamponne rien (le chemin « avoir manuel » reste sûr)."""
+        periode, _regularisation, facture = self._regul_emise()
+        double = facture.copy()
+        self.assertFalse(double.regularisation_id)
+        self.assertEqual(periode.provision_base_kwh, 225.0)

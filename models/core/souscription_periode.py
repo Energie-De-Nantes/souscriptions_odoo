@@ -333,9 +333,10 @@ class SouscriptionPeriode(models.Model):
 
         return super().create(vals_list)
 
-    # Champs **facturés**, gelés : dès qu'une facture référence la période, les
-    # réécrire désaccorderait la facture de la période. Le verrou (#14) les
-    # protège ; les champs techniques/calculés (facture_id, facture_state,
+    # Champs **facturés**, gelés : dès qu'une Facture qui référence la période
+    # est **émise** (postée), les réécrire désaccorderait la facture de la
+    # période. Le verrou (#14, amendé #267 — ADR 0006/0007 amendés, ADR 0032)
+    # les protège ; les champs techniques/calculés (facture_id, facture_state,
     # mois_annee, jours…) restent recalculables par l'ORM (passe par _write, pas
     # par ce write public).
     #
@@ -378,30 +379,64 @@ class SouscriptionPeriode(models.Model):
         }
     )
 
+    def _est_facturee_emise(self):
+        """Condition **dérivée** du gel (#267 — brouillon gouverné, ADR 0006/
+        0007 amendés, ADR 0032) : cette Période est-elle verrouillée ?
+
+        Oui si une Facture qui la référence est **postée** (`facture_id.state
+        == 'posted'`), ou si elle porte une référence de facture legacy
+        (`facture_legacy_ref`, #107) — une Période d'ouverture backfillée est
+        TOUJOURS considérée émise : la facture prod qu'elle projette est hors
+        de ce système, jamais en brouillon ici.
+
+        Non si aucune Facture ne la référence, OU si la Facture qui la
+        référence est encore en **brouillon** : la fenêtre brouillon reste
+        vivante — c'est l'**émission**, pas l'existence de la facture, qui
+        fige (avant #267 : `facture_id or facture_legacy_ref` seul, sans
+        regarder l'état)."""
+        self.ensure_one()
+        return bool(self.facture_legacy_ref or self.facture_id.state == 'posted')
+
     def write(self, vals):
-        """Verrou de facturation (#14) : la période est le brouillon de travail
-        éditable *avant* facturation ; dès qu'une facture la référence — un
-        account.move (facture_id, #14) ou une facture legacy (facture_legacy_ref,
-        #107, Période d'ouverture sans move) —, ses champs facturables sont
-        figés et toute réécriture est rejetée (UserError, y compris via RPC).
-        Pour corriger : supprimer la facture (ce qui dé-fige la période) ou
-        émettre une régularisation.
+        """Verrou de facturation (#14, amendé #267) : la période est le
+        brouillon de travail éditable *avant* et *pendant* la fenêtre
+        brouillon de sa Facture ; dès qu'une Facture qui la référence est
+        **émise** (postée) — ou qu'elle porte une facture legacy (#107) —,
+        ses champs facturables sont figés et toute réécriture est rejetée
+        (UserError, y compris via RPC). Pour corriger après émission : un
+        avoir ou une régularisation (plus de « supprimer la facture », qui ne
+        fige plus rien tant qu'elle est en brouillon — cf. `_est_facturee_emise`).
 
         Exemption ciblée : le contexte `regularisation_tampon` (posé
         uniquement par `souscription.regularisation._solder_provisions()`,
         ADR 0030 décision 4) contourne ce verrou pour `provision_*_kwh` — seul
-        canal qui réécrit la provision d'une Période déjà facturée, à
-        l'émission d'une facture de régularisation qui la porte. Aucun autre
-        appelant ne pose ce contexte ; le pull et l'édition manuelle restent
-        bloqués."""
-        if self._LOCKED_FIELDS.intersection(vals) and not self.env.context.get('regularisation_tampon'):
+        canal qui réécrit la provision d'une Période déjà émise, à l'émission
+        d'une facture de régularisation qui la porte. Aucun autre appelant ne
+        pose ce contexte ; le pull et l'édition manuelle restent bloqués une
+        fois émise.
+
+        Régénération au fil de l'eau (#267, point d'entrée (b)) : une édition
+        RÉUSSIE d'un champ facturable — la Période est donc dans sa fenêtre
+        brouillon, avec ou sans brouillon de Facture lié — recompose les
+        lignes générées de ce brouillon, pour que le·la facturiste voie tout
+        de suite l'effet de sa correction. Contexte `souscription_tampon_emission`
+        (posé uniquement par `_tamponner_provision`) : la re-génération de
+        `account.move._post()` suit immédiatement le tampon dans le même
+        événement d'émission, inutile de la déclencher deux fois."""
+        champs_geles = self._LOCKED_FIELDS.intersection(vals)
+        if champs_geles and not self.env.context.get('regularisation_tampon'):
             for periode in self:
-                if periode.facture_id or periode.facture_legacy_ref:
+                if periode._est_facturee_emise():
                     raise UserError(
-                        f'Période {periode.mois_annee} : déjà facturée, modification interdite. '
-                        'Supprimez la facture pour corriger, ou créez une régularisation.'
+                        f'Période {periode.mois_annee} : facture émise, modification interdite. '
+                        'Corrigez par un avoir ou par une régularisation.'
                     )
-        return super().write(vals)
+        resultat = super().write(vals)
+        if champs_geles and not self.env.context.get('souscription_tampon_emission'):
+            for periode in self:
+                if periode.facture_id.state == 'draft':
+                    periode.facture_id._recomposer_lignes_generees()
+        return resultat
 
     # Mapping cadran réseau → colonne d'index, source unique pour le justificatif
     # PDF (#55), portail (#57) et formulaire backend (#138) — ADR 0015 (amendé
@@ -548,17 +583,36 @@ class SouscriptionPeriode(models.Model):
     def _quantite_facturee(self, cadran):
         """Quantité d'énergie à facturer pour un cadran facturé ('base'/'hp'/'hc').
 
-        Énergie facturée universelle (ADR 0030 décision 2, #234) : toujours la
-        *provision* (``provision_*_kwh``), lissé ou non — la branche qui lisait
-        le mesuré (``energie_*_kwh``) directement pour un contrat non lissé a
-        disparu. Contrat **lissé** : la provision contractuelle, fixée à la
-        création de la Période. Contrat **non lissé** : la provision est
-        tamponnée ``provision := energie`` à la création de la facture (voir
-        ``_tamponner_provision``, appelée par ``_creer_facture`` avant
-        composition) — elle porte donc déjà la meilleure mesure/estimation du
-        moment quand cette méthode la lit.
+        Énergie facturée universelle (ADR 0030 décision 2, #234) : la
+        *provision* (``provision_*_kwh``) fait foi, lissé ou non — MAIS
+        seulement une fois **tamponnée** (#267). Le tampon
+        ``provision := energie`` a migré de la création de la facture à son
+        **émission** (``_tamponner_provision``, appelée par
+        ``account.move._post()``, AVANT la re-génération) : pendant toute la
+        fenêtre brouillon, une Période qui doit recevoir ce tampon
+        (``_a_tamponner``) porte encore une provision **vide** — la lire
+        montrerait 0 kWh, alors qu'electricore connaît déjà mieux.
+
+        **Choix documenté (#267)** : tant que non tamponnée (facture pas
+        encore émise), cette méthode lit le **mesuré** (``energie_*_kwh``)
+        directement — le brouillon montre la meilleure connaissance du
+        moment, cohérent avec « rien ne gèle au brouillon » (CONTEXT.md
+        « Facture »). Une fois tamponnée (facture émise, ou contrat lissé
+        hors clôture dont la provision contractuelle est fixée dès la
+        création), la provision fait foi, gelée contre le mesuré qui continue
+        de vivre à côté (ADR 0030). L'alternative écartée — un second
+        mécanisme de calcul dédié au brouillon — aurait dupliqué la logique
+        que le tampon applique déjà ; lire le mesuré en repli est la même
+        Énergie facturée universelle, simplement pas-encore-gelée.
         """
         self.ensure_one()
+        if self._a_tamponner() and not self._est_facturee_emise():
+            mesure = {
+                'base': self.energie_base_kwh,
+                'hp': self.energie_hp_kwh,
+                'hc': self.energie_hc_kwh,
+            }
+            return mesure[cadran]
         provision = {
             'base': self.provision_base_kwh,
             'hp': self.provision_hp_kwh,
@@ -730,22 +784,31 @@ class SouscriptionPeriode(models.Model):
         un seul `write()`, jamais d'énergie fraîche sur TURPE périmé. Passe
         par `write()` (pas d'écriture directe) : l'exemption ciblée du verrou
         de facturation (#14, cf. `_LOCKED_FIELDS`) rend cette écriture valide
-        même sur une Période facturée — c'est précisément ce qui réalise « le
+        même sur une Période émise — c'est précisément ce qui réalise « le
         mesuré vivant » d'ADR 0030.
 
         Relevés : remplacés **en bloc** (`releve_ids`, le re-pull promis par
-        ADR 0015) **seulement si la Période n'est pas encore facturée** — sur
-        une Période facturée, le relevé-justificatif reste figé (verrou propre
-        de `souscription.releve`, jamais contourné ici) et `releve_ids` est
+        ADR 0015) **seulement si la Période n'est pas encore émise**
+        (`_est_facturee_emise`, #267) — pendant la fenêtre brouillon, le
+        re-pull rafraîchit les relevés comme le reste du mesuré ; une fois
+        émise, le relevé-justificatif reste figé (verrou propre de
+        `souscription.releve`, jamais contourné ici) et `releve_ids` est
         absent des vals, donc intact.
-        """
+
+        Régénération au fil de l'eau (#267, point d'entrée (a)) : si cette
+        Période porte un brouillon de Facture, il est recomposé après le
+        write — le facturiste voit tout de suite le mesuré rafraîchi reflété
+        dans les lignes (énergie non tamponnée encore lue en direct par
+        `_quantite_facturee`, tant que le brouillon n'a pas été émis)."""
         self.ensure_one()
         vals = self._vals_atterrissage_v3(meta)
-        if not (self.facture_id or self.facture_legacy_ref):
+        if not self._est_facturee_emise():
             vals['releve_ids'] = [(5, 0, 0)] + [
                 (0, 0, self._releve_vals_depuis_objet(releve)) for releve in (meta.releves_utilises or [])
             ]
         self.write(vals)
+        if self.facture_id.state == 'draft':
+            self.facture_id._recomposer_lignes_generees()
 
     def _est_periode_cloture(self):
         """Cette Période est-elle la Période de clôture de sa Souscription —
@@ -760,44 +823,66 @@ class SouscriptionPeriode(models.Model):
             sous.date_fin and self.date_debut and self.date_fin and self.date_debut <= sous.date_fin < self.date_fin
         )
 
+    def _a_tamponner(self):
+        """Cette Période reçoit-elle le tampon ``provision := energie`` à
+        l'émission (#267, ADR 0030 décision 2) ? Contrat **non lissé** :
+        toujours. Contrat **lissé** : jamais, SAUF pour la Période de
+        **clôture** d'une souscription sortie (`date_fin` posé, ADR 0031
+        décision 4, #248) — la dernière mensuelle d'un lissé se facture **au
+        réel** comme n'importe quelle non-lissée. Factorisé hors de
+        ``_tamponner_provision`` : ``_quantite_facturee`` partage exactement
+        ce prédicat pour savoir si le brouillon doit lire le mesuré ou la
+        provision (#267)."""
+        self.ensure_one()
+        return not self.lisse_periode or self._est_periode_cloture()
+
     def _tamponner_provision(self):
         """Tamponne ``provision_* := energie_*`` (par cadran facturé) sur une
-        Période **non lissée**, juste avant sa facturation — Énergie facturée
-        universelle (ADR 0030 décision 2, #234) : la provision devient le
-        facturé pour tout contrat, la branche lissé/non-lissé de
-        ``_quantite_facturee`` meurt. Contrat **lissé** : no-op, la provision
-        contractuelle est déjà fixée à la création — SAUF pour la Période de
-        **clôture** d'une souscription sortie (`date_fin` posé, ADR 0031
-        décision 4, #248) : la dernière mensuelle d'un lissé se facture **au
-        réel** comme n'importe quelle non-lissée — jours exacts et énergie
-        exacte viennent déjà d'electricore (atterris via
-        `_amorcer_depuis_meta`/`_rafraichir_depuis_meta`), la facture porte
-        ses relevés-justificatifs comme toute mensuelle. Si la mensualité
-        pleine est déjà partie (facture existante avant la détection de la
-        sortie), le garde-fou suivant (``facture_id``) s'applique déjà :
-        aucun cas spécial, l'écart du dernier mois ravive le tampon et la
-        Régularisation de clôture l'avale.
+        Période éligible (``_a_tamponner``), à l'**émission** de sa Facture —
+        Énergie facturée universelle (ADR 0030 décision 2, #234) : la
+        provision devient le facturé pour tout contrat, la branche
+        lissé/non-lissé de ``_quantite_facturee`` reste mais bascule sur
+        « tamponnée ou non », pas sur le lissage seul (#267). Contrat
+        **lissé** hors clôture : no-op, la provision contractuelle est déjà
+        fixée à la création. Non éligible (``_a_tamponner`` faux) : rien à
+        faire, ``_quantite_facturee`` lit déjà la provision contractuelle.
 
-        Doit s'exécuter **avant** ``account.move.create()`` dans
-        ``_creer_facture`` : le verrou de facturation (#14) refuse l'écriture
-        de ``provision_*`` dès qu'une facture référence la Période, donc ce
-        tampon doit précéder le gel. Passe par ``write()`` (pas d'écriture
-        directe), encore autorisé tant que la Période n'est pas facturée.
+        **Déplacement (#267, tranche 3 du PRD #264)** : appelée depuis
+        ``account.move._post()``, AVANT la re-génération des lignes et AVANT
+        ``super()._post()`` — plus depuis ``_creer_facture()`` (qui ne
+        produit plus qu'un brouillon non tamponné). Pendant toute la fenêtre
+        brouillon, ``provision_*`` reste donc vide pour une Période non
+        tamponnée ; c'est ``_quantite_facturee`` qui compense en lisant le
+        mesuré en direct jusqu'à ce tampon (voir son docstring). Passe par
+        ``write()`` (pas d'écriture directe) : au moment de l'appel, la
+        Facture qui référence CETTE Période est encore en état ``draft``
+        (``super()._post()`` n'a pas encore tourné) — le verrou (#14,
+        ``_est_facturee_emise``) ne bloque donc pas cette écriture,
+        exactement comme avant #267 où le tampon précédait la création du
+        move. Contexte `souscription_tampon_emission` : la re-génération de
+        `_post()` suit immédiatement dans le même événement d'émission,
+        inutile de la déclencher une seconde fois depuis `write()`.
 
-        Dé-figeage : supprimer la facture dé-fige la Période (#14 write()) ;
-        rappeler ``_creer_facture`` rejoue ce tampon aux valeurs courantes de
-        ``energie_*`` — la future « régularisation des réels » d'un non-lissé
-        rééditée par Enedis emprunte le même mécanisme.
+        Garde-fou : no-op si la Période est déjà **émise**
+        (``_est_facturee_emise``) — défense en profondeur (ne devrait pas se
+        produire, une Période n'a qu'une Facture par construction, ADR 0004)
+        et cas de la Période legacy (``facture_legacy_ref``, jamais de move
+        dans ce système, donc jamais atteinte par ``account.move._post()``
+        de toute façon).
+
+        Rejoué : réouvrir la Facture en brouillon (``button_draft()``) puis
+        la ré-émettre rejoue ce tampon aux valeurs courantes de ``energie_*``
+        — la future « régularisation des réels » d'un non-lissé rééditée par
+        Enedis emprunte le même mécanisme.
         """
         self.ensure_one()
-        if self.lisse_periode and not self._est_periode_cloture():
+        if not self._a_tamponner():
             return
-        if self.facture_id or self.facture_legacy_ref:
-            # Le facturé gelé (ADR 0030) : une Période encore facturée garde sa
-            # provision scellée — refacturer sans dé-figer compose sur le gelé,
-            # même condition que le verrou de write().
+        if self._est_facturee_emise():
+            # Le facturé gelé (ADR 0030) : une Période déjà émise garde sa
+            # provision scellée — même condition que le verrou de write().
             return
-        self.write(
+        self.with_context(souscription_tampon_emission=True).write(
             {
                 'provision_hp_kwh': self.energie_hp_kwh,
                 'provision_hc_kwh': self.energie_hc_kwh,
@@ -810,16 +895,20 @@ class SouscriptionPeriode(models.Model):
     def _creer_facture(self):
         """Crée la facture (``account.move``) de cette période, en **brouillon**.
 
-        Tamponne d'abord la provision (``_tamponner_provision``, non-lissé
-        uniquement, no-op sinon), puis sélectionne la grille active à la date
-        de fin, compose les lignes (``_composer_lignes``) et crée le move en
-        posant ``periode_id`` (source unique du lien Période ↔ Facture, ADR
-        0004). Ne poste jamais le move : l'émission (``action_post`` /
-        ``account.move._post``) reste un geste distinct — c'est elle, pas la
-        création, qui impute le chèque énergie (tranche 1 du PRD #264, #265).
+        Sélectionne la grille active à la date de fin, compose les lignes
+        (``_composer_lignes``) et crée le move en posant ``periode_id``
+        (source unique du lien Période ↔ Facture, ADR 0004). Ne tamponne
+        PLUS la provision ici (``_tamponner_provision`` a migré à
+        l'**émission**, appelée par ``account.move._post()`` — #267, tranche
+        3 du PRD #264) : le brouillon créé ici porte donc, pour une Période
+        éligible (``_a_tamponner``), le **mesuré** en lecture directe
+        (``_quantite_facturee``), pas encore la provision tamponnée. Ne poste
+        jamais le move : l'émission (``action_post`` / ``account.move._post``)
+        reste un geste distinct — c'est elle, pas la création, qui tamponne,
+        re-génère, verrouille et impute le chèque énergie (tranche 1 du PRD
+        #264, #265 ; tranche 3, #267).
         """
         self.ensure_one()
-        self._tamponner_provision()
         grille = self.env['grille.prix'].get_grille_active(self.date_fin, regime=self.regime_prix_periode)
         return self.env['account.move'].create(
             {

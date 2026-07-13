@@ -1,10 +1,27 @@
 from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class AccountMove(models.Model):
     _inherit = 'account.move'
 
     periode_id = fields.Many2one('souscription.periode', string='Période facturée')
+
+    # Parallèle à periode_id (ADR 0030 décision 5, amende ADR-0004 en « toute
+    # facture d'énergie référence sa source : une Période OU une
+    # Régularisation »). Pas encore posé par aucun code de ce système dans
+    # cette tranche — la génération de facture de régularisation est la
+    # tranche 5 (#237) ; seul le lien et sa contrainte d'exclusivité existent
+    # déjà.
+    regularisation_id = fields.Many2one('souscription.regularisation', string='Régularisation liée')
+
+    @api.constrains('periode_id', 'regularisation_id')
+    def _check_source_exclusive(self):
+        for move in self:
+            if move.periode_id and move.regularisation_id:
+                raise ValidationError(
+                    'Une facture référence sa source : une Période ou une Régularisation, jamais les deux.'
+                )
 
     souscription_id = fields.Many2one(
         related='periode_id.souscription_id',

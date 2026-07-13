@@ -17,6 +17,7 @@ from datetime import date
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from odoo.exceptions import ValidationError
 from odoo.tests.common import tagged
 
 from .common import (
@@ -294,6 +295,61 @@ class TestRegularisationBouton(SouscriptionsTestCase):
         self.souscription_base.action_regulariser()
         self.assertEqual(len(self.souscription_base.regularisation_ids), 1, 'jamais un second brouillon')
         self.assertEqual(self.souscription_base.regularisation_ids, premiere)
+
+
+@tagged('souscriptions', 'souscriptions_regularisation', 'post_install', '-at_install')
+class TestRegularisationLiens(SouscriptionsTestCase):
+    """Contraintes des liens posés (ADR 0030 décision 5, amende ADR-0004)."""
+
+    def test_move_jamais_periode_et_regularisation(self):
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.souscription_base.id})
+        with self.assertRaises(ValidationError):
+            self.env['account.move'].create(
+                {
+                    'move_type': 'out_invoice',
+                    'partner_id': self.partner_test.id,
+                    'periode_id': periode.id,
+                    'regularisation_id': regularisation.id,
+                }
+            )
+
+    def test_move_periode_seule_ok(self):
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        move = self.env['account.move'].create(
+            {
+                'move_type': 'out_invoice',
+                'partner_id': self.partner_test.id,
+                'periode_id': periode.id,
+            }
+        )
+        self.assertTrue(move.periode_id)
+        self.assertFalse(move.regularisation_id)
+
+    def test_releve_exactement_un_parent_regularisation_seule(self):
+        regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.souscription_base.id})
+        releve = self.env['souscription.releve'].create(
+            {'regularisation_id': regularisation.id, 'date': date(2024, 1, 1), 'nature': 'reel'}
+        )
+        self.assertIn(releve, regularisation.releve_ids)
+        self.assertFalse(releve.periode_id)
+
+    def test_releve_sans_parent_refuse(self):
+        with self.assertRaises(ValidationError):
+            self.env['souscription.releve'].create({'date': date(2024, 1, 1), 'nature': 'reel'})
+
+    def test_releve_deux_parents_refuse(self):
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.souscription_base.id})
+        with self.assertRaises(ValidationError):
+            self.env['souscription.releve'].create(
+                {
+                    'periode_id': periode.id,
+                    'regularisation_id': regularisation.id,
+                    'date': date(2024, 1, 1),
+                    'nature': 'reel',
+                }
+            )
 
 
 @tagged('souscriptions', 'souscriptions_regularisation', 'post_install', '-at_install')

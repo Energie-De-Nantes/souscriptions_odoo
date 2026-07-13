@@ -1,10 +1,11 @@
 from odoo import api, fields, models
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 
 class SouscriptionReleve(models.Model):
     """Relevé d'index : événement de lecture daté du compteur, enfant d'une
-    *Période* (ADR 0015). Forme **large, par cadran réseau** — un record porte un
+    *Période* (ADR 0015) ou d'une *Régularisation* (ADR 0030 décision 5).
+    Forme **large, par cadran réseau** — un record porte un
     index par registre physique du compteur (HPH/HPB/HCH/HCB, ou HP/HC, ou Base),
     jamais par cadran *facturé*. Cardinalité variable (≈2 en régime normal, 3–4
     lors d'un changement de compteur), représentée fidèlement sans branche
@@ -19,10 +20,29 @@ class SouscriptionReleve(models.Model):
     periode_id = fields.Many2one(
         'souscription.periode',
         string='Période',
-        required=True,
         ondelete='cascade',
         index=True,
     )
+
+    # Bi-parent (ADR 0030 décision 5, amende ADR-0004) : un relevé frais posé
+    # en justificatif d'une Régularisation n'a pas de Période propre (la
+    # Régularisation n'en porte aucune, ADR 0030 décision 3). `periode_id`
+    # devient donc optionnel ; la contrainte `_check_parent_exclusif`
+    # ci-dessous impose « exactement un » des deux parents.
+    regularisation_id = fields.Many2one(
+        'souscription.regularisation',
+        string='Régularisation',
+        ondelete='cascade',
+        index=True,
+    )
+
+    @api.constrains('periode_id', 'regularisation_id')
+    def _check_parent_exclusif(self):
+        for releve in self:
+            if bool(releve.periode_id) == bool(releve.regularisation_id):
+                raise ValidationError(
+                    'Un relevé porte exactement un parent : une Période ou une Régularisation, jamais les deux ni aucun.'
+                )
 
     # Calendrier de comptage de la Période (ADR 0005) : pilote les colonnes
     # d'index pertinentes à la saisie / à l'affichage.

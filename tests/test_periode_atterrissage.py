@@ -121,7 +121,9 @@ class TestReleveProvenance(SouscriptionsTestCase):
         self.assertEqual(releve.origine, 'C15_releve_meter_reading')
 
     def test_releve_provenance_verrouillee_apres_facturation(self):
-        """La provenance suit le verrou existant du Relevé (#56, ADR 0020 §7)."""
+        """La provenance suit le verrou existant du Relevé (#56, ADR 0020 §7) —
+        déclenché à l'émission depuis #267 (gel à l'émission), plus à la simple
+        existence d'un brouillon."""
         periode = self.create_test_periode(self.souscription_base)
         releve = self.env['souscription.releve'].create(
             {
@@ -131,7 +133,8 @@ class TestReleveProvenance(SouscriptionsTestCase):
                 'releve_externe_id': 'ELC-RELEVE-002',
             }
         )
-        periode._creer_facture()
+        facture = periode._creer_facture()
+        facture.action_post()
 
         with self.assertRaises(UserError):
             releve.write({'releve_externe_id': 'AUTRE'})

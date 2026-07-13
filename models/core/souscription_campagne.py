@@ -481,10 +481,81 @@ class SouscriptionCampagneFacturation(models.Model):
         """Gated sur créer factures (#158) : poste les factures brouillon du
         mois de la campagne (accounting standard, `action_post`) — c'est ce
         `action_post` qui, via `account.move._post()`, impute les chèques
-        énergie validés (ADR 0026, #172, tranche 1 du PRD #264, #265)."""
+        énergie validés (ADR 0026, #172, tranche 1 du PRD #264, #265).
+
+        Isolation d'erreur par facture (#268, tranche 4 du PRD #264) :
+        reprend le pattern du cron natif
+        ``account.move._autopost_draft_entries`` (account/models/account_move.py,
+        image odoo:19.0) — tente le lot entier sous un ``savepoint()`` ; si
+        ça lève, replie facture par facture, chacune sous son propre
+        savepoint, en collectant les échecs. Une grille incapable de prixer
+        (``UserError``, ADR 0029) ou toute autre donnée manquante sur UNE
+        facture n'emporte plus tout le lot : les factures saines sont
+        émises, les échecs sont rapportés (notification sticky, cf.
+        ``_notification_emission``) au·à la facturiste — souscription,
+        période, cause.
+
+        Idempotent par construction, sans état de retry dédié : le filtre
+        ``state == 'draft'`` exclut déjà les factures émises (elles ne
+        repassent jamais par ``action_post``) ; les échecs restent en
+        brouillon et sont retentés au prochain appel. Le reste-à-faire de
+        l'étape (#157, ``_reste_a_faire``) reflète l'état réel tout seul —
+        aucun champ ajouté."""
         self.ensure_one()
         self._verifier_gate('emettre_factures')
-        self._factures_du_mois().filtered(lambda f: f.state == 'draft').action_post()
+        a_emettre = self._factures_du_mois().filtered(lambda f: f.state == 'draft')
+        echecs = []
+        if a_emettre:
+            try:
+                with self.env.cr.savepoint():
+                    a_emettre.action_post()
+            except UserError:
+                for facture in a_emettre:
+                    try:
+                        with self.env.cr.savepoint():
+                            facture.action_post()
+                    except UserError as exc:
+                        echecs.append((facture, exc))
+        emises = a_emettre.filtered(lambda f: f.state == 'posted')
+        return self._notification_emission(emises, echecs)
+
+    def _notification_emission(self, emises, echecs):
+        """Notification de fin d'étape « émettre factures » (#268) :
+        compteurs + détail par échec (souscription, période, cause) —
+        sticky tant qu'un échec subsiste, pour laisser au·à la facturiste
+        le temps de le lire (même idiome que ``action_pull_meta_periodes``/
+        ``action_regulariser_clotures``)."""
+        self.ensure_one()
+        if not echecs:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': _('Émettre factures'),
+                    'message': _('Émises : %(nb)s.', nb=len(emises)),
+                    'type': 'success',
+                    'sticky': False,
+                },
+            }
+        detail = '\n'.join(
+            f'{facture.souscription_id.name} ({facture.periode_id.mois_annee or facture.name}) : {exc}'
+            for facture, exc in echecs
+        )
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Émettre factures'),
+                'message': _(
+                    'Émises : %(nb_emises)s · Échecs : %(nb_echecs)s\n%(detail)s',
+                    nb_emises=len(emises),
+                    nb_echecs=len(echecs),
+                    detail=detail,
+                ),
+                'type': 'warning',
+                'sticky': True,
+            },
+        }
 
     # action_preparer_prelevements (#186) : déclarée plus haut, aux côtés du
     # domaine partagé avec le signal dérivé « fait ».

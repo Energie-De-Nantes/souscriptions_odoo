@@ -151,3 +151,15 @@ justifie.
   ce chantier l'implémente, il ne le redéfinit pas.
 - **FEATURES.md** : REQ-FAC-07/08/12/13 mis à jour pour ne plus encoder « figé/verrouillé à
   la facturation » comme l'ancien moment.
+
+## Amendement (#268) — le geste de hash documenté à part
+
+Décision 4 annonçait la consigne de déploiement sans la détailler. La tranche 4 du chantier
+(#268) l'écrit : [`docs/deploiement-inalterabilite.md`](../deploiement-inalterabilite.md)
+— le geste exact (Comptabilité → Configuration → Journaux → journal de ventes → Réglages
+avancés → « Sécuriser les écritures comptabilisées avec une empreinte »), la vérification
+dans le source Odoo que `l10n_fr` ne l'active pas seul, et le mécanisme qui rend le geste
+irréversible dès la première écriture postée (`account.journal.write()` refuse de décocher
+`restrict_mode_hash_table` dès qu'un `inalterable_hash` existe sur le journal). S'applique
+à chaque base qui facture réellement, `souscriptions_prodlocal` comprise — jamais aux bases
+de test/démo, qui doivent garder `button_draft()` disponible.

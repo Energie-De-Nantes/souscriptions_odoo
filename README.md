@@ -155,6 +155,7 @@ souscriptions_odoo/
 | [FEATURES.md](FEATURES.md) | Story map : chaque capacité avec statut et preuve |
 | [COOKBOOK.md](COOKBOOK.md) | Les routines du dépôt : lancer l'instance, tester, inspecter les données |
 | [docs/adr/](docs/adr/) | Les décisions d'architecture (ADR) |
+| [docs/deploiement-inalterabilite.md](docs/deploiement-inalterabilite.md) | Le geste à faire sur chaque base en production : sécuriser les factures émises avec le hash de séquence |
 | [AUDIT_REFONTE.md](AUDIT_REFONTE.md) | L'audit qui a guidé la refonte Odoo 19 |
 
 ## Compatibilité et dépendances

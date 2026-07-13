@@ -161,6 +161,11 @@
                              pas d'account.move ; ce champ est le marqueur
                              d'identification de la Période d'ouverture. -->
                         <field name="facture_legacy_ref"/>
+                        <!-- État « régularisée » posé par la migration (PRD
+                             #207/#208, ADR 0030 décision 4) : mois déjà soldé
+                             côté prod, exclu des candidats de la
+                             Régularisation (#236). -->
+                        <field name="legacy_regularisee"/>
                     </group>
                     <!-- Tous les documents liés (factures, avoirs…), brouillons
                          compris : une facture remise en brouillon reste visible ici. -->

@@ -198,6 +198,20 @@ class GrillePrix(models.Model):
 
         return {'abonnement': abonnement, 'energies': energies}
 
+    def prix_energie_cadran(self, cadran, tarif_solidaire=False, coeff_pro=0.0):
+        """Prix unitaire (€/kWh) du cadran facturé pour cette grille, univers et
+        majoration PRO donnés — même moteur que ``composants()`` (ADR 0029),
+        sans nécessiter de puissance (aucun abonnement en jeu). Consommé par
+        la Régularisation (ADR 0030 décision 4) pour valoriser un écart aux
+        prix historiques de sa grille. Prix manquant -> ``UserError``, jamais
+        un prix nul par défaut (même garde que ``composants()``)."""
+        self.ensure_one()
+        produit = self.env['souscription.produit'].produit_energie(cadran, tarif_solidaire)
+        prix = self._get_prix_dict().get(produit.id)
+        if prix is None:
+            raise UserError(f'Prix non trouvé dans la grille {self.name} pour le produit : {produit.name}')
+        return prix * (1 + coeff_pro / 100.0)
+
     def _get_prix_dict(self):
         """{product_id: prix_interne} pour toute la grille — interne, servi via
         ``composants()`` (ADR 0029)."""

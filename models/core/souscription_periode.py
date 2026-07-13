@@ -230,6 +230,23 @@ class SouscriptionPeriode(models.Model):
         "Marque la Période comme « d'ouverture » : pas d'account.move dans ce système.",
     )
 
+    # État « régularisée » posé par la migration (PRD #207/#208, ADR 0030
+    # décision 4) : un mois déjà soldé côté prod (settled-is-settled, ADR
+    # 0023 §2) avant bascule — exclu des candidats de la Régularisation,
+    # silencieusement (ce n'est pas une anomalie, juste déjà réglé). Le
+    # backfill qui pose ce marqueur est le chantier #208, pas celui-ci ; le
+    # champ est posé ici pour que le calcul des candidats puisse déjà le
+    # lire. Volontairement absent de `_LOCKED_FIELDS` : une Période legacy
+    # porte déjà `facture_legacy_ref` (donc verrouillée), et le backfill
+    # #208 doit pouvoir écrire ce marqueur après coup sans dé-figer le reste.
+    legacy_regularisee = fields.Boolean(
+        string='Régularisée (legacy)',
+        default=False,
+        readonly=True,
+        help='Mois déjà soldé par une régularisation prod avant la bascule (PRD #207/#208) — '
+        'exclu des candidats de la Régularisation du nouveau système.',
+    )
+
     @api.depends('move_ids.move_type')
     def _compute_facture_id(self):
         for periode in self:

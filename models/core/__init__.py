@@ -13,6 +13,7 @@ from . import (
     souscription_produit,
     souscription_pull_meta_periodes_service,
     souscription_refacturation,
+    souscription_regularisation,
     souscription_releve,
     souscription_sepa_mandat,
 )

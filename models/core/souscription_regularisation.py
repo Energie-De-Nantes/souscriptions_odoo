@@ -365,7 +365,9 @@ class SouscriptionRegularisation(models.Model):
     def _creer_facture(self):
         """Crée, en **brouillon**, la Facture (ou l'avoir) de cette
         Régularisation — projection de `ligne_ids` (`_composer_lignes`).
-        Verrouillée dès qu'une Facture existe (même garde que `_recalculer`) ;
+        Refuse dès qu'une Facture existe (une seule par Régularisation) —
+        garde distincte du verrou de `_recalculer`, qui ne bloque, lui, qu'à
+        l'ÉMISSION (#267) ;
         refuse aussi une Régularisation sans ligne (rien à facturer). Ne poste
         jamais le move : l'émission (geste distinct) impute le chèque énergie
         et déclenche le tampon (`_solder_provisions`, via `account.move._post`)."""
@@ -410,7 +412,7 @@ class SouscriptionRegularisation(models.Model):
 
         Contourne le verrou de facturation (#14) via le contexte
         `regularisation_tampon` — seul canal qui réécrit la provision d'une
-        Période déjà facturée (cf. `souscription.periode.write`).
+        Période déjà émise (cf. `souscription.periode.write`).
 
         Note (PR #259, décision en attente) : re-poster le même move (post ->
         button_draft -> re-post) rejoue ce tampon et double-buffer les

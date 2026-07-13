@@ -66,7 +66,7 @@ class TestPeriodeMoisCanonique(SouscriptionsTestCase):
     # créer de période 'regularisation'/'ajustement' via l'ORM (Selection).
 
 
-@tagged('souscriptions', 'souscriptions_mois', 'post_install', '-at_install')
+@tagged('souscriptions', 'souscriptions_mois', 'souscriptions_migration', 'post_install', '-at_install')
 class TestMigrationTypesPeriodeMorts(SouscriptionsTestCase):
     """AC1 : garde de nettoyage (migrations/19.0.1.15.0/pre-migrate.py) —
     l'upgrade échoue bruyamment si une Période porte encore un type mort.

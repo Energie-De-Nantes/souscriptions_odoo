@@ -25,6 +25,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-SOU-05 ✅ journal de consentement append-only — preuve: tests/test_documents_contractuels.py::test_journal_est_append_only_en_ecriture
 - REQ-SOU-06 ✅ conditions particulières et attestation PDF — preuve: tests/test_documents_contractuels.py
 - REQ-SOU-07 ✅ droits resserrés user/manager sur souscriptions et grilles — preuve: tests/test_security.py · #17
+- REQ-SOU-08 ✅ chronologie du contrat à la demande : événements contractuels, relevés et périodes d'énergie tirés d'electricore par RSC, vue liste transitoire purgée entre deux clics — preuve: tests/test_chronologie.py · #200
 
 ## Parcours : grilles de prix & catalogue
 
@@ -51,6 +52,11 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-FAC-13 ✅ Énergie facturée universelle : la provision, tamponnée `provision := energie` à la facturation pour un contrat non lissé (dé-figeage/refacturation re-tamponne), porte uniformément la quantité facturée ; backfill des non-lissées déjà facturées — preuve: tests/test_periode_composition.py::test_creer_facture_tamponne_la_provision_non_lissee, tests/test_migration_energie_facturee.py · #234
 - REQ-FAC-14 ✅ Pull unifié gardé par l'empreinte : `source_hash` inchangé n'écrit rien, empreinte nouvelle + verdict fiable rafraîchit le mesuré v3 en bloc (relevés remplacés en bloc seulement si non facturée), incalculable/mois absent conservé et signalé ; exemption chirurgicale du verrou de facturation sur le mesuré (jamais la provision) ; scope refresh (plage de mois, ne crée rien) pour la Régularisation — preuve: tests/test_pull_meta_periodes.py::TestPullMetaPeriodesService, tests/test_pull_meta_periodes.py::TestPullMetaPeriodesServiceRefresh, tests/test_periode_atterrissage.py::test_champs_atterrissage_reecrivables_apres_facturation · #235
 - REQ-FAC-15 ✅ Pull des sorties C15 : `date_fin` à auteur unique — idempotence par comparaison de champ (absente → écrit + chatter code/date brute, identique → noop strict, différente → corrige + trace), `date_fin = date_sortie − 1 jour` (dernier jour servi), `CFNS` strictement équivalent à `RES`, bouton autonome (câblage campagne différé, tranche 3) — preuve: tests/test_pull_sorties.py, tests/test_souscription_form.py::test_date_fin_readonly_dans_le_formulaire · #21, #246, ADR 0031
+
+## Parcours : facture émise → règlement
+
+- REQ-REG-01 ✅ mode de paiement porté par la facture (dérivé de la souscription) ; vue « Règlements en attente » : postées à reste-à-payer, hors prélèvement, groupées par mode — preuve: tests/test_paiements_reglements_attente.py · #185
+- REQ-REG-02 ✅ étape de campagne « Préparer les prélèvements » après l'émission : toutes les factures prélèvement ouvertes (rattrapages compris), « fait » dérivé — preuve: tests/test_campagne_etapes_actions.py::TestCampagneEtapePreparerPrelevements · #186
 
 ## Parcours : espace usager (portail)
 

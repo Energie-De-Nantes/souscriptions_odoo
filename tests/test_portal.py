@@ -527,3 +527,25 @@ class PortalRegularisationTestCase(SouscriptionsTestMixin, HttpCase):
         self.assertEqual(response.status_code, 200)
 
         self.assertNotIn(f'/my/invoices/{facture_brouillon.id}', response.text)
+
+    def test_acces_facture_regularisation_reserve_au_souscripteur(self):
+        """Un·e autre usager·ère ne voit ni la page de la souscription
+        d'autrui, ni ne peut télécharger sa facture de régularisation."""
+        other_partner = self.env['res.partner'].create({'name': 'Autre Régul', 'email': 'autre_regul@test.com'})
+        other_user = self.env['res.users'].create(
+            {
+                'name': 'Other Regul Portal User',
+                'login': 'other_regul_portal',
+                'email': 'other_regul_portal@test.com',
+                'group_ids': [(6, 0, [self.env.ref('base.group_portal').id])],
+            }
+        )
+        other_partner.user_ids = [(6, 0, [other_user.id])]
+
+        self.authenticate(other_user.login, other_user.login)
+        response = self.url_open(self._detail_url())
+        self.assertEqual(response.status_code, 403)
+
+        facture = self.regularisation_emise.facture_id
+        telechargement = self.url_open(f'/my/invoices/{facture.id}')
+        self.assertEqual(telechargement.status_code, 403)

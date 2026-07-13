@@ -477,6 +477,18 @@ class Souscription(models.Model):
         for sous in self:
             sous.regularisation_count = len(sous.regularisation_ids)
 
+    def _regularisation_brouillon(self):
+        """Trouve ou crée LA Régularisation **brouillon** de cette
+        Souscription — jamais deux simultanées. Source unique, partagée par
+        le bouton « Régulariser » (#236) et la Régularisation de clôture
+        pilotée par la Campagne (`regulariser_clotures`, #248, ADR 0031
+        décision 4)."""
+        self.ensure_one()
+        regularisation = self.regularisation_ids.filtered(lambda r: r.etat == 'brouillon')[:1]
+        if not regularisation:
+            regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.id})
+        return regularisation
+
     def action_regulariser(self):
         """Bouton « Régulariser » (#236, tranche 4 du PRD #231) : trouve ou
         crée la Régularisation **brouillon** de cette Souscription puis la
@@ -486,9 +498,7 @@ class Souscription(models.Model):
         elle est verrouillée (`_recalculer` refuse) : ce bouton en ouvre alors
         une **nouvelle** plutôt que de heurter le verrou."""
         self.ensure_one()
-        regularisation = self.regularisation_ids.filtered(lambda r: r.etat == 'brouillon')[:1]
-        if not regularisation:
-            regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.id})
+        regularisation = self._regularisation_brouillon()
         regularisation._recalculer()
         return {
             'type': 'ir.actions.act_window',

@@ -333,11 +333,15 @@ class TestCampagneEtapePreparerPrelevements(SouscriptionsTestCase):
         return facture
 
     def test_etape_apparait_apres_emettre_factures_avec_prerequis(self):
-        """AC : dans le DAG, après « Émettre factures », gated dessus."""
+        """AC : dans le DAG, après « Émettre factures », gated dessus. Depuis
+        #248 (ADR 0031 décision 4), `regulariser_clotures` s'intercale aussi
+        après `emettre_factures` (les deux étapes partagent ce prérequis, DAG
+        pas pipeline) : on vérifie l'ordre relatif plutôt que l'adjacence
+        stricte."""
         codes = list(self.env['souscription.campagne.etape']._selection_code())
         codes_ordonnes = [c for c, _ in codes]
         self.assertEqual(codes_ordonnes[-1], 'preparer_prelevements')
-        self.assertEqual(codes_ordonnes[-2], 'emettre_factures')
+        self.assertLess(codes_ordonnes.index('emettre_factures'), codes_ordonnes.index('preparer_prelevements'))
 
         etape = self._etape()
         self.assertEqual(etape.etat_prerequis, 'bloquee', 'emettre_factures pas encore faite')

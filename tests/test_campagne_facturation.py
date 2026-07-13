@@ -48,10 +48,13 @@ class TestCampagneFacturationSpine(SouscriptionsTestCase):
         self.assertEqual(campagne.mois, date(2026, 7, 1))
 
     def test_racines_du_dag_toujours_pretes(self):
-        """Les deux racines (les vrais pulls : méta-périodes + sync F15) sont
-        toujours « prête » : aucune dépendance à satisfaire."""
+        """Les racines du DAG (pull sorties C15 + sync F15) sont toujours
+        « prête » : aucune dépendance à satisfaire. `pull_meta_periodes`
+        gagne un prérequis sur `pull_sorties_c15` (#248, ADR 0031 décision 4 —
+        l'ordre de campagne « pull des sorties -> date_fin -> périmètre ->
+        pull des méta-périodes ») : ce n'est donc plus une racine."""
         campagne = self._campagne()
-        racines = campagne.etape_ids.filtered(lambda e: e.code in ('pull_meta_periodes', 'sync_f15'))
+        racines = campagne.etape_ids.filtered(lambda e: e.code in ('pull_sorties_c15', 'sync_f15'))
         self.assertEqual(len(racines), 2)
         self.assertTrue(all(e.etat_prerequis == 'prete' for e in racines))
 

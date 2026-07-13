@@ -42,11 +42,31 @@ from odoo.exceptions import UserError
 # à sync F15, son « fait » n'est PAS le lancement (`lance`) mais un signal
 # dérivé (cf. _compute_fait/_compute_nb_reste_a_faire) — aucun champ de
 # verrou ajouté sur Période/Facture (esprit ADR 0025).
+#
+# « Pull sorties C15 » et « Régulariser les clôtures » (#248, ADR 0031
+# décision 4) : câblent l'ordre de campagne de la clôture — pull des sorties
+# -> date_fin -> périmètre -> pull des méta-périodes -> mensuelles -> réguls
+# de clôture. `pull_sorties_c15` devient la troisième racine du DAG (aucun
+# prérequis, comme sync F15 : tire tout, auto-cicatrisant, ADR 0031 décision
+# 1) ; `pull_meta_periodes` en dépend désormais — le prérequis documente
+# l'ordre voulu (`date_fin` doit être à jour avant que le périmètre du mois
+# soit tiré) mais n'est PAS un verrou dur (`action_pull_meta_periodes` ne
+# gate pas dessus, même idiome que les autres pulls-racines : l'auto-
+# cicatrisation du pull des sorties absorbe un passage dans le désordre).
+# `regulariser_clotures` est une étape 'action' (comme sync F15/pull sorties :
+# pas de backlog mensuel dérivable au sens de _CIBLE_PAR_ETAPE_DERIVEE, sa
+# cible est la file des sorties `en_attente_cloture`, pas un statut de
+# facturation) gatée sur les mensuelles émises.
 ETAPES_CAMPAGNE = {
+    'pull_sorties_c15': {
+        'label': 'Pull sorties C15',
+        'type': 'action',
+        'prerequis': (),
+    },
     'pull_meta_periodes': {
         'label': 'Pull méta-périodes',
         'type': 'derive',
-        'prerequis': (),
+        'prerequis': ('pull_sorties_c15',),
     },
     'sync_f15': {
         'label': 'Sync F15',
@@ -72,6 +92,11 @@ ETAPES_CAMPAGNE = {
         'label': 'Émettre factures',
         'type': 'derive',
         'prerequis': ('creer_factures',),
+    },
+    'regulariser_clotures': {
+        'label': 'Régulariser les clôtures',
+        'type': 'action',
+        'prerequis': ('emettre_factures',),
     },
     'preparer_prelevements': {
         'label': 'Préparer les prélèvements',
@@ -335,6 +360,74 @@ class SouscriptionCampagneFacturation(models.Model):
         if etape.etat_prerequis != 'prete':
             raise UserError(_('Étape « %s » bloquée : prérequis non satisfaits.', ETAPES_CAMPAGNE[code]['label']))
 
+    def action_pull_sorties_c15(self):
+        """Étape racine du DAG (#248, ADR 0031 décision 4) : pull des sorties
+        C15 en tête de campagne — ordre voulu « pull des sorties -> date_fin
+        -> périmètre -> pull des méta-périodes ». Délègue intégralement au
+        bouton autonome déjà couvert
+        (`souscription.souscription.action_tirer_sorties_c15`, #246), même
+        périmètre toutes-souscriptions-non-résiliées (auto-cicatrisant, pas
+        de fenêtre mensuelle, ADR 0031 décision 1) : aucune nouvelle couture
+        réseau, aucun scope par mois de campagne — la file des sorties n'en a
+        pas besoin."""
+        self.ensure_one()
+        return self.env['souscription.souscription'].action_tirer_sorties_c15()
+
+    def action_regulariser_clotures(self):
+        """Étape de fin de campagne (#248, ADR 0031 décision 4) : émet la
+        Régularisation de clôture — une Régularisation **ordinaire** (mêmes
+        candidats, ADR 0030) — de chaque Souscription actuellement
+        `en_attente_cloture`. Cible la file d'ATTENTE (l'état, CONTEXT.md
+        « En instance / En service / En attente de clôture / Résiliée »),
+        pas le seul périmètre de ce mois : la file est auto-cicatrisante,
+        comme le pull des sorties — une clôture ratée un mois ressort au
+        passage suivant.
+
+        Skip-and-report par souscription (ADR 0011) : une Période de clôture
+        pas encore facturée (mensuelles pas encore émises) est ignorée ce
+        passage, retentée au suivant ; une Régularisation sans écart (rien à
+        solder ce tour-ci) est laissée en brouillon vide, jamais facturée
+        (`_creer_facture` refuserait une Régularisation sans ligne) — ni
+        erreur, ni notification bloquante, l'état `en_attente_cloture`
+        persiste jusqu'à ce qu'un écart apparaisse. Une erreur de calcul sur
+        une souscription n'interrompt pas le lot."""
+        self.ensure_one()
+        cibles = self.env['souscription.souscription'].search([('etat', '=', 'en_attente_cloture')])
+        emises, ignorees, erreurs = [], [], []
+        for souscription in cibles:
+            periode_cloture = souscription._periode_cloture()
+            if not periode_cloture or not (periode_cloture.facture_id or periode_cloture.facture_legacy_ref):
+                ignorees.append(souscription.name)
+                continue
+            try:
+                with self.env.cr.savepoint():
+                    regularisation = souscription._regularisation_brouillon()
+                    regularisation._recalculer()
+                    if not regularisation.ligne_ids:
+                        ignorees.append(souscription.name)
+                        continue
+                    facture = regularisation._creer_facture()
+                    facture.action_post()
+                    emises.append(souscription.name)
+            except Exception as exc:
+                erreurs.append(f'{souscription.name} : {exc}')
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': _('Régulariser les clôtures'),
+                'message': _(
+                    'Émises : %(emises)s · Ignorées (rien à solder pour le moment) : %(ignorees)s · '
+                    'Erreurs : %(erreurs)s',
+                    emises=len(emises),
+                    ignorees=len(ignorees),
+                    erreurs=len(erreurs),
+                ),
+                'type': 'warning' if erreurs else 'success',
+                'sticky': bool(erreurs),
+            },
+        }
+
     def action_pull_meta_periodes(self):
         """Lance le tirage en un clic (#176), sans fenêtre intermédiaire :
         cible le Périmètre de campagne (#175) pour `self.mois` — aucun mois
@@ -535,10 +628,12 @@ class SouscriptionCampagneEtape(models.Model):
     # logique dupliquée entre la vue et ETAPES_CAMPAGNE. Les portes manuelles
     # n'ont pas d'entrée ici : elles se valident via le champ `valide`.
     _ACTIONS_PAR_ETAPE = {
+        'pull_sorties_c15': 'action_pull_sorties_c15',
         'pull_meta_periodes': 'action_pull_meta_periodes',
         'sync_f15': 'action_sync_f15',
         'creer_factures': 'action_creer_factures',
         'emettre_factures': 'action_emettre_factures',
+        'regulariser_clotures': 'action_regulariser_clotures',
         'preparer_prelevements': 'action_preparer_prelevements',
     }
 

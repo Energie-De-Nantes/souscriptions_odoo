@@ -7,6 +7,7 @@ from . import (
     test_catalogue,
     test_cheque_energie,
     test_chronologie,
+    test_cloture_campagne,
     test_documents_contractuels,
     test_electricore_client_fabrique,
     test_estimation_provisions,

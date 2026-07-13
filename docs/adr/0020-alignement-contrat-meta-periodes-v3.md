@@ -35,6 +35,14 @@ là-bas ; ici on acte la cible.
    **`(souscription, mois)` scopée aux périodes mensuelles** : les
    régularisations/ajustements restent libres (plusieurs par mois possibles).
 
+   > **Amendé (2026-07,
+   > [ADR-0030](0030-facture-gele-mesure-vivant-regularisation-modele-propre-solde-tampon.md)
+   > décision 3, #239)** : la Période redevient **purement mensuelle** — `type_periode`
+   > perd `regularisation`/`ajustement` (jamais portés par une donnée, la Régularisation
+   > étant un modèle propre depuis la tranche 4, #236). L'unicité `(souscription, mois)`
+   > devient **pleine** : l'index unique perd sa clause `WHERE type_periode = 'mensuelle'`,
+   > exprimable en `models.Constraint` UNIQUE ordinaire.
+
 3. **Identité : la *Période* snapshotte la RSC.** `ref_situation_contractuelle` est recopiée
    de la *Souscription* à la création — même logique que le snapshot des paramètres
    contractuels ([ADR-0006](0006-snapshot-periode-fait-autorite-facturation.md)). La
@@ -97,7 +105,8 @@ là-bas ; ici on acte la cible.
 - **Table de correspondance nom-fil → nom-Odoo** : une couche de traduction à maintenir,
   que l'alignement des noms rend inutile.
 - **Unicité `(souscription, mois)` globale** : bloquerait régularisations et ajustements —
-  d'où le scope aux seules périodes mensuelles.
+  d'où le scope aux seules périodes mensuelles. *(Devenu le cas nominal — amendement de
+  juillet 2026 ci-dessus : la Régularisation n'étant plus une Période, plus rien ne bloque.)*
 - **Renvoyer la puissance souscrite dans le payload** : reste exclu — la frontière
   d'[ADR-0002](0002-deux-sources-de-verite-marge-en-analytique.md)/0011 sur les paramètres
   contractuels tient ; seule la grandeur *physique* (moyenne C15) traverse le fil.

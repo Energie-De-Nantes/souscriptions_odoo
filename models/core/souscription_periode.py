@@ -129,9 +129,13 @@ class SouscriptionPeriode(models.Model):
         'distincte de la puissance souscrite (paramètre contractuel snapshotté).',
     )
 
-    # Métadonnées période
+    # Métadonnées période. La Période est **purement mensuelle** (ADR 0030
+    # décision 3, #239) : `regularisation`/`ajustement` n'ont jamais porté de
+    # donnée (la Régularisation est un modèle propre depuis la tranche 4,
+    # #236) — sélection réduite en conséquence, garde de nettoyage en
+    # pre-migrate (migrations/19.0.1.15.0).
     type_periode = fields.Selection(
-        [('mensuelle', 'Mensuelle'), ('regularisation', 'Régularisation'), ('ajustement', 'Ajustement')],
+        [('mensuelle', 'Mensuelle')],
         default='mensuelle',
         string='Type de période',
     )
@@ -276,21 +280,16 @@ class SouscriptionPeriode(models.Model):
             factures = periode.move_ids.filtered(lambda m: m.move_type == 'out_invoice')
             periode.facture_id = factures[:1]
 
-    def init(self):
-        """Unicité `(souscription, mois)` scopée aux périodes **mensuelles**
-        (ADR 0020 §2) : support de la clé d'idempotence `(RSC, mois)` du pull
-        electricore, sans bloquer régularisations/ajustements (libres, plusieurs
-        par mois possibles). Un index unique partiel — hors du vocabulaire de
-        `models.Constraint`, qui ne sait pas exprimer de clause `WHERE` — est la
-        façon idiomatique Odoo d'imposer une contrainte SQL conditionnelle."""
-        self.env.cr.execute(
-            """
-            CREATE UNIQUE INDEX IF NOT EXISTS souscription_periode_mois_mensuelle_unique
-            ON souscription_periode (souscription_id, mois)
-            WHERE type_periode = 'mensuelle'
-            """
-        )
-        super().init()
+    # Unicité `(souscription, mois)` (ADR 0020 §2, amendé par ADR 0030 décision
+    # 3 / #239) : support de la clé d'idempotence `(RSC, mois)` du pull
+    # electricore. La Période étant désormais purement mensuelle (plus de
+    # `regularisation`/`ajustement`), l'unicité est **pleine** — un
+    # `models.Constraint` UNIQUE ordinaire suffit, plus besoin de l'index
+    # partiel `WHERE type_periode = 'mensuelle'` (raw SQL en `init()`).
+    _unique_mois = models.Constraint(
+        'UNIQUE(souscription_id, mois)',
+        'Une période existe déjà pour cette souscription sur ce mois.',
+    )
 
     @api.model_create_multi
     def create(self, vals_list):

@@ -34,6 +34,7 @@ from . import (
     test_raccordement,
     test_raccordement_kanban_faits,
     test_refacturation,
+    test_regularisation,
     test_releve,
     test_releve_demo,
     test_res_partner,

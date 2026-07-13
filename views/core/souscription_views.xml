@@ -19,6 +19,12 @@
                         <button class="oe_stat_button" type="object" name="action_voir_factures" icon="fa-pencil-square-o">
                             <field name="facture_count" widget="statinfo" string="Factures"/>
                         </button>
+                        <!-- Entrée unique de la régularisation (#236) : trouve ou crée le
+                             brouillon — le header reste réservé à la RSC (refonte #246). -->
+                        <button class="oe_stat_button" type="object" name="action_regulariser" icon="fa-balance-scale"
+                                invisible="etat == 'en_instance'">
+                            <field name="regularisation_count" widget="statinfo" string="Régularisations"/>
+                        </button>
                         <button class="oe_stat_button" type="object" name="action_apercu_portail" icon="fa-globe">
                             <div class="o_stat_info">
                                 <span class="o_stat_text">Aperçu portail</span>

@@ -85,9 +85,9 @@ de contrat » au sens du rapport prod (qui est en réalité la CP, pas une attes
 Période mensuelle de facturation d'une *Souscription* (`souscription.periode`). **Brouillon de
 travail facturable** : amorcé par les quantités calculées par electricore (méta-période), puis
 **complété/corrigé par le·la facturiste** avant facturation — saisie manuelle d'estimations quand
-le flux Enedis manque, *gestes commerciaux*, ajustements. À la facturation, son **facturé** —
-l'*énergie facturée* par cadran, jours, puissance, taxes, relevés-justificatifs — est **figé**
-(historisation) et lié à la facture ; son **mesuré** (énergies par cadran, verdicts, coûts réseau
+le flux Enedis manque, *gestes commerciaux*, ajustements. À l'**émission** de sa *Facture*, son
+**facturé** — l'*énergie facturée* par cadran, jours, puissance, taxes, relevés-justificatifs —
+est **figé** (historisation) et lié à la facture ; son **mesuré** (énergies par cadran, verdicts, coûts réseau
 servis par electricore) reste **vivant** : electricore fait foi et le raffine à tout moment, y
 compris après facturation. Porte
 ce qui est **facturé** — pas une copie du coût réseau ; la marge se calcule à la demande côté
@@ -100,8 +100,8 @@ est un brouillon facturable, pas une copie figée d'electricore).
 **Énergie facturée** :
 La quantité d'énergie, par cadran facturé, que les *Factures* émises ont réellement portée pour
 une *Période* — le « facturé ». **N'évolue que par l'émission d'une facture qui la porte** :
-fixée à la **création** de la Période pour un contrat *lissé* (la provision contractuelle), à la
-**facturation** pour un contrat non lissé (la meilleure mesure/estimation du moment), puis
+fixée à la **création** de la Période pour un contrat *lissé* (la provision contractuelle), à
+l'**émission** pour un contrat non lissé (la meilleure mesure/estimation du moment), puis
 déplacée uniquement par l'émission d'une facture de *régularisation* qui solde l'écart — la
 Période reste en permanence la somme exacte de ce que ses factures ont porté (historisation
 **raffinée**, toujours opposable, ADR 0030). Gelée contre tout le reste : pulls, éditions. Se distingue de l'**énergie
@@ -146,7 +146,8 @@ déjà regroupées (contrat v3, ADR 0020). Porte sa **provenance** (`releve_exte
 pour le calcul d'énergie de la Période — **obligation légale** sur la *Facture* et support de
 **vérification** par le·la *souscripteur·rice*. Chaque relevé déclare sa **nature** : *réel*
 (mesure Enedis) ou *estimé* (estimation electricore ou *facturiste*), étiquetée sur la facture.
-**Figé** avec le snapshot de la Période et verrouillé après facturation (ADR 0006/0014) ; le relevé
+**Figé** avec le snapshot de la Période et verrouillé à l'**émission** de la *Facture* (ADR
+0006/0014 amendés) ; le relevé
 **frontière** est dupliqué entre deux Périodes consécutives — assumé : chaque facture est
 auto-portante. Source : electricore (pull, ADR 0011), saisi à la main par le·la *facturiste* tant
 que l'intégration manque (#12). C'est un **justificatif**, pas la quantité facturée : l'énergie
@@ -222,11 +223,24 @@ _Éviter_ : *article* ; confondre avec la *Grille de prix* (qui porte le **prix*
 
 **Facture** :
 Le document comptable légal (`account.move`, *facture d'énergie*) émis à partir d'une *Période*
-qu'il référence (`periode_id`). Une *Période* est dite **facturée** dès qu'une *Facture* la
-référence ; elle est **émise** (finalisée, opposable) à un état ultérieur. Seules les *Périodes*
-dont la *Facture* est **émise** sont visibles du·de la *souscripteur·rice* au *Portail* — un
-brouillon de facture ne fuite jamais côté usager.
-_Éviter_ : confondre « facturée » (une facture existe) et « émise » (facture finalisée).
+qu'il référence (`periode_id`). Vit en deux temps. **Brouillon** : l'espace de travail du·de la
+*facturiste* — ses lignes **générées** sont le miroir en lecture seule de la source (*Période*,
+*Régularisation*, *Refacturations* rassemblées), régénérées tant qu'elle bouge ; ses lignes
+**manuelles** (*gestes commerciaux* en euros, corrections) s'y ajoutent et **survivent à la
+régénération**. Rien ne gèle au brouillon — la *Période* reste corrigeable. **Émise** :
+l'émission est l'**unique événement de gel** — elle re-génère une dernière fois (la source fait
+foi à l'instant T), fige le facturé, verrouille la *Période* et ses *Relevés*, impute le *chèque
+énergie* — et la facture devient **définitive** : la correction passe par un avoir ou une
+*Régularisation*, jamais par un retour en brouillon (inaltérabilité par hachage, configurée au
+journal de ventes au déploiement). Une *Période* est dite **facturée** dès qu'une *Facture* la
+référence, **émise** quand cette facture l'est. Seules les *Périodes* dont la *Facture* est
+**émise** sont visibles du·de la *souscripteur·rice* au *Portail* — un brouillon de facture ne
+fuite jamais côté usager.
+_Éviter_ : confondre « facturée » (une facture existe) et « émise » (facture finalisée) ;
+**pré-facture** (rejetée : le brouillon d'`account.move` **est** l'espace intermédiaire
+d'édition — jamais de deuxième couche) ; éditer une ligne **générée** (les quantités se
+corrigent à la source, les euros par ligne manuelle) ; supprimer le brouillon pour « défiger »
+(rien n'est figé avant l'émission).
 
 **Chèque énergie** :
 Aide de l'État versée **au fournisseur à la place** du·de la *souscripteur·rice* (`souscription.cheque_energie`). C'est un **tiers-payeur**, **jamais une remise** : la fourniture n'est pas moins chère, une partie est payée par l'État — le **chiffre d'affaires et la TVA de la _Facture_ restent intacts**. Sur la *Facture*, il apparaît en **« payé / reste à payer »**, pas en ligne négative. Porte une **valeur nominale**, un **numéro** (unique), une **date d'expiration** (~mars N+1) et un **cycle de vie** : **reçu** (saisi, sans effet) → **validé** (la **porte** : saisie *à la main* sur le site étatique par le·la *facturiste* — aucun signal dérivable — qui le rend **imputable**) → **rejeté / expiré**. Rattaché au·à la *souscripteur·rice* (nominatif à la personne, pas au contrat) ; s'impute sur ses *Factures* **à leur création**, à hauteur de `min(solde, total)` sans jamais rendre la facture négative, **FIFO par expiration** quand la personne en détient plusieurs (renouvellement annuel). Le **solde** (portion non encore imputée) est **dérivé**, pas saisi. Un rejet/expiration *après* imputation se corrige **à la main** (pas d'automatisme). Le modèle **possède** l'identité et le cycle de vie ; la mécanique de solde et de lettrage est **déléguée** (cf. ADR 0026), non réimplémentée.
@@ -328,7 +342,12 @@ contrat).
 **Geste commercial** :
 Ajustement par le·la *facturiste* de ce qui est **facturé** à un·e souscripteur·rice pour raison
 commerciale (ex. : RES oubliée non encore traitée par Enedis → jours facturés réduits), assumé
-comme distinct de la réalité *physique* mesurée par electricore.
+comme distinct de la réalité *physique* mesurée par electricore. Deux maisons selon sa langue :
+en **quantités/jours**, il s'applique à la *Période* (tant qu'elle n'est pas gelée) ; en
+**euros**, c'est une **ligne manuelle** du brouillon de *Facture* — traçable telle quelle sur la
+facture émise.
+_Éviter_ : maquiller une ligne **générée** ou une quantité pour porter une remise en euros (le
+geste reste une ligne identifiable).
 
 **Refacturation (Enedis)** :
 En-cours refacturable d'origine **Enedis** que le fournisseur **refacture** au·à la

@@ -200,15 +200,21 @@ class Souscription(models.Model):
         'quotidien des affaires Enedis (#89).',
     )
     etat = fields.Selection(
-        [('en_instance', 'En instance'), ('en_service', 'En service'), ('resiliee', 'Résiliée')],
+        [
+            ('en_instance', 'En instance'),
+            ('en_service', 'En service'),
+            ('en_attente_cloture', 'En attente de clôture'),
+            ('resiliee', 'Résiliée'),
+        ],
         string='État',
         compute='_compute_etat',
         store=True,
         tracking=True,
-        help='Cycle de vie calculé depuis les faits (ADR 0021), jamais saisi : '
+        help='Cycle de vie calculé depuis les faits (ADR 0021, ADR 0031), jamais saisi : '
         '*en instance* (RSC absente, non facturable), *en service* (RSC acquise, '
-        'facturable), *résiliée* (date de fin passée — logique minimale, chantier '
-        'dédié ultérieur). Se corrige par le fait (la RSC), jamais par ce champ.',
+        'facturable), *en attente de clôture* (date de fin passée, clôture non '
+        'soldée — la file des sorties à traiter), *résiliée* (clôture soldée). '
+        'Se corrige par le fait (la RSC, le C15 de sortie), jamais par ce champ.',
     )
     motif_resolution_rsc = fields.Char(
         string='Motif dernière résolution RSC',
@@ -230,16 +236,65 @@ class Souscription(models.Model):
         'Cette RSC est déjà portée par une autre souscription — une RSC identifie un contrat unique.',
     )
 
-    @api.depends('ref_situation_contractuelle', 'date_fin')
+    @api.depends(
+        'ref_situation_contractuelle',
+        'date_fin',
+        'periode_ids.date_debut',
+        'periode_ids.date_fin',
+        'periode_ids.facture_id',
+        'periode_ids.facture_legacy_ref',
+        'periode_ids.legacy_regularisee',
+        'periode_ids.lisse_periode',
+        'periode_ids.regularisation_id',
+    )
     def _compute_etat(self):
         today = fields.Date.context_today(self)
         for sous in self:
             if sous.date_fin and sous.date_fin < today:
-                sous.etat = 'resiliee'
+                sous.etat = 'resiliee' if sous._cloture_soldee() else 'en_attente_cloture'
             elif sous.ref_situation_contractuelle:
                 sous.etat = 'en_service'
             else:
                 sous.etat = 'en_instance'
+
+    def _periode_cloture(self):
+        """La Période mensuelle contenant `date_fin` (dernier jour servi,
+        ADR 0031 décision 2) — bornes demi-ouvertes de la Période
+        (`date_debut <= date_fin < periode.date_fin`, ADR 0031)."""
+        self.ensure_one()
+        if not self.date_fin:
+            return self.env['souscription.periode']
+        return self.periode_ids.filtered(
+            lambda p: p.date_debut and p.date_fin and p.date_debut <= self.date_fin < p.date_fin
+        )[:1]
+
+    def _cloture_soldee(self):
+        """Prédicat de faits « clôture soldée » (ADR 0031 décision 3, #247) :
+        la Période contenant `date_fin` est facturée ET (une Régularisation
+        de clôture est émise OU rien à solder). Aucun statut à la main.
+
+        « Émise » : `periode.regularisation_id` n'est posé que par
+        `souscription.regularisation._solder_provisions()`, appelée
+        uniquement depuis `account.move._post()` sur les factures qui
+        viennent d'être postées — jamais au brouillon (tranche 6, #238). Le
+        champ trace donc exactement le fait « une Régularisation qui couvre
+        cette Période a été émise », pas seulement « facturée » (`etat ==
+        'facturee'` inclut le brouillon d'une facture pas encore postée).
+
+        « Rien à solder » : non-lissé (écarts nuls par construction — le
+        tampon de facturation pose `provision := energie` à chaque
+        facturation, #234) ou résilié migré déjà réglé avant bascule (mois
+        « régularisée », `legacy_regularisee`, ADR 0023/PRD #207).
+        """
+        self.ensure_one()
+        periode = self._periode_cloture()
+        if not periode:
+            return False
+        if not (periode.facture_id or periode.facture_legacy_ref):
+            return False
+        if periode.regularisation_id:
+            return True
+        return not periode.lisse_periode or periode.legacy_regularisee
 
     @api.model
     def souscriptions_concernees(self, mois):

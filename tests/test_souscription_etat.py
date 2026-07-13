@@ -2,6 +2,11 @@
 amendé) : capture de l'id_Affaire côté raccordement (avec sa date de saisie),
 recopie à la création, correction possible, RSC restreinte au groupe
 gestionnaire, état de cycle de vie calculé.
+
+Le quatrième état dérivé (`en_attente_cloture`, `resiliee` resserrée) —
+prédicat de faits « clôture soldée » — est couvert par
+`TestEtatEnAttenteCloture` (#247, ADR 0031 décision 3, tranche 2 du chantier
+#21).
 """
 
 from datetime import date, timedelta
@@ -11,7 +16,7 @@ from odoo.tests.common import tagged
 from odoo.tools import mute_logger
 from psycopg2 import IntegrityError
 
-from .common import SouscriptionsTestCase
+from .common import SouscriptionsTestCase, build_grille_lignes, client_flux_factice, patcher_client_fabrique
 
 
 @tagged('souscriptions', 'souscriptions_etat', 'post_install', '-at_install')
@@ -143,11 +148,16 @@ class TestEtatCalcule(SouscriptionsTestCase):
         self.souscription_base.write({'ref_situation_contractuelle': 'RSC-1'})
         self.assertEqual(self.souscription_base.etat, 'en_service')
 
-    def test_resiliee_si_date_fin_passee(self):
+    def test_en_attente_cloture_si_date_fin_passee_sans_cloture_soldee(self):
+        """`resiliee` s'est resserrée (#247, ADR 0031 décision 3) : date de fin
+        passée seule ne suffit plus. Sans aucune Période couvrant `date_fin`,
+        le prédicat « clôture soldée » échoue -> `en_attente_cloture` (la
+        file d'attente des sorties à traiter) — le cycle complet vers
+        `resiliee` est couvert par `TestEtatEnAttenteCloture`."""
         self.souscription_base.write(
             {'ref_situation_contractuelle': 'RSC-1', 'date_fin': date.today() - timedelta(days=1)}
         )
-        self.assertEqual(self.souscription_base.etat, 'resiliee')
+        self.assertEqual(self.souscription_base.etat, 'en_attente_cloture')
 
     def test_pas_de_vocabulaire_brouillon_dans_la_selection(self):
         """Vocabulaire du glossaire (CONTEXT.md) : jamais « brouillon », jamais
@@ -185,6 +195,21 @@ class TestFiltresEtat(SouscriptionsTestCase):
 
         self.assertEqual(par_rsc, self.souscription_base)
         self.assertEqual(par_affaire, self.souscription_hphc)
+
+    def test_filtre_en_attente_cloture_liste_exactement_cet_etat(self):
+        """La file d'attente des sorties à traiter, c'est la vue de l'état
+        `en_attente_cloture` (#247, ADR 0031 décision 3) : le filtre ne
+        retourne ni les souscriptions en service ni les résiliées."""
+        self.souscription_base.write(
+            {'ref_situation_contractuelle': 'RSC-QUEUE-1', 'date_fin': date.today() - timedelta(days=1)}
+        )
+        self.souscription_hphc.write({'ref_situation_contractuelle': 'RSC-QUEUE-2'})
+
+        Souscription = self.env['souscription.souscription']
+        resultat = Souscription.search([('etat', '=', 'en_attente_cloture')])
+
+        self.assertIn(self.souscription_base, resultat)
+        self.assertNotIn(self.souscription_hphc, resultat)
 
 
 @tagged('souscriptions', 'souscriptions_etat', 'post_install', '-at_install')
@@ -229,3 +254,137 @@ class TestRscUnique(SouscriptionsTestCase):
         self._souscription('PDL_A', False)
         self._souscription('PDL_B', False)
         self.env.flush_all()
+
+
+@tagged('souscriptions', 'souscriptions_etat', 'post_install', '-at_install')
+class TestEtatEnAttenteCloture(SouscriptionsTestCase):
+    """#247 (ADR 0031 décision 3, tranche 2 du chantier #21) : quatrième état
+    dérivé — `en_attente_cloture` / `resiliee` resserrée. Prédicat de faits
+    « clôture soldée » : la Période contenant `date_fin` est facturée ET (une
+    Régularisation de clôture est émise OU rien à solder). Aucun statut à la
+    main — dérivé des mêmes faits que `test_regularisation_tampon.py` (le
+    tampon d'émission pose `souscription.periode.regularisation_id`, jamais
+    au brouillon)."""
+
+    def _grille_moulin(self, name):
+        """Grille dédiée (régime `moulin`) : n'entre pas en collision avec
+        `cls.grille_prix` (régime standard, `common.py`) — même motif que
+        `test_regularisation.py`/`test_regularisation_tampon.py`."""
+        grille = self.env['grille.prix'].create(
+            {
+                'name': name,
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 12, 31),
+                'active': True,
+                'regime_prix': 'moulin',
+            }
+        )
+        build_grille_lignes(self.env, grille, prix_base=0.15, prix_hp=0.18, prix_hc=0.12)
+        return grille
+
+    def _souscription_lissee(self, ref, pdl):
+        return self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.partner_test.id,
+                'pdl': pdl,
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'date_debut': date(2023, 1, 1),
+                'lisse': True,
+                'provision_mensuelle_kwh': 200.0,
+                'regime_prix': 'moulin',
+                'ref_situation_contractuelle': ref,
+            }
+        )
+
+    def _periode(self, souscription, date_debut, date_fin, **overrides):
+        """Une Période mensuelle demi-ouverte (`date_fin` = 1er du mois
+        suivant, ADR 0031) — convention distincte du helper partagé
+        `create_test_periode` (`common.py`, bornes inclusives héritées d'un
+        usage antérieur) : le prédicat de clôture a besoin des bornes
+        v3 brutes réelles pour situer `date_fin` de la Souscription."""
+        vals = {
+            'souscription_id': souscription.id,
+            'date_debut': date_debut,
+            'date_fin': date_fin,
+            'type_periode': 'mensuelle',
+        }
+        vals.update(overrides)
+        return self.env['souscription.periode'].create(vals)
+
+    def _sans_appel_reseau(self):
+        return patcher_client_fabrique(client_flux_factice('meta_periodes', []))
+
+    # --- AC « cycle complet » ---
+
+    def test_cycle_complet_en_service_puis_en_attente_cloture_puis_resiliee(self):
+        """en_service -> en_attente_cloture (sortie posée) -> resiliee (solde
+        émis) : le cycle complet de l'ADR 0031 décision 3."""
+        souscription = self._souscription_lissee('RSC-CYCLE', 'PDL_CYCLE')
+        self._grille_moulin('Grille Cycle')
+        self.assertEqual(souscription.etat, 'en_service')
+
+        # Dernier mois facturé (janvier), écart non nul -> pas encore soldé.
+        periode = self._periode(
+            souscription,
+            date(2024, 1, 1),
+            date(2024, 2, 1),
+            provision_base_kwh=200.0,
+            energie_base_kwh=225.0,  # écart +25
+            qualite='réelle',
+            statut_communication='communicante',
+            facture_legacy_ref='LEGACY-CYCLE-1',
+        )
+        souscription.date_fin = date(2024, 1, 31)  # dernier jour servi (sortie C15 posée)
+        self.assertEqual(souscription.etat, 'en_attente_cloture')
+
+        # Solde émis : la régul de clôture est une Régularisation ordinaire
+        # (ADR 0031 décision 4) — le câblage/l'ordonnancement de campagne
+        # (tranche 3, #248) n'est pas construit ici, on émet directement pour
+        # isoler le prédicat de faits de cette tranche.
+        regularisation = self.env['souscription.regularisation'].create({'souscription_id': souscription.id})
+        with self._sans_appel_reseau():
+            regularisation._recalculer()
+        facture = regularisation._creer_facture()
+        facture.action_post()
+
+        self.assertEqual(periode.regularisation_id, regularisation)
+        self.assertEqual(souscription.etat, 'resiliee')
+
+    # --- AC « non-lissé sorti » ---
+
+    def test_non_lisse_sorti_resiliee_direct(self):
+        """Non-lissé : écarts nuls par construction (le tampon de
+        facturation pose `provision := energie`, #234) -> rien à solder,
+        `resiliee` direct dès que la Période contenant `date_fin` est
+        facturée — aucune Régularisation requise."""
+        souscription = self.souscription_base  # lisse=False (common.py)
+        souscription.write({'ref_situation_contractuelle': 'RSC-NON-LISSE'})
+        self._periode(
+            souscription,
+            date(2024, 1, 1),
+            date(2024, 2, 1),
+            facture_legacy_ref='LEGACY-NON-LISSE-1',
+        )
+        souscription.date_fin = date(2024, 1, 31)
+
+        self.assertEqual(souscription.etat, 'resiliee')
+
+    # --- AC « résilié migré » ---
+
+    def test_resilie_migre_mois_regularisee_resiliee_direct(self):
+        """Résilié migré : la Période contenant `date_fin` porte le marqueur
+        legacy « régularisée » (ADR 0023/PRD #207) -> déjà soldée avant
+        bascule, `resiliee` direct — sans Régularisation émise dans ce
+        système, y compris pour un contrat lissé."""
+        souscription = self._souscription_lissee('RSC-MIGRE', 'PDL_MIGRE')
+        self._periode(
+            souscription,
+            date(2024, 1, 1),
+            date(2024, 2, 1),
+            facture_legacy_ref='LEGACY-MIGRE-1',
+            legacy_regularisee=True,
+        )
+        souscription.date_fin = date(2024, 1, 31)
+
+        self.assertEqual(souscription.etat, 'resiliee')

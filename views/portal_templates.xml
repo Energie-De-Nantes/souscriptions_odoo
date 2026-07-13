@@ -58,8 +58,12 @@
                                         </t>
                                     </td>
                                     <td>
-                                        <span t-attf-class="badge rounded-pill text-bg-#{souscription.active and 'success' or 'secondary'}">
-                                            <t t-out="souscription.active and 'Active' or 'Inactive'"/>
+                                        <!-- Statut reflété (critère de #21, ADR 0031) : le libellé vient de
+                                             la Selection du modèle — jamais redéfini ici — seule la couleur
+                                             se choisit par état. -->
+                                        <t t-set="etat_color" t-value="{'en_instance': 'secondary', 'en_service': 'success', 'en_attente_cloture': 'warning', 'resiliee': 'danger'}.get(souscription.etat, 'secondary')"/>
+                                        <span t-attf-class="badge rounded-pill text-bg-#{etat_color}">
+                                            <t t-out="dict(souscription._fields['etat'].selection).get(souscription.etat, souscription.etat)"/>
                                         </span>
                                     </td>
                                     <td class="text-end">

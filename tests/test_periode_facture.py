@@ -51,8 +51,10 @@ class TestPeriodeFactureLien(SouscriptionsTestCase):
 @tagged('souscriptions', 'souscriptions_periode_facture', 'souscriptions_cheque_energie', 'post_install', '-at_install')
 class TestPeriodeFactureChequeEnergie(SouscriptionsTestCase):
     """#172, couture 2 (point de couture le plus haut) : effet de l'imputation
-    FIFO des chèques énergie validés sur `amount_residual`, au hook
-    `_creer_facture()` (ADR 0026)."""
+    FIFO des chèques énergie validés sur `amount_residual`. Déplacée de la
+    création à l'ÉMISSION par la tranche 1 du PRD #264 (#265) : `_creer_facture()`
+    ne produit plus qu'un brouillon, l'imputation ne se déclenche qu'à
+    `action_post()` (via `account.move._post()`, ADR 0026)."""
 
     def _new_cheque(self, **kwargs):
         vals = {
@@ -65,14 +67,29 @@ class TestPeriodeFactureChequeEnergie(SouscriptionsTestCase):
         vals.update(kwargs)
         return self.env['souscription.cheque_energie'].create(vals)
 
-    def test_cheque_valide_reduit_amount_residual_sans_jamais_etre_negatif(self):
-        """Facture couverte partiellement par un chèque validé : amount_residual
-        réduit de min(solde, total), jamais négatif."""
+    def test_creation_avec_cheque_valide_reste_en_brouillon(self):
+        """AC #265 : même avec un chèque validé à solde positif disponible,
+        la création de la facture ne poste plus rien — plus aucune facture
+        d'énergie postée à la création, par aucun chemin."""
         cheque = self._new_cheque(montant=10.0)
         cheque.action_valider()
 
         periode = self.create_test_periode(self.souscription_base)
         facture = periode._creer_facture()
+
+        self.assertEqual(facture.state, 'draft')
+        self.assertAlmostEqual(facture.amount_residual, facture.amount_total, places=2)
+        self.assertAlmostEqual(cheque.solde, cheque.montant, places=2, msg='rien imputé avant émission')
+
+    def test_cheque_valide_reduit_amount_residual_sans_jamais_etre_negatif(self):
+        """Facture couverte partiellement par un chèque validé : à l'émission,
+        amount_residual réduit de min(solde, total), jamais négatif."""
+        cheque = self._new_cheque(montant=10.0)
+        cheque.action_valider()
+
+        periode = self.create_test_periode(self.souscription_base)
+        facture = periode._creer_facture()
+        facture.action_post()
 
         self.assertEqual(facture.state, 'posted')
         self.assertAlmostEqual(facture.amount_residual, facture.amount_total - 10.0, places=2)
@@ -80,19 +97,24 @@ class TestPeriodeFactureChequeEnergie(SouscriptionsTestCase):
         self.assertAlmostEqual(cheque.solde, 0.0, places=2)
 
     def test_cheque_non_valide_aucun_effet(self):
-        """Un chèque 'reçu' (non validé) n'impute rien : la Facture reste
-        `draft`, amount_residual == amount_total, comme sans chèque du tout."""
+        """Un chèque 'reçu' (non validé) n'impute rien, même à l'émission :
+        amount_residual == amount_total, comme sans chèque du tout
+        (non-régression, AC #265)."""
         self._new_cheque(montant=1000.0)  # jamais validé
 
         periode = self.create_test_periode(self.souscription_base)
         facture = periode._creer_facture()
-
         self.assertEqual(facture.state, 'draft')
+
+        facture.action_post()
+
+        self.assertEqual(facture.state, 'posted')
         self.assertAlmostEqual(facture.amount_residual, facture.amount_total, places=2)
 
     def test_fifo_par_expiration_le_plus_proche_consomme_en_premier(self):
-        """Deux chèques validés : celui qui périme le plus tôt est consommé en
-        premier (FIFO par expiration), quel que soit l'ordre de création/montant."""
+        """Deux chèques validés : à l'émission, celui qui périme le plus tôt
+        est consommé en premier (FIFO par expiration), quel que soit l'ordre
+        de création/montant."""
         cheque_tardif = self._new_cheque(numero='CHQ-172-TARD', montant=1000.0, date_expiration=date(2026, 3, 31))
         cheque_tardif.action_valider()
         cheque_proche = self._new_cheque(numero='CHQ-172-PROCHE', montant=5.0, date_expiration=date(2024, 3, 31))
@@ -100,6 +122,7 @@ class TestPeriodeFactureChequeEnergie(SouscriptionsTestCase):
 
         periode = self.create_test_periode(self.souscription_base)
         facture = periode._creer_facture()
+        facture.action_post()
 
         # Le chèque qui périme le plus tôt (proche) est épuisé en premier ;
         # le tardif n'absorbe que ce que le proche n'a pas couvert.
@@ -113,7 +136,8 @@ class TestPeriodeFactureChequeEnergie(SouscriptionsTestCase):
 
     def test_reliquat_se_reporte_sur_la_facture_suivante(self):
         """Un chèque plus gros qu'une Facture se reporte sur la Facture suivante
-        jusqu'à épuisement — report natif du lettrage, pas de code métier."""
+        jusqu'à épuisement — report natif du lettrage, pas de code métier.
+        Chaque Facture est émise (`action_post()`) pour déclencher l'imputation."""
         cheque = self._new_cheque(montant=1000.0)
         cheque.action_valider()
 
@@ -121,6 +145,7 @@ class TestPeriodeFactureChequeEnergie(SouscriptionsTestCase):
             self.souscription_base, date_debut=date(2024, 1, 1), date_fin=date(2024, 1, 31)
         )
         facture_janvier = periode_janvier._creer_facture()
+        facture_janvier.action_post()
         self.assertAlmostEqual(facture_janvier.amount_residual, 0.0, places=2)
         solde_apres_janvier = cheque.solde
         self.assertGreater(solde_apres_janvier, 0.0)
@@ -129,6 +154,7 @@ class TestPeriodeFactureChequeEnergie(SouscriptionsTestCase):
             self.souscription_base, date_debut=date(2024, 2, 1), date_fin=date(2024, 2, 29)
         )
         facture_fevrier = periode_fevrier._creer_facture()
+        facture_fevrier.action_post()
 
         self.assertAlmostEqual(facture_fevrier.amount_residual, 0.0, places=2)
         self.assertAlmostEqual(cheque.solde, solde_apres_janvier - facture_fevrier.amount_total, places=2)
@@ -136,12 +162,14 @@ class TestPeriodeFactureChequeEnergie(SouscriptionsTestCase):
     def test_structure_facture_et_pas_de_ligne_negative(self):
         """Tiers-payeur, jamais une remise (ADR 0026) : la structure de la
         Facture (sections, notes TURPE, lignes produit) et son CA/TVA ne sont
-        pas touchés par l'imputation — aucune ligne négative n'est ajoutée."""
+        pas touchés par l'imputation à l'émission — aucune ligne négative
+        n'est ajoutée."""
         cheque = self._new_cheque(montant=10.0)
         cheque.action_valider()
 
         periode = self.create_test_periode(self.souscription_base)
         facture = periode._creer_facture()
+        facture.action_post()
 
         self.assert_invoice_structure(facture)
         lignes_produit = facture.invoice_line_ids.filtered(lambda l: l.display_type == 'product')

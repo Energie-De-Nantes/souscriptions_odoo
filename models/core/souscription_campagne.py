@@ -479,7 +479,9 @@ class SouscriptionCampagneFacturation(models.Model):
 
     def action_emettre_factures(self):
         """Gated sur créer factures (#158) : poste les factures brouillon du
-        mois de la campagne (accounting standard, `action_post`)."""
+        mois de la campagne (accounting standard, `action_post`) — c'est ce
+        `action_post` qui, via `account.move._post()`, impute les chèques
+        énergie validés (ADR 0026, #172, tranche 1 du PRD #264, #265)."""
         self.ensure_one()
         self._verifier_gate('emettre_factures')
         self._factures_du_mois().filtered(lambda f: f.state == 'draft').action_post()

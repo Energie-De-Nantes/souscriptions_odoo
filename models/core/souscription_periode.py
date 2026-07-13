@@ -802,18 +802,20 @@ class SouscriptionPeriode(models.Model):
     # Underscore délibéré : ferme la porte RPC externe, même idiome que
     # `sale.order._create_invoices` (décision du grill, amende la revue d'architecture).
     def _creer_facture(self):
-        """Émet la facture (``account.move``) de cette période.
+        """Crée la facture (``account.move``) de cette période, en **brouillon**.
 
         Tamponne d'abord la provision (``_tamponner_provision``, non-lissé
         uniquement, no-op sinon), puis sélectionne la grille active à la date
         de fin, compose les lignes (``_composer_lignes``) et crée le move en
         posant ``periode_id`` (source unique du lien Période ↔ Facture, ADR
-        0004).
+        0004). Ne poste jamais le move : l'émission (``action_post`` /
+        ``account.move._post``) reste un geste distinct — c'est elle, pas la
+        création, qui impute le chèque énergie (tranche 1 du PRD #264, #265).
         """
         self.ensure_one()
         self._tamponner_provision()
         grille = self.env['grille.prix'].get_grille_active(self.date_fin, regime=self.regime_prix_periode)
-        facture = self.env['account.move'].create(
+        return self.env['account.move'].create(
             {
                 'move_type': 'out_invoice',
                 'partner_id': self.souscription_id.partner_id.id,
@@ -822,5 +824,3 @@ class SouscriptionPeriode(models.Model):
                 'invoice_line_ids': self._composer_lignes(grille),
             }
         )
-        facture._imputer_cheques_energie()
-        return facture

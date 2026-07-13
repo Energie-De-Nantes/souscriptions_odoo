@@ -866,10 +866,12 @@ class Souscription(models.Model):
         return self.env['souscription.consentement'].create(vals)
 
     def creer_factures(self):
-        """Émet les factures des périodes non encore facturées.
+        """Crée, en brouillon, les factures des périodes non encore facturées
+        (l'émission — le geste qui poste et impute le chèque énergie,
+        #265 — reste un pas distinct, cf. ``account.move._post``).
 
         Orchestrateur : pour chaque souscription, boucle sur ses périodes sans
-        facture (garde anti-doublon) et délègue l'émission à la période
+        facture (garde anti-doublon) et délègue la création à la période
         (``periode._creer_facture``). La composition des lignes et la création du
         ``account.move`` vivent désormais sur la Période (ADR 0006).
 

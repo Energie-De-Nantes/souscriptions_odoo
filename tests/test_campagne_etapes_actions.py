@@ -300,6 +300,36 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
 
         self.assertEqual(periode.facture_id.state, 'posted')
 
+    def test_emettre_factures_impute_les_cheques_energie_valides(self):
+        """Couture campagne (#172, ADR 0026, tranche 1 du PRD #264, #265) : le
+        brouillon créé par `creer_factures` reste sans imputation tant que
+        l'étape « Émettre factures » ne l'a pas postée — c'est
+        `action_emettre_factures` (donc `action_post`, donc `account.move.
+        _post()`) qui déclenche l'imputation FIFO, à la maille campagne comme
+        à la maille facture individuelle."""
+        cheque = self.env['souscription.cheque_energie'].create(
+            {
+                'numero': 'CHQ-CAMPAGNE-A',
+                'partner_id': self.souscription_base.partner_id.id,
+                'montant': 10.0,
+                'date_reception': self.MOIS,
+                'date_expiration': date(2026, 3, 31),
+            }
+        )
+        cheque.action_valider()
+
+        periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        facture = periode._creer_facture()
+        self.assertEqual(facture.state, 'draft', 'rien imputé avant émission')
+        self.assertAlmostEqual(cheque.solde, cheque.montant, places=2)
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.campagne.action_emettre_factures()
+
+        self.assertEqual(facture.state, 'posted')
+        self.assertAlmostEqual(facture.amount_residual, facture.amount_total - 10.0, places=2)
+        self.assertAlmostEqual(cheque.solde, 0.0, places=2)
+
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneEtapePreparerPrelevements(SouscriptionsTestCase):

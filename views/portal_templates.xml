@@ -299,57 +299,6 @@
                                     </div>
                                 </t>
 
-                                <!-- Factures de régularisation ÉMISES (tranche 8 du PRD #231, #240,
-                                     ADR 0030) : `regularisations` est déjà filtré aux factures
-                                     postées par le contrôleur — aucun brouillon ne fuite côté
-                                     usager. Section propre plutôt que fusionnée à l'historique des
-                                     périodes : le group_by mensuelles/réguls est hors périmètre. -->
-                                <t t-if="regularisations">
-                                    <h5 class="mt-4">Factures de régularisation</h5>
-                                    <div class="table-responsive">
-                                        <table class="table table-sm table-striped align-middle">
-                                            <thead>
-                                                <tr>
-                                                    <th>Période couverte</th>
-                                                    <th class="text-end">Montant</th>
-                                                    <th class="text-center">Paiement</th>
-                                                    <th class="text-center">Facture</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <t t-foreach="regularisations" t-as="regularisation">
-                                                    <tr>
-                                                        <td>
-                                                            <t t-out="regularisation.date_debut.strftime('%d/%m/%Y') if regularisation.date_debut else '-'"/> -
-                                                            <t t-out="regularisation.date_fin.strftime('%d/%m/%Y') if regularisation.date_fin else '-'"/>
-                                                        </td>
-                                                        <td class="text-end">
-                                                            <strong><t t-out="'%.2f' % (regularisation.facture_id.amount_total or 0)"/> €</strong>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <t t-if="regularisation.facture_id.payment_state == 'paid'">
-                                                                <span class="badge rounded-pill text-bg-success"><i class="fa fa-check"/> Payée</span>
-                                                            </t>
-                                                            <t t-elif="regularisation.facture_id.payment_state == 'partial'">
-                                                                <span class="badge rounded-pill text-bg-warning">Partielle</span>
-                                                            </t>
-                                                            <t t-else="">
-                                                                <span class="badge rounded-pill text-bg-danger">Impayée</span>
-                                                            </t>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <a t-attf-href="/my/invoices/#{regularisation.facture_id.id}"
-                                                               class="btn btn-sm btn-outline-primary" title="Voir la facture">
-                                                                <i class="fa fa-file-text-o"/> <t t-out="regularisation.facture_id.name"/>
-                                                            </a>
-                                                        </td>
-                                                    </tr>
-                                                </t>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </t>
-
                                 <!-- Justificatif — relevés d'index utilisés (#57 / ADR 0015).
                                      Même source que le PDF (periode_id.releve_ids). `periodes`
                                      est déjà filtré aux factures ÉMISES (postées) par le
@@ -432,6 +381,58 @@
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </t>
+
+                            <!-- Factures de régularisation ÉMISES (tranche 8 du PRD #231, #240,
+                                 ADR 0030) : `regularisations` est déjà filtré aux factures
+                                 postées par le contrôleur — aucun brouillon ne fuite côté
+                                 usager. Hors du bloc `periodes` : une régul émise se montre
+                                 même sans période visible. Section propre plutôt que fusionnée
+                                 (le group_by mensuelles/réguls est hors périmètre). -->
+                            <t t-if="regularisations">
+                                <h5 class="mt-4">Factures de régularisation</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>Période couverte</th>
+                                                <th class="text-end">Montant</th>
+                                                <th class="text-center">Paiement</th>
+                                                <th class="text-center">Facture</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-foreach="regularisations" t-as="regularisation">
+                                                <tr>
+                                                    <td>
+                                                        <t t-out="regularisation.date_debut.strftime('%d/%m/%Y') if regularisation.date_debut else '-'"/> -
+                                                        <t t-out="regularisation.date_fin.strftime('%d/%m/%Y') if regularisation.date_fin else '-'"/>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <strong><t t-out="'%.2f' % (regularisation.facture_id.amount_total or 0)"/> €</strong>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <t t-if="regularisation.facture_id.payment_state == 'paid'">
+                                                            <span class="badge rounded-pill text-bg-success"><i class="fa fa-check"/> Payée</span>
+                                                        </t>
+                                                        <t t-elif="regularisation.facture_id.payment_state == 'partial'">
+                                                            <span class="badge rounded-pill text-bg-warning">Partielle</span>
+                                                        </t>
+                                                        <t t-else="">
+                                                            <span class="badge rounded-pill text-bg-danger">Impayée</span>
+                                                        </t>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <a t-attf-href="/my/invoices/#{regularisation.facture_id.id}"
+                                                           class="btn btn-sm btn-outline-primary" title="Voir la facture">
+                                                            <i class="fa fa-file-text-o"/> <t t-out="regularisation.facture_id.name"/>
+                                                        </a>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </t>
 

@@ -513,7 +513,9 @@ class PortalRegularisationTestCase(SouscriptionsTestMixin, HttpCase):
         self.assertIn(facture.name, response.text)
         self.assertIn(f'/my/invoices/{facture.id}', response.text)
 
-        telechargement = self.url_open(f'/my/invoices/{facture.id}')
+        # Sans suivre les redirections : un 200 après redirect vers /my serait
+        # un refus déguisé, pas un téléchargement.
+        telechargement = self.url_open(f'/my/invoices/{facture.id}', allow_redirects=False)
         self.assertEqual(telechargement.status_code, 200)
 
     def test_facture_regularisation_brouillon_invisible(self):
@@ -546,6 +548,10 @@ class PortalRegularisationTestCase(SouscriptionsTestMixin, HttpCase):
         response = self.url_open(self._detail_url())
         self.assertEqual(response.status_code, 403)
 
+        # La route portail native ne renvoie pas 403 : sur AccessError elle
+        # REDIRIGE vers /my. C'est la redirection qui est le refus — un 200
+        # direct serait la fuite.
         facture = self.regularisation_emise.facture_id
-        telechargement = self.url_open(f'/my/invoices/{facture.id}')
-        self.assertEqual(telechargement.status_code, 403)
+        telechargement = self.url_open(f'/my/invoices/{facture.id}', allow_redirects=False)
+        self.assertIn(telechargement.status_code, (302, 303))
+        self.assertNotIn('/my/invoices', telechargement.headers.get('Location', ''))

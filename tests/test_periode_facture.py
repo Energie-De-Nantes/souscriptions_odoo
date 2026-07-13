@@ -358,6 +358,22 @@ class TestPeriodeEditionBrouillonRegenerationFilDeLeau(SouscriptionsTestCase):
         self.assertEqual(len(ligne_manuelle), 1, 'la ligne manuelle survit à la régénération au fil de l’eau')
         self.assertEqual(ligne_manuelle.price_unit, -5.0)
 
+    def test_edition_du_mesure_non_lisse_recompose_le_brouillon(self):
+        """Suivi de review #271 : le mesuré est exempt du verrou (vivant, ADR
+        0030) et un non-lissé non tamponné le facture en direct — sa saisie
+        manuelle (« estimations quand le flux Enedis manque », CONTEXT.md)
+        doit se refléter en live dans le brouillon, comme une provision."""
+        periode = self.create_test_periode(self.souscription_base, energie_base_kwh=100.0)
+        self.assertFalse(periode.lisse_periode)
+        facture = periode._creer_facture()
+        ligne = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie Base')
+        self.assertEqual(ligne.quantity, 100.0)
+
+        periode.write({'energie_base_kwh': 130.0})  # estimation corrigée à la main
+
+        ligne = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie Base')
+        self.assertEqual(ligne.quantity, 130.0, 'le mesuré corrigé se reflète en live dans le brouillon')
+
     def test_edition_periode_sans_brouillon_ne_leve_rien(self):
         """Non-régression : éditer une Période sans aucune Facture liée reste
         un no-op côté régénération (rien à recomposer)."""

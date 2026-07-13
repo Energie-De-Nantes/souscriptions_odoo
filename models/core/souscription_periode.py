@@ -379,6 +379,25 @@ class SouscriptionPeriode(models.Model):
         }
     )
 
+    # Champs du MESURÉ que la composition des lignes lit (suivi de review
+    # #271) : exclus du verrou (mesuré vivant, ADR 0030) mais leur écriture
+    # recompose un brouillon lié — un non-lissé non tamponné facture le mesuré
+    # en direct (`_quantite_facturee`), les notes TURPE lisent `turpe_*`, et
+    # les 4 cadrans saisonniers recalculent HP/HC (compute stocké).
+    _CHAMPS_MESURE_COMPOSES = frozenset(
+        {
+            'energie_base_kwh',
+            'energie_hp_kwh',
+            'energie_hc_kwh',
+            'energie_hph_kwh',
+            'energie_hpb_kwh',
+            'energie_hch_kwh',
+            'energie_hcb_kwh',
+            'turpe_fixe',
+            'turpe_variable',
+        }
+    )
+
     def _est_facturee_emise(self):
         """Condition **dérivée** du gel (#267 — brouillon gouverné, ADR 0006/
         0007 amendés, ADR 0032) : cette Période est-elle verrouillée ?
@@ -419,10 +438,16 @@ class SouscriptionPeriode(models.Model):
         RÉUSSIE d'un champ facturable — la Période est donc dans sa fenêtre
         brouillon, avec ou sans brouillon de Facture lié — recompose les
         lignes générées de ce brouillon, pour que le·la facturiste voie tout
-        de suite l'effet de sa correction. Contexte `souscription_tampon_emission`
-        (posé uniquement par `_tamponner_provision`) : la re-génération de
-        `account.move._post()` suit immédiatement le tampon dans le même
-        événement d'émission, inutile de la déclencher deux fois."""
+        de suite l'effet de sa correction. Le MESURÉ composé
+        (`_CHAMPS_MESURE_COMPOSES`) déclenche la même recomposition sans être
+        verrouillé (suivi de review #271) : un non-lissé non tamponné facture
+        le mesuré en direct (`_quantite_facturee`) et les notes TURPE lisent
+        `turpe_*` — la saisie manuelle d'estimations doit se refléter en live,
+        pas seulement au prochain pull ou à l'émission. Contexte
+        `souscription_tampon_emission` (posé uniquement par
+        `_tamponner_provision`) : la re-génération de `account.move._post()`
+        suit immédiatement le tampon dans le même événement d'émission,
+        inutile de la déclencher deux fois."""
         champs_geles = self._LOCKED_FIELDS.intersection(vals)
         if champs_geles and not self.env.context.get('regularisation_tampon'):
             for periode in self:
@@ -432,7 +457,8 @@ class SouscriptionPeriode(models.Model):
                         'Corrigez par un avoir ou par une régularisation.'
                     )
         resultat = super().write(vals)
-        if champs_geles and not self.env.context.get('souscription_tampon_emission'):
+        champs_recomposes = champs_geles or self._CHAMPS_MESURE_COMPOSES.intersection(vals)
+        if champs_recomposes and not self.env.context.get('souscription_tampon_emission'):
             for periode in self:
                 if periode.facture_id.state == 'draft':
                     periode.facture_id._recomposer_lignes_generees()
@@ -795,11 +821,11 @@ class SouscriptionPeriode(models.Model):
         `souscription.releve`, jamais contourné ici) et `releve_ids` est
         absent des vals, donc intact.
 
-        Régénération au fil de l'eau (#267, point d'entrée (a)) : si cette
-        Période porte un brouillon de Facture, il est recomposé après le
-        write — le facturiste voit tout de suite le mesuré rafraîchi reflété
-        dans les lignes (énergie non tamponnée encore lue en direct par
-        `_quantite_facturee`, tant que le brouillon n'a pas été émis)."""
+        Régénération au fil de l'eau (#267, point d'entrée (a)) : le `write()`
+        du mesuré déclenche lui-même la recomposition d'un brouillon lié
+        (`_CHAMPS_MESURE_COMPOSES`, suivi de review #271) — les vals
+        d'atterrissage portent toujours les énergies/TURPE, un seul mécanisme
+        suffit, plus d'appel explicite ici."""
         self.ensure_one()
         vals = self._vals_atterrissage_v3(meta)
         if not self._est_facturee_emise():
@@ -807,8 +833,6 @@ class SouscriptionPeriode(models.Model):
                 (0, 0, self._releve_vals_depuis_objet(releve)) for releve in (meta.releves_utilises or [])
             ]
         self.write(vals)
-        if self.facture_id.state == 'draft':
-            self.facture_id._recomposer_lignes_generees()
 
     def _est_periode_cloture(self):
         """Cette Période est-elle la Période de clôture de sa Souscription —

@@ -59,6 +59,22 @@ class AccountMove(models.Model):
         for move in self:
             move.is_facture_energie = bool((move.periode_id or move.regularisation_id) and move.souscription_id)
 
+    def _post(self, soft=True):
+        """Tampon d'émission (ADR 0030 décision 4, tranche 6 du PRD #231,
+        #238) : à l'émission RÉELLE (jamais au brouillon) d'une facture
+        portant `regularisation_id`, la Régularisation solde ses mensuelles
+        couvertes (`souscription.regularisation._solder_provisions`) —
+        provision += écart figé, trace posée, écart nul par construction.
+
+        `super()._post()` ne rend que les moves réellement passés à l'état
+        posté (les moves programmés dans le futur avec ``soft=True`` restent
+        en brouillon) : filtrer sur son résultat, pas sur ``self``, exclut
+        naturellement ce cas sans logique dédiée."""
+        posted = super()._post(soft=soft)
+        for move in posted.filtered(lambda m: m.regularisation_id):
+            move.regularisation_id._solder_provisions()
+        return posted
+
     def _get_report_base_filename(self):
         """Nom de fichier personnalisé pour les factures d'énergie"""
         self.ensure_one()

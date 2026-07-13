@@ -36,6 +36,7 @@ from . import (
     test_refacturation,
     test_regularisation,
     test_regularisation_facture,
+    test_regularisation_tampon,
     test_releve,
     test_releve_demo,
     test_res_partner,

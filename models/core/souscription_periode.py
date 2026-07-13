@@ -247,6 +247,20 @@ class SouscriptionPeriode(models.Model):
         'exclu des candidats de la Régularisation du nouveau système.',
     )
 
+    # Trace du tampon d'émission (ADR 0030 décision 4, tranche 6 #238) : posée
+    # par `souscription.regularisation._solder_provisions()` sur CHAQUE
+    # mensuelle couverte par la Régularisation émise — écart nul compris (une
+    # mensuelle sans écart à ce tour-ci reçoit quand même la trace, tampon
+    # +=0). « La trace pointe la dernière » : un mesuré raffiné après solde
+    # fait renaître l'écart pour une régul suivante, qui écrase ce lien.
+    # Jamais posée avant l'émission (brouillon régul, facture non postée).
+    regularisation_id = fields.Many2one(
+        'souscription.regularisation',
+        string='Régularisation (dernier solde)',
+        readonly=True,
+        help="Dernière Régularisation dont l'émission a tamponné la provision de cette Période.",
+    )
+
     @api.depends('move_ids.move_type')
     def _compute_facture_id(self):
         for periode in self:
@@ -363,8 +377,16 @@ class SouscriptionPeriode(models.Model):
         #107, Période d'ouverture sans move) —, ses champs facturables sont
         figés et toute réécriture est rejetée (UserError, y compris via RPC).
         Pour corriger : supprimer la facture (ce qui dé-fige la période) ou
-        émettre une régularisation."""
-        if self._LOCKED_FIELDS.intersection(vals):
+        émettre une régularisation.
+
+        Exemption ciblée : le contexte `regularisation_tampon` (posé
+        uniquement par `souscription.regularisation._solder_provisions()`,
+        ADR 0030 décision 4) contourne ce verrou pour `provision_*_kwh` — seul
+        canal qui réécrit la provision d'une Période déjà facturée, à
+        l'émission d'une facture de régularisation qui la porte. Aucun autre
+        appelant ne pose ce contexte ; le pull et l'édition manuelle restent
+        bloqués."""
+        if self._LOCKED_FIELDS.intersection(vals) and not self.env.context.get('regularisation_tampon'):
             for periode in self:
                 if periode.facture_id or periode.facture_legacy_ref:
                     raise UserError(

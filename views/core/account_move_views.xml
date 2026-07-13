@@ -22,4 +22,37 @@
         parent="menu_souscription_root"
         action="action_facture_reglements_attente"
         sequence="45"/>
+
+    <!-- Enforcement doux de la provenance (#266, tranche 2 du PRD #264, ADR
+         0014 amendé) : les cellules des lignes GÉNÉRÉES (Période,
+         Régularisation, Refacturations rassemblées — `souscription_ligne_generee`)
+         deviennent non éditables dans le formulaire — mécanisme Odoo 19
+         standard (readonly conditionnel par champ dans la sous-liste),
+         JAMAIS une surcharge de write(). Les lignes manuelles du·de la
+         facturiste (flag à False) restent éditables et supprimables : seul
+         le champ produit/libellé/quantité/prix — ce que la composition
+         écrit — est concerné, pas la ligne entière (les sections/notes
+         générées n'ont, de toute façon, que `name` d'éditable). -->
+    <record id="view_move_form_lignes_generees_readonly" model="ir.ui.view">
+        <field name="name">account.move.form.lignes.generees.readonly</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='invoice_line_ids']//field[@name='product_id']" position="before">
+                <field name="souscription_ligne_generee" column_invisible="1"/>
+            </xpath>
+            <xpath expr="//field[@name='invoice_line_ids']//field[@name='product_id']" position="attributes">
+                <attribute name="readonly">souscription_ligne_generee</attribute>
+            </xpath>
+            <xpath expr="//field[@name='invoice_line_ids']//field[@name='name']" position="attributes">
+                <attribute name="readonly">souscription_ligne_generee</attribute>
+            </xpath>
+            <xpath expr="//field[@name='invoice_line_ids']//field[@name='quantity']" position="attributes">
+                <attribute name="readonly">souscription_ligne_generee</attribute>
+            </xpath>
+            <xpath expr="//field[@name='invoice_line_ids']//field[@name='price_unit']" position="attributes">
+                <attribute name="readonly">souscription_ligne_generee</attribute>
+            </xpath>
+        </field>
+    </record>
 </odoo>

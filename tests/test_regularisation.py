@@ -280,6 +280,23 @@ class TestRegularisationCandidats(SouscriptionsTestCase):
 
 
 @tagged('souscriptions', 'souscriptions_regularisation', 'post_install', '-at_install')
+class TestRegularisationBouton(SouscriptionsTestCase):
+    """Bouton « Régulariser » sur la Souscription : trouve ou crée le
+    brouillon puis délègue le recalcul (#236)."""
+
+    def test_action_regulariser_trouve_ou_cree_le_brouillon(self):
+        self.assertFalse(self.souscription_base.regularisation_ids)
+
+        self.souscription_base.action_regulariser()
+        self.assertEqual(len(self.souscription_base.regularisation_ids), 1)
+        premiere = self.souscription_base.regularisation_ids
+
+        self.souscription_base.action_regulariser()
+        self.assertEqual(len(self.souscription_base.regularisation_ids), 1, 'jamais un second brouillon')
+        self.assertEqual(self.souscription_base.regularisation_ids, premiere)
+
+
+@tagged('souscriptions', 'souscriptions_regularisation', 'post_install', '-at_install')
 class TestRegularisationVuesEtSecurite(SouscriptionsTestCase):
     """Sécurité/vues du nouveau modèle (dernier point de l'AC #236)."""
 

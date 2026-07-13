@@ -10,6 +10,10 @@
                             string="Résoudre la RSC maintenant"
                             type="object"
                             invisible="etat != 'en_instance'"/>
+                    <button name="action_regulariser"
+                            string="Régulariser"
+                            type="object"
+                            invisible="etat == 'en_instance'"/>
                     <field name="etat" widget="statusbar" readonly="1"/>
                 </header>
                 <sheet>
@@ -18,6 +22,10 @@
                     <div class="oe_button_box" name="button_box">
                         <button class="oe_stat_button" type="object" name="action_voir_factures" icon="fa-pencil-square-o">
                             <field name="facture_count" widget="statinfo" string="Factures"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_regulariser" icon="fa-balance-scale"
+                                invisible="not regularisation_count">
+                            <field name="regularisation_count" widget="statinfo" string="Régularisations"/>
                         </button>
                         <button class="oe_stat_button" type="object" name="action_apercu_portail" icon="fa-globe">
                             <div class="o_stat_info">

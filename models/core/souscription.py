@@ -39,6 +39,8 @@ class Souscription(models.Model):
     facture_count = fields.Integer(string='Nombre de factures', compute='_compute_facture_count')
     periode_ids = fields.One2many('souscription.periode', 'souscription_id', string='Périodes de facturation')
     refacturation_ids = fields.One2many('souscription.refacturation', 'souscription_id', string='Refacturations')
+    regularisation_ids = fields.One2many('souscription.regularisation', 'souscription_id', string='Régularisations')
+    regularisation_count = fields.Integer(string='Nombre de régularisations', compute='_compute_regularisation_count')
     consentement_ids = fields.One2many('souscription.consentement', 'souscription_id', string='Journal des actes')
     # Données métier
 
@@ -414,6 +416,31 @@ class Souscription(models.Model):
     def _compute_facture_count(self):
         for sous in self:
             sous.facture_count = len(sous.facture_ids)
+
+    @api.depends('regularisation_ids')
+    def _compute_regularisation_count(self):
+        for sous in self:
+            sous.regularisation_count = len(sous.regularisation_ids)
+
+    def action_regulariser(self):
+        """Bouton « Régulariser » (#236, tranche 4 du PRD #231) : trouve ou
+        crée la Régularisation brouillon de cette Souscription puis la
+        recalcule (refresh du mesuré + candidats, ADR 0030 décision 4) —
+        recalculable à volonté, jamais deux brouillons pour une même
+        Souscription tant qu'aucune n'est émise (tranche 5, #237, pas encore
+        de champ d'état)."""
+        self.ensure_one()
+        regularisation = self.regularisation_ids[:1]
+        if not regularisation:
+            regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.id})
+        regularisation._recalculer()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Régularisation',
+            'res_model': 'souscription.regularisation',
+            'res_id': regularisation.id,
+            'view_mode': 'form',
+        }
 
     def action_voir_factures(self):
         """Bouton stat « N Factures » de la button box (#199) : ouvre la liste

@@ -10,10 +10,6 @@
                             string="Résoudre la RSC maintenant"
                             type="object"
                             invisible="etat != 'en_instance'"/>
-                    <button name="action_regulariser"
-                            string="Régulariser"
-                            type="object"
-                            invisible="etat == 'en_instance'"/>
                     <field name="etat" widget="statusbar" readonly="1"/>
                 </header>
                 <sheet>
@@ -23,8 +19,10 @@
                         <button class="oe_stat_button" type="object" name="action_voir_factures" icon="fa-pencil-square-o">
                             <field name="facture_count" widget="statinfo" string="Factures"/>
                         </button>
+                        <!-- Entrée unique de la régularisation (#236) : trouve ou crée le
+                             brouillon — le header reste réservé à la RSC (refonte #246). -->
                         <button class="oe_stat_button" type="object" name="action_regulariser" icon="fa-balance-scale"
-                                invisible="not regularisation_count">
+                                invisible="etat == 'en_instance'">
                             <field name="regularisation_count" widget="statinfo" string="Régularisations"/>
                         </button>
                         <button class="oe_stat_button" type="object" name="action_apercu_portail" icon="fa-globe">

@@ -1,5 +1,5 @@
 from odoo import api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError
 
 
 class SouscriptionReleve(models.Model):
@@ -27,8 +27,9 @@ class SouscriptionReleve(models.Model):
     # Bi-parent (ADR 0030 décision 5, amende ADR-0004) : un relevé frais posé
     # en justificatif d'une Régularisation n'a pas de Période propre (la
     # Régularisation n'en porte aucune, ADR 0030 décision 3). `periode_id`
-    # devient donc optionnel ; la contrainte `_check_parent_exclusif`
-    # ci-dessous impose « exactement un » des deux parents.
+    # devient donc optionnel ; la contrainte SQL ci-dessous impose
+    # « exactement un » des deux parents — en SQL et non en `@api.constrains`,
+    # qui ne se déclenche pas quand un create omet les deux champs.
     regularisation_id = fields.Many2one(
         'souscription.regularisation',
         string='Régularisation',
@@ -36,13 +37,10 @@ class SouscriptionReleve(models.Model):
         index=True,
     )
 
-    @api.constrains('periode_id', 'regularisation_id')
-    def _check_parent_exclusif(self):
-        for releve in self:
-            if bool(releve.periode_id) == bool(releve.regularisation_id):
-                raise ValidationError(
-                    'Un relevé porte exactement un parent : une Période ou une Régularisation, jamais les deux ni aucun.'
-                )
+    _parent_exclusif = models.Constraint(
+        'CHECK ((periode_id IS NULL) != (regularisation_id IS NULL))',
+        'Un relevé porte exactement un parent : une Période ou une Régularisation, jamais les deux ni aucun.',
+    )
 
     # Calendrier de comptage de la Période (ADR 0005) : pilote les colonnes
     # d'index pertinentes à la saisie / à l'affichage.

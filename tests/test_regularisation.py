@@ -19,6 +19,8 @@ from unittest.mock import MagicMock
 
 from odoo.exceptions import ValidationError
 from odoo.tests.common import tagged
+from odoo.tools import mute_logger
+from psycopg2 import IntegrityError
 
 from .common import (
     SouscriptionsTestCase,
@@ -334,14 +336,17 @@ class TestRegularisationLiens(SouscriptionsTestCase):
         self.assertIn(releve, regularisation.releve_ids)
         self.assertFalse(releve.periode_id)
 
+    # Contrainte SQL (pas un `@api.constrains`, qui ne se déclencherait pas
+    # sur un create omettant les deux parents) : violation à la flush, même
+    # idiome que les tests d'unicité du repo.
     def test_releve_sans_parent_refuse(self):
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(IntegrityError), mute_logger('odoo.sql_db'), self.cr.savepoint():
             self.env['souscription.releve'].create({'date': date(2024, 1, 1), 'nature': 'reel'})
 
     def test_releve_deux_parents_refuse(self):
         periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
         regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.souscription_base.id})
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(IntegrityError), mute_logger('odoo.sql_db'), self.cr.savepoint():
             self.env['souscription.releve'].create(
                 {
                     'periode_id': periode.id,

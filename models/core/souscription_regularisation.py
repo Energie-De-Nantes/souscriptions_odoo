@@ -21,11 +21,13 @@ class SouscriptionRegularisation(models.Model):
         'souscription.souscription', required=True, ondelete='cascade', string='Souscription'
     )
 
-    # Dates couvertes, purement informatives (ADR 0030 décision 4) : dérivées
-    # des lignes construites par `_recalculer()`, jamais une fenêtre stockée
-    # qui bornerait les candidats du prochain recalcul.
-    date_debut = fields.Date(string='Début couvert', compute='_compute_dates_couvertes', store=True)
-    date_fin = fields.Date(string='Fin couverte', compute='_compute_dates_couvertes', store=True)
+    # Dates couvertes, purement informatives (ADR 0030 décision 4) : posées
+    # par `_recalculer()` sur le span des mois EXAMINÉS (verdict connu, non
+    # legacy), écarts nuls compris — le solde couvre tout le span, pas
+    # seulement les mois à écart. Jamais une borne des candidats du prochain
+    # recalcul.
+    date_debut = fields.Date(string='Début couvert', readonly=True)
+    date_fin = fields.Date(string='Fin couverte', readonly=True)
 
     ligne_ids = fields.One2many('souscription.regularisation.ligne', 'regularisation_id', string='Lignes')
 
@@ -41,14 +43,6 @@ class SouscriptionRegularisation(models.Model):
     # candidats, souscription non communicante écartée…) — surface de review
     # du·de la facturiste, même idiome que `wizard.resultat`.
     signalements = fields.Text(string='Signalements', readonly=True)
-
-    @api.depends('ligne_ids.date_debut', 'ligne_ids.date_fin')
-    def _compute_dates_couvertes(self):
-        for regul in self:
-            debuts = regul.ligne_ids.mapped('date_debut')
-            fins = regul.ligne_ids.mapped('date_fin')
-            regul.date_debut = min(debuts) if debuts else False
-            regul.date_fin = max(fins) if fins else False
 
     @api.depends('ligne_ids.montant')
     def _compute_montant_total(self):
@@ -81,7 +75,7 @@ class SouscriptionRegularisation(models.Model):
             lambda p: p.type_periode == 'mensuelle' and (p.facture_id or p.facture_legacy_ref)
         )
         if not facturees:
-            self.signalements = False
+            self.write({'signalements': False, 'date_debut': False, 'date_fin': False})
             return
 
         signalements = []
@@ -95,7 +89,7 @@ class SouscriptionRegularisation(models.Model):
             signalements.append(
                 f'{souscription.name} : compteur non communicant, régularisation écartée (hors périmètre v1, ADR 0030).'
             )
-            self.signalements = '\n'.join(signalements)
+            self.write({'signalements': '\n'.join(signalements), 'date_debut': False, 'date_fin': False})
             return
 
         # Rafraîchit le mesuré (scope régul de la tranche 2, #235) avant de
@@ -111,6 +105,7 @@ class SouscriptionRegularisation(models.Model):
                 fraiches.add(mois)
 
         groupes = {}
+        couvertes = self.env['souscription.periode']
         Grille = self.env['grille.prix']
         for periode in facturees.sorted('mois'):
             if periode.qualite not in ('réelle', 'estimée'):
@@ -118,6 +113,7 @@ class SouscriptionRegularisation(models.Model):
                 continue
             if periode.legacy_regularisee:
                 continue  # déjà soldée en legacy : exclusion silencieuse, pas une anomalie
+            couvertes |= periode  # examiné = couvert, écart nul compris
 
             cadrans = Grille._CADRANS_FACTURES.get(periode.type_tarif_periode, [])
             ecarts = {cadran: getattr(periode, f'ecart_{cadran}_kwh') for cadran, _label in cadrans}
@@ -169,7 +165,14 @@ class SouscriptionRegularisation(models.Model):
                 )
             )
 
-        self.write({'ligne_ids': lignes_vals, 'signalements': '\n'.join(signalements)})
+        self.write(
+            {
+                'ligne_ids': lignes_vals,
+                'signalements': '\n'.join(signalements),
+                'date_debut': min(couvertes.mapped('date_debut')) if couvertes else False,
+                'date_fin': max(couvertes.mapped('date_fin')) if couvertes else False,
+            }
+        )
 
 
 class SouscriptionRegularisationLigne(models.Model):

@@ -10,6 +10,8 @@ La Période est **purement mensuelle** : `type_periode` ne porte plus que
 `models.Constraint` UNIQUE ordinaire (plus d'index partiel scopé au type).
 """
 
+import os
+import runpy
 from datetime import date
 
 from odoo.tests.common import tagged
@@ -62,3 +64,45 @@ class TestPeriodeMoisCanonique(SouscriptionsTestCase):
     # scopée aux seules mensuelles) sont retirés : sans objet depuis que
     # `type_periode` ne porte plus que `mensuelle` (#239) — on ne peut plus
     # créer de période 'regularisation'/'ajustement' via l'ORM (Selection).
+
+
+@tagged('souscriptions', 'souscriptions_mois', 'post_install', '-at_install')
+class TestMigrationTypesPeriodeMorts(SouscriptionsTestCase):
+    """AC1 : garde de nettoyage (migrations/19.0.1.15.0/pre-migrate.py) —
+    l'upgrade échoue bruyamment si une Période porte encore un type mort.
+    Écrit en SQL brut (`cr.execute`) : ces valeurs ne sont plus dans la
+    sélection Python, l'ORM les refuserait à la création (même idiome que
+    `test_migration_energie_facturee.py`, script chargé par chemin via
+    `runpy` — le dossier de version n'est pas un identifiant Python)."""
+
+    @staticmethod
+    def _migrer(cr):
+        chemin = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'migrations', '19.0.1.15.0', 'pre-migrate.py')
+        module = runpy.run_path(chemin)
+        module['migrate'](cr, None)
+
+    def _periode(self, souscription, **vals):
+        base = {
+            'souscription_id': souscription.id,
+            'date_debut': date(2024, 3, 1),
+            'date_fin': date(2024, 4, 1),
+            'type_periode': 'mensuelle',
+        }
+        base.update(vals)
+        return self.env['souscription.periode'].create(base)
+
+    def test_type_mort_leve_bruyamment(self):
+        """Une ligne portant encore 'regularisation'/'ajustement' fait
+        échouer l'upgrade bruyamment plutôt que d'être absorbée en silence."""
+        periode = self._periode(self.souscription_base)
+        self.env.cr.execute(
+            "UPDATE souscription_periode SET type_periode = 'regularisation' WHERE id = %s", (periode.id,)
+        )
+        with self.assertRaises(Exception):
+            self._migrer(self.env.cr)
+
+    def test_aucune_donnee_morte_ne_leve_rien(self):
+        """Sans ligne portant un type mort (le cas nominal, #239), la garde
+        est un no-op — l'upgrade se poursuit normalement."""
+        self._periode(self.souscription_base)
+        self._migrer(self.env.cr)  # ne lève rien

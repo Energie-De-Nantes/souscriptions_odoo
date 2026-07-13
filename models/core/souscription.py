@@ -424,13 +424,14 @@ class Souscription(models.Model):
 
     def action_regulariser(self):
         """Bouton « Régulariser » (#236, tranche 4 du PRD #231) : trouve ou
-        crée la Régularisation brouillon de cette Souscription puis la
+        crée la Régularisation **brouillon** de cette Souscription puis la
         recalcule (refresh du mesuré + candidats, ADR 0030 décision 4) —
-        recalculable à volonté, jamais deux brouillons pour une même
-        Souscription tant qu'aucune n'est émise (tranche 5, #237, pas encore
-        de champ d'état)."""
+        recalculable à volonté, jamais deux brouillons simultanés. Une fois
+        une Régularisation facturée (`etat == 'facturee'`, tranche 5, #237),
+        elle est verrouillée (`_recalculer` refuse) : ce bouton en ouvre alors
+        une **nouvelle** plutôt que de heurter le verrou."""
         self.ensure_one()
-        regularisation = self.regularisation_ids[:1]
+        regularisation = self.regularisation_ids.filtered(lambda r: r.etat == 'brouillon')[:1]
         if not regularisation:
             regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.id})
         regularisation._recalculer()

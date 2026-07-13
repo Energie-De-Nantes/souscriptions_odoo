@@ -1,17 +1,20 @@
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
 
 class SouscriptionRegularisation(models.Model):
-    """Régularisation (solde) — CONTEXT.md, ADR 0030 décisions 3-4, tranche 4
-    du PRD #231. Même motif que la Refacturation (ADR 0009) : modèle
-    indépendant de la Période, rassemblé sur une Facture (tranche 5, #237).
+    """Régularisation (solde) — CONTEXT.md, ADR 0030 décisions 3-4, tranches 4
+    et 5 du PRD #231. Même motif que la Refacturation (ADR 0009) : modèle
+    indépendant de la Période, rassemblé sur une Facture.
 
     En-tête par Souscription : dates couvertes **informatives** (dérivées des
     lignes, jamais une fenêtre stockée — les candidats se sélectionnent par
     l'écart et le verdict, ADR 0030 décision 4) + lignes **typées** (une par
-    grille × cadran). Toujours en brouillon dans cette tranche : ni génération
-    de facture (tranche 5, #237) ni tampon de l'énergie facturée (tranche 6,
-    #238) — `_recalculer()` ne fait que (re)construire les lignes, à volonté.
+    grille × cadran). `_recalculer()` (re)construit les lignes, à volonté —
+    mais refuse dès qu'une Facture existe (``facture_id``, tranche 5, #237) :
+    l'« état facturée » dérivé du lien **verrouille** le recalcul, faute de
+    quoi la Facture divergerait silencieusement des lignes qui l'ont projetée.
+    Le tampon de l'énergie facturée (tranche 6, #238) reste hors périmètre.
     """
 
     _name = 'souscription.regularisation'
@@ -44,10 +47,45 @@ class SouscriptionRegularisation(models.Model):
     # du·de la facturiste, même idiome que `wizard.resultat`.
     signalements = fields.Text(string='Signalements', readonly=True)
 
+    # Lien Régularisation ↔ Facture (ADR 0030 décision 5) : `account.move.
+    # regularisation_id` est l'unique source de vérité (même motif que
+    # `souscription.periode.facture_id`/`move_ids`, ADR 0004) ; `facture_id`
+    # en est dérivé. La Facture peut être un avoir (`out_refund`, net négatif,
+    # tranche 5 #237) — les deux types comptent comme « facturée ».
+    move_ids = fields.One2many('account.move', 'regularisation_id', string='Documents liés', readonly=True)
+    facture_id = fields.Many2one(
+        'account.move',
+        string='Facture (ou avoir)',
+        compute='_compute_facture_id',
+        store=True,
+        help='Facture (out_invoice) ou avoir (out_refund) projeté depuis cette Régularisation.',
+    )
+
+    # État dérivé du lien (aucun champ saisi, CONTEXT.md « Régularisation
+    # (solde) ») : « facturée » dès qu'une Facture référence cette
+    # Régularisation — verrouille alors `_recalculer()` (tranche 5, #237).
+    etat = fields.Selection(
+        [('brouillon', 'Brouillon'), ('facturee', 'Facturée')],
+        string='État',
+        compute='_compute_etat',
+        store=True,
+    )
+
     @api.depends('ligne_ids.montant')
     def _compute_montant_total(self):
         for regul in self:
             regul.montant_total = sum(regul.ligne_ids.mapped('montant'))
+
+    @api.depends('move_ids.move_type')
+    def _compute_facture_id(self):
+        for regul in self:
+            factures = regul.move_ids.filtered(lambda m: m.move_type in ('out_invoice', 'out_refund'))
+            regul.facture_id = factures[:1]
+
+    @api.depends('facture_id')
+    def _compute_etat(self):
+        for regul in self:
+            regul.etat = 'facturee' if regul.facture_id else 'brouillon'
 
     def action_recalculer(self):
         self.ensure_one()
@@ -66,8 +104,21 @@ class SouscriptionRegularisation(models.Model):
     def _recalculer(self):
         """(Re)construit les lignes depuis les mois candidats — supprime les
         lignes existantes puis reconstruit entièrement (idempotent à données
-        constantes, AC #236)."""
+        constantes, AC #236).
+
+        Refuse dès qu'une Facture existe (``facture_id``, tranche 5, #237) :
+        une Régularisation facturée est verrouillée, au même titre qu'une
+        Période facturée (#14) — recalculer romprait silencieusement le lien
+        entre les lignes projetées et le document légal déjà émis. Pour
+        corriger : supprimer la Facture (ce qui dé-fige la Régularisation) ou
+        émettre une nouvelle Régularisation.
+        """
         self.ensure_one()
+        if self.facture_id:
+            raise UserError(
+                f'{self.souscription_id.name} : régularisation déjà facturée, recalcul interdit. '
+                'Supprimez la facture pour corriger, ou créez une nouvelle régularisation.'
+            )
         souscription = self.souscription_id
         self.ligne_ids.unlink()
 
@@ -136,6 +187,11 @@ class SouscriptionRegularisation(models.Model):
                         'ecart': 0.0,
                         'periode_ids': [],
                         'detail': [],
+                        # Snapshot du premier mois du groupe (ADR 0006) : le
+                        # solidaire est structurel à la Souscription (ne
+                        # change pas en cours de route), figé ici pour que la
+                        # projection facture (tranche 5, #237) choisisse le
+                        # bon produit du catalogue sans relire les Périodes.
                         'tarif_solidaire': periode.tarif_solidaire_periode,
                         'coeff_pro': periode.coeff_pro_periode,
                     }
@@ -161,6 +217,7 @@ class SouscriptionRegularisation(models.Model):
                         'prix_kwh': prix,
                         'periode_ids': [(6, 0, groupe['periode_ids'])],
                         'detail': '\n'.join(groupe['detail']),
+                        'tarif_solidaire': groupe['tarif_solidaire'],
                     },
                 )
             )
@@ -173,6 +230,101 @@ class SouscriptionRegularisation(models.Model):
                 'date_fin': max(couvertes.mapped('date_fin')) if couvertes else False,
             }
         )
+
+    # === Projection facture (ADR 0030 décision 3, tranche 5 du PRD #231, #237) ===
+    #
+    # La Facture est la PROJECTION des lignes typées, jamais l'inverse (même
+    # motif que la Période, ADR 0006/0029) : une ligne de facture par ligne de
+    # régularisation (grille × cadran — produit résolu par le catalogue,
+    # isolation solidaire respectée, ADR 0013), notes par mois sous chaque
+    # ligne (`detail`, traçabilité gelée dans le document légal). Σ écarts
+    # positif -> facture complémentaire (out_invoice) ; négatif -> avoir
+    # (out_refund) — jamais un document à total négatif posté : les quantités
+    # sont alors inversées pour que le total du document reste positif (le
+    # signe individuel de chaque ligne peut rester négatif, seul le total
+    # compte). Le chèque énergie validé est imputé à la création par la
+    # mécanique partagée avec la mensuelle (`account.move.
+    # _imputer_cheques_energie`, #172).
+
+    def action_creer_facture(self):
+        """Bouton « Facturer » du formulaire brouillon : projette les lignes
+        vers une Facture (ou un avoir) et ouvre le document créé."""
+        self.ensure_one()
+        facture = self._creer_facture()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Facture de régularisation',
+            'res_model': 'account.move',
+            'res_id': facture.id,
+            'view_mode': 'form',
+        }
+
+    def _creer_facture(self):
+        """Émet la Facture (ou l'avoir) de cette Régularisation — projection
+        de `ligne_ids`, une ligne de facture par ligne (grille × cadran),
+        notes par mois sous chacune. Verrouillée dès qu'une Facture existe
+        (même garde que `_recalculer`) ; refuse aussi une Régularisation sans
+        ligne (rien à facturer)."""
+        self.ensure_one()
+        if self.facture_id:
+            raise UserError(f'{self.souscription_id.name} : régularisation déjà facturée.')
+        if not self.ligne_ids:
+            raise UserError(
+                f'{self.souscription_id.name} : aucune ligne à facturer. Recalculez la régularisation avant de facturer.'
+            )
+
+        # Net négatif -> avoir, jamais de document à total négatif posté
+        # (AC #237) : les quantités sont inversées pour que le total du
+        # document reste positif — le signe d'une ligne individuelle peut
+        # rester négatif (deux grilles/cadrans peuvent varier en sens
+        # opposé), seul le total compte.
+        avoir = self.montant_total < 0.0
+        signe = -1.0 if avoir else 1.0
+
+        lignes_vals = [(0, 0, {'display_type': 'line_section', 'name': 'Régularisation'})]
+        Produit = self.env['souscription.produit']
+        for ligne in self.ligne_ids:
+            produit = Produit.produit_energie(ligne.cadran, ligne.tarif_solidaire)
+            lignes_vals.append(
+                (
+                    0,
+                    0,
+                    {
+                        'product_id': produit.id,
+                        'name': produit.name,
+                        'quantity': signe * ligne.ecart_kwh,
+                        'price_unit': ligne.prix_kwh,
+                    },
+                )
+            )
+            for mois_ligne in (ligne.detail or '').splitlines():
+                if mois_ligne:
+                    lignes_vals.append((0, 0, {'display_type': 'line_note', 'name': mois_ligne}))
+
+        facture = self.env['account.move'].create(
+            {
+                'move_type': 'out_refund' if avoir else 'out_invoice',
+                'partner_id': self.souscription_id.partner_id.id,
+                'invoice_date': self.date_fin,
+                'regularisation_id': self.id,
+                'invoice_line_ids': lignes_vals,
+            }
+        )
+        facture._imputer_cheques_energie()
+        return facture
+
+    def releve_colonnes(self):
+        """Colonnes d'index réseau (`label`, `field`) pour le justificatif des
+        relevés **de cette Régularisation** (bi-parent, ADR 0030 décision 5) —
+        variante de `souscription.periode.releve_colonnes()` (#138), même
+        mapping cadran → colonne (source unique, lu sur `souscription.periode`
+        plutôt que dupliqué). Pas de repli `config_cadrans` : contrairement à
+        la Période, la Régularisation n'en porte pas — seules les familles
+        réellement présentes dans `releve_ids` comptent."""
+        self.ensure_one()
+        Periode = self.env['souscription.periode']
+        presentes = [f for f in Periode._FAMILLES if any(Periode._famille_non_vide(r, f) for r in self.releve_ids)]
+        return [colonne for famille in presentes for colonne in Periode._RELEVE_COLONNES[famille]]
 
 
 class SouscriptionRegularisationLigne(models.Model):
@@ -202,6 +354,13 @@ class SouscriptionRegularisationLigne(models.Model):
     ecart_kwh = fields.Float(string='Écart (kWh)')
     prix_kwh = fields.Float(string='Prix (€/kWh)', digits=(16, 6))
     montant = fields.Float(string='Montant (€)', compute='_compute_montant', store=True)
+
+    # Snapshot du tarif solidaire (ADR 0013) au moment du calcul des
+    # candidats — le solidaire choisit le *Produit de facturation* (compte +
+    # TVA isolés) à la projection facture (tranche 5, #237) ; figé ici plutôt
+    # que relu sur la Souscription live, même logique de snapshot que la
+    # Période (ADR 0006).
+    tarif_solidaire = fields.Boolean(string='Tarif solidaire (snapshot)', readonly=True)
 
     # Mois agrégés dans cette ligne — support du détail et du signalement
     # « estimation locale » (mois conservé au refresh, ADR 0030 décision 1).

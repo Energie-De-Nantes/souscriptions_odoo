@@ -11,7 +11,10 @@
             <form>
                 <header>
                     <button name="action_recalculer" type="object" string="Recalculer"
-                            class="btn-primary"/>
+                            class="btn-primary" invisible="etat == 'facturee'"/>
+                    <button name="action_creer_facture" type="object" string="Facturer"
+                            class="btn-primary" invisible="etat == 'facturee'"/>
+                    <field name="etat" widget="statusbar" readonly="1"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -24,6 +27,7 @@
                             <field name="date_debut"/>
                             <field name="date_fin"/>
                             <field name="montant_total"/>
+                            <field name="facture_id" invisible="not facture_id"/>
                         </group>
                     </group>
                     <field name="signalements" invisible="not signalements"/>
@@ -71,6 +75,7 @@
                 <field name="date_debut"/>
                 <field name="date_fin"/>
                 <field name="montant_total" sum="Total"/>
+                <field name="etat"/>
             </list>
         </field>
     </record>

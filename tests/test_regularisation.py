@@ -17,7 +17,7 @@ from datetime import date
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests.common import tagged
 from odoo.tools import mute_logger
 from psycopg2 import IntegrityError
@@ -62,7 +62,7 @@ def _meta_stub(**kwargs):
 class TestRegularisationCandidats(SouscriptionsTestCase):
     """Calcul des candidats et ventilation des lignes (`_recalculer`)."""
 
-    def _souscription_lissee(self, ref='RSC-REGUL', pdl='PDL_REGUL', provision=200.0):
+    def _souscription_lissee(self, ref='RSC-REGUL', pdl='PDL_REGUL', provision=200.0, tarif_solidaire=False):
         return self.env['souscription.souscription'].create(
             {
                 'partner_id': self.partner_test.id,
@@ -74,6 +74,7 @@ class TestRegularisationCandidats(SouscriptionsTestCase):
                 'provision_mensuelle_kwh': provision,
                 'regime_prix': 'moulin',  # regime dédié : n'entre pas en collision
                 'ref_situation_contractuelle': ref,
+                'tarif_solidaire': tarif_solidaire,
             }
         )
 
@@ -137,6 +138,21 @@ class TestRegularisationCandidats(SouscriptionsTestCase):
         self.assertEqual(regularisation.date_debut, date(2024, 1, 1))
         self.assertEqual(regularisation.date_fin, date(2025, 1, 1))
         self.assertAlmostEqual(regularisation.montant_total, 30.0, places=2)
+        self.assertFalse(ligne.tarif_solidaire, 'snapshot standard par défaut')
+
+    def test_ac1bis_tarif_solidaire_snapshotte_sur_la_ligne(self):
+        """Le solidaire (ADR 0013) est figé sur la ligne au calcul des
+        candidats — support du choix du produit de facturation à la
+        projection facture (tranche 5, #237), sans relire la Souscription."""
+        souscription = self._souscription_lissee(ref='RSC-REGUL-AC1BIS', pdl='PDL_REGUL_AC1BIS', tarif_solidaire=True)
+        self._grille_moulin(name='Grille AC1BIS')
+        self._periode_facturee(souscription, 1, energie_base_kwh=220.0)
+
+        regularisation = self.env['souscription.regularisation'].create({'souscription_id': souscription.id})
+        with patcher_client_fabrique(client_flux_factice('meta_periodes', [])):
+            regularisation._recalculer()
+
+        self.assertTrue(regularisation.ligne_ids.tarif_solidaire)
 
     # --- AC2 : changement de grille en cours d'année ---
 
@@ -298,6 +314,27 @@ class TestRegularisationBouton(SouscriptionsTestCase):
         self.assertEqual(len(self.souscription_base.regularisation_ids), 1, 'jamais un second brouillon')
         self.assertEqual(self.souscription_base.regularisation_ids, premiere)
 
+    def test_action_regulariser_nouveau_brouillon_si_la_precedente_est_facturee(self):
+        """Une fois la Régularisation facturée (verrouillée, tranche 5 #237),
+        le bouton en ouvre une nouvelle plutôt que de heurter le verrou de
+        `_recalculer`."""
+        self.souscription_base.action_regulariser()
+        premiere = self.souscription_base.regularisation_ids
+        self.env['account.move'].create(
+            {
+                'move_type': 'out_invoice',
+                'partner_id': self.partner_test.id,
+                'regularisation_id': premiere.id,
+            }
+        )
+        self.assertEqual(premiere.etat, 'facturee')
+
+        self.souscription_base.action_regulariser()
+
+        self.assertEqual(len(self.souscription_base.regularisation_ids), 2)
+        nouvelle = self.souscription_base.regularisation_ids - premiere
+        self.assertEqual(nouvelle.etat, 'brouillon')
+
 
 @tagged('souscriptions', 'souscriptions_regularisation', 'post_install', '-at_install')
 class TestRegularisationLiens(SouscriptionsTestCase):
@@ -374,3 +411,38 @@ class TestRegularisationVuesEtSecurite(SouscriptionsTestCase):
         for model_name in ('souscription.regularisation', 'souscription.regularisation.ligne'):
             accesses = self.env['ir.model.access'].search([('model_id.model', '=', model_name)])
             self.assertTrue(accesses, f'ACL manquante pour {model_name}')
+
+
+@tagged('souscriptions', 'souscriptions_regularisation', 'post_install', '-at_install')
+class TestRegularisationEtatEtVerrou(SouscriptionsTestCase):
+    """État dérivé du lien facture + verrou du recalcul (tranche 5, #237) —
+    même motif que le verrou de facturation de la Période (#14)."""
+
+    def test_brouillon_par_defaut_sans_facture(self):
+        regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.souscription_base.id})
+        self.assertEqual(regularisation.etat, 'brouillon')
+        self.assertFalse(regularisation.facture_id)
+
+    def test_facturee_des_qu_une_facture_ou_un_avoir_reference_la_regularisation(self):
+        regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.souscription_base.id})
+        move = self.env['account.move'].create(
+            {
+                'move_type': 'out_invoice',
+                'partner_id': self.partner_test.id,
+                'regularisation_id': regularisation.id,
+            }
+        )
+        self.assertEqual(regularisation.facture_id, move)
+        self.assertEqual(regularisation.etat, 'facturee')
+
+    def test_recalcul_refuse_tant_que_la_facture_existe(self):
+        regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.souscription_base.id})
+        self.env['account.move'].create(
+            {
+                'move_type': 'out_invoice',
+                'partner_id': self.partner_test.id,
+                'regularisation_id': regularisation.id,
+            }
+        )
+        with self.assertRaises(UserError):
+            regularisation._recalculer()

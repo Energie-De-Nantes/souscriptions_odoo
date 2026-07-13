@@ -43,7 +43,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-FAC-04 ✅ notes de campagne reportées au mois suivant — preuve: tests/test_campagne_notes.py · #159
 - REQ-FAC-05 ✅ pull des méta-périodes electricore, idempotent — propriétaire durable extrait en service (`souscription.pull.meta.periodes.service`), wizard/Campagne en coquilles minces — preuve: tests/test_pull_meta_periodes.py · #77, #233
 - REQ-FAC-06 ✅ énergie par cadran en cascade selon le calendrier de comptage — preuve: tests/test_periode_energie.py · #26
-- REQ-FAC-07 ✅ période mensuelle unique, snapshot figé à la facturation — preuve: tests/test_periode_snapshot.py::test_periode_figee_des_la_facturation · #14
+- REQ-FAC-07 ✅ période purement mensuelle (plus de `regularisation`/`ajustement`, jamais portés par une donnée — la Régularisation est un modèle propre depuis la tranche 4), unicité `(souscription, mois)` pleine, snapshot figé à la facturation — preuve: tests/test_periode_snapshot.py::test_periode_figee_des_la_facturation, tests/test_periode_mois.py · #14, #239, ADR 0030 décision 3
 - REQ-FAC-08 ✅ relevés d'index : verrou de facturation + bloc justificatif (colonnes = union des familles réellement relevées) — preuve: tests/test_releve.py · #54, #138
 - REQ-FAC-09 ✅ composition des lignes : prorata, cadrans, TURPE, pro, solidaire, régime — preuve: tests/test_periode_composition.py · #74
 - REQ-FAC-10 ✅ facture d'énergie PDF sur template dédié — preuve: tests/test_invoice_template.py, tests/test_facture_document.py::test_facture_energie_pdf

@@ -17,7 +17,13 @@ from odoo.addons.souscriptions_odoo.models.core import souscription_refacturatio
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
-from .common import SouscriptionsTestCase, client_flux_factice, patcher_client_fabrique, patcher_transport
+from .common import (
+    SouscriptionsTestCase,
+    build_grille_lignes,
+    client_flux_factice,
+    patcher_client_fabrique,
+    patcher_transport,
+)
 
 
 def _periode_meta(**kwargs):
@@ -329,6 +335,173 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
         self.assertEqual(facture.state, 'posted')
         self.assertAlmostEqual(facture.amount_residual, facture.amount_total - 10.0, places=2)
         self.assertAlmostEqual(cheque.solde, 0.0, places=2)
+
+    # --- Isolation d'erreur par facture (#268, tranche 4 du PRD #264) ---
+    #
+    # Scénario « grille incapable de prixer » : une souscription en régime
+    # Moulin sans AUCUNE grille Moulin en base (seule la grille standard
+    # existe, fixture commune, tests/common.py) — sa Période ne peut jamais
+    # être prixée à l'émission, `grille.prix.get_grille_active` lève
+    # UserError (ADR 0029 : « échoue bruyamment »). Même scénario que
+    # `_composer_lignes_generees`/`_recomposer_lignes_generees` (#266/#267).
+
+    def _souscription_moulin_sans_grille(self, ref='RSC-CAMPAGNE-MOULIN-KO'):
+        souscription = self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.souscription_base.partner_id.id,
+                'pdl': 'PDL_TEST_MOULIN_SANS_GRILLE',
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'regime_prix': 'moulin',
+                'date_debut': self.MOIS,
+                'provision_mensuelle_kwh': 300.0,
+            }
+        )
+        souscription.with_context(rsc_automatisme=True).write({'ref_situation_contractuelle': ref})
+        return souscription
+
+    def test_lot_partiel_isole_lechec_et_emet_le_reste(self):
+        """AC #268 : une facture en échec (grille incapable de prixer)
+        n'emporte plus le lot — reprend le pattern du cron natif
+        `account.move._autopost_draft_entries` (lot sous savepoint, repli un
+        par un). La facture saine s'émet, l'échec est rapporté (souscription,
+        période, cause) dans la notification, sticky."""
+        periode_ok = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        facture_ok = periode_ok._creer_facture()
+
+        souscription_ko = self._souscription_moulin_sans_grille()
+        periode_ko = self.create_test_periode(souscription_ko, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        facture_ko = periode_ko._creer_facture()
+        self.campagne.etape_ids.invalidate_recordset()
+
+        action = self.campagne.action_emettre_factures()
+
+        self.assertEqual(facture_ok.state, 'posted', "la facture saine s'émet malgré l'échec de l'autre")
+        self.assertEqual(facture_ko.state, 'draft', 'la facture en échec reste en brouillon, rejouable')
+
+        params = action['params']
+        self.assertEqual(params['type'], 'warning')
+        self.assertTrue(params['sticky'], 'un échec -> toast sticky, le temps de le lire')
+        self.assertIn('Émises : 1', params['message'])
+        self.assertIn('Échecs : 1', params['message'])
+        self.assertIn(souscription_ko.name, params['message'], 'la souscription en échec est nommée')
+
+    def test_lot_partiel_reste_a_faire_reflete_letat_reel(self):
+        """AC #268 : le reste-à-faire dérivé de « émettre factures » (#157)
+        ne montre plus que la souscription en échec après un lot partiel —
+        aucun champ de suivi ajouté, l'état découle des factures elles-mêmes."""
+        periode_ok = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        periode_ok._creer_facture()
+        souscription_ko = self._souscription_moulin_sans_grille()
+        periode_ko = self.create_test_periode(souscription_ko, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        periode_ko._creer_facture()
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.campagne.action_emettre_factures()
+        self.campagne.etape_ids.invalidate_recordset()
+
+        etape = self.campagne.etape_ids.filtered(lambda e: e.code == 'emettre_factures')
+        self.assertFalse(etape.fait, "l'étape n'est pas faite tant qu'un échec subsiste")
+        self.assertEqual(etape.nb_reste_a_faire, 1)
+        self.assertEqual(self.campagne._reste_a_faire('emettre_factures'), souscription_ko)
+
+    def test_relancer_letape_apres_correction_est_idempotent(self):
+        """AC #268 : relancer l'étape après avoir corrigé la cause de
+        l'échec (ici : la grille Moulin manquante est créée) émet la
+        facture restée en échec — sans re-poster celle déjà émise
+        (idempotence : `state == 'draft'` l'exclut du lot, cf.
+        `action_emettre_factures`)."""
+        periode_ok = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        facture_ok = periode_ok._creer_facture()
+        souscription_ko = self._souscription_moulin_sans_grille()
+        periode_ko = self.create_test_periode(souscription_ko, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        facture_ko = periode_ko._creer_facture()
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.campagne.action_emettre_factures()
+        self.assertEqual(facture_ok.state, 'posted')
+        self.assertEqual(facture_ko.state, 'draft')
+
+        # Corrige la cause : la grille Moulin manquante apparaît.
+        grille_moulin = self.env['grille.prix'].create(
+            {
+                'name': 'Grille Moulin Test',
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 12, 31),
+                'regime_prix': 'moulin',
+                'active': True,
+            }
+        )
+        build_grille_lignes(self.env, grille_moulin, prix_base=0.10, prix_hp=0.12, prix_hc=0.08)
+        self.campagne.etape_ids.invalidate_recordset()
+
+        action = self.campagne.action_emettre_factures()
+
+        self.assertEqual(facture_ko.state, 'posted', "l'échec est retenté et réussit une fois corrigé")
+        self.assertEqual(facture_ok.state, 'posted', 'la facture déjà émise le reste, sans double émission')
+        self.assertIn('Émises : 1', action['params']['message'], 'seule la facture retentée compte ici (idempotence)')
+        self.assertEqual(action['params']['type'], 'success')
+
+    def test_emission_individuelle_et_emission_en_masse_produisent_les_memes_effets(self):
+        """AC #268 : l'émission individuelle (bouton produit, clôture, fil de
+        l'eau) et l'émission en masse (étape de campagne) partagent
+        EXACTEMENT le même point de couture (`account.move._post`, ADR 0032)
+        — même tampon de provision, même imputation FIFO de chèque énergie,
+        quel que soit le chemin emprunté."""
+        partner_masse = self.env['res.partner'].create({'name': 'Souscripteur masse', 'is_company': False})
+        souscription_masse = self.env['souscription.souscription'].create(
+            {
+                'partner_id': partner_masse.id,
+                'pdl': 'PDL_TEST_EMISSION_MASSE',
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'date_debut': self.MOIS,
+                'provision_mensuelle_kwh': 300.0,
+            }
+        )
+        souscription_masse.with_context(rsc_automatisme=True).write(
+            {'ref_situation_contractuelle': 'RSC-CAMPAGNE-EMISSION-MASSE'}
+        )
+
+        def _cheque_valide(partner, numero):
+            cheque = self.env['souscription.cheque_energie'].create(
+                {
+                    'numero': numero,
+                    'partner_id': partner.id,
+                    'montant': 10.0,
+                    'date_reception': self.MOIS,
+                    'date_expiration': date(2026, 3, 31),
+                }
+            )
+            cheque.action_valider()
+            return cheque
+
+        cheque_individuel = _cheque_valide(self.souscription_base.partner_id, 'CHQ-INDIVIDUEL')
+        cheque_masse = _cheque_valide(partner_masse, 'CHQ-MASSE')
+
+        periode_individuelle = self.create_test_periode(
+            self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS, energie_base_kwh=280.0
+        )
+        facture_individuelle = periode_individuelle._creer_facture()
+        periode_masse = self.create_test_periode(
+            souscription_masse, date_debut=self.MOIS, date_fin=self.FIN_MOIS, energie_base_kwh=280.0
+        )
+        facture_masse = periode_masse._creer_facture()
+        self.campagne.etape_ids.invalidate_recordset()
+
+        facture_individuelle.action_post()  # émission individuelle : le bouton produit
+        self.campagne.action_emettre_factures()  # émission en masse : l'étape de campagne
+
+        for facture, periode, cheque in (
+            (facture_individuelle, periode_individuelle, cheque_individuel),
+            (facture_masse, periode_masse, cheque_masse),
+        ):
+            self.assertEqual(facture.state, 'posted')
+            self.assertEqual(periode.provision_base_kwh, 280.0, 'même tampon de provision (ADR 0032), les deux voies')
+            self.assertAlmostEqual(
+                facture.amount_residual, facture.amount_total - 10.0, places=2, msg='même imputation FIFO'
+            )
+            self.assertAlmostEqual(cheque.solde, 0.0, places=2)
 
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')

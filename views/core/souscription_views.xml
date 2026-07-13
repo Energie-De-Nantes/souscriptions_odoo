@@ -187,6 +187,7 @@
             <field name="etat" widget="badge"
                    decoration-warning="etat == 'en_instance'"
                    decoration-success="etat == 'en_service'"
+                   decoration-info="etat == 'en_attente_cloture'"
                    decoration-danger="etat == 'resiliee'"/>
             <field name="id_affaire" optional="hide"/>
             <field name="ref_situation_contractuelle" optional="hide"/>
@@ -230,6 +231,10 @@
                 <field name="id_affaire" string="N° d'affaire Enedis"/>
                 <filter string="En instance" name="en_instance" domain="[('etat', '=', 'en_instance')]"/>
                 <filter string="En service" name="en_service" domain="[('etat', '=', 'en_service')]"/>
+                <!-- File d'attente des sorties à traiter (#247, ADR 0031 décision 3) :
+                     la vue de l'état dérivé, aucun objet ni statut de traitement à part. -->
+                <filter string="En attente de clôture" name="en_attente_cloture"
+                        domain="[('etat', '=', 'en_attente_cloture')]"/>
                 <filter string="Résiliée" name="resiliee" domain="[('etat', '=', 'resiliee')]"/>
                 <separator/>
                 <filter string="En instance sans id_Affaire" name="en_instance_sans_id_affaire"

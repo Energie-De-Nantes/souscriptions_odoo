@@ -109,6 +109,16 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
         self.assertIn(self.souscription_base.name, response.text)
         self.assertIn(self.souscription_base.pdl, response.text)
 
+    def test_liste_reflete_le_statut_de_cycle_de_vie(self):
+        """Le statut reflété au portail est l'état dérivé (`etat`, critère de
+        #21, ADR 0031) — plus le générique « Active »/« Inactive » (archivage
+        Odoo, sans rapport avec le cycle de vie)."""
+        self.assertEqual(self.souscription_base.etat, 'en_instance')
+        self.authenticate(self.portal_user.login, self.portal_user.login)
+        response = self.url_open('/my/souscriptions')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('En instance', response.text)
+
     def test_apercu_via_access_token(self):
         """L'URL signée (access_token) ouvre la page à un non-propriétaire — c'est
         ce qui alimente le bouton « Aperçu » back-office. Sans token : 403."""

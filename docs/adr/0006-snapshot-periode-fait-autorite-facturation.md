@@ -53,3 +53,23 @@ Une facture émise doit être **rejouable à l'identique** depuis ce que la Pér
 depuis un état contractuel qui a pu dériver. Faire de la Période l'unique source à la
 facturation concentre la logique (locality) et ramène la surface de test à une seule
 interface (`_composer_lignes`), au lieu d'un graphe de records + un move comptabilisé.
+
+## Amendement (#267) — le snapshot fait autorité une fois la facture ÉMISE
+
+Décision re-instruite dans le cadre du PRD #264 (Brouillon gouverné, grillé le 2026-07-13),
+tranche 3 — voir [ADR-0032](0032-brouillon-gouverne-gel-a-lemission.md) pour la décision
+complète. Ce que ce document appelait « la facturation » (le moment où le snapshot fige)
+supposait une facture créée = une facture figée : `_creer_facture()` tamponnait la
+provision et `souscription.periode.write()` verrouillait dès que `facture_id` existait, y
+compris en brouillon ([ADR-0007](0007-snapshot-periode-type-verrou-facturation.md)).
+
+Cette hypothèse ne tient plus. La Facture vit désormais en deux temps (brouillon éditable,
+émission qui fige — CONTEXT.md « Facture ») ; le snapshot lui-même reste posé **à la
+création** de la Période (inchangé, décision toujours valide ci-dessus), mais ce qui « fait
+autorité » — au sens où plus rien ne peut le contredire — ne le devient qu'à l'**émission**.
+Pendant la fenêtre brouillon, la Période reste éditable et son brouillon de Facture se
+régénère au fil de l'eau (`souscription.periode._est_facturee_emise`, `write()`,
+`account.move._recomposer_lignes_generees`). Le principe qui motivait cet ADR — pas de repli
+sur l'état *live* de la Souscription, reproductibilité de la facture depuis ce qui a été
+gelé — reste entier ; seul le **moment** où ce gel devient irréversible se déplace de « la
+Période a une Facture » à « la Facture référençant la Période est postée ».

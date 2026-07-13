@@ -13,6 +13,8 @@
 #   ./scripts/dev.sh --data=prod --fresh  # idem + extract prod frais au préalable — requiert
 #                                      # PROD__URL/PROD__DB/PROD__LOGIN/PROD__PASSWORD en env
 #                                      # (jamais committés ; pass-cli `pr` ou .env chargé au préalable)
+#   ./scripts/dev.sh --data=prod --light[=PAS]  # chargement rapide : 1 souscription sur PAS
+#                                      # (défaut 10), cascade sur les collections liées
 #   ./scripts/dev.sh --reset          # repart d'une base vierge pour le mode choisi
 #
 # Mode prod : pilote `../souscriptions_migration` (ADR 0003/0023, dépôt jetable **voisin**,
@@ -21,10 +23,9 @@
 # (charte migration) vérifiés avant ET après chargement : crons coupés, aucun mail sortant,
 # aucun règlement SEPA groupé — une base non conforme arrête le script.
 #
-# Secrets electricore (ELECTRICORE_URL / _API_KEY) : injectés depuis Proton Pass.
-# Le script s'auto-wrappe sous `pass-cli run` (.env.pass) quand les vars manquent —
-# plus besoin de préfixer par `pr`. Sans .env.pass ni pass-cli : vars vides ->
-# intégration electricore désactivée (repli, ADR-0024), pas de crash.
+# Secrets electricore (ELECTRICORE_URL / _API_KEY) : injectés depuis Proton Pass —
+#   pr ./scripts/dev.sh              # pass-cli résout .env.pass -> env shell -> pass-through compose -> conteneur
+# Sans `pr` : vars vides -> intégration electricore désactivée (repli, ADR-0024), pas de crash.
 # Voir docs/adr/0026 + electricore ADR-0056.
 #
 # -> http://localhost:8069  (admin / admin)
@@ -39,14 +40,6 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-
-# Auto-wrap pass-cli (ADR-0026) : si les secrets electricore manquent et que
-# .env.pass + pass-cli sont là, on se relance sous `pass-cli run` — plus besoin
-# de penser à `pr`. Échec bruyant si la session Proton est verrouillée.
-if [ -z "${ELECTRICORE_URL:-}" ] && [ -f "$REPO_ROOT/.env.pass" ] && command -v pass-cli >/dev/null 2>&1; then
-    exec pass-cli run --env-file "$REPO_ROOT/.env.pass" -- "$0" "$@"
-fi
-
 COMPOSE=(docker compose -f "$REPO_ROOT/docker/docker-compose.yml")
 # Chemin RELATIF au dépôt (contrat de layout : dépôts voisins), jamais celui du
 # worktree courant — cf. commentaire d'en-tête.
@@ -55,6 +48,7 @@ MIGRATION_DIR="$REPO_ROOT/../souscriptions_migration"
 DATA=demo
 RESET=
 FRESH=
+LIGHT=
 
 for arg in "$@"; do
     case "$arg" in
@@ -62,8 +56,10 @@ for arg in "$@"; do
         --data=prod) DATA=prod ;;
         --reset) RESET=1 ;;
         --fresh) FRESH=1 ;;
+        --light) LIGHT=10 ;;
+        --light=*) LIGHT="${arg#--light=}" ;;
         *)
-            echo "Usage: $0 [--data=demo|prod] [--reset] [--fresh]" >&2
+            echo "Usage: $0 [--data=demo|prod] [--reset] [--fresh] [--light[=PAS]]" >&2
             exit 1
             ;;
     esac
@@ -71,6 +67,11 @@ done
 
 if [ -n "$FRESH" ] && [ "$DATA" != "prod" ]; then
     echo "--fresh n'a de sens qu'avec --data=prod." >&2
+    exit 1
+fi
+
+if [ -n "$LIGHT" ] && [ "$DATA" != "prod" ]; then
+    echo "--light n'a de sens qu'avec --data=prod." >&2
     exit 1
 fi
 
@@ -105,9 +106,13 @@ fi
 
 if [ -n "$RESET" ]; then
     echo "Réinitialisation : suppression de la base '$DB' (l'autre mode n'est pas touché)..."
+    # Odoo tient des connexions sur la base : l'arrêter d'abord, sinon dropdb échoue
+    # (et un `up -d` ultérieur ne redémarrerait pas un conteneur déjà en route).
+    "${COMPOSE[@]}" stop odoo
     "${COMPOSE[@]}" up -d db
     until "${COMPOSE[@]}" exec -T db pg_isready -U odoo -q 2>/dev/null; do sleep 1; done
-    "${COMPOSE[@]}" exec -T db dropdb -U odoo --if-exists "$DB"
+    # --force (PG 13+) : coupe les sessions restantes (psql ouverts, etc.).
+    "${COMPOSE[@]}" exec -T db dropdb -U odoo --if-exists --force "$DB"
 fi
 
 echo ""
@@ -206,7 +211,9 @@ assert_garde_fous "avant chargement"
     export DEV__DB="$DB"
     export DEV__LOGIN=admin
     export DEV__PASSWORD=admin
-    uv run --with pydantic-settings --no-project python -m migration load --rapport "$rapport"
+    light_args=()
+    if [ -n "$LIGHT" ]; then light_args=(--light "$LIGHT"); fi
+    uv run --with pydantic-settings --no-project python -m migration load --rapport "$rapport" "${light_args[@]}"
 )
 
 assert_garde_fous "après chargement"

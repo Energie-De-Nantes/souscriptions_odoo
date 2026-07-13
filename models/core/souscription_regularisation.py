@@ -313,6 +313,19 @@ class SouscriptionRegularisation(models.Model):
         facture._imputer_cheques_energie()
         return facture
 
+    def releve_colonnes(self):
+        """Colonnes d'index réseau (`label`, `field`) pour le justificatif des
+        relevés **de cette Régularisation** (bi-parent, ADR 0030 décision 5) —
+        variante de `souscription.periode.releve_colonnes()` (#138), même
+        mapping cadran → colonne (source unique, lu sur `souscription.periode`
+        plutôt que dupliqué). Pas de repli `config_cadrans` : contrairement à
+        la Période, la Régularisation n'en porte pas — seules les familles
+        réellement présentes dans `releve_ids` comptent."""
+        self.ensure_one()
+        Periode = self.env['souscription.periode']
+        presentes = [f for f in Periode._FAMILLES if any(Periode._famille_non_vide(r, f) for r in self.releve_ids)]
+        return [colonne for famille in presentes for colonne in Periode._RELEVE_COLONNES[famille]]
+
 
 class SouscriptionRegularisationLigne(models.Model):
     """Ligne typée de la Régularisation : une par grille × cadran (CONTEXT.md

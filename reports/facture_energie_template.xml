@@ -16,6 +16,13 @@
                     <t t-set="o" t-value="o.with_context(lang=lang)"/>
                     <t t-set="souscription" t-value="o.souscription_id"/>
                     <t t-set="periode" t-value="o.periode_id"/>
+                    <!-- Variante Régularisation (ADR 0030 décision 5, tranche 5 du PRD
+                         #231, #237) : la Facture référence soit une Période (mensuelle),
+                         soit une Régularisation, jamais les deux (ADR-0004 amendé). Les
+                         deux blocs qui suivent (sous-titre, justificatif) lisent l'un OU
+                         l'autre selon la source ; le reste du gabarit (lignes, totaux)
+                         reste générique, indifférent à la source. -->
+                    <t t-set="regularisation" t-value="o.regularisation_id"/>
                     <t t-call="web.external_layout">
                         <!-- Adresse client rendue par le letterhead standard. -->
                         <t t-set="address">
@@ -49,6 +56,10 @@
                                             <t t-if="periode.date_debut and periode.date_fin">
                                                 · Période du <span t-out="periode.date_debut.strftime('%d/%m/%Y')"/>
                                                 au <span t-out="periode.date_fin.strftime('%d/%m/%Y')"/>
+                                            </t>
+                                            <t t-elif="regularisation.date_debut and regularisation.date_fin">
+                                                · Régularisation du <span t-out="regularisation.date_debut.strftime('%d/%m/%Y')"/>
+                                                au <span t-out="regularisation.date_fin.strftime('%d/%m/%Y')"/>
                                             </t>
                                         </div>
                                     </td>
@@ -177,15 +188,17 @@
                                 </tr>
                             </table>
 
-                            <!-- ===== Justificatif — relevés d'index (ADR 0015) ===== -->
-                            <t t-set="releves" t-value="periode.releve_ids.sorted('date')"/>
+                            <!-- ===== Justificatif — relevés d'index (ADR 0015, bi-parent
+                                 ADR 0030 décision 5) : portés par la Période (mensuelle) OU
+                                 par la Régularisation elle-même — jamais les deux. ===== -->
+                            <t t-set="releves" t-value="(periode.releve_ids or regularisation.releve_ids).sorted('date')"/>
                             <div t-if="releves" class="no-page-break">
                                 <div class="fe_section">Justificatif de calcul — relevés utilisés</div>
                                 <p class="fe_muted" style="font-size:11px; margin-bottom:8px;">
                                     Index ayant servi au calcul de votre consommation, par cadran de comptage.
                                     Vous pouvez les comparer aux index affichés sur votre compteur.
                                 </p>
-                                <t t-set="colonnes" t-value="periode.releve_colonnes()"/>
+                                <t t-set="colonnes" t-value="periode.releve_colonnes() if periode else regularisation.releve_colonnes()"/>
                                 <table class="fe_table o_ignore_layout_styling">
                                     <thead>
                                         <tr>

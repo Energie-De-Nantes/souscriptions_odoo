@@ -14,10 +14,11 @@ class SouscriptionChequeEnergie(models.Model):
     **gate** est `action_valider()` : il crée et poste l'`account.payment`
     qui porte seul le solde et le lettrage — jamais réimplémentés ici
     (ADR 0026 §3, alternative écartée : « modèle propre réimplémentant
-    solde + imputation »). L'imputation FIFO automatique à la facturation vit
-    côté `account.move._imputer_cheques_energie()` (#172) — mécanique
-    partagée par la mensuelle et la facture de régularisation (tranche 5,
-    #237).
+    solde + imputation »). L'imputation FIFO automatique à l'ÉMISSION (pas la
+    création, tranche 1 du PRD #264, #265) vit côté
+    `account.move._imputer_cheques_energie()`, appelée depuis `_post()`
+    (#172) — mécanique partagée par la mensuelle et la facture de
+    régularisation (tranche 5, #237).
     """
 
     _name = 'souscription.cheque_energie'

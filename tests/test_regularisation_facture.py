@@ -139,7 +139,10 @@ class TestRegularisationFactureProjection(SouscriptionsTestCase):
 @tagged('souscriptions', 'souscriptions_regularisation', 'souscriptions_cheque_energie', 'post_install', '-at_install')
 class TestRegularisationFactureChequeEnergie(SouscriptionsTestCase):
     """#172 : imputation FIFO du chèque énergie validé sur la facture de
-    régularisation, même mécanique que la mensuelle (test_periode_facture.py)."""
+    régularisation, même mécanique que la mensuelle (test_periode_facture.py).
+    Déplacée de la création à l'ÉMISSION (tranche 1 du PRD #264, #265) :
+    `_creer_facture()` ne produit qu'un brouillon, l'imputation se déclenche
+    à `action_post()`."""
 
     def _new_cheque(self, **kwargs):
         vals = {
@@ -152,10 +155,7 @@ class TestRegularisationFactureChequeEnergie(SouscriptionsTestCase):
         vals.update(kwargs)
         return self.env['souscription.cheque_energie'].create(vals)
 
-    def test_cheque_valide_reduit_amount_residual_de_la_facture_de_regularisation(self):
-        cheque = self._new_cheque(montant=5.0)
-        cheque.action_valider()
-
+    def _regularisation_avec_ecart(self, montant_ecart=50.0):
         regularisation = self.env['souscription.regularisation'].create(
             {
                 'souscription_id': self.souscription_base.id,
@@ -168,13 +168,34 @@ class TestRegularisationFactureChequeEnergie(SouscriptionsTestCase):
                 'regularisation_id': regularisation.id,
                 'grille_id': self.grille_prix.id,
                 'cadran': 'base',
-                'ecart_kwh': 50.0,
+                'ecart_kwh': montant_ecart,
                 'prix_kwh': 0.15,
                 'detail': 'Janvier 2024 : 50.00 kWh',
             }
         )
+        return regularisation
 
+    def test_creation_avec_cheque_valide_reste_en_brouillon(self):
+        """AC #265, transposé à la régularisation : la création reste un
+        brouillon même avec un chèque validé disponible."""
+        cheque = self._new_cheque(montant=5.0)
+        cheque.action_valider()
+
+        regularisation = self._regularisation_avec_ecart()
         facture = regularisation._creer_facture()
+
+        self.assertEqual(facture.state, 'draft')
+        self.assertAlmostEqual(cheque.solde, cheque.montant, places=2, msg='rien imputé avant émission')
+
+    def test_cheque_valide_reduit_amount_residual_de_la_facture_de_regularisation(self):
+        cheque = self._new_cheque(montant=5.0)
+        cheque.action_valider()
+
+        regularisation = self._regularisation_avec_ecart()
+        facture = regularisation._creer_facture()
+        self.assertEqual(facture.state, 'draft')
+
+        facture.action_post()
 
         self.assertEqual(facture.state, 'posted')
         self.assertAlmostEqual(facture.amount_residual, facture.amount_total - 5.0, places=2)

@@ -283,9 +283,10 @@ class SouscriptionRegularisation(models.Model):
     # (out_refund) — jamais un document à total négatif posté : les quantités
     # sont alors inversées pour que le total du document reste positif (le
     # signe individuel de chaque ligne peut rester négatif, seul le total
-    # compte). Le chèque énergie validé est imputé à la création par la
-    # mécanique partagée avec la mensuelle (`account.move.
-    # _imputer_cheques_energie`, #172).
+    # compte). Créée en brouillon ; le chèque énergie validé est imputé à
+    # l'ÉMISSION par la mécanique partagée avec la mensuelle
+    # (`account.move._imputer_cheques_energie`, appelée depuis `_post()`,
+    # #172, tranche 1 du PRD #264, #265).
 
     def action_creer_facture(self):
         """Bouton « Facturer » du formulaire brouillon : projette les lignes
@@ -301,11 +302,13 @@ class SouscriptionRegularisation(models.Model):
         }
 
     def _creer_facture(self):
-        """Émet la Facture (ou l'avoir) de cette Régularisation — projection
-        de `ligne_ids`, une ligne de facture par ligne (grille × cadran),
-        notes par mois sous chacune. Verrouillée dès qu'une Facture existe
-        (même garde que `_recalculer`) ; refuse aussi une Régularisation sans
-        ligne (rien à facturer)."""
+        """Crée, en **brouillon**, la Facture (ou l'avoir) de cette
+        Régularisation — projection de `ligne_ids`, une ligne de facture par
+        ligne (grille × cadran), notes par mois sous chacune. Verrouillée dès
+        qu'une Facture existe (même garde que `_recalculer`) ; refuse aussi
+        une Régularisation sans ligne (rien à facturer). Ne poste jamais le
+        move : l'émission (geste distinct) impute le chèque énergie et
+        déclenche le tampon (`_solder_provisions`, via `account.move._post`)."""
         self.ensure_one()
         if self.facture_id:
             raise UserError(f'{self.souscription_id.name} : régularisation déjà facturée.')
@@ -342,7 +345,7 @@ class SouscriptionRegularisation(models.Model):
                 if mois_ligne:
                     lignes_vals.append((0, 0, {'display_type': 'line_note', 'name': mois_ligne}))
 
-        facture = self.env['account.move'].create(
+        return self.env['account.move'].create(
             {
                 'move_type': 'out_refund' if avoir else 'out_invoice',
                 'partner_id': self.souscription_id.partner_id.id,
@@ -351,8 +354,6 @@ class SouscriptionRegularisation(models.Model):
                 'invoice_line_ids': lignes_vals,
             }
         )
-        facture._imputer_cheques_energie()
-        return facture
 
     # === Tampon d'émission (ADR 0030 décision 4, tranche 6 du PRD #231, #238) ===
     #

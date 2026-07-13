@@ -60,11 +60,11 @@ class AccountMove(models.Model):
             move.is_facture_energie = bool((move.periode_id or move.regularisation_id) and move.souscription_id)
 
     def _post(self, soft=True):
-        """Tampon d'émission (ADR 0030 décision 4, tranche 6 du PRD #231,
-        #238) : à l'émission RÉELLE (jamais au brouillon) d'une facture
-        portant `regularisation_id`, la Régularisation solde ses mensuelles
-        couvertes (`souscription.regularisation._solder_provisions`) —
-        provision += écart figé, trace posée, écart nul par construction.
+        """Point de couture de l'émission — tampon de Régularisation (ADR
+        0030 décision 4, tranche 6 du PRD #231, #238) **et** imputation du
+        chèque énergie (ADR 0026, #172, déplacée de la création à l'émission
+        par la tranche 1 du PRD #264, #265) : les deux effets ne se
+        déclenchent qu'à l'émission RÉELLE (jamais au brouillon).
 
         `super()._post()` ne rend que les moves réellement passés à l'état
         posté (les moves programmés dans le futur avec ``soft=True`` restent
@@ -73,6 +73,8 @@ class AccountMove(models.Model):
         posted = super()._post(soft=soft)
         for move in posted.filtered(lambda m: m.regularisation_id):
             move.regularisation_id._solder_provisions()
+        for move in posted.filtered(lambda m: m.is_facture_energie):
+            move._imputer_cheques_energie()
         return posted
 
     def _verifier_regularisation_emise_immuable(self):
@@ -109,14 +111,19 @@ class AccountMove(models.Model):
     def _imputer_cheques_energie(self):
         """Impute en FIFO (par date d'expiration) les *outstanding credits* des
         chèques énergie **validés** de l'usager·ère sur **cette** Facture qui
-        vient d'être créée (#172, ADR 0026). Mécanique partagée entre la
-        mensuelle (``souscription.periode._creer_facture``) et la facture de
-        régularisation (``souscription.regularisation._creer_facture``,
-        tranche 5, #237) : le point de couture ne dépend que de la Facture et
-        de son partenaire, jamais de sa source (Période ou Régularisation).
-        Aucun effet si l'usager·ère ne détient aucun chèque validé à solde
-        positif : la Facture reste ``draft``, comportement de facturation
-        inchangé (#170, non-régression).
+        vient d'être **émise** (#172, ADR 0026 ; déplacé de la création à
+        l'émission par la tranche 1 du PRD #264, #265). Appelée depuis
+        ``_post()`` — jamais au brouillon — pour toute facture d'énergie
+        (``is_facture_energie``) réellement postée : la mécanique est
+        partagée entre la mensuelle (``souscription.periode._creer_facture``)
+        et la facture de régularisation
+        (``souscription.regularisation._creer_facture``, tranche 5, #237),
+        toutes deux créées en **brouillon** — le point de couture ne dépend
+        que de la Facture et de son partenaire, jamais de sa source (Période
+        ou Régularisation). Aucun effet si l'usager·ère ne détient aucun
+        chèque validé à solde positif : la Facture postée reste sans
+        imputation, comportement de facturation inchangé (#170,
+        non-régression).
 
         Le lettrage **natif** d'Odoo fait tout le travail — même mécanique que
         le widget « Outstanding credits »/``js_assign_outstanding_line`` : seul
@@ -124,8 +131,9 @@ class AccountMove(models.Model):
         (``min(solde, total)``, jamais de ligne/solde négatif) et le report du
         reliquat sur la Facture suivante sont natifs à
         ``account.move.line.reconcile()``, jamais réimplémentés — la
-        réconciliation exige des écritures **postées** des deux côtés, d'où le
-        ``action_post()`` déclenché ici quand un chèque est disponible.
+        réconciliation exige des écritures **postées** des deux côtés, déjà
+        garanti par l'appel depuis ``_post()`` (plus de ``action_post()``
+        interne ici).
         """
         self.ensure_one()
         Cheque = self.env['souscription.cheque_energie']
@@ -135,9 +143,6 @@ class AccountMove(models.Model):
         cheques = cheques.filtered(lambda c: c.solde > 0.0)
         if not cheques:
             return
-
-        if self.state == 'draft':
-            self.action_post()
 
         compte_tiers = ('asset_receivable', 'liability_payable')
         for cheque in cheques:

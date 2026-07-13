@@ -225,34 +225,37 @@ class TestReleveVerrou(SouscriptionsTestCase):
         )
         return periode, releve
 
-    def test_write_releve_periode_facturee_rejete(self):
-        """write sur un relevé d'une Période facturée lève UserError."""
+    def test_write_releve_periode_facture_emise_rejete(self):
+        """write sur un relevé d'une Période dont la Facture est ÉMISE
+        (postée) lève UserError (#14, condition dérivée amendée #267)."""
         periode, releve = self._periode_avec_releve()
-        periode._creer_facture()  # facture_id existe → période figée
+        periode._creer_facture().action_post()  # facture émise → période figée
 
         with self.assertRaises(UserError):
             releve.index_base = 999.0
 
-    def test_create_releve_periode_facturee_rejete(self):
-        """create d'un relevé sur une Période facturée lève UserError."""
+    def test_create_releve_periode_facture_emise_rejete(self):
+        """create d'un relevé sur une Période dont la Facture est ÉMISE lève
+        UserError."""
         periode, _releve = self._periode_avec_releve()
-        periode._creer_facture()
+        periode._creer_facture().action_post()
 
         with self.assertRaises(UserError):
             self.env['souscription.releve'].create(
                 {'periode_id': periode.id, 'date': date(2024, 1, 31), 'index_base': 500.0}
             )
 
-    def test_unlink_releve_periode_facturee_rejete(self):
-        """unlink d'un relevé d'une Période facturée lève UserError."""
+    def test_unlink_releve_periode_facture_emise_rejete(self):
+        """unlink d'un relevé d'une Période dont la Facture est ÉMISE lève
+        UserError."""
         periode, releve = self._periode_avec_releve()
-        periode._creer_facture()
+        periode._creer_facture().action_post()
 
         with self.assertRaises(UserError):
             releve.unlink()
 
     def test_releves_libres_avant_facturation(self):
-        """Avant facturation : create / write / unlink restent libres."""
+        """Avant toute facture : create / write / unlink restent libres."""
         periode, releve = self._periode_avec_releve()
         self.assertFalse(periode.facture_id)
 
@@ -264,15 +267,39 @@ class TestReleveVerrou(SouscriptionsTestCase):
         autre.unlink()  # unlink OK
         self.assertFalse(autre.exists())
 
-    def test_suppression_facture_defige_les_releves(self):
-        """Supprimer la facture défige les relevés (édition de nouveau possible)."""
+    def test_releves_libres_avec_facture_brouillon(self):
+        """AC #267 : une Facture en BROUILLON qui référence la Période ne fige
+        pas ses relevés — write / create / unlink restent libres tant que la
+        facture n'est pas émise. Preuve, sans migration de données, que les
+        relevés gelés sous l'ancien régime (facture_id truthy = gelé) avec
+        facture encore en brouillon sont DE FAIT dé-gelés par la condition
+        dérivée."""
         periode, releve = self._periode_avec_releve()
         facture = periode._creer_facture()
+        self.assertEqual(facture.state, 'draft')
 
-        facture.unlink()  # la période et ses relevés se défigent
-        self.assertFalse(periode.facture_id)
+        releve.index_base = 777.0  # ne lève rien
+        self.assertEqual(releve.index_base, 777.0)
+        autre = self.env['souscription.releve'].create(
+            {'periode_id': periode.id, 'date': date(2024, 1, 31), 'index_base': 800.0}
+        )
+        autre.unlink()  # ne lève rien
+        self.assertFalse(autre.exists())
 
-        releve.index_base = 333.0  # write de nouveau autorisé
+    def test_remise_en_brouillon_reouvre_lecriture_des_releves(self):
+        """Non-régression, seul le déclencheur change (#267) : le verrou est
+        symétrique de l'état réel de la Facture — remettre en brouillon une
+        Facture émise (`button_draft`) rouvre l'écriture des relevés, sans
+        suppression ni « défigeage » explicite."""
+        periode, releve = self._periode_avec_releve()
+        facture = periode._creer_facture()
+        facture.action_post()
+        with self.assertRaises(UserError):
+            releve.index_base = 999.0
+
+        facture.button_draft()
+
+        releve.index_base = 333.0  # de nouveau autorisé
         self.assertEqual(releve.index_base, 333.0)
 
 

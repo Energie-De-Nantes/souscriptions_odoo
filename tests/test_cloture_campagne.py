@@ -129,7 +129,8 @@ class TestPeriodeClotureAuReel(SouscriptionsTestCase):
 
     def test_tamponner_provision_ne_touche_pas_un_lisse_normal_sans_sortie(self):
         """Non-régression : une Période lissée normale (pas de clôture)
-        garde la provision contractuelle après facturation."""
+        garde la provision contractuelle, au brouillon comme à l'émission
+        (le tampon a migré à l'émission, #267)."""
         souscription = self._souscription_lissee('RSC-CLOTURE-NORMAL', 'PDL_CLOTURE_NORMAL')
         self._grille_moulin('Grille Clôture Normal')
         periode = self.env['souscription.periode'].create(
@@ -141,14 +142,18 @@ class TestPeriodeClotureAuReel(SouscriptionsTestCase):
                 'energie_base_kwh': 250.0,
             }
         )
-        periode._creer_facture()
+        facture = periode._creer_facture()
         self.assertEqual(periode.provision_base_kwh, 200.0, 'provision contractuelle : pas de clôture ici')
 
-    def test_periode_de_cloture_lissee_tamponnee_au_reel_a_la_facturation(self):
+        facture.action_post()
+
+        self.assertEqual(periode.provision_base_kwh, 200.0, 'toujours intacte après émission')
+
+    def test_periode_de_cloture_lissee_tamponnee_au_reel_a_lemission(self):
         """AC1 (partiel) : la Période de clôture d'un lissé sorti (jours
         exacts déjà tronqués par electricore) se voit tamponner sa provision
-        à la conso réelle, comme une non-lissée, à la création de la
-        facture."""
+        à la conso réelle, comme une non-lissée, à l'ÉMISSION de la facture
+        (déplacé de la création par #267, tranche 3 du PRD #264)."""
         souscription = self._souscription_lissee('RSC-CLOTURE-REEL-UNIT', 'PDL_CLOTURE_REEL_UNIT')
         self._grille_moulin('Grille Clôture Réel Unit')
         souscription.date_fin = date(2024, 6, 11)
@@ -179,8 +184,11 @@ class TestPeriodeClotureAuReel(SouscriptionsTestCase):
         self.assertEqual(periode.provision_base_kwh, 200.0, 'provision contractuelle avant facturation')
 
         facture = periode._creer_facture()
+        self.assertEqual(periode.provision_base_kwh, 200.0, 'toujours pas tamponnée au brouillon (#267)')
 
-        self.assertEqual(periode.provision_base_kwh, 90.0, 'au réel : tamponnée à la conso réelle')
+        facture.action_post()
+
+        self.assertEqual(periode.provision_base_kwh, 90.0, 'au réel : tamponnée à la conso réelle, à l’émission')
         ligne_abo = facture.invoice_line_ids.filtered(lambda l: l.quantity == 11)
         self.assertEqual(len(ligne_abo), 1, "l'abonnement porte les 11 jours exacts")
 

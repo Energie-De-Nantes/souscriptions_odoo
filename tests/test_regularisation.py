@@ -435,14 +435,56 @@ class TestRegularisationEtatEtVerrou(SouscriptionsTestCase):
         self.assertEqual(regularisation.facture_id, move)
         self.assertEqual(regularisation.etat, 'facturee')
 
-    def test_recalcul_refuse_tant_que_la_facture_existe(self):
+    def _regularisation_avec_ligne(self):
         regularisation = self.env['souscription.regularisation'].create({'souscription_id': self.souscription_base.id})
-        self.env['account.move'].create(
+        self.env['souscription.regularisation.ligne'].create(
             {
-                'move_type': 'out_invoice',
-                'partner_id': self.partner_test.id,
                 'regularisation_id': regularisation.id,
+                'grille_id': self.grille_prix.id,
+                'cadran': 'base',
+                'ecart_kwh': 20.0,
+                'prix_kwh': 0.15,
+                'detail': 'Janvier 2024 : 20.00 kWh',
             }
         )
+        return regularisation
+
+    def test_recalcul_autorise_tant_que_la_facture_liee_est_en_brouillon(self):
+        """#267 : le recalcul reste autorisé pendant la fenêtre brouillon
+        d'une Facture liée — avant #267, toute Facture (brouillon compris)
+        bloquait le recalcul dès qu'elle existait."""
+        regularisation = self._regularisation_avec_ligne()
+        regularisation._creer_facture()
+        self.assertEqual(regularisation.facture_id.state, 'draft')
+
+        regularisation._recalculer()  # ne lève rien
+
+    def test_recalcul_refuse_une_fois_la_facture_emise(self):
+        """La Facture ÉMISE (postée), pas seulement existante, verrouille le
+        recalcul (#267, condition dérivée)."""
+        regularisation = self._regularisation_avec_ligne()
+        regularisation._creer_facture()
+        regularisation.facture_id.action_post()
+
         with self.assertRaises(UserError):
             regularisation._recalculer()
+
+    def test_action_recalculer_recompose_le_brouillon_lie(self):
+        """#267, point d'entrée (d) : `action_recalculer` recompose le
+        brouillon de Facture lié juste après avoir reconstruit les lignes —
+        le facturiste voit tout de suite l'effet du recalcul sur le
+        document, sans devoir le rouvrir. `souscription_base` ne porte aucune
+        Période facturée : un recalcul réel n'y trouve aucun candidat, donc
+        vide `ligne_ids` — la preuve que le brouillon suit est que sa ligne
+        produit disparaît avec, dans le même geste."""
+        regularisation = self._regularisation_avec_ligne()
+        facture = regularisation._creer_facture()
+        self.assertTrue(facture.invoice_line_ids.filtered(lambda l: l.product_id))
+
+        regularisation.action_recalculer()
+
+        self.assertFalse(regularisation.ligne_ids, 'aucun candidat réel : le recalcul vide les lignes')
+        self.assertFalse(
+            facture.invoice_line_ids.filtered(lambda l: l.product_id),
+            'le brouillon a été recomposé en phase avec le recalcul',
+        )

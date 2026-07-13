@@ -318,3 +318,52 @@ class TestPeriodeFactureRegenerationEmission(SouscriptionsTestCase):
         facture.unlink()  # ne lève rien : cascade autorisée
 
         self.assertFalse(periode.facture_id)
+
+
+@tagged('souscriptions', 'souscriptions_periode_facture', 'souscriptions_provenance', 'post_install', '-at_install')
+class TestPeriodeEditionBrouillonRegenerationFilDeLeau(SouscriptionsTestCase):
+    """#267 (tranche 3 du PRD #264), point d'entrée (b) : éditer une Période
+    NON GELÉE qui porte un brouillon de Facture recompose ce brouillon —
+    AC « son édition régénère les lignes générées du brouillon (les
+    manuelles restent) »."""
+
+    def test_edition_periode_avec_brouillon_recompose_les_lignes_generees(self):
+        periode = self.create_test_periode(self.souscription_hphc, provision_hp_kwh=150.0, provision_hc_kwh=100.0)
+        facture = periode._creer_facture()
+        hp_avant = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie HP')
+        self.assertEqual(hp_avant.quantity, 150.0)
+
+        periode.write({'provision_hp_kwh': 175.0})  # correction du·de la facturiste
+
+        hp_apres = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie HP')
+        self.assertEqual(hp_apres.quantity, 175.0, "l'édition régénère le brouillon")
+
+    def test_edition_periode_avec_brouillon_preserve_la_ligne_manuelle(self):
+        """La régénération au fil de l'eau reste PRÉSERVANTE (#266) : une
+        ligne manuelle (geste commercial) survit à l'édition de la Période."""
+        periode = self.create_test_periode(self.souscription_hphc, provision_hp_kwh=150.0, provision_hc_kwh=100.0)
+        facture = periode._creer_facture()
+        produit = self.env.ref('souscriptions_odoo.souscriptions_product_energie_hp')
+        facture.write(
+            {
+                'invoice_line_ids': [
+                    (0, 0, {'product_id': produit.id, 'name': 'Geste commercial', 'quantity': 1.0, 'price_unit': -5.0})
+                ]
+            }
+        )
+
+        periode.write({'provision_hp_kwh': 175.0})
+
+        ligne_manuelle = facture.invoice_line_ids.filtered(lambda l: l.name == 'Geste commercial')
+        self.assertEqual(len(ligne_manuelle), 1, 'la ligne manuelle survit à la régénération au fil de l’eau')
+        self.assertEqual(ligne_manuelle.price_unit, -5.0)
+
+    def test_edition_periode_sans_brouillon_ne_leve_rien(self):
+        """Non-régression : éditer une Période sans aucune Facture liée reste
+        un no-op côté régénération (rien à recomposer)."""
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        self.assertFalse(periode.facture_id)
+
+        periode.write({'provision_base_kwh': 150.0})  # ne lève rien
+
+        self.assertEqual(periode.provision_base_kwh, 150.0)

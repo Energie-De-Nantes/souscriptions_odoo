@@ -13,6 +13,7 @@ from . import (
     test_estimation_provisions,
     test_facturation,
     test_facture_document,
+    test_facture_provenance,
     test_grille_prix,
     test_integration,
     test_invoice_template,

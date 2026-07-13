@@ -176,3 +176,145 @@ class TestPeriodeFactureChequeEnergie(SouscriptionsTestCase):
         self.assertTrue(lignes_produit)
         self.assertTrue(all(l.quantity >= 0 and l.price_unit >= 0 for l in lignes_produit))
         self.assertAlmostEqual(facture.amount_untaxed, sum(lignes_produit.mapped('price_subtotal')), places=2)
+
+
+@tagged('souscriptions', 'souscriptions_periode_facture', 'souscriptions_provenance', 'post_install', '-at_install')
+class TestPeriodeFactureRegenerationEmission(SouscriptionsTestCase):
+    """#266 (tranche 2 du PRD #264) : re-génération préservante à l'émission —
+    `account.move._post()` recompose les lignes GÉNÉRÉES depuis la Période
+    (même snapshot, même grille) et rassemble les Refacturations en file,
+    tout en préservant les lignes manuelles."""
+
+    def test_lignes_composees_par_la_periode_portent_le_flag(self):
+        """Toute ligne composée par `_composer_lignes` porte
+        `souscription_ligne_generee = True` (ADR 0014 amendé)."""
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        lignes = periode._composer_lignes(self.grille_prix)
+        self.assertTrue(lignes)
+        self.assertTrue(all(vals.get('souscription_ligne_generee') is True for _cmd, _id, vals in lignes))
+
+    def test_ligne_manuelle_survit_a_la_regeneration_de_l_emission(self):
+        """AC #266 : une ligne manuelle ajoutée au brouillon (geste
+        commercial) survit à l'émission, telle quelle."""
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        facture = periode._creer_facture()
+        produit = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
+        facture.write(
+            {
+                'invoice_line_ids': [
+                    (0, 0, {'product_id': produit.id, 'name': 'Geste commercial', 'quantity': 1.0, 'price_unit': -5.0})
+                ]
+            }
+        )
+        ligne_manuelle = facture.invoice_line_ids.filtered(lambda l: l.name == 'Geste commercial')
+        self.assertTrue(ligne_manuelle)
+        self.assertFalse(ligne_manuelle.souscription_ligne_generee)
+
+        facture.action_post()
+
+        ligne_apres = facture.invoice_line_ids.filtered(lambda l: l.name == 'Geste commercial')
+        self.assertEqual(len(ligne_apres), 1, 'la ligne manuelle survit à la re-génération')
+        self.assertEqual(ligne_apres.price_unit, -5.0)
+
+    def test_lignes_generees_recomposees_a_l_emission(self):
+        """Les lignes GÉNÉRÉES sont bien re-composées (supprimées puis
+        recréées) à l'émission — même structure qu'au brouillon (la provision
+        et la grille ne bougent pas dans cette tranche, ADR 0030 décision 4
+        vs tranche 3)."""
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        facture = periode._creer_facture()
+        ids_avant = set(facture.invoice_line_ids.filtered('souscription_ligne_generee').ids)
+
+        facture.action_post()
+
+        ids_apres = set(facture.invoice_line_ids.filtered('souscription_ligne_generee').ids)
+        self.assertFalse(ids_avant & ids_apres, 'les anciennes lignes générées sont supprimées, pas réutilisées')
+        self.assert_invoice_structure(facture)
+
+    def test_refacturation_entree_apres_le_brouillon_rassemblee_a_l_emission(self):
+        """AC #266 : une Refacturation entrée en file APRÈS la création du
+        brouillon est rassemblée à l'émission (re-génération), pas seulement
+        à la création."""
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        facture = periode._creer_facture()
+        self.assertFalse(facture.invoice_line_ids.filtered(lambda l: l.name == 'Déplacement tardif'))
+
+        presta = self.env['souscription.refacturation'].create(
+            {
+                'souscription_id': self.souscription_base.id,
+                'reference': 'F15-TARDIF',
+                'libelle': 'Déplacement tardif',
+                'prix': 40.0,
+                'quantite': 1.0,
+            }
+        )
+        self.assertFalse(presta.facture_id, 'encore dans la file avant émission')
+
+        facture.action_post()
+
+        ligne = facture.invoice_line_ids.filtered(lambda l: l.name == 'Déplacement tardif')
+        self.assertEqual(len(ligne), 1)
+        self.assertTrue(ligne.souscription_ligne_generee)
+        self.assertEqual(presta.facture_id, facture)
+
+    def test_refacturation_deja_rassemblee_a_la_creation_survit_a_la_regeneration(self):
+        """Non-régression : une Refacturation déjà rassemblée AVANT l'émission
+        (chemin de création, `souscription.creer_factures()`) n'est pas
+        perdue par la re-génération — recomposée, pas seulement préservée."""
+        self.env['souscription.refacturation'].create(
+            {
+                'souscription_id': self.souscription_base.id,
+                'reference': 'F15-PRECOCE',
+                'libelle': 'Déplacement précoce',
+                'prix': 25.0,
+                'quantite': 1.0,
+            }
+        )
+        self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+
+        self.souscription_base.creer_factures()
+        facture = self.souscription_base.facture_ids
+        ligne_avant = facture.invoice_line_ids.filtered(lambda l: l.name == 'Déplacement précoce')
+        self.assertEqual(len(ligne_avant), 1, 'rassemblée dès la création')
+
+        facture.action_post()
+
+        ligne_apres = facture.invoice_line_ids.filtered(lambda l: l.name == 'Déplacement précoce')
+        self.assertEqual(len(ligne_apres), 1, 'toujours présente après re-génération à l’émission')
+        presta = self.souscription_base.refacturation_ids.filtered(lambda p: p.reference == 'F15-PRECOCE')
+        self.assertEqual(presta.facture_id, facture)
+
+    def test_suppression_directe_ligne_generee_refusee_en_brouillon(self):
+        """Garde `ondelete` (#266) : suppression directe d'une ligne générée
+        d'une facture d'énergie en brouillon refusée."""
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        facture = periode._creer_facture()
+        ligne = facture.invoice_line_ids.filtered('souscription_ligne_generee')[:1]
+        self.assertTrue(ligne)
+
+        with self.assertRaises(Exception):
+            ligne.unlink()
+
+    def test_suppression_ligne_manuelle_autorisee(self):
+        """Une ligne manuelle reste supprimable (pas de flag = pas de garde)."""
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        facture = periode._creer_facture()
+        produit = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
+        facture.write({'invoice_line_ids': [(0, 0, {'product_id': produit.id, 'name': 'Note libre', 'quantity': 1.0})]})
+        ligne = facture.invoice_line_ids.filtered(lambda l: l.name == 'Note libre')
+        self.assertFalse(ligne.souscription_ligne_generee)
+
+        ligne.unlink()  # ne lève rien
+
+        self.assertFalse(facture.invoice_line_ids.filtered(lambda l: l.name == 'Note libre'))
+
+    def test_suppression_facture_entiere_toujours_autorisee(self):
+        """La cascade (suppression du move entier) n'est jamais bloquée par
+        la garde `ondelete` des lignes générées."""
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        facture = periode._creer_facture()
+        self.assertTrue(facture.invoice_line_ids.filtered('souscription_ligne_generee'))
+
+        facture.unlink()  # ne lève rien : cascade autorisée
+
+        self.assertFalse(periode.facture_id)

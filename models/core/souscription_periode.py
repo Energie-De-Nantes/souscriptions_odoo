@@ -573,6 +573,12 @@ class SouscriptionPeriode(models.Model):
         ``grille.composants()`` — l'unique règle d'assemblage (ADR 0029) — et
         ne garde que la projection : quantités du snapshot, sections, notes.
         Ne crée aucun ``account.move``.
+
+        Chaque ligne porte ``souscription_ligne_generee = True`` (#266, ADR
+        0014 amendé) : c'est cette méthode — pas un appelant — qui pose le
+        flag de provenance, pour que TOUT chemin qui compose des lignes
+        depuis une Période (création, re-génération à l'émission) le porte
+        sans avoir à y penser.
         """
         self.ensure_one()
 
@@ -640,7 +646,7 @@ class SouscriptionPeriode(models.Model):
                 (0, 0, {'display_type': 'line_note', 'name': f'Dont turpe variable: {self.turpe_variable:.2f}€'})
             )
 
-        return lines_vals
+        return [(cmd, id_, dict(vals, souscription_ligne_generee=True)) for cmd, id_, vals in lines_vals]
 
     # === Amorçage depuis le pull electricore (#77, ADR 0011/0019/0020) ===
 

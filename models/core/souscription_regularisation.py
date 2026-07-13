@@ -301,27 +301,26 @@ class SouscriptionRegularisation(models.Model):
             'view_mode': 'form',
         }
 
-    def _creer_facture(self):
-        """Crée, en **brouillon**, la Facture (ou l'avoir) de cette
-        Régularisation — projection de `ligne_ids`, une ligne de facture par
-        ligne (grille × cadran), notes par mois sous chacune. Verrouillée dès
-        qu'une Facture existe (même garde que `_recalculer`) ; refuse aussi
-        une Régularisation sans ligne (rien à facturer). Ne poste jamais le
-        move : l'émission (geste distinct) impute le chèque énergie et
-        déclenche le tampon (`_solder_provisions`, via `account.move._post`)."""
-        self.ensure_one()
-        if self.facture_id:
-            raise UserError(f'{self.souscription_id.name} : régularisation déjà facturée.')
-        if not self.ligne_ids:
-            raise UserError(
-                f'{self.souscription_id.name} : aucune ligne à facturer. Recalculez la régularisation avant de facturer.'
-            )
+    def _composer_lignes(self):
+        """Compose les lignes de facture (``[(0, 0, vals)]``) projetées depuis
+        `ligne_ids` : une ligne section 'Régularisation', une ligne produit
+        par (grille, cadran) et des notes par mois sous chacune. Ne crée aucun
+        `account.move` (même motif que `souscription.periode._composer_lignes`,
+        ADR 0006/0029).
 
-        # Net négatif -> avoir, jamais de document à total négatif posté
-        # (AC #237) : les quantités sont inversées pour que le total du
-        # document reste positif — le signe d'une ligne individuelle peut
-        # rester négatif (deux grilles/cadrans peuvent varier en sens
-        # opposé), seul le total compte.
+        Net négatif -> avoir, jamais de document à total négatif posté (AC
+        #237) : les quantités sont inversées pour que le total du document
+        reste positif — le signe d'une ligne individuelle peut rester négatif
+        (deux grilles/cadrans peuvent varier en sens opposé), seul le total
+        compte. `ligne_ids` est verrouillé dès qu'une Facture existe
+        (`_recalculer`), donc `montant_total` — et le signe qui en dérive —
+        reste stable d'un appel à l'autre (création, re-génération à
+        l'émission, #266).
+
+        Chaque ligne porte `souscription_ligne_generee = True` (#266, ADR
+        0014 amendé) : posé ici, une fois pour toutes, comme
+        `souscription.periode._composer_lignes`."""
+        self.ensure_one()
         avoir = self.montant_total < 0.0
         signe = -1.0 if avoir else 1.0
 
@@ -345,13 +344,31 @@ class SouscriptionRegularisation(models.Model):
                 if mois_ligne:
                     lignes_vals.append((0, 0, {'display_type': 'line_note', 'name': mois_ligne}))
 
+        return [(cmd, id_, dict(vals, souscription_ligne_generee=True)) for cmd, id_, vals in lignes_vals]
+
+    def _creer_facture(self):
+        """Crée, en **brouillon**, la Facture (ou l'avoir) de cette
+        Régularisation — projection de `ligne_ids` (`_composer_lignes`).
+        Verrouillée dès qu'une Facture existe (même garde que `_recalculer`) ;
+        refuse aussi une Régularisation sans ligne (rien à facturer). Ne poste
+        jamais le move : l'émission (geste distinct) impute le chèque énergie
+        et déclenche le tampon (`_solder_provisions`, via `account.move._post`)."""
+        self.ensure_one()
+        if self.facture_id:
+            raise UserError(f'{self.souscription_id.name} : régularisation déjà facturée.')
+        if not self.ligne_ids:
+            raise UserError(
+                f'{self.souscription_id.name} : aucune ligne à facturer. Recalculez la régularisation avant de facturer.'
+            )
+
+        avoir = self.montant_total < 0.0
         return self.env['account.move'].create(
             {
                 'move_type': 'out_refund' if avoir else 'out_invoice',
                 'partner_id': self.souscription_id.partner_id.id,
                 'invoice_date': self.date_fin,
                 'regularisation_id': self.id,
-                'invoice_line_ids': lignes_vals,
+                'invoice_line_ids': self._composer_lignes(),
             }
         )
 

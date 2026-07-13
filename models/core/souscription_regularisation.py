@@ -11,9 +11,13 @@ class SouscriptionRegularisation(models.Model):
     lignes, jamais une fenêtre stockée — les candidats se sélectionnent par
     l'écart et le verdict, ADR 0030 décision 4) + lignes **typées** (une par
     grille × cadran). `_recalculer()` (re)construit les lignes, à volonté —
-    mais refuse dès qu'une Facture existe (``facture_id``, tranche 5, #237) :
-    l'« état facturée » dérivé du lien **verrouille** le recalcul, faute de
-    quoi la Facture divergerait silencieusement des lignes qui l'ont projetée.
+    mais refuse dès qu'une Facture ÉMISE existe (``facture_id.state ==
+    'posted'``, tranche 5 #237, condition dérivée amendée tranche 3 #267) :
+    l'« état facturée » dérivé du lien ne verrouille plus à lui seul le
+    recalcul — pendant la fenêtre brouillon, recalculer reconstruit les
+    lignes ET recompose le brouillon lié (``action_recalculer``, #267) ;
+    c'est l'ÉMISSION, pas l'existence de la Facture, qui fige, faute de quoi
+    la Facture divergerait silencieusement des lignes qui l'ont projetée.
 
     Le tampon (tranche 6, #238) ne se déclenche jamais ici : `_recalculer()`
     et `_creer_facture()` ne font que figer le split par (ligne, Période) —
@@ -106,8 +110,16 @@ class SouscriptionRegularisation(models.Model):
             regul.etat = 'facturee' if regul.facture_id else 'brouillon'
 
     def action_recalculer(self):
+        """Bouton « Recalculer » du formulaire brouillon. Régénération au fil
+        de l'eau (#267, point d'entrée (d)) : si un brouillon de Facture est
+        déjà lié (``_recalculer`` l'autorise tant qu'il n'est pas ÉMIS), ses
+        lignes générées sont recomposées juste après — le·la facturiste voit
+        immédiatement l'effet du recalcul sur le document, sans devoir
+        rouvrir la Facture."""
         self.ensure_one()
         self._recalculer()
+        if self.facture_id.state == 'draft':
+            self.facture_id._recomposer_lignes_generees()
 
     # === Calcul des candidats (ADR 0030 décision 4) ===
     #
@@ -124,18 +136,22 @@ class SouscriptionRegularisation(models.Model):
         lignes existantes puis reconstruit entièrement (idempotent à données
         constantes, AC #236).
 
-        Refuse dès qu'une Facture existe (``facture_id``, tranche 5, #237) :
-        une Régularisation facturée est verrouillée, au même titre qu'une
-        Période facturée (#14) — recalculer romprait silencieusement le lien
-        entre les lignes projetées et le document légal déjà émis. Pour
-        corriger : supprimer la Facture (ce qui dé-fige la Régularisation) ou
-        émettre une nouvelle Régularisation.
+        Refuse dès qu'une Facture ÉMISE existe (``facture_id.state ==
+        'posted'``, tranche 5 #237, condition dérivée amendée tranche 3
+        #267) : une Régularisation ÉMISE est verrouillée, au même titre
+        qu'une Période émise (#14/#267, ADR 0032) — recalculer romprait
+        silencieusement le lien entre les lignes projetées et le document
+        légal déjà émis. Pendant la fenêtre brouillon (Facture pas encore
+        postée), recalculer reste autorisé — ``action_recalculer`` recompose
+        alors le brouillon lié pour que la Facture reflète le nouveau calcul.
+        Pour corriger après émission : un avoir ou une nouvelle
+        Régularisation.
         """
         self.ensure_one()
-        if self.facture_id:
+        if self.facture_id.state == 'posted':
             raise UserError(
-                f'{self.souscription_id.name} : régularisation déjà facturée, recalcul interdit. '
-                'Supprimez la facture pour corriger, ou créez une nouvelle régularisation.'
+                f'{self.souscription_id.name} : régularisation émise, recalcul interdit. '
+                'Corrigez par un avoir ou par une nouvelle régularisation.'
             )
         souscription = self.souscription_id
         self.ligne_ids.unlink()
@@ -349,7 +365,9 @@ class SouscriptionRegularisation(models.Model):
     def _creer_facture(self):
         """Crée, en **brouillon**, la Facture (ou l'avoir) de cette
         Régularisation — projection de `ligne_ids` (`_composer_lignes`).
-        Verrouillée dès qu'une Facture existe (même garde que `_recalculer`) ;
+        Refuse dès qu'une Facture existe (une seule par Régularisation) —
+        garde distincte du verrou de `_recalculer`, qui ne bloque, lui, qu'à
+        l'ÉMISSION (#267) ;
         refuse aussi une Régularisation sans ligne (rien à facturer). Ne poste
         jamais le move : l'émission (geste distinct) impute le chèque énergie
         et déclenche le tampon (`_solder_provisions`, via `account.move._post`)."""
@@ -394,7 +412,7 @@ class SouscriptionRegularisation(models.Model):
 
         Contourne le verrou de facturation (#14) via le contexte
         `regularisation_tampon` — seul canal qui réécrit la provision d'une
-        Période déjà facturée (cf. `souscription.periode.write`).
+        Période déjà émise (cf. `souscription.periode.write`).
 
         Note (PR #259, décision en attente) : re-poster le même move (post ->
         button_draft -> re-post) rejoue ce tampon et double-buffer les

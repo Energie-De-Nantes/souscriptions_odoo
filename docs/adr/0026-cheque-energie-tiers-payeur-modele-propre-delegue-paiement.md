@@ -65,3 +65,19 @@ en `related` sur celui-ci. Il ne réimplémente **pas** solde ni lettrage.
   modèle propre.
 - Couplage résiduel à Odoo : la création/le lettrage du `account.payment`. Assumé (B1
   l'impose de toute façon), rangé derrière le modèle.
+
+## Amendement (#265) — le lettrage se déclenche à l'émission, pas à la création
+
+Décision 2 ci-dessus (« petit hook à la création de facture ») décrivait l'ancien moment.
+Il a été déplacé de `souscription.periode._creer_facture()` (création du brouillon) à
+`account.move._post()` (émission réelle) par la tranche 1 du PRD #264 (#265) :
+`_imputer_cheques_energie()` est désormais appelée uniquement quand la Facture (mensuelle ou
+de régularisation) est effectivement **postée**, jamais à sa création en brouillon — plus
+aucune facture d'énergie postée « en douce » à la création, par aucun chemin. Contrainte
+dure retrouvée en le faisant : le lettrage natif d'Odoo exige des écritures **postées** des
+deux côtés (« *You can only register payment for posted journal entries* ») — l'imputation
+ne pouvait de toute façon pas s'exécuter avant l'émission. Cette note documente le
+changement pour le futur lecteur ; le mécanisme de lettrage lui-même (décision 2, natif Odoo)
+est inchangé — cf. [ADR-0032](0032-brouillon-gouverne-gel-a-lemission.md) pour la vue
+d'ensemble « brouillon gouverné, émission = unique événement de gel » dont cette bascule
+fait partie.

@@ -176,6 +176,13 @@ class SouscriptionRefacturation(models.Model):
         run suivant. Une référence déjà présente n'est jamais touchée (pas de
         chemin d'update). Savepoint par ligne (skip-and-report, ADR 0011) : une
         contrainte sur une ligne n'emporte pas le lot.
+
+        Régénération au fil de l'eau (#267, point d'entrée (c)) : une fois le
+        lot inséré, les brouillons mensuels non émis des souscriptions
+        touchées sont recomposés (`_recomposer_brouillons_mensuels`) — la
+        re-génération à l'émission (#266) suffit déjà à la conformité du
+        document final, mais le·la facturiste doit voir la nouvelle
+        Refacturation rassemblée AVANT d'émettre, pas seulement après.
         """
         existantes = set(
             self.search([('reference', 'in', [ligne['reference'] for ligne in lignes])]).mapped('reference')
@@ -186,6 +193,7 @@ class SouscriptionRefacturation(models.Model):
             for s in self.env['souscription.souscription'].search([('ref_situation_contractuelle', 'in', list(rscs))])
         }
         compte = {'creees': 0, 'ignorees': 0, 'erreurs': 0}
+        souscriptions_touchees = set()
         for ligne in lignes:
             if ligne['reference'] in existantes:
                 continue
@@ -197,10 +205,32 @@ class SouscriptionRefacturation(models.Model):
                 with self.env.cr.savepoint():
                     self.create(self._vals_prestation(ligne, souscription))
                 compte['creees'] += 1
+                souscriptions_touchees.add(souscription.id)
             except Exception:
                 _logger.warning('Sync prestation %s : échec, ligne sautée.', ligne.get('reference'), exc_info=True)
                 compte['erreurs'] += 1
+        self._recomposer_brouillons_mensuels(souscriptions_touchees)
         return compte
+
+    def _recomposer_brouillons_mensuels(self, souscription_ids):
+        """Recompose les brouillons mensuels (source Période, pas
+        Régularisation) NON ÉMIS des souscriptions dont une nouvelle
+        Refacturation vient d'être insérée (#267, point d'entrée (c)) — pour
+        que le·la facturiste voie tout de suite la ligne rassemblée sur le
+        document qu'il·elle s'apprête à émettre. Aucun effet sur une facture
+        déjà émise (filtre `state == 'draft'`) : la re-génération à
+        l'émission (#266) reste le filet de sécurité final."""
+        if not souscription_ids:
+            return
+        brouillons = self.env['account.move'].search(
+            [
+                ('souscription_id', 'in', list(souscription_ids)),
+                ('state', '=', 'draft'),
+                ('periode_id', '!=', False),
+            ]
+        )
+        for move in brouillons:
+            move._recomposer_lignes_generees()
 
     @api.model
     def _vals_prestation(self, ligne, souscription):

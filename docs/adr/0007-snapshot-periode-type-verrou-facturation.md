@@ -65,3 +65,29 @@ Achever la « refonte propre » du modèle Période (#14) : un snapshot **typé*
 dette de parsing, et le **verrou à la facturation** fait du couple Période/Facture un objet
 **rejouable**, sans surface d'altération a posteriori — la période est éditée *avant*
 facturation, puis figée par celle-ci.
+
+## Amendement (#267) — le verrou suit l'émission, pas l'existence de la facture
+
+Décision re-instruite dans le cadre du PRD #264 (Brouillon gouverné, grillé le 2026-07-13),
+tranche 3 — voir [ADR-0032](0032-brouillon-gouverne-gel-a-lemission.md) pour la décision
+complète et sa recherche d'idiome. La décision 2 ci-dessus tranchait explicitement pour un
+verrou à la **facturation** (`facture_id` truthy, brouillon compris) plutôt qu'à
+l'**émission** (`state == 'posted'`), écartée alors au motif que « laisserait la période
+modifiable alors qu'une facture (brouillon) la reflète déjà, désaccordant la facture de la
+période ».
+
+Ce risque est neutralisé autrement depuis : la Facture ne « reflète » plus passivement la
+Période, elle la **projette** et se **régénère au fil de l'eau** pendant toute la fenêtre
+brouillon dès que la Période bouge ([ADR-0014 amendé](0014-pas-de-verrou-lignes-facture-confiance-facturiste.md),
+#266/#267). Le brouillon ne peut donc plus « désaccorder » silencieusement — il suit. Le
+verrou (`souscription.periode._est_facturee_emise`) se déclenche désormais sur
+**`facture_id.state == 'posted'`** (ou `facture_legacy_ref`, toujours considérée émise),
+plus sur la seule existence d'une Facture : `write()` rejette l'édition des champs
+facturables une fois la Facture ÉMISE, et déclenche (au lieu de rejeter) la régénération du
+brouillon lié tant qu'elle ne l'est pas. Message d'erreur mis à jour en conséquence
+(« supprimer la facture pour dé-figer » n'a plus de sens : rien n'est figé avant
+l'émission — la correction passe par un avoir ou une régularisation après coup).
+
+La Période elle-même n'a pas gagné de second état stocké : la condition reste **dérivée**,
+lue sur `account.move.state` au moment du `write()`, dans le même esprit « 0 champ » que le
+reste du module (ADR 0025 §2).

@@ -14,6 +14,7 @@ from . import (
     test_facturation,
     test_facture_document,
     test_facture_provenance,
+    test_gel_emission,
     test_grille_prix,
     test_integration,
     test_invoice_template,

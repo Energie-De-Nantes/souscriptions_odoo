@@ -60,22 +60,40 @@ class AccountMove(models.Model):
             move.is_facture_energie = bool((move.periode_id or move.regularisation_id) and move.souscription_id)
 
     def _post(self, soft=True):
-        """Point de couture de l'émission — re-génération préservante des
-        lignes (#266, tranche 2 du PRD #264), tampon de Régularisation (ADR
-        0030 décision 4, tranche 6 du PRD #231, #238) **et** imputation du
-        chèque énergie (ADR 0026, #172, déplacée de la création à l'émission
-        par la tranche 1 du PRD #264, #265).
+        """Point de couture de l'émission — **unique événement de gel** (ADR
+        0032) : tampon de provision Période (ADR 0030 décision 2, #234,
+        déplacé de la création à l'émission par la tranche 3 du PRD #264,
+        #267), re-génération préservante des lignes (#266, tranche 2 du PRD
+        #264), tampon de Régularisation (ADR 0030 décision 4, tranche 6 du
+        PRD #231, #238) **et** imputation du chèque énergie (ADR 0026, #172,
+        déplacée de la création à l'émission par la tranche 1 du PRD #264,
+        #265).
 
-        La re-génération se déclenche AVANT ``super()._post()`` — le move est
-        encore brouillon, ses lignes flaguées éditables — sur ``self`` (pas
-        sur le résultat filtré) : même un move programmé dans le futur
-        (``soft=True``, qui restera en brouillon) doit voir ses lignes
-        rafraîchies. Le tampon et l'imputation, eux, ne se déclenchent qu'à
-        l'émission RÉELLE : filtrer sur le résultat de ``super()._post()``,
-        pas sur ``self``, exclut naturellement les moves soft-programmés sans
-        logique dédiée."""
+        Ordre gravé (#267, AC « effets observables dans cet ordre ») :
+        **tampon -> re-génération finale -> post -> verrou (dérivé) -> solde
+        régul -> imputation chèque**. Le tampon doit précéder la
+        re-génération : ``_quantite_facturee`` lit le mesuré tant que la
+        provision n'est pas tamponnée (#267), donc composer les lignes AVANT
+        le tampon figerait une quantité pas encore gelée sur les lignes qui,
+        elles, ne seront plus jamais recomposées après ce ``_post()``. Le
+        verrou de la Période/des Relevés n'a besoin d'aucun appel : il est
+        **dérivé** de ``facture_id.state == 'posted'``
+        (``souscription.periode._est_facturee_emise``) — il s'active tout
+        seul dès que ``super()._post()`` a tourné.
+
+        Tampon et re-génération se déclenchent AVANT ``super()._post()`` — le
+        move est encore brouillon, sa Période pas encore verrouillée, ses
+        lignes flaguées éditables — sur ``self`` (pas sur le résultat
+        filtré) : même un move programmé dans le futur (``soft=True``, qui
+        restera en brouillon) doit voir sa provision tamponnée et ses lignes
+        rafraîchies. Le solde régul et l'imputation, eux, ne se déclenchent
+        qu'à l'émission RÉELLE : filtrer sur le résultat de
+        ``super()._post()``, pas sur ``self``, exclut naturellement les
+        moves soft-programmés sans logique dédiée."""
         a_regenerer = self.filtered(lambda m: m.is_facture_energie and m.state == 'draft')
         for move in a_regenerer:
+            if move.periode_id:
+                move.periode_id._tamponner_provision()
             move._recomposer_lignes_generees()
 
         posted = super()._post(soft=soft)
@@ -89,10 +107,17 @@ class AccountMove(models.Model):
         """Autorise la suppression EN CASCADE des lignes générées (#266) : le
         contexte `souscription_move_unlink` lève la garde `ondelete` de
         `account.move.line` (`_empecher_suppression_directe_ligne_generee`)
-        pour les lignes de CE move — supprimer la facture reste le geste de
-        correction documenté (dé-fige la Période, ADR 0014/0007), la cascade
-        ORM (`account.move.line.move_id`, `ondelete='cascade'`) ne doit jamais
-        être bloquée par cette garde."""
+        pour les lignes de CE move — la cascade ORM (`account.move.line.
+        move_id`, `ondelete='cascade'`) ne doit jamais être bloquée par cette
+        garde.
+
+        Supprimer un brouillon est ANODIN depuis #267 (ADR 0006/0007 amendés,
+        ADR 0032) : rien n'est figé avant l'émission, donc rien à
+        « dé-figer ». `souscription.refacturation.facture_id` (ondelete='set
+        null') remet les Refacturations rassemblées en file, et le statut de
+        facturation de la Souscription (dérivé, ADR 0025 §2) retombe tout
+        seul à « à facturer » — la cascade native suffit, aucun code dédié
+        ici."""
         self = self.with_context(souscription_move_unlink=True)
         return super().unlink()
 

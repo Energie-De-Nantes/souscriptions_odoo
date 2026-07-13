@@ -10,8 +10,11 @@ amorcé :
 - empreinte **nouvelle** + verdict `réelle`/`estimée` -> écrase l'atterrissage
   réseau v3 **en bloc** (`souscription.periode._rafraichir_depuis_meta`) —
   jamais d'énergie fraîche sur TURPE périmé — et, **seulement si la Période
-  n'est pas facturée**, remplace aussi les relevés en bloc (le re-pull promis
-  par ADR 0015) ;
+  n'est pas ÉMISE** (condition dérivée, amendée #267 : une Facture qui la
+  référence est postée — plus « facturée » au sens brouillon compris),
+  remplace aussi les relevés en bloc (le re-pull promis par ADR 0015) et
+  recompose le brouillon lié s'il en existe un (régénération au fil de
+  l'eau, #267) ;
 - `incalculable` ou mois absent du flux -> la valeur stockée est conservée,
   signalée au rapport (« je ne sais pas » n'écrase pas « je savais »).
 
@@ -21,10 +24,10 @@ mais elle n'est plus systématiquement **ignorée** — elle est désormais
 évaluée par l'empreinte ci-dessus.
 
 Exemption chirurgicale du verrou de facturation (#14) : le **mesuré** d'une
-Période facturée redevient réécrivable par ce service (et par le·la
-facturiste à la main, cf. `souscription.periode._LOCKED_FIELDS`). Le
-**facturé** (provisions, jours, snapshot contractuel, relevés-justificatifs)
-reste refusé — ce service n'écrit **jamais** `provision_*`.
+Période ÉMISE redevient réécrivable par ce service (et par le·la facturiste
+à la main, cf. `souscription.periode._LOCKED_FIELDS`). Le **facturé**
+(provisions, jours, snapshot contractuel, relevés-justificatifs) reste
+refusé — ce service n'écrit **jamais** `provision_*`.
 
 Deux scopes partagent cette politique (ADR 0030 conséquences) :
 - `pull(souscriptions, mois)` — scope **facturation** : un mois, crée les

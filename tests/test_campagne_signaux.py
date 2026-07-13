@@ -68,6 +68,18 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
         periode._creer_facture()
         self.assertEqual(self.campagne._statut_facturation(self.souscription_base), 'facturee')
 
+    def test_statut_redevient_a_facturer_apres_suppression_du_brouillon(self):
+        """#267 AC : supprimer un brouillon ne laisse aucun gel résiduel — le
+        statut de facturation, dérivé à zéro champ, retombe tout seul à
+        « à facturer » (`periode.facture_id` recalculé)."""
+        periode = self._periode(self.souscription_base)
+        facture = periode._creer_facture()
+        self.assertEqual(self.campagne._statut_facturation(self.souscription_base), 'facturee')
+
+        facture.unlink()
+
+        self.assertEqual(self.campagne._statut_facturation(self.souscription_base), 'a_facturer')
+
     def test_statut_emise_facture_postee(self):
         """Config 4 : facture postée -> émise."""
         periode = self._periode(self.souscription_base)

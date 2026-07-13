@@ -71,22 +71,32 @@ class TestPeriodeSnapshotType(SouscriptionsTestCase):
         periode.write({'provision_base_kwh': 250.0})
         self.assertEqual(periode.provision_base_kwh, 250.0)
 
-    def test_periode_figee_des_la_facturation(self):
-        """Dès qu'une facture référence la période (brouillon de facture compris),
-        ses champs facturables sont figés : toute réécriture est rejetée
-        (UserError), y compris via RPC (#14).
-
-        `energie_base_kwh` est aligné sur `provision_base_kwh` : souscription_base
-        est non lissée, donc `_creer_facture` tamponne `provision := energie`
-        (#234) — sans cet alignement le tampon écraserait la provision saisie
-        avant de tester le verrou, ce qui n'est pas le sujet de ce test."""
+    def test_periode_editable_avec_facture_brouillon(self):
+        """AC #267 : une facture en BROUILLON qui référence la période ne la
+        fige plus — le gel suit l'émission, pas l'existence de la facture.
+        Preuve, sans migration de données, que les Périodes gelées sous
+        l'ancien régime (facture_id truthy = gelée) avec facture encore en
+        brouillon sont DE FAIT dé-gelées par la condition dérivée."""
         periode = self._periode(self.souscription_base, provision_base_kwh=100.0, energie_base_kwh=100.0)
-        periode._creer_facture()  # facture créée (brouillon) → période figée
+        facture = periode._creer_facture()  # brouillon → période toujours éditable
+        self.assertEqual(facture.state, 'draft')
+
+        periode.write({'provision_base_kwh': 999.0})  # ne lève rien
+
+        self.assertEqual(periode.provision_base_kwh, 999.0)
+
+    def test_periode_figee_a_lemission(self):
+        """Dès qu'une facture ÉMISE (postée) référence la période, ses champs
+        facturables sont figés : toute réécriture est rejetée (UserError), y
+        compris via RPC (#14, condition dérivée amendée #267)."""
+        periode = self._periode(self.souscription_base, provision_base_kwh=100.0, energie_base_kwh=100.0)
+        facture = periode._creer_facture()
+        facture.action_post()  # émission → période figée
 
         with self.assertRaises(UserError):
             periode.write({'provision_base_kwh': 999.0})
 
-        # La valeur figée n'a pas bougé.
+        # La valeur figée n'a pas bougé (tamponnée à l'émission : energie_base_kwh).
         self.assertEqual(periode.provision_base_kwh, 100.0)
 
     def test_champs_compat_deprecies_supprimes(self):

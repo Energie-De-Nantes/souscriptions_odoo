@@ -87,18 +87,21 @@ class SouscriptionReleve(models.Model):
         "pour les relevés d'événement C15).",
     )
 
-    # Verrou de facturation étendu à l'enfant (#56 / ADR 0014-0015). Symétrique du
-    # verrou _LOCKED_FIELDS de la Période : dès qu'une Période est facturée
-    # (facture_id existe, brouillon de facture compris), ses relevés sont figés —
-    # sinon le justificatif d'index pourrait diverger silencieusement de la facture
-    # émise. Pour corriger : supprimer la facture (défige) ou émettre une
-    # régularisation.
+    # Verrou de facturation étendu à l'enfant (#56 / ADR 0014-0015, condition
+    # dérivée amendée #267). Symétrique de `souscription.periode._est_facturee_emise` :
+    # dès qu'une Facture qui référence la Période est **émise** (postée) — ou
+    # qu'elle porte une facture legacy (#107) —, ses relevés sont figés,
+    # sinon le justificatif d'index pourrait diverger silencieusement de la
+    # facture émise. Pendant la fenêtre brouillon (Facture pas encore
+    # postée), les relevés restent librement éditables — même condition que
+    # le verrou de la Période elle-même. Pour corriger après émission : un
+    # avoir ou une régularisation.
     def _check_periode_non_facturee(self, periodes):
         for periode in periodes:
-            if periode.facture_id:
+            if periode._est_facturee_emise():
                 raise UserError(
-                    f'Période {periode.mois_annee} : déjà facturée, modification des relevés '
-                    'interdite. Supprimez la facture pour corriger, ou créez une régularisation.'
+                    f'Période {periode.mois_annee} : facture émise, modification des relevés '
+                    'interdite. Corrigez par un avoir ou par une régularisation.'
                 )
 
     @api.model_create_multi

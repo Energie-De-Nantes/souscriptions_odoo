@@ -247,17 +247,18 @@ class TestRafraichirDepuisMeta(SouscriptionsTestCase):
         self.assertEqual(len(periode.releve_ids), 1)
         self.assertEqual(periode.releve_ids.releve_externe_id, 'R2')
 
-    def test_provisions_et_releves_intacts_si_facturee(self):
-        """AC2/AC5 : Période facturée -> le mesuré est rafraîchi mais la
-        provision (facturé gelé) et le relevé-justificatif restent intacts —
-        exemption chirurgicale du verrou (#14), jamais la provision."""
+    def test_provisions_et_releves_intacts_si_emise(self):
+        """AC2/AC5 (condition dérivée amendée #267) : Période ÉMISE (facture
+        postée) -> le mesuré est rafraîchi mais la provision (facturé gelé)
+        et le relevé-justificatif restent intacts — exemption chirurgicale du
+        verrou (#14), jamais la provision."""
         periode = self.env['souscription.periode']._amorcer_depuis_meta(
             self.souscription_base,
             _periode_meta(
                 releves_utilises=[_objet_releve(releve_id='R1', index_base_kwh=1000)], energie_base_kwh=280.0
             ),
         )
-        periode._creer_facture()  # facturée -> tampon provision := energie (#234)
+        periode._creer_facture().action_post()  # émise -> tampon provision := energie (#234, #267)
         self.assertEqual(periode.provision_base_kwh, 280.0)
 
         periode._rafraichir_depuis_meta(
@@ -272,6 +273,42 @@ class TestRafraichirDepuisMeta(SouscriptionsTestCase):
         self.assertEqual(periode.energie_base_kwh, 310.0)  # mesuré rafraîchi
         self.assertEqual(periode.provision_base_kwh, 280.0)  # facturé gelé, intact
         self.assertEqual(periode.releve_ids.releve_externe_id, 'R1')  # relevé-justificatif intact
+
+    def test_releves_remplaces_en_bloc_si_facture_encore_brouillon(self):
+        """AC #267 : une Période dont la Facture est en BROUILLON n'est pas
+        encore émise — le refresh continue de remplacer ses relevés en bloc
+        (le re-pull promis par ADR 0015), condition dérivée de l'état réel de
+        la Facture, pas de sa seule existence."""
+        periode = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base,
+            _periode_meta(releves_utilises=[_objet_releve(releve_id='R1', index_base_kwh=1000)]),
+        )
+        periode._creer_facture()  # brouillon : pas encore émise
+        self.assertEqual(periode.facture_id.state, 'draft')
+
+        periode._rafraichir_depuis_meta(
+            _periode_meta(source_hash='H2', releves_utilises=[_objet_releve(releve_id='R2', index_base_kwh=1310)])
+        )
+
+        self.assertEqual(len(periode.releve_ids), 1)
+        self.assertEqual(periode.releve_ids.releve_externe_id, 'R2')
+
+    def test_refresh_regenere_le_brouillon_lie(self):
+        """AC #267, point d'entrée (a) : le refresh d'une Période dont la
+        Facture est en brouillon recompose ce brouillon — le facturiste voit
+        tout de suite le mesuré rafraîchi reflété dans les lignes (lu en
+        direct par `_quantite_facturee` tant que non tamponné, #267)."""
+        periode = self.env['souscription.periode']._amorcer_depuis_meta(
+            self.souscription_base, _periode_meta(energie_base_kwh=280.0)
+        )
+        facture = periode._creer_facture()
+        ligne = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie Base')
+        self.assertEqual(ligne.quantity, 280.0)
+
+        periode._rafraichir_depuis_meta(_periode_meta(source_hash='H2', energie_base_kwh=310.0, qualite='réelle'))
+
+        ligne_apres = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie Base')
+        self.assertEqual(ligne_apres.quantity, 310.0, 'le brouillon a été recomposé avec le mesuré rafraîchi')
 
 
 # === Service « propriétaire durable du pull », gardé par l'empreinte (#233,
@@ -402,10 +439,11 @@ class TestPullMetaPeriodesService(SouscriptionsTestCase):
         self.assertFalse(conservees)
         self.assertFalse(erreurs)
 
-    def test_empreinte_nouvelle_periode_facturee_provisions_et_releves_intacts(self):
-        """AC2 : sur une Période facturée, le mesuré est rafraîchi mais les
-        provisions et les relevés-justificatifs restent intacts — exemption
-        chirurgicale du verrou (#14), jamais la provision."""
+    def test_empreinte_nouvelle_periode_emise_provisions_et_releves_intacts(self):
+        """AC2 (condition dérivée amendée #267) : sur une Période ÉMISE, le
+        mesuré est rafraîchi mais les provisions et les relevés-justificatifs
+        restent intacts — exemption chirurgicale du verrou (#14), jamais la
+        provision."""
         self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
         existante = self.env['souscription.periode']._amorcer_depuis_meta(
             self.souscription_base,
@@ -416,7 +454,7 @@ class TestPullMetaPeriodesService(SouscriptionsTestCase):
                 releves_utilises=[_objet_releve(releve_id='R1', index_base_kwh=1000)],
             ),
         )
-        existante._creer_facture()  # facturée -> provision tamponnée (#234)
+        existante._creer_facture().action_post()  # émise -> provision tamponnée (#234, #267)
         self.assertEqual(existante.provision_base_kwh, 280.0)
 
         meta = _periode_meta(

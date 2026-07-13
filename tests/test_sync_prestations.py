@@ -184,6 +184,34 @@ class TestSyncPrestations(SouscriptionsTestCase):
         self.assertEqual(presta.prix, 30.37)
         self.assertEqual(presta.facture_id, facture)
 
+    def test_sync_recompose_le_brouillon_mensuel_non_emis(self):
+        """#267, point d'entrée (c) : une nouvelle Refacturation tirée par le
+        sync apparaît immédiatement sur le brouillon mensuel NON ÉMIS du·de
+        la souscripteur·rice — le·la facturiste la voit AVANT d'émettre (la
+        re-génération à l'émission, #266, reste le filet de sécurité final,
+        pas le seul moment où la ligne apparaît)."""
+        _periode, facture = self.create_test_invoice(self.souscription_base)
+        self.assertEqual(facture.state, 'draft')
+        self.assertFalse(facture.invoice_line_ids.filtered(lambda l: l.name == 'Mise en service'))
+
+        self._sync([_ligne(reference='ref-au-fil-de-leau')])
+
+        ligne = facture.invoice_line_ids.filtered(lambda l: l.name == 'Mise en service')
+        self.assertEqual(len(ligne), 1)
+        self.assertEqual(self._prestas('ref-au-fil-de-leau').facture_id, facture)
+
+    def test_sync_ne_touche_pas_un_brouillon_deja_emis(self):
+        """Non-régression : une Facture déjà ÉMISE (postée) n'est pas
+        recomposée par le sync — la nouvelle Refacturation reste en file,
+        rassemblée par la prochaine facture (comportement inchangé, #266)."""
+        _periode, facture = self.create_test_invoice(self.souscription_base)
+        facture.action_post()
+
+        self._sync([_ligne(reference='ref-apres-emission')])
+
+        self.assertFalse(facture.invoice_line_ids.filtered(lambda l: l.name == 'Mise en service'))
+        self.assertFalse(self._prestas('ref-apres-emission').facture_id, 'reste en file, pas rassemblée après coup')
+
     def test_erreur_par_ligne_ne_bloque_pas_le_lot(self):
         """Skip-and-report par ligne (ADR 0011) : une contrainte (ici UNIQUE sur
         une référence dupliquée dans le même lot — violation du contrat v1) est

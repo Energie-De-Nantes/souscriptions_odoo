@@ -95,7 +95,7 @@ class SouscriptionRegularisation(models.Model):
         # Rafraîchit le mesuré (scope régul de la tranche 2, #235) avant de
         # lire les verdicts — un appel par mois représenté, jamais une plage :
         # chaque appel rend son propre rapport (conservées/rafraîchies…),
-        # correlé sans ambiguïté au mois qui vient d'être demandé (pas de
+        # corrélé sans ambiguïté au mois qui vient d'être demandé (pas de
         # parsing de libellés à travers deux conventions de format).
         Service = self.env['souscription.pull.meta.periodes.service']
         fraiches = set()

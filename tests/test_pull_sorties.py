@@ -16,7 +16,7 @@ Deux tranches :
 Fixtures RSC/PDL : identifiants factices (jamais des vrais échantillons).
 """
 
-from datetime import date, timedelta
+from datetime import date
 
 from odoo.addons.souscriptions_odoo.models.core import souscription_pull_meta_periodes_service as service_module
 from odoo.exceptions import UserError
@@ -33,8 +33,10 @@ class TestPullSortiesService(SouscriptionsTestCase):
 
     def test_sortie_absente_ecrit_date_fin_dernier_jour_servi_et_trace_au_chatter(self):
         """AC1 : une sortie RES au 12/06 -> date_fin = 11/06 (dernier jour
-        servi, convention de borne ADR 0031 décision 2), etat = 'resiliee'
-        dérive (compute existant), chatter posé avec le code et la date brute."""
+        servi, convention de borne ADR 0031 décision 2), etat = 'en_attente_cloture'
+        dérive (compute existant) — la clôture n'est pas soldée (aucune
+        Période ne couvre encore `date_fin`), tranche 2 #247 ; chatter posé
+        avec le code et la date brute."""
         self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
         client = client_sorties_factice(
             [ligne_sortie('RSC-00000000000001', date(2024, 6, 12), evenement_declencheur='RES')]
@@ -43,7 +45,7 @@ class TestPullSortiesService(SouscriptionsTestCase):
         ecrites, corrigees, inchangees, erreurs = self._pull_sorties(client, self.souscription_base)
 
         self.assertEqual(self.souscription_base.date_fin, date(2024, 6, 11))
-        self.assertEqual(self.souscription_base.etat, 'resiliee')
+        self.assertEqual(self.souscription_base.etat, 'en_attente_cloture')
         self.assertEqual(len(ecrites), 1)
         self.assertFalse(corrigees)
         self.assertFalse(inchangees)
@@ -195,7 +197,19 @@ class TestActionTirerSortiesC15(SouscriptionsTestCase):
 
     def test_perimetre_exclut_les_souscriptions_deja_resiliees(self):
         self.souscription_base.write(
-            {'ref_situation_contractuelle': 'RSC-00000000000001', 'date_fin': date.today() - timedelta(days=1)}
+            {'ref_situation_contractuelle': 'RSC-00000000000001', 'date_fin': date(2024, 1, 31)}
+        )
+        # Clôture soldée (non-lissé, écarts nuls par construction, ADR 0031
+        # décision 3, #247) : la Période contenant `date_fin` facturée suffit
+        # -> `resiliee` direct, hors périmètre du pull (même garde que la RSC
+        # déjà résolue).
+        self.env['souscription.periode'].create(
+            {
+                'souscription_id': self.souscription_base.id,
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 2, 1),
+                'facture_legacy_ref': 'LEGACY-DEJA-RESILIEE-1',
+            }
         )
         self.assertEqual(self.souscription_base.etat, 'resiliee')
         client = client_sorties_factice([])

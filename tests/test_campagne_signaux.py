@@ -140,11 +140,14 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
         self.assertEqual(self._etape('pull_meta_periodes').nb_reste_a_faire, 2)
 
     def test_perimetre_inclut_souscription_en_service_pendant_le_mois_mais_resiliee_depuis(self):
-        """En service dès janvier, résiliée en juin (dans le passé par
+        """En service dès janvier, sortie posée en juin (dans le passé par
         rapport à aujourd'hui) : concernée par mars, donc dans le
-        périmètre — pas de sous-compte malgré `etat == 'resiliee'`."""
+        périmètre — pas de sous-compte malgré `etat == 'en_attente_cloture'`
+        (aucune Période ne couvre encore `date_fin` ici, clôture non soldée,
+        ADR 0031 décision 3, #247 — le périmètre lit `date_fin`, jamais
+        l'instantané vivant `etat`, quel que soit son état dérivé)."""
         resiliee = self._creer_souscription_rsc('PDL_RESILIEE', 'RSC-RESILIEE', date(2024, 1, 1), date(2024, 6, 30))
-        self.assertEqual(resiliee.etat, 'resiliee')
+        self.assertEqual(resiliee.etat, 'en_attente_cloture')
         self.campagne.invalidate_recordset()
 
         self.assertIn(resiliee, self.campagne._souscriptions_facturables())

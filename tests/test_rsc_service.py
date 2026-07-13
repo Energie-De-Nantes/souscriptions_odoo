@@ -9,7 +9,7 @@ pas de mock d'`electricore_client` lui-même, pas de HTTP, pas de mock du
 temps.
 """
 
-from datetime import date, timedelta
+from datetime import date
 
 from odoo.addons.souscriptions_odoo.models.core import electricore_rsc_service as service_module
 from odoo.exceptions import UserError
@@ -146,8 +146,19 @@ class TestActionResoudreRscMaintenant(SouscriptionsTestCase):
         l'action serveur, même sans RSC (résiliation avant mise en service)
         et même appelée en lot — aucun appel au service RSC, idempotence
         conservée (même garde que le poll quotidien #89, `etat ==
-        'en_instance'`)."""
-        self.souscription_base.write({'date_fin': date.today() - timedelta(days=1)})
+        'en_instance'`). Clôture soldée (non-lissé, écarts nuls par
+        construction, ADR 0031 décision 3, #247) : la Période contenant
+        `date_fin` facturée suffit à faire basculer directement en
+        `resiliee`, sans Régularisation."""
+        self.env['souscription.periode'].create(
+            {
+                'souscription_id': self.souscription_base.id,
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 2, 1),
+                'facture_legacy_ref': 'LEGACY-RESILIEE-GUARD-1',
+            }
+        )
+        self.souscription_base.write({'date_fin': date(2024, 1, 31)})
         self.assertEqual(self.souscription_base.etat, 'resiliee')
 
         with _patch_appeler() as mock_appeler:

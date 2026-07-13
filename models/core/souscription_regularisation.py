@@ -376,7 +376,16 @@ class SouscriptionRegularisation(models.Model):
 
         Contourne le verrou de facturation (#14) via le contexte
         `regularisation_tampon` — seul canal qui réécrit la provision d'une
-        Période déjà facturée (cf. `souscription.periode.write`)."""
+        Période déjà facturée (cf. `souscription.periode.write`).
+
+        Note (PR #259, décision en attente) : re-poster le même move (post ->
+        button_draft -> re-post) rejoue ce tampon et double-buffer les
+        provisions — problème connu, pas résolu ici. `_marquer_regularisee_si_cloture`
+        ci-dessous reste dans ce même chemin gardé (appelé uniquement depuis
+        `account.move._post()` sur les moves qui viennent d'être postés,
+        jamais un second effet non idempotent ajouté) : poser un booléen à
+        `True` deux fois est un non-événement, donc un re-post n'aggrave rien
+        de ce côté-là."""
         self.ensure_one()
         for ligne in self.ligne_ids:
             champ = f'provision_{ligne.cadran}_kwh'
@@ -384,6 +393,35 @@ class SouscriptionRegularisation(models.Model):
                 periode = detail.periode_id
                 periode.with_context(regularisation_tampon=True).write({champ: periode[champ] + detail.ecart_kwh})
         self.periode_couverte_ids.with_context(regularisation_tampon=True).write({'regularisation_id': self.id})
+        self._marquer_regularisee_si_cloture()
+
+    def _marquer_regularisee_si_cloture(self):
+        """ADR 0031 décision 4 (#248) : quand `self` est LA Régularisation de
+        clôture — celle dont `periode_couverte_ids` inclut la Période de
+        clôture de la souscription (`souscription._periode_cloture()`,
+        laquelle n'existe que si `date_fin` est posé) — TOUS les mois
+        (mensuelles) de la souscription passent à l'état « régularisée » :
+        `legacy_regularisee` gagne un second auteur (le premier étant la
+        migration, PRD #207/#208 — cf. son docstring sur
+        `souscription.periode`). Le livre est fermé : `_recalculer()` exclut
+        silencieusement ces mois de tout futur calcul de candidats, même si
+        electricore raffine encore le mesuré ensuite.
+
+        No-op pour une Régularisation ordinaire en cours de vie (souscription
+        encore en service, ou clôture pas encore couverte par CE
+        recalcul) : seule celle qui couvre effectivement la Période de
+        clôture déclenche le marquage — une régularisation antérieure sur une
+        souscription qui sortira plus tard ne doit rien marquer.
+
+        Idempotent par construction (poser `True` deux fois est un
+        non-événement) — cf. la note sur le re-post dans `_solder_provisions`."""
+        self.ensure_one()
+        souscription = self.souscription_id
+        periode_cloture = souscription._periode_cloture()
+        if not periode_cloture or periode_cloture not in self.periode_couverte_ids:
+            return
+        mois = souscription.periode_ids.filtered(lambda p: p.type_periode == 'mensuelle')
+        mois.write({'legacy_regularisee': True})
 
     def releve_colonnes(self):
         """Colonnes d'index réseau (`label`, `field`) pour le justificatif des

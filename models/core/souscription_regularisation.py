@@ -1,17 +1,20 @@
 from odoo import api, fields, models
+from odoo.exceptions import UserError
 
 
 class SouscriptionRegularisation(models.Model):
-    """Régularisation (solde) — CONTEXT.md, ADR 0030 décisions 3-4, tranche 4
-    du PRD #231. Même motif que la Refacturation (ADR 0009) : modèle
-    indépendant de la Période, rassemblé sur une Facture (tranche 5, #237).
+    """Régularisation (solde) — CONTEXT.md, ADR 0030 décisions 3-4, tranches 4
+    et 5 du PRD #231. Même motif que la Refacturation (ADR 0009) : modèle
+    indépendant de la Période, rassemblé sur une Facture.
 
     En-tête par Souscription : dates couvertes **informatives** (dérivées des
     lignes, jamais une fenêtre stockée — les candidats se sélectionnent par
     l'écart et le verdict, ADR 0030 décision 4) + lignes **typées** (une par
-    grille × cadran). Toujours en brouillon dans cette tranche : ni génération
-    de facture (tranche 5, #237) ni tampon de l'énergie facturée (tranche 6,
-    #238) — `_recalculer()` ne fait que (re)construire les lignes, à volonté.
+    grille × cadran). `_recalculer()` (re)construit les lignes, à volonté —
+    mais refuse dès qu'une Facture existe (``facture_id``, tranche 5, #237) :
+    l'« état facturée » dérivé du lien **verrouille** le recalcul, faute de
+    quoi la Facture divergerait silencieusement des lignes qui l'ont projetée.
+    Le tampon de l'énergie facturée (tranche 6, #238) reste hors périmètre.
     """
 
     _name = 'souscription.regularisation'
@@ -44,10 +47,45 @@ class SouscriptionRegularisation(models.Model):
     # du·de la facturiste, même idiome que `wizard.resultat`.
     signalements = fields.Text(string='Signalements', readonly=True)
 
+    # Lien Régularisation ↔ Facture (ADR 0030 décision 5) : `account.move.
+    # regularisation_id` est l'unique source de vérité (même motif que
+    # `souscription.periode.facture_id`/`move_ids`, ADR 0004) ; `facture_id`
+    # en est dérivé. La Facture peut être un avoir (`out_refund`, net négatif,
+    # tranche 5 #237) — les deux types comptent comme « facturée ».
+    move_ids = fields.One2many('account.move', 'regularisation_id', string='Documents liés', readonly=True)
+    facture_id = fields.Many2one(
+        'account.move',
+        string='Facture (ou avoir)',
+        compute='_compute_facture_id',
+        store=True,
+        help='Facture (out_invoice) ou avoir (out_refund) projeté depuis cette Régularisation.',
+    )
+
+    # État dérivé du lien (aucun champ saisi, CONTEXT.md « Régularisation
+    # (solde) ») : « facturée » dès qu'une Facture référence cette
+    # Régularisation — verrouille alors `_recalculer()` (tranche 5, #237).
+    etat = fields.Selection(
+        [('brouillon', 'Brouillon'), ('facturee', 'Facturée')],
+        string='État',
+        compute='_compute_etat',
+        store=True,
+    )
+
     @api.depends('ligne_ids.montant')
     def _compute_montant_total(self):
         for regul in self:
             regul.montant_total = sum(regul.ligne_ids.mapped('montant'))
+
+    @api.depends('move_ids.move_type')
+    def _compute_facture_id(self):
+        for regul in self:
+            factures = regul.move_ids.filtered(lambda m: m.move_type in ('out_invoice', 'out_refund'))
+            regul.facture_id = factures[:1]
+
+    @api.depends('facture_id')
+    def _compute_etat(self):
+        for regul in self:
+            regul.etat = 'facturee' if regul.facture_id else 'brouillon'
 
     def action_recalculer(self):
         self.ensure_one()
@@ -66,8 +104,21 @@ class SouscriptionRegularisation(models.Model):
     def _recalculer(self):
         """(Re)construit les lignes depuis les mois candidats — supprime les
         lignes existantes puis reconstruit entièrement (idempotent à données
-        constantes, AC #236)."""
+        constantes, AC #236).
+
+        Refuse dès qu'une Facture existe (``facture_id``, tranche 5, #237) :
+        une Régularisation facturée est verrouillée, au même titre qu'une
+        Période facturée (#14) — recalculer romprait silencieusement le lien
+        entre les lignes projetées et le document légal déjà émis. Pour
+        corriger : supprimer la Facture (ce qui dé-fige la Régularisation) ou
+        émettre une nouvelle Régularisation.
+        """
         self.ensure_one()
+        if self.facture_id:
+            raise UserError(
+                f'{self.souscription_id.name} : régularisation déjà facturée, recalcul interdit. '
+                'Supprimez la facture pour corriger, ou créez une nouvelle régularisation.'
+            )
         souscription = self.souscription_id
         self.ligne_ids.unlink()
 

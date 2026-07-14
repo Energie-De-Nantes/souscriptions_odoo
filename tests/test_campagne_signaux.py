@@ -236,6 +236,23 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
         group_by = action['context'].get('group_by')
         self.assertIn('state', [group_by] if isinstance(group_by, str) else group_by)
 
+    def test_drill_down_gestes_commerciaux_ouvre_les_factures_du_mois_groupees_par_etat(self):
+        """#287 : la porte « Gestes commerciaux » ouvre le même drill-down que
+        Créer/Émettre — c'est sur ces brouillons du mois que la facturiste
+        pose la ligne € manuelle avant que l'émission ne les gèle (ADR 0032)."""
+        p1 = self._periode(self.souscription_base)
+        p2 = self._periode(self.souscription_hphc)
+        p1._creer_facture()
+        p2._creer_facture().action_post()
+        self.campagne.invalidate_recordset()
+
+        action = self._etape('gestes_commerciaux').action_drill_down()
+
+        self.assertEqual(action['res_model'], 'account.move')
+        self.assertEqual(set(action['domain'][0][2]), set(self.campagne._factures_du_mois().ids))
+        group_by = action['context'].get('group_by')
+        self.assertIn('state', [group_by] if isinstance(group_by, str) else group_by)
+
     # --- Décompte factures créées / émises du mois (AC) ---
 
     def test_compte_factures_creees_et_emises_du_mois(self):

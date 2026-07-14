@@ -88,10 +88,21 @@ ETAPES_CAMPAGNE = {
         'type': 'derive',
         'prerequis': ('verif_periodes', 'verif_refacturations'),
     },
+    # Porte manuelle (#287, ADR 0025 §2 — même grain que les vérifs) : la
+    # fenêtre du geste commercial (CONTEXT.md « Geste commercial », ADR 0032)
+    # se referme consciemment ici, AVANT le gel irréversible de l'émission —
+    # aucun reste-à-faire (pas de signal dérivé), aucune action, son « Voir »
+    # ouvre les mêmes factures du mois que Créer/Émettre (#282,
+    # _CODES_DRILL_DOWN_FACTURES).
+    'gestes_commerciaux': {
+        'label': 'Gestes commerciaux',
+        'type': 'porte',
+        'prerequis': ('creer_factures',),
+    },
     'emettre_factures': {
         'label': 'Émettre factures',
         'type': 'derive',
-        'prerequis': ('creer_factures',),
+        'prerequis': ('creer_factures', 'gestes_commerciaux'),
     },
     'regulariser_clotures': {
         'label': 'Régulariser les clôtures',
@@ -694,7 +705,10 @@ class SouscriptionCampagneEtape(models.Model):
     # souscriptions, groupées par statut (brouillon à émettre / comptabilisé
     # déjà émis). Même action pour les deux étapes. ---
 
-    _CODES_DRILL_DOWN_FACTURES = ('creer_factures', 'emettre_factures')
+    # gestes_commerciaux (#287) : même drill-down — la porte n'a pas de
+    # reste-à-faire propre, c'est sur CES factures du mois que se pose la
+    # ligne € manuelle avant que l'émission ne gèle le brouillon.
+    _CODES_DRILL_DOWN_FACTURES = ('creer_factures', 'gestes_commerciaux', 'emettre_factures')
 
     def action_drill_down(self):
         self.ensure_one()

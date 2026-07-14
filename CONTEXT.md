@@ -366,6 +366,8 @@ comme distinct de la réalité *physique* mesurée par electricore. Deux maisons
 en **quantités/jours**, il s'applique à la *Période* (tant qu'elle n'est pas gelée) ; en
 **euros**, c'est une **ligne manuelle** du brouillon de *Facture* — traçable telle quelle sur la
 facture émise.
+Sur la *Campagne*, une **porte** « Gestes commerciaux » garde l'**émission** : le·la *facturiste*
+confirme les avoir appliqués avant le gel.
 _Éviter_ : maquiller une ligne **générée** ou une quantité pour porter une remise en euros (le
 geste reste une ligne identifiable).
 

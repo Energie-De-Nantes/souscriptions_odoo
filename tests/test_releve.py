@@ -310,8 +310,12 @@ class TestReleveFacturePDF(SouscriptionsTestCase):
     matérialisé en account.move.line."""
 
     def _render_facture(self, facture):
-        context = {'docs': facture, 'doc_ids': facture.ids, 'doc_model': 'account.move'}
-        return str(self.env['ir.qweb']._render('souscriptions_odoo.report_facture_energie', context))
+        # Vrai chemin (#289) : account.account_invoices est l'action Imprimer
+        # par défaut — report_facture_energie n'est plus qu'un document que
+        # account.report_invoice appelle, il n'a plus de contexte de rendu
+        # autonome (docs/doc_ids/doc_model).
+        html_bytes, _dummy = self.env['ir.actions.report']._render_qweb_html('account.account_invoices', facture.ids)
+        return html_bytes.decode()
 
     def test_bloc_justificatif_liste_les_releves_chronologiquement(self):
         """Le bloc liste chaque relevé : date, nature étiquetée, index, par ordre de date."""

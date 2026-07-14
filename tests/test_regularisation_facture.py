@@ -15,8 +15,11 @@ from odoo.tests.common import HttpCase, tagged
 
 from .common import SouscriptionsTestCase, SouscriptionsTestMixin
 
-PDF_URL = '/report/pdf/souscriptions_odoo.report_facture_energie/%s'
-HTML_URL = '/report/html/souscriptions_odoo.report_facture_energie/%s'
+# Vrai chemin (#289) : account.account_invoices est l'action Imprimer par
+# défaut — portail, email et impression la traversent toutes via
+# account.report_invoice / account.move._get_name_invoice_report().
+PDF_URL = '/report/pdf/account.account_invoices/%s'
+HTML_URL = '/report/html/account.account_invoices/%s'
 
 
 @tagged('souscriptions', 'souscriptions_regularisation', 'post_install', '-at_install')

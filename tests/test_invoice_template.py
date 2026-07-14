@@ -162,9 +162,10 @@ class TestInvoiceTemplate(TransactionCase):
         """Test du rendu du template pour tarif Base"""
         periode, facture = self._create_periode_and_invoice(self.souscription_base, date(2024, 2, 1), date(2024, 2, 29))
 
-        # Rendu du template
-        context = {'docs': [facture], 'doc_ids': facture.ids, 'doc_model': 'account.move'}
-        html_content = self.env['ir.qweb']._render('souscriptions_odoo.report_facture_energie', context)
+        # Rendu au vrai chemin (#289) : account.account_invoices est l'action
+        # Imprimer par défaut — portail/email/impression la traversent toutes.
+        html_bytes, _dummy = self.env['ir.actions.report']._render_qweb_html('account.account_invoices', facture.ids)
+        html_content = html_bytes.decode()
 
         # Vérifications du contenu HTML (cartes Contrat / Point de livraison
         # du template EDN — reports/facture_energie_template.xml)
@@ -191,8 +192,8 @@ class TestInvoiceTemplate(TransactionCase):
         """Test du rendu du template pour tarif HP/HC"""
         periode, facture = self._create_periode_and_invoice(self.souscription_hphc, date(2024, 3, 1), date(2024, 3, 31))
 
-        context = {'docs': [facture], 'doc_ids': facture.ids, 'doc_model': 'account.move'}
-        html_content = self.env['ir.qweb']._render('souscriptions_odoo.report_facture_energie', context)
+        html_bytes, _dummy = self.env['ir.actions.report']._render_qweb_html('account.account_invoices', facture.ids)
+        html_content = html_bytes.decode()
 
         # Vérifications spécifiques HP/HC
         self.assertIn('HP/HC', html_content)
@@ -208,8 +209,8 @@ class TestInvoiceTemplate(TransactionCase):
             self.souscription_solidaire, date(2024, 4, 1), date(2024, 4, 30)
         )
 
-        context = {'docs': [facture], 'doc_ids': facture.ids, 'doc_model': 'account.move'}
-        html_content = self.env['ir.qweb']._render('souscriptions_odoo.report_facture_energie', context)
+        html_bytes, _dummy = self.env['ir.actions.report']._render_qweb_html('account.account_invoices', facture.ids)
+        html_content = html_bytes.decode()
 
         # Vérifier le badge tarif solidaire
         self.assertIn('Tarif solidaire', html_content)
@@ -243,7 +244,10 @@ class TestInvoiceTemplate(TransactionCase):
         self.assertTrue(len(turpe_notes) >= 2)
 
     def test_template_fallback_non_energie(self):
-        """Test que le template utilise le fallback pour les factures non-énergie"""
+        """#289, vrai chemin : une facture hors énergie rend le gabarit
+        standard d'Odoo sur account.account_invoices (l'action Imprimer par
+        défaut, celle que portail/email/impression traversent toutes) — pas
+        de fuite du design électricité."""
         # Créer une facture normale (non-énergie)
         facture_normale = self.env['account.move'].create(
             {
@@ -266,11 +270,8 @@ class TestInvoiceTemplate(TransactionCase):
         # Vérifier que ce n'est pas une facture d'énergie
         self.assertFalse(facture_normale.is_facture_energie)
 
-        # Le rendu devrait utiliser le template standard — via ir.actions.report,
-        # qui injecte le contexte de rendu complet (is_html_empty, company, …)
-        # dont le template account.report_invoice_document a besoin.
-        html_bytes, _ = self.env['ir.actions.report']._render_qweb_html(
-            'souscriptions_odoo.action_report_facture_energie', facture_normale.ids
+        html_bytes, _dummy = self.env['ir.actions.report']._render_qweb_html(
+            'account.account_invoices', facture_normale.ids
         )
         html_content = html_bytes.decode()
 

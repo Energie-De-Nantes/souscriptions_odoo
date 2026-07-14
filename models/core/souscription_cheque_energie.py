@@ -9,21 +9,30 @@ class SouscriptionChequeEnergie(models.Model):
     souscripteur·rice — le chiffre d'affaires et la TVA des *Factures*
     qu'il paie restent intacts (CONTEXT.md « Chèque énergie »).
 
-    **Propriété** : ce modèle possède l'identité (numéro, montant,
-    expiration) et le cycle de vie (reçu → validé → rejeté/expiré). Le
-    **gate** est `action_valider()` : il crée et poste l'`account.payment`
+    **Propriété** : ce modèle possède toute son histoire (revue
+    d'architecture #255) — identité (numéro, montant, expiration), cycle de
+    vie (reçu → validé → rejeté/expiré), **imputation** (`imputer()`,
+    appelée depuis `account.move._post()` — #172, tranche 1 du PRD #264,
+    #265) et **setup comptable** (`_setup_compta()`, #170). Le **gate** du
+    cycle de vie est `action_valider()` : il crée et poste l'`account.payment`
     qui porte seul le solde et le lettrage — jamais réimplémentés ici
     (ADR 0026 §3, alternative écartée : « modèle propre réimplémentant
     solde + imputation »). L'imputation FIFO automatique à l'ÉMISSION (pas la
-    création, tranche 1 du PRD #264, #265) vit côté
-    `account.move._imputer_cheques_energie()`, appelée depuis `_post()`
-    (#172) — mécanique partagée par la mensuelle et la facture de
-    régularisation (tranche 5, #237).
+    création) est partagée par la mensuelle et la facture de régularisation
+    (tranche 5, #237), toutes deux résolues au seul point de couture commun :
+    `account.move._post()`.
     """
 
     _name = 'souscription.cheque_energie'
     _description = 'Chèque énergie'
     _order = 'date_expiration'
+
+    # ponytail : une seule société (`env.company`), pas de boucle
+    # multi-société — ni ce module ni le reste du repo ne gèrent le
+    # multi-company aujourd'hui. Ajouter la boucle sur `res.company.search([])`
+    # si ça change.
+    _CODE_COMPTE_CHEQUE_ENERGIE = '467100'
+    _CODE_JOURNAL_CHEQUE_ENERGIE = 'CHEN'
 
     numero = fields.Char(string='Numéro', required=True, copy=False)
 
@@ -131,11 +140,10 @@ class SouscriptionChequeEnergie(models.Model):
         rejeté ou expiré) ne peut pas être (re)validé — erreur explicite plutôt
         qu'un second paiement fantôme."""
         # get-or-create par code (auto-réparation) : la config #170 n'a pas
-        # d'xmlid — cf. hooks.py, un record xmlid'é posé en post_init est purgé
-        # par le nettoyage de fin d'install. On (re)pose le journal au besoin.
-        from ...hooks import setup_cheque_energie_compta
-
-        journal = setup_cheque_energie_compta(self.env)
+        # d'xmlid — cf. `_setup_compta()`, un record xmlid'é posé en
+        # post_init est purgé par le nettoyage de fin d'install. On (re)pose
+        # le journal au besoin.
+        journal = self._setup_compta()
         for cheque in self:
             if cheque.state != 'recu':
                 label = dict(cheque._fields['state'].selection).get(cheque.state, cheque.state)
@@ -154,3 +162,149 @@ class SouscriptionChequeEnergie(models.Model):
             )
             payment.action_post()
             cheque.write({'payment_id': payment.id, 'state': 'valide'})
+
+    @api.model
+    def _setup_compta(self):
+        """Crée (ou retrouve) le journal « Chèques énergie » + le compte
+        « à recevoir de l'État » (467100) et renvoie le journal (#170,
+        ADR 0026 ; rapatrié depuis `hooks.setup_cheque_energie_compta` par
+        #255, revue d'architecture — sémantique strictement inchangée).
+
+        Posé en Python plutôt qu'en `data/*.xml` statique :
+        `account.account.company_ids` est un many2many *requis* (variante
+        multi-société) et l'outstanding receipts account d'une méthode de
+        paiement entrante (`account.payment.method.line`, compute stocké
+        auto-créé par le journal) n'est pas assignable proprement en
+        `<record>` déclaratif.
+
+        **Sans xmlid, exprès.** On crée en `search`-or-`create` par *code*,
+        pas via `_load_records` + xmlid : un record xmlid'é créé en
+        `post_init_hook` est *purgé* par le nettoyage de fin d'install
+        d'Odoo (il n'est pas dans le jeu d'xmlids « vus » pendant le
+        chargement des data → considéré orphelin → supprimé, cascade sur le
+        journal). Un record sans ir.model.data n'y est pas soumis : il
+        survit. C'est aussi ce qui rend cette méthode sûre à appeler *à la
+        volée* depuis `action_valider()` (auto-réparation si l'install ne
+        l'a pas posée).
+
+        Appelée par le shim `hooks.setup_cheque_energie_compta(env)` — le
+        manifeste (`post_init_hook`) et la migration `19.0.1.8.0` l'appellent
+        par ce nom, ils ne bougent pas.
+
+        Idempotent : recherche par code avant de créer, et le correctif de
+        `payment_account_id` ne réécrit que si nécessaire — rejouable sans
+        doublon.
+        """
+        company = self.env.company
+
+        # ponytail : classe 4 générique (« autres comptes débiteurs »), pas
+        # un code PCG spécifique État (44x) — paramétrage à préciser par la
+        # compta, au même niveau que la neutralisation des produits 331/332
+        # (cf. migrations/19.0.1.8.0/post-migrate.py). `asset_receivable`
+        # (et non `asset_current`) est requis : c'est ce qui rend le compte
+        # `reconcile` et compatible avec `_get_valid_payment_account_types()`
+        # côté `account.payment` (ADR 0026 §2).
+        compte = self.env['account.account'].search(
+            [('code', '=', self._CODE_COMPTE_CHEQUE_ENERGIE), ('company_ids', 'in', company.id)], limit=1
+        )
+        if not compte:
+            compte = self.env['account.account'].create(
+                {
+                    'name': "Chèques énergie à recevoir de l'État",
+                    'code': self._CODE_COMPTE_CHEQUE_ENERGIE,
+                    'account_type': 'asset_receivable',
+                    'company_ids': [(6, 0, [company.id])],
+                }
+            )
+
+        journal = self.env['account.journal'].search(
+            [('code', '=', self._CODE_JOURNAL_CHEQUE_ENERGIE), ('company_id', '=', company.id)], limit=1
+        )
+        if not journal:
+            journal = self.env['account.journal'].create(
+                {
+                    'name': 'Chèques énergie',
+                    'code': self._CODE_JOURNAL_CHEQUE_ENERGIE,
+                    'type': 'cash',
+                    'company_id': company.id,
+                    'default_account_id': compte.id,
+                }
+            )
+
+        # La ligne de méthode de paiement entrante manuelle est auto-créée
+        # par le journal (compute stocké, ADR 0026) : sans son outstanding
+        # account explicite, `action_post()` sur le paiement échoue dès que
+        # la comptabilité complète est installée ("outstanding
+        # payments/receipts account" manquant, cf.
+        # account_payment.py:_prepare_move_line_default_vals).
+        journal.inbound_payment_method_line_ids.filtered(lambda l: l.payment_account_id != compte).write(
+            {'payment_account_id': compte.id}
+        )
+        return journal
+
+    @api.model
+    def imputer(self, facture):
+        """Impute en FIFO (par date d'expiration) les *outstanding credits*
+        des chèques énergie **validés** de l'usager·ère sur ``facture``
+        (#172, ADR 0026 ; rapatriée depuis `account.move._imputer_cheques_energie()`
+        par #255, revue d'architecture — sémantique strictement inchangée).
+        Appelée depuis `account.move._post()` — jamais au brouillon — pour
+        toute facture d'énergie réellement postée : la mécanique est
+        partagée entre la mensuelle (`souscription.periode._creer_facture`)
+        et la facture de régularisation
+        (`souscription.regularisation._creer_facture`, tranche 5, #237),
+        toutes deux créées en **brouillon** — cette méthode ne dépend que de
+        ``facture`` et de son partenaire, jamais de sa source (Période ou
+        Régularisation). Retourne les chèques effectivement consommés (au
+        moins une ligne lettrée), recordset vide si aucun.
+
+        **Contrat figé (#255, décision du grill 2026-07-13) : l'état est la
+        seule porte, l'expiration ne sert qu'au FIFO.** Le filtre porte
+        uniquement sur `state = 'valide'` — un chèque **validé** est une
+        créance acquise sur l'État et reste imputable après sa date
+        d'expiration (celle-ci borne la **validation**, la porte étatique,
+        jamais l'imputation). `date_expiration` n'intervient qu'au tri, pour
+        ordonner le FIFO entre plusieurs chèques valides d'un même
+        usager·ère. Aucun effet si l'usager·ère ne détient aucun chèque
+        validé à solde positif : la Facture postée reste sans imputation,
+        comportement de facturation inchangé (#170, non-régression).
+
+        Le lettrage **natif** d'Odoo fait tout le travail — même mécanique que
+        le widget « Outstanding credits »/``js_assign_outstanding_line`` : seul
+        l'ordre FIFO par expiration est du code métier ici. Le plafonnement
+        (``min(solde, total)``, jamais de ligne/solde négatif) et le report du
+        reliquat sur la Facture suivante sont natifs à
+        ``account.move.line.reconcile()``, jamais réimplémentés — la
+        réconciliation exige des écritures **postées** des deux côtés :
+        cette méthode n'appelle jamais ``action_post()`` elle-même, c'est la
+        responsabilité de l'appelant (``_post()``) de ne l'invoquer qu'une
+        fois ``facture`` réellement postée.
+        """
+        facture.ensure_one()
+        cheques = self.search([('partner_id', '=', facture.partner_id.id), ('state', '=', 'valide')]).sorted(
+            'date_expiration'
+        )
+        cheques = cheques.filtered(lambda c: c.solde > 0.0)
+        consommes = self.browse()
+        if not cheques:
+            return consommes
+
+        compte_tiers = ('asset_receivable', 'liability_payable')
+        for cheque in cheques:
+            if facture.currency_id.is_zero(facture.amount_residual):
+                break
+            # `_seek_for_lines()` (natif) plutôt qu'un filtre par account_type
+            # brut : le compte « à recevoir de l'État » est lui-même typé
+            # asset_receivable (#170 FIX 4), donc un filtre account_type seul
+            # matcherait aussi la ligne de liquidité du paiement — on veut
+            # uniquement la ligne contrepartie tiers (411 usager·ère).
+            _liquidite, contrepartie, ecart = cheque.payment_id._seek_for_lines()
+            ligne_paiement = (contrepartie + ecart).filtered(lambda l: l.account_id.reconcile and not l.reconciled)
+            ligne_facture = facture.line_ids.filtered(
+                lambda l: l.account_id.account_type in compte_tiers and not l.reconciled
+            )
+            if not ligne_paiement or not ligne_facture:
+                continue
+            (ligne_paiement + ligne_facture).reconcile()
+            consommes += cheque
+        return consommes

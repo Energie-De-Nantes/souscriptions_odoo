@@ -301,8 +301,9 @@ class SouscriptionRegularisation(models.Model):
     # signe individuel de chaque ligne peut rester négatif, seul le total
     # compte). Créée en brouillon ; le chèque énergie validé est imputé à
     # l'ÉMISSION par la mécanique partagée avec la mensuelle
-    # (`account.move._imputer_cheques_energie`, appelée depuis `_post()`,
-    # #172, tranche 1 du PRD #264, #265).
+    # (`souscription.cheque_energie.imputer()`, appelée depuis
+    # `account.move._post()`, #172, tranche 1 du PRD #264, #265 ; rapatriée
+    # sur le modèle chèque par #255).
 
     def action_creer_facture(self):
         """Bouton « Facturer » du formulaire brouillon : projette les lignes

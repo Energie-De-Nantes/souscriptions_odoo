@@ -89,7 +89,11 @@ class AccountMove(models.Model):
         rafraîchies. Le solde régul et l'imputation, eux, ne se déclenchent
         qu'à l'émission RÉELLE : filtrer sur le résultat de
         ``super()._post()``, pas sur ``self``, exclut naturellement les
-        moves soft-programmés sans logique dédiée."""
+        moves soft-programmés sans logique dédiée.
+
+        L'imputation elle-même (recherche FIFO des chèques validés,
+        lettrage) vit sur `souscription.cheque_energie.imputer()` — ce point
+        de couture ne fait plus que l'appeler (#255, revue d'architecture)."""
         a_regenerer = self.filtered(lambda m: m.is_facture_energie and m.state == 'draft')
         for move in a_regenerer:
             if move.periode_id:
@@ -100,7 +104,7 @@ class AccountMove(models.Model):
         for move in posted.filtered(lambda m: m.regularisation_id):
             move.regularisation_id._solder_provisions()
         for move in posted.filtered(lambda m: m.is_facture_energie):
-            move._imputer_cheques_energie()
+            self.env['souscription.cheque_energie'].imputer(move)
         return posted
 
     def unlink(self):
@@ -217,57 +221,3 @@ class AccountMove(models.Model):
         if self.is_facture_energie and self.souscription_id:
             return f'Facture_Energie_{self.souscription_id.name}_{self.name}'
         return super()._get_report_base_filename()
-
-    def _imputer_cheques_energie(self):
-        """Impute en FIFO (par date d'expiration) les *outstanding credits* des
-        chèques énergie **validés** de l'usager·ère sur **cette** Facture qui
-        vient d'être **émise** (#172, ADR 0026 ; déplacé de la création à
-        l'émission par la tranche 1 du PRD #264, #265). Appelée depuis
-        ``_post()`` — jamais au brouillon — pour toute facture d'énergie
-        (``is_facture_energie``) réellement postée : la mécanique est
-        partagée entre la mensuelle (``souscription.periode._creer_facture``)
-        et la facture de régularisation
-        (``souscription.regularisation._creer_facture``, tranche 5, #237),
-        toutes deux créées en **brouillon** — le point de couture ne dépend
-        que de la Facture et de son partenaire, jamais de sa source (Période
-        ou Régularisation). Aucun effet si l'usager·ère ne détient aucun
-        chèque validé à solde positif : la Facture postée reste sans
-        imputation, comportement de facturation inchangé (#170,
-        non-régression).
-
-        Le lettrage **natif** d'Odoo fait tout le travail — même mécanique que
-        le widget « Outstanding credits »/``js_assign_outstanding_line`` : seul
-        l'ordre FIFO par expiration est du code métier ici. Le plafonnement
-        (``min(solde, total)``, jamais de ligne/solde négatif) et le report du
-        reliquat sur la Facture suivante sont natifs à
-        ``account.move.line.reconcile()``, jamais réimplémentés — la
-        réconciliation exige des écritures **postées** des deux côtés, déjà
-        garanti par l'appel depuis ``_post()`` (plus de ``action_post()``
-        interne ici).
-        """
-        self.ensure_one()
-        Cheque = self.env['souscription.cheque_energie']
-        cheques = Cheque.search([('partner_id', '=', self.partner_id.id), ('state', '=', 'valide')]).sorted(
-            'date_expiration'
-        )
-        cheques = cheques.filtered(lambda c: c.solde > 0.0)
-        if not cheques:
-            return
-
-        compte_tiers = ('asset_receivable', 'liability_payable')
-        for cheque in cheques:
-            if self.currency_id.is_zero(self.amount_residual):
-                break
-            # `_seek_for_lines()` (natif) plutôt qu'un filtre par account_type
-            # brut : le compte « à recevoir de l'État » est lui-même typé
-            # asset_receivable (#170 FIX 4), donc un filtre account_type seul
-            # matcherait aussi la ligne de liquidité du paiement — on veut
-            # uniquement la ligne contrepartie tiers (411 usager·ère).
-            _liquidite, contrepartie, ecart = cheque.payment_id._seek_for_lines()
-            ligne_paiement = (contrepartie + ecart).filtered(lambda l: l.account_id.reconcile and not l.reconciled)
-            ligne_facture = self.line_ids.filtered(
-                lambda l: l.account_id.account_type in compte_tiers and not l.reconciled
-            )
-            if not ligne_paiement or not ligne_facture:
-                continue
-            (ligne_paiement + ligne_facture).reconcile()

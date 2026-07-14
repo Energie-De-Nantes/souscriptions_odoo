@@ -30,7 +30,7 @@ when: a change to a QWeb report in reports/
 do: start the app (see `bring-up`), log in admin / admin, open the report PDF URL
 look: http://localhost:8069/report/pdf/{report_name}/{record_id}
   # report_name is one of:
-  #   souscriptions_odoo.report_facture_energie                    (record model: account.move)
+  #   account.account_invoices                                     (facture d'énergie, record model: account.move — routée par _get_name_invoice_report(), #289)
   #   souscriptions_odoo.souscription_attestation_document         (record model: souscription.souscription)
   #   souscriptions_odoo.souscription_conditions_particulieres_document  (record model: souscription.souscription)
   # TODO(you): the {record_id} to print

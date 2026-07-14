@@ -342,6 +342,31 @@ class PortalIntegrationTestCase(SouscriptionsTestMixin, HttpCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(facture.name, response.text)
 
+    def test_portail_report_type_html_rend_le_design_energie(self):
+        """Non-régression #289 : la page facture du portail encapsule le
+        document dans une iframe pointant `invoice.get_portal_url(
+        report_type='html')` (account/views/account_portal_templates.xml) —
+        ce chemin doit rendre le design électricité (PDL), pas basculer sur
+        le gabarit Odoo standard."""
+        periode, facture = self.create_test_invoice(self.souscription_base)
+        facture.action_post()
+        self.souscription_base.partner_id = self.partner_test.id
+
+        portal_user = self.env['res.users'].create(
+            {
+                'name': 'Portal HTML Test User',
+                'login': 'portal_html_test',
+                'email': 'portal_html@test.com',
+                'group_ids': [(6, 0, [self.env.ref('base.group_portal').id])],
+            }
+        )
+        self.partner_test.user_ids = [(6, 0, [portal_user.id])]
+        self.authenticate(portal_user.login, portal_user.login)
+
+        response = self.url_open(f'/my/invoices/{facture.id}?report_type=html')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('PDL_TEST_STANDARD', response.text)
+
     def test_portal_permissions_consistency(self):
         """Les droits portail (lecture seule) sont cohérents."""
         portal_group = self.env.ref('base.group_portal')

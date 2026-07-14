@@ -11,6 +11,8 @@ résolu par `account.move._resoudre_journal_encaissement()` — jamais par nom
 (même idiome que `souscription.sepa.mandat._resoudre_journal_sdd`).
 """
 
+import ast
+
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
@@ -115,3 +117,93 @@ class TestResoudreJournalEncaissement(SouscriptionsTestCase):
         facture = self._facture_avec_mode('virement')
         with self.assertRaises(UserError):
             facture._resoudre_journal_encaissement()
+
+
+@tagged('souscriptions', 'souscriptions_paiements', 'post_install', '-at_install')
+class TestActionEncaisser(SouscriptionsTestCase):
+    """`account.move.action_encaisser()` : effet observable du bouton
+    une-clic (#290, ADR 0033) — paiement créé/posté/lettré, résidu à zéro,
+    sortie du domaine de l'action « Règlements en attente », et le paiement
+    ne naît qu'au clic, jamais à l'émission seule."""
+
+    def _facture_avec_mode(self, mode_paiement, **periode_kwargs):
+        self.souscription_base.mode_paiement = mode_paiement
+        periode, facture = self.create_test_invoice(self.souscription_base, **periode_kwargs)
+        facture.action_post()
+        return facture
+
+    def _isoler_journaux_cash(self):
+        self.env['account.journal'].search([('type', '=', 'cash'), ('company_id', '=', self.env.company.id)]).write(
+            {'active': False}
+        )
+
+    def _dans_la_vue(self, facture):
+        action = self.env.ref('souscriptions_odoo.action_facture_reglements_attente')
+        domaine = ast.literal_eval(action.domain)
+        return facture in self.env['account.move'].search(domaine + [('id', '=', facture.id)])
+
+    def test_especes_solde_la_facture_et_la_sort_de_la_vue(self):
+        self._isoler_journaux_cash()
+        journal = self.env['account.journal'].create(
+            {'name': 'Caisse Test', 'code': 'CAISS', 'type': 'cash', 'company_id': self.env.company.id}
+        )
+        facture = self._facture_avec_mode('especes')
+        residuel_avant = facture.amount_residual
+        self.assertGreater(residuel_avant, 0.0)
+        self.assertTrue(self._dans_la_vue(facture))
+
+        facture.action_encaisser()
+        facture.invalidate_recordset(['amount_residual', 'payment_state'])
+
+        self.assertAlmostEqual(facture.amount_residual, 0.0, places=2)
+        self.assertEqual(facture.payment_state, 'paid')
+        self.assertFalse(self._dans_la_vue(facture))
+
+        paiement = self.env['account.payment'].search([('partner_id', '=', facture.partner_id.id)])
+        self.assertEqual(len(paiement), 1)
+        self.assertEqual(paiement.journal_id, journal)
+        self.assertEqual(paiement.payment_type, 'inbound')
+        self.assertAlmostEqual(paiement.amount, residuel_avant, places=2)
+
+    def test_monnaie_locale_solde_la_facture_et_la_sort_de_la_vue(self):
+        journal = self.env['account.journal'].create(
+            {'name': 'Moneko', 'code': 'MNLO', 'type': 'bank', 'company_id': self.env.company.id}
+        )
+        self.env.company.journal_monnaie_locale_id = journal
+        facture = self._facture_avec_mode('monnaie_locale')
+        self.assertGreater(facture.amount_residual, 0.0)
+
+        facture.action_encaisser()
+        facture.invalidate_recordset(['amount_residual', 'payment_state'])
+
+        self.assertAlmostEqual(facture.amount_residual, 0.0, places=2)
+        self.assertEqual(facture.payment_state, 'paid')
+        self.assertFalse(self._dans_la_vue(facture))
+
+        paiement = self.env['account.payment'].search([('partner_id', '=', facture.partner_id.id)])
+        self.assertEqual(len(paiement), 1)
+        self.assertEqual(paiement.journal_id, journal)
+
+    def test_paiement_nait_seulement_au_clic_jamais_a_lemission(self):
+        """AC : le paiement n'existe qu'après le clic — l'émission seule
+        (action_post) ne crée ni ne réconcilie rien."""
+        self._isoler_journaux_cash()
+        self.env['account.journal'].create(
+            {'name': 'Caisse Test', 'code': 'CAISS', 'type': 'cash', 'company_id': self.env.company.id}
+        )
+        facture = self._facture_avec_mode('especes')
+
+        self.assertGreater(facture.amount_residual, 0.0)
+        self.assertFalse(self.env['account.payment'].search([('partner_id', '=', facture.partner_id.id)]))
+
+    def test_journal_absent_ne_cree_aucun_paiement(self):
+        """AC : journal cible absent -> UserError, aucun paiement créé (pas
+        de repli deviné)."""
+        self.assertFalse(self.env.company.journal_monnaie_locale_id)
+        facture = self._facture_avec_mode('monnaie_locale')
+
+        with self.assertRaises(UserError):
+            facture.action_encaisser()
+
+        self.assertFalse(self.env['account.payment'].search([('partner_id', '=', facture.partner_id.id)]))
+        self.assertGreater(facture.amount_residual, 0.0)

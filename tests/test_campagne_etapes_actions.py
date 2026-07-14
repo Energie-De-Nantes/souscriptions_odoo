@@ -9,6 +9,8 @@ exactement comme dans ces suites. Créer/émettre factures délèguent à
 Dates dans la couverture de la grille de prix fixture (2024, tests/common.py).
 """
 
+import os
+import runpy
 from datetime import date
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -741,3 +743,87 @@ class TestCampagneEtapeGestesCommerciaux(SouscriptionsTestCase):
         self.campagne.action_emettre_factures()
 
         self.assertEqual(facture.state, 'posted')
+
+
+@tagged('souscriptions', 'souscriptions_migration', 'post_install', '-at_install')
+class TestMigrationGestesCommerciaux(SouscriptionsTestCase):
+    """Migration `19.0.1.17.0` (#287) : soigne les campagnes déjà ouvertes
+    avant l'ajout de la porte « Gestes commerciaux » — `_seed_etapes` ne
+    s'exécute qu'à la création, donc une campagne en vol n'a pas la ligne
+    d'étape `gestes_commerciaux` ; `_compute_etat_prerequis` d'`emettre_factures`
+    lit alors un prérequis absent (`freres.get('gestes_commerciaux')` -> None)
+    -> bloquée à vie. Charge le script par chemin (`runpy.run_path`, même
+    idiome que `test_migration_energie_facturee.py`/`test_facture_provenance.py`
+    — le dossier de version n'est pas un identifiant Python importable)."""
+
+    MOIS = date(2024, 3, 1)
+    FIN_MOIS = date(2024, 3, 31)
+
+    @staticmethod
+    def _migrer(cr):
+        chemin = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), 'migrations', '19.0.1.17.0', 'post-migrate.py'
+        )
+        module = runpy.run_path(chemin)
+        module['migrate'](cr, None)
+
+    def _campagne_en_vol(self):
+        """Simule une campagne créée AVANT #287 : la ligne d'étape
+        `gestes_commerciaux` existe (posée par `_seed_etapes`, le code est
+        déjà déployé dans ce dépôt) puis on la supprime pour retrouver l'état
+        pré-migration d'une campagne en vol."""
+        campagne = self.env['souscription.campagne.facturation'].create({'mois': self.MOIS})
+        campagne.etape_ids.filtered(lambda e: e.code == 'gestes_commerciaux').unlink()
+        return campagne
+
+    def test_migration_insere_la_ligne_manquante(self):
+        campagne = self._campagne_en_vol()
+        self.assertFalse(campagne.etape_ids.filtered(lambda e: e.code == 'gestes_commerciaux'))
+
+        self._migrer(self.env.cr)
+        campagne.invalidate_recordset()
+
+        etape = campagne.etape_ids.filtered(lambda e: e.code == 'gestes_commerciaux')
+        self.assertEqual(len(etape), 1)
+        self.assertEqual(etape.sequence, 65, 'entre creer_factures=60 et emettre_factures=70 déjà tenus par le vol')
+        self.assertEqual(etape.type_etape, 'porte')
+        self.assertFalse(etape.valide)
+
+    def test_migration_debloque_emettre_factures(self):
+        """La ligne manquante bloquait `emettre_factures` à vie ; la
+        migration lève le blocage — mais n'auto-valide rien : la porte
+        insérée reste à valider par le·la facturiste."""
+        campagne = self._campagne_en_vol()
+        self.souscription_base.with_context(rsc_automatisme=True).write(
+            {'ref_situation_contractuelle': 'RSC-MIGRATION-GESTES'}
+        )
+        periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        periode._creer_facture()
+        campagne.etape_ids.invalidate_recordset()
+
+        etape_emettre = campagne.etape_ids.filtered(lambda e: e.code == 'emettre_factures')
+        self.assertEqual(etape_emettre.etat_prerequis, 'bloquee', 'gestes_commerciaux absente : bloquée à vie')
+
+        self._migrer(self.env.cr)
+        campagne.invalidate_recordset()
+        campagne.etape_ids.invalidate_recordset()
+
+        etape_emettre = campagne.etape_ids.filtered(lambda e: e.code == 'emettre_factures')
+        self.assertEqual(etape_emettre.etat_prerequis, 'bloquee', 'insérée mais pas encore validée : toujours bloquée')
+
+        campagne.etape_ids.filtered(lambda e: e.code == 'gestes_commerciaux').write({'valide': True})
+        campagne.invalidate_recordset()
+        campagne.etape_ids.invalidate_recordset()
+
+        etape_emettre = campagne.etape_ids.filtered(lambda e: e.code == 'emettre_factures')
+        self.assertEqual(etape_emettre.etat_prerequis, 'prete', 'validée : le blocage à vie est levé')
+
+    def test_migration_idempotente(self):
+        campagne = self._campagne_en_vol()
+
+        self._migrer(self.env.cr)
+        self._migrer(self.env.cr)  # rejoué : no-op
+        campagne.invalidate_recordset()
+
+        etapes = campagne.etape_ids.filtered(lambda e: e.code == 'gestes_commerciaux')
+        self.assertEqual(len(etapes), 1, 'idempotent : pas de doublon')

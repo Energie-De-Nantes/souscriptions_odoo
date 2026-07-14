@@ -4,14 +4,40 @@
          facturiste voit ce qui reste à encaisser hors prélèvement — postées,
          reste-à-payer > 0, mode ≠ prélèvement, groupe « (vide) » compris
          (souscription sans mode renseigné, à compléter, jamais deviné). Une
-         facture soldée (chèque énergie, 0 €) sort du domaine d'elle-même.
-         Aucune vue dédiée : les vues liste/formulaire natives de la
-         Facturation portent déjà l'action « Enregistrer un paiement » sur la
-         sélection — aucun wizard maison. -->
+         facture soldée (chèque énergie, 0 €, ou via le bouton ci-dessous)
+         sort du domaine d'elle-même. Les vues liste/formulaire natives de la
+         Facturation portent toujours l'action « Enregistrer un paiement »
+         (wizard natif) sur la sélection — reste le seul chemin pour
+         prélèvement/virement/chèque. Vue liste dédiée uniquement pour porter
+         le bouton une-clic des modes attestation-pure (#290, ADR 0033). -->
+    <record id="view_move_reglements_attente_list" model="ir.ui.view">
+        <field name="name">account.move.reglements.attente.list</field>
+        <field name="model">account.move</field>
+        <field name="arch" type="xml">
+            <list string="Règlements en attente" create="0" delete="0" default_order="invoice_date_due">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="invoice_date"/>
+                <field name="mode_paiement"/>
+                <field name="amount_total" widget="monetary"/>
+                <field name="amount_residual" widget="monetary"/>
+                <field name="currency_id" column_invisible="1"/>
+                <!-- Encaissement une-clic (#290, ADR 0033) : seuls les modes
+                     attestation-pure (aucune trace bancaire, jamais) ont un
+                     geste d'encaissement à affirmer ici — prélèvement,
+                     virement, chèque et le groupe « (vide) » restent 100 %
+                     natifs, pas de bouton. -->
+                <button name="action_encaisser" type="object" string="Encaisser" class="btn-link"
+                        invisible="mode_paiement not in ('monnaie_locale', 'especes') or amount_residual &lt;= 0"/>
+            </list>
+        </field>
+    </record>
+
     <record id="action_facture_reglements_attente" model="ir.actions.act_window">
         <field name="name">Règlements en attente</field>
         <field name="res_model">account.move</field>
         <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_move_reglements_attente_list"/>
         <field name="domain">[('is_facture_energie', '=', True), ('state', '=', 'posted'), ('amount_residual', '>', 0), '|', ('mode_paiement', '!=', 'prelevement'), ('mode_paiement', '=', False)]</field>
         <field name="context">{'group_by': 'mode_paiement'}</field>
     </record>

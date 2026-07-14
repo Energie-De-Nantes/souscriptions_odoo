@@ -13,6 +13,7 @@ résolu par `account.move._resoudre_journal_encaissement()` — jamais par nom
 
 import ast
 
+from lxml import etree
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
@@ -207,3 +208,43 @@ class TestActionEncaisser(SouscriptionsTestCase):
 
         self.assertFalse(self.env['account.payment'].search([('partner_id', '=', facture.partner_id.id)]))
         self.assertGreater(facture.amount_residual, 0.0)
+
+
+@tagged('souscriptions', 'souscriptions_paiements', 'post_install', '-at_install')
+class TestBoutonEncaisserVisibilite(SouscriptionsTestCase):
+    """AC : le bouton n'apparaît que pour `mode_paiement ∈ {monnaie_locale,
+    especes}` ET `amount_residual > 0` — absent pour prélèvement / virement /
+    chèque et pour le groupe « (vide) ». Assertion structurelle sur l'arch
+    résolu (lxml), même méthode que `test_facture_provenance.py`/
+    `test_souscription_form.py` — pas de rendu client réel."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        action = cls.env.ref('souscriptions_odoo.action_facture_reglements_attente')
+        view = cls.env['account.move'].get_view(view_id=action.view_id.id, view_type='list')
+        cls.arch = etree.fromstring(view['arch'])
+
+    def test_action_pointe_la_vue_dediee(self):
+        action = self.env.ref('souscriptions_odoo.action_facture_reglements_attente')
+        self.assertEqual(action.view_id, self.env.ref('souscriptions_odoo.view_move_reglements_attente_list'))
+
+    def test_bouton_present_avec_condition_mode_et_residuel(self):
+        bouton = self.arch.find(".//button[@name='action_encaisser']")
+        self.assertIsNotNone(bouton, 'le bouton action_encaisser doit être dans la vue liste dédiée')
+        invisible = bouton.get('invisible')
+        self.assertIn('monnaie_locale', invisible)
+        self.assertIn('especes', invisible)
+        self.assertIn('amount_residual', invisible)
+
+        # Les modes bancaire-rapprochable et le prélèvement doivent être hors
+        # de l'ensemble autorisé — jamais de bouton pour eux (100 % natif).
+        for mode in ('prelevement', 'virement', 'cheque'):
+            self.assertNotIn(f"'{mode}'", invisible)
+
+    def test_champs_conditionnants_charges_dans_la_vue(self):
+        """`mode_paiement` et `amount_residual` doivent être chargés (au
+        moins en colonne) pour que la condition `invisible` soit évaluable
+        par ligne — même garde que `test_facture_provenance.py`."""
+        self.assertTrue(self.arch.findall(".//field[@name='mode_paiement']"))
+        self.assertTrue(self.arch.findall(".//field[@name='amount_residual']"))

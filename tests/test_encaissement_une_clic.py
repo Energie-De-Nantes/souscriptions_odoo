@@ -75,15 +75,6 @@ class TestResoudreJournalEncaissement(SouscriptionsTestCase):
         facture.action_post()
         return facture
 
-    def _isoler_journaux_cash(self):
-        """Neutralise les journaux `cash` préexistants de la société (données
-        de démo/fixtures) pour rendre le test déterministe — la garde
-        cotise ensuite les journaux qu'on pose nous-mêmes, jamais un mélange
-        avec l'état ambiant."""
-        self.env['account.journal'].search([('type', '=', 'cash'), ('company_id', '=', self.env.company.id)]).write(
-            {'active': False}
-        )
-
     # -- monnaie_locale --
 
     def test_monnaie_locale_resout_le_journal_configure(self):
@@ -101,35 +92,47 @@ class TestResoudreJournalEncaissement(SouscriptionsTestCase):
             facture._resoudre_journal_encaissement()
         self.assertIn('Journal monnaie locale', str(cm.exception))
 
-    # -- especes --
+    # -- especes (#298, ADR 0033 amendé) : pointeur société, plus de search
+    # « cash unique » — jamais bousculé par le journal CHEN ambiant. --
 
-    def test_especes_resout_le_journal_cash_unique(self):
-        self._isoler_journaux_cash()
+    def test_especes_resout_le_journal_pointe(self):
         journal = self.env['account.journal'].create(
             {'name': 'Caisse Test', 'code': 'CAISS', 'type': 'cash', 'company_id': self.env.company.id}
         )
+        self.env.company.journal_especes_id = journal
         facture = self._facture_avec_mode('especes')
         self.assertEqual(facture._resoudre_journal_encaissement(), journal)
 
-    def test_especes_absent_leve_erreur(self):
-        self._isoler_journaux_cash()
+    def test_especes_absent_leve_erreur_explicite(self):
+        self.assertFalse(self.env.company.journal_especes_id)
         facture = self._facture_avec_mode('especes')
         with self.assertRaises(UserError) as cm:
             facture._resoudre_journal_encaissement()
-        self.assertIn('Aucun journal de caisse', str(cm.exception))
+        self.assertIn('Journal espèces', str(cm.exception))
 
-    def test_especes_ambigu_leve_erreur(self):
-        self._isoler_journaux_cash()
-        self.env['account.journal'].create(
-            {'name': 'Caisse A', 'code': 'CAA', 'type': 'cash', 'company_id': self.env.company.id}
+    def test_especes_non_regression_chen_pointeur_resout_sans_ambiguite(self):
+        """Non-régression CHEN (#298) : le journal « Chèques énergie »
+        (`type='cash'`, posé par le `post_init_hook` à chaque install —
+        code réel `CHEN`, ici un second journal cash qui en tient lieu pour
+        ne dépendre d'aucun état ambiant) coexiste avec la caisse ; le
+        pointeur société désigne la caisse sans AUCUNE erreur d'ambiguïté —
+        la résolution ne passe plus par `type`, donc n'est plus cassée par
+        un second journal `cash` quel qu'il soit."""
+        chen = self.env['account.journal'].create(
+            {
+                'name': 'Chèque énergie (tient lieu de CHEN)',
+                'code': 'CHENSIM',
+                'type': 'cash',
+                'company_id': self.env.company.id,
+            }
         )
-        self.env['account.journal'].create(
-            {'name': 'Caisse B', 'code': 'CAB', 'type': 'cash', 'company_id': self.env.company.id}
+        caisse = self.env['account.journal'].create(
+            {'name': 'Caisse Test', 'code': 'CAISS', 'type': 'cash', 'company_id': self.env.company.id}
         )
+        self.env.company.journal_especes_id = caisse
         facture = self._facture_avec_mode('especes')
-        with self.assertRaises(UserError) as cm:
-            facture._resoudre_journal_encaissement()
-        self.assertIn('Plusieurs', str(cm.exception))
+        self.assertEqual(facture._resoudre_journal_encaissement(), caisse)
+        self.assertNotEqual(facture._resoudre_journal_encaissement(), chen)
 
     # -- mode hors attestation-pure : défensif, ne devrait jamais être appelé
     # (le bouton ne l'exhibe pas) mais ne devine jamais un journal si un
@@ -154,21 +157,16 @@ class TestActionEncaisser(SouscriptionsTestCase):
         facture.action_post()
         return facture
 
-    def _isoler_journaux_cash(self):
-        self.env['account.journal'].search([('type', '=', 'cash'), ('company_id', '=', self.env.company.id)]).write(
-            {'active': False}
-        )
-
     def _dans_la_vue(self, facture):
         action = self.env.ref('souscriptions_odoo.action_facture_reglements_attente')
         domaine = ast.literal_eval(action.domain)
         return facture in self.env['account.move'].search(domaine + [('id', '=', facture.id)])
 
     def test_especes_solde_la_facture_et_la_sort_de_la_vue(self):
-        self._isoler_journaux_cash()
         journal = self.env['account.journal'].create(
             {'name': 'Caisse Test', 'code': 'CAISS', 'type': 'cash', 'company_id': self.env.company.id}
         )
+        self.env.company.journal_especes_id = journal
         facture = self._facture_avec_mode('especes')
         residuel_avant = facture.amount_residual
         self.assertGreater(residuel_avant, 0.0)
@@ -209,10 +207,10 @@ class TestActionEncaisser(SouscriptionsTestCase):
     def test_paiement_nait_seulement_au_clic_jamais_a_lemission(self):
         """AC : le paiement n'existe qu'après le clic — l'émission seule
         (action_post) ne crée ni ne réconcilie rien."""
-        self._isoler_journaux_cash()
-        self.env['account.journal'].create(
+        journal = self.env['account.journal'].create(
             {'name': 'Caisse Test', 'code': 'CAISS', 'type': 'cash', 'company_id': self.env.company.id}
         )
+        self.env.company.journal_especes_id = journal
         facture = self._facture_avec_mode('especes')
 
         self.assertGreater(facture.amount_residual, 0.0)

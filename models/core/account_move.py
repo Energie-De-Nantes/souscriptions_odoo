@@ -250,15 +250,19 @@ class AccountMove(models.Model):
 
     def _resoudre_journal_encaissement(self):
         """Résout le journal cible de l'encaissement une-clic selon
-        `mode_paiement` — jamais par nom (même idiome que
-        `souscription.sepa.mandat._resoudre_journal_sdd`) :
+        `mode_paiement` — jamais par `type` (même idiome que
+        `souscription.sepa.mandat._resoudre_journal_sdd`, gravé par ADR 0033
+        amendé : un rôle de journal possédé par la société est un pointeur
+        `res.company`, `type` n'est jamais un discriminateur de rôle) :
         - `monnaie_locale` -> pointeur société `journal_monnaie_locale_id`
           (calqué sur `res.company.currency_exchange_journal_id`) ;
-        - `especes` -> journal `type='cash'` unique de la société, résolu à
-          la volée (pas de champ stocké, idiome de
-          `account.move._search_default_journal`).
-        Erreur explicite si le journal est absent ou ambigu — jamais de
-        journal deviné sur un chemin monétaire."""
+        - `especes` -> pointeur société `journal_especes_id` (#298, calqué
+          sur le même idiome — robuste au journal CHEN du chèque énergie,
+          un autre journal `type='cash'` posé par le `post_init_hook` à
+          chaque install, qui cassait la résolution « cash unique »
+          précédente).
+        Erreur explicite si le journal est absent — jamais de journal
+        deviné sur un chemin monétaire."""
         self.ensure_one()
         if self.mode_paiement == 'monnaie_locale':
             journal = self.company_id.journal_monnaie_locale_id
@@ -272,27 +276,16 @@ class AccountMove(models.Model):
                 )
             return journal
         if self.mode_paiement == 'especes':
-            journaux = self.env['account.journal'].search(
-                [('type', '=', 'cash'), ('company_id', '=', self.company_id.id)]
-            )
-            if not journaux:
+            journal = self.company_id.journal_especes_id
+            if not journal:
                 raise UserError(
                     _(
-                        'Aucun journal de caisse (type « Espèces ») configuré pour %(societe)s : '
-                        "configurez-en un avant d'encaisser.",
+                        'Aucun journal « espèces » configuré pour %(societe)s : renseignez le champ '
+                        "Journal espèces de la société avant d'encaisser.",
                         societe=self.company_id.name,
                     )
                 )
-            if len(journaux) > 1:
-                raise UserError(
-                    _(
-                        'Plusieurs journaux de caisse existent pour %(societe)s, ambiguïté à résoudre avant '
-                        "d'encaisser : %(journaux)s.",
-                        societe=self.company_id.name,
-                        journaux=', '.join(journaux.mapped('name')),
-                    )
-                )
-            return journaux
+            return journal
         raise UserError(
             _(
                 'Encaissement une-clic indisponible pour le mode de paiement « %(mode)s ».',

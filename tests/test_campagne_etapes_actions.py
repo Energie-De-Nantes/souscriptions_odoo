@@ -501,6 +501,39 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
 
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
+class TestCampagneStatutFacturationPeriodeOuverture(SouscriptionsTestCase):
+    """#284 : une Période d'ouverture (`facture_legacy_ref`, #107) porte une
+    facture déjà créée ET émise dans l'ancien système (Odoo 17) — statut
+    terminal `émise`, jamais `à facturer`. `creer_factures()` le savait déjà
+    (anti-doublon, #107) ; `_statut_facturation` doit converger au même
+    endroit, sinon les deux compteurs dérivés (Créer, Émettre) restent
+    bloqués à vie sur ces souscriptions."""
+
+    MOIS = date(2024, 3, 1)
+    FIN_MOIS = date(2024, 3, 31)
+
+    def setUp(self):
+        super().setUp()
+        self.souscription_base.with_context(rsc_automatisme=True).write(
+            {'ref_situation_contractuelle': 'RSC-CAMPAGNE-OUVERTURE'}
+        )
+        self.campagne = self.env['souscription.campagne.facturation'].create({'mois': self.MOIS})
+        self.create_test_periode(
+            self.souscription_base,
+            date_debut=self.MOIS,
+            date_fin=self.FIN_MOIS,
+            facture_legacy_ref='FACT-PROD-2024-0099',
+        )
+
+    def test_periode_ouverture_classee_emise(self):
+        self.assertEqual(self.campagne._statut_facturation(self.souscription_base), 'emise')
+
+    def test_periode_ouverture_absente_du_reste_a_faire_creer_et_emettre(self):
+        self.assertNotIn(self.souscription_base, self.campagne._reste_a_faire('creer_factures'))
+        self.assertNotIn(self.souscription_base, self.campagne._reste_a_faire('emettre_factures'))
+
+
+@tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneEtapePreparerPrelevements(SouscriptionsTestCase):
     """#186, PRD #183 : étape après « Émettre factures », son domaine
     s'appuie sur `account.move.mode_paiement` porté par la Facture (#185,

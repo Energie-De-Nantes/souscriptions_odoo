@@ -250,6 +250,13 @@ class SouscriptionCampagneFacturation(models.Model):
         )
         if not periode:
             return 'a_tirer'
+        # Période d'ouverture (#107, ADR 0023 décision 3) : facture legacy déjà
+        # créée ET émise dans l'ancien système (Odoo 17), sans account.move ici
+        # (`facture_id` restera vide, ADR 0004). Statut terminal — sinon elle
+        # reste comptée « à facturer » à vie, comme `creer_factures()` le sait
+        # déjà côté action (#284) mais le compteur dérivé l'ignorait.
+        if periode.facture_legacy_ref:
+            return 'emise'
         if not periode.facture_id:
             return 'a_facturer'
         return 'emise' if periode.facture_state == 'posted' else 'facturee'

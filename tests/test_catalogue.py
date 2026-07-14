@@ -68,3 +68,19 @@ class TestCatalogueProduit(TransactionCase):
         chuter le compte sous 12 — donc ce test garde l'isolation (ADR 0013)."""
         requis = self.env['souscription.produit'].produits_requis()
         self.assertEqual(len(requis), 12)
+
+    def test_produits_refacturation_portent_la_categorie_prestations_enedis(self):
+        """#279 : les 4 produits de refacturation (standard + solidaire ×
+        prestation + indemnité) portent la catégorie « Prestations Enedis »
+        sur une install fraîche — purement organisationnel (ADR 0013 :
+        l'isolation comptable reste sur les comptes/TVA des produits)."""
+        categorie = self._ref('souscriptions_product_category_prestations_enedis')
+        self.assertEqual(categorie.name, 'Prestations Enedis')
+        for xmlid in (
+            'souscriptions_product_prestation_enedis',
+            'souscriptions_product_indemnite_enedis',
+            'souscriptions_product_prestation_enedis_solidaire',
+            'souscriptions_product_indemnite_enedis_solidaire',
+        ):
+            produit = self._ref(xmlid)
+            self.assertEqual(produit.categ_id, categorie, f'{xmlid} doit porter la catégorie Prestations Enedis')

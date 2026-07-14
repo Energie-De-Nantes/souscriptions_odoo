@@ -161,6 +161,55 @@ class TestRefacturation(SouscriptionsTestCase):
         self.assertEqual(ligne_neg.price_unit, -30.0)
         self.assertLess(ligne_neg.price_subtotal, 0, 'la ligne réduit le total')
 
+    def test_facture_rassemblee_porte_une_section_prestations_enedis(self):
+        """#279 : une facture avec des Refacturations rassemblées porte UNE
+        section « Prestations Enedis », en tête des lignes de prestations."""
+        self._presta(self.souscription_base, reference='F15-SEC1', libelle='Mise en service')
+        self._presta(self.souscription_base, reference='F15-SEC2', libelle='Déplacement technicien')
+        self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+
+        self.souscription_base.creer_factures()
+
+        facture = self.souscription_base.refacturation_ids.mapped('facture_id')
+        self.assertEqual(len(facture), 1)
+        sections = facture.invoice_line_ids.filtered(
+            lambda l: l.display_type == 'line_section' and l.name == 'Prestations Enedis'
+        )
+        self.assertEqual(len(sections), 1, 'une seule section Prestations Enedis')
+        noms = facture.invoice_line_ids.mapped('name')
+        idx_section = noms.index('Prestations Enedis')
+        idx_p1 = noms.index('Mise en service')
+        idx_p2 = noms.index('Déplacement technicien')
+        self.assertLess(idx_section, idx_p1, 'la section précède les lignes de prestations')
+        self.assertLess(idx_section, idx_p2, 'la section précède les lignes de prestations')
+
+    def test_facture_sans_refacturation_ne_porte_pas_de_section(self):
+        """#279 : pas de Refacturation à rassembler → pas de section
+        « Prestations Enedis » sur la facture."""
+        periode = self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+
+        self.souscription_base.creer_factures()
+
+        sections = periode.facture_id.invoice_line_ids.filtered(
+            lambda l: l.display_type == 'line_section' and l.name == 'Prestations Enedis'
+        )
+        self.assertFalse(sections, 'aucune Refacturation → aucune section')
+
+    def test_composer_lignes_groupees_vide_sur_recordset_vide(self):
+        """#279 : le helper est correct standalone — un recordset vide ne
+        compose aucune section (pas seulement grâce au garde-fou appelant)."""
+        vide = self.env['souscription.refacturation']
+        self.assertEqual(vide._composer_lignes_groupees(), [])
+
+    def test_composer_lignes_groupees_pose_le_flag_sur_la_section(self):
+        """#279 : la section porte le flag de provenance, comme les sections
+        Abonnement/Énergie — recomposable par la recompose préservante."""
+        presta = self._presta(self.souscription_base, reference='F15-SECFLAG')
+        _cmd, _id, vals_section = presta._composer_lignes_groupees()[0]
+        self.assertEqual(vals_section['display_type'], 'line_section')
+        self.assertEqual(vals_section['name'], 'Prestations Enedis')
+        self.assertTrue(vals_section['souscription_ligne_generee'])
+
     def test_presta_facturee_une_seule_fois_sur_plusieurs_periodes(self):
         """Deux périodes facturées en un run : la presta n'atterrit que sur UNE
         facture, jamais dupliquée (pas de double facturation)."""

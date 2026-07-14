@@ -287,3 +287,28 @@ class SouscriptionRefacturation(models.Model):
                 'souscription_ligne_generee': True,
             },
         )
+
+    def _composer_lignes_groupees(self):
+        """Compose les lignes de CE recordset rassemblé, précédées d'UNE
+        section « Prestations Enedis » (#279) — langue client, indemnités
+        comprises (la distinction fiscale reste portée par les produits, ADR
+        0009 §5 / ADR 0013). Vide si le recordset est vide : pas de section
+        sans presta à rassembler.
+
+        Point d'entrée unique appelé par les deux chemins de rassemblement
+        (création : `souscription._facturer_refacturations`, re-génération à
+        l'émission : `account.move._composer_lignes_generees`) — un seul
+        endroit pose la section, jamais dupliquée.
+
+        La section porte `souscription_ligne_generee = True` explicitement,
+        comme les sections Abonnement/Énergie (`souscription_periode.
+        _composer_lignes`) : une ligne générée, supprimée/recomposée par la
+        recompose préservante (#266)."""
+        if not self:
+            return []
+        section = (
+            0,
+            0,
+            {'display_type': 'line_section', 'name': 'Prestations Enedis', 'souscription_ligne_generee': True},
+        )
+        return [section] + [presta._composer_ligne() for presta in self]

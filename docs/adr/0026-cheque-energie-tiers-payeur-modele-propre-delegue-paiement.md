@@ -71,7 +71,7 @@ en `related` sur celui-ci. Il ne réimplémente **pas** solde ni lettrage.
 Décision 2 ci-dessus (« petit hook à la création de facture ») décrivait l'ancien moment.
 Il a été déplacé de `souscription.periode._creer_facture()` (création du brouillon) à
 `account.move._post()` (émission réelle) par la tranche 1 du PRD #264 (#265) :
-`_imputer_cheques_energie()` est désormais appelée uniquement quand la Facture (mensuelle ou
+l'imputation est désormais appelée uniquement quand la Facture (mensuelle ou
 de régularisation) est effectivement **postée**, jamais à sa création en brouillon — plus
 aucune facture d'énergie postée « en douce » à la création, par aucun chemin. Contrainte
 dure retrouvée en le faisant : le lettrage natif d'Odoo exige des écritures **postées** des
@@ -81,3 +81,15 @@ changement pour le futur lecteur ; le mécanisme de lettrage lui-même (décisio
 est inchangé — cf. [ADR-0032](0032-brouillon-gouverne-gel-a-lemission.md) pour la vue
 d'ensemble « brouillon gouverné, émission = unique événement de gel » dont cette bascule
 fait partie.
+
+## Amendement (#255) — le corps de l'imputation et du setup compta vivent sur le modèle
+
+Revue d'architecture du 2026-07-13 (« le Chèque énergie possède toute son histoire ») :
+l'imputation (ex-`account.move._imputer_cheques_energie()`) est devenue
+`souscription.cheque_energie.imputer(facture)` — `account.move._post()` ne fait plus que
+l'appeler, le point de couture (amendement #265 ci-dessus) ne change pas. Même déplacement
+pour le setup comptable : `hooks.setup_cheque_energie_compta()` est devenu
+`souscription.cheque_energie._setup_compta()`, `hooks.py` ne gardant qu'un shim d'une ligne
+(le `post_init_hook` du manifeste et la migration `19.0.1.8.0` l'appellent par nom, inchangés).
+Refactor pur : aucune règle (validés seuls, FIFO par expiration, `min(solde, total)`, lettrage
+natif) ne change.

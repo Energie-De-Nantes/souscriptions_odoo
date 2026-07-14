@@ -296,7 +296,7 @@ class AccountMove(models.Model):
         raise UserError(
             _(
                 'Encaissement une-clic indisponible pour le mode de paiement « %(mode)s ».',
-                mode=dict(self._fields['mode_paiement'].selection).get(self.mode_paiement, self.mode_paiement),
+                mode=self.mode_paiement,
             )
         )
 

@@ -5,8 +5,8 @@
 # electricore-client : client fin (httpx+pydantic) vers l'API facturiste
 # electricore (#77, ADR 0019). Épinglé — pas dans `external_dependencies` du
 # manifeste : l'absence du paquet ne doit pas empêcher l'installation du
-# module (garde d'import dans models/wizard/souscription_pull_meta_periodes_wizard.py,
-# UserError explicite au clic si absent).
+# module (garde d'import dans models/core/electricore_client_fabrique.py,
+# UserError explicite à l'appel si absent).
 # 0.4.0 : ajoute prestations() (requis par la sync #147 « à refacturer »,
 # souscription_refacturation._tirer_prestations). Publié sur PyPI, surface
 # prestations() vérifiée au tag ; les symboles importés par l'addon

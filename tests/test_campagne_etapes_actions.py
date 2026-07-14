@@ -123,18 +123,6 @@ class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
             action = etape.action_executer()
         self.assertEqual(action['tag'], 'display_notification')
 
-    def test_wizard_ad_hoc_fonctionne_toujours(self):
-        """Non-régression : le wizard « Récupérer les périodes du mois » et
-        son bouton d'en-tête restent inchangés (chemin secondaire, #176)."""
-        wizard = self.env['souscription.pull.meta.periodes.wizard'].create({'mois': self.MOIS})
-        client = client_flux_factice('meta_periodes', [_periode_meta()])
-        with patcher_client_fabrique(client):
-            action = wizard.action_lancer()
-
-        self.assertEqual(action['type'], 'ir.actions.act_window')
-        self.assertEqual(wizard.state, 'done')
-        self.assertIn('Créées : 1', wizard.resultat)
-
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneEtapeSyncF15(SouscriptionsTestCase):

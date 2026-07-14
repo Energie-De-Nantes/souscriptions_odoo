@@ -14,15 +14,15 @@ Quatre tranches :
 - Le service `souscription.pull.meta.periodes.service` — propriétaire
   durable du pull (#233), gardé par l'empreinte (#235) : create-missing,
   écriture gardée par `source_hash`, skip-and-report, erreurs typées
-  mappées, scope refresh — client mocké.
-- Le wizard « Récupérer les périodes du mois », coquille mince (#233) :
-  périmètre avec/sans RSC + formatage du résumé, délègue au service.
+  mappées, scope refresh — client mocké. Consommé par la campagne de
+  facturation (`souscription.campagne.facturation.action_pull_meta_periodes`,
+  #278 : le wizard ad-hoc historique a été retiré).
 
 Fixtures RSC/PDL : identifiants factices (jamais des vrais échantillons).
 """
 
 import unittest
-from datetime import date, timedelta
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -181,7 +181,7 @@ class TestAmorcerDepuisMeta(SouscriptionsTestCase):
 
     def test_create_missing_only_ne_reecrit_jamais_lexistant(self):
         """Un `(souscription, mois)` déjà amorcé n'est jamais réécrit
-        automatiquement (ADR 0011) : garde vérifiée au niveau wizard, pas ici —
+        automatiquement (ADR 0011) : garde vérifiée au niveau service, pas ici —
         ce test verrouille la clé (contrainte unique mensuelle, ADR 0020 §2)."""
         self.env['souscription.periode']._amorcer_depuis_meta(self.souscription_base, _periode_meta())
         with self.assertRaises(Exception):
@@ -655,149 +655,6 @@ class TestPullMetaPeriodesServiceRefresh(SouscriptionsTestCase):
                 self.souscription_hphc, date(2024, 1, 1), date(2024, 3, 1)
             )
         client.meta_periodes.assert_not_called()
-
-
-# === Wizard « Récupérer les périodes du mois » : coquille mince (#233) ===
-#
-# La politique de pull (create-missing-only, skip-and-report, mapping des
-# exceptions) est couverte par `TestPullMetaPeriodesService` ci-dessus. Ce qui
-# reste propre au wizard : construire le périmètre (avec/sans RSC), déléguer
-# et formater le résumé — vérifié ici, client mocké.
-
-
-@tagged('souscriptions', 'souscriptions_pull_meta', 'post_install', '-at_install')
-class TestWizardPullMetaPeriodes(SouscriptionsTestCase):
-    def _wizard(self, mois=date(2024, 1, 1)):
-        return self.env['souscription.pull.meta.periodes.wizard'].create({'mois': mois})
-
-    def _lancer_avec_client(self, client, mois=date(2024, 1, 1)):
-        """Lance le wizard avec un client factice fourni directement par la
-        fabrique (ADR 0024) : la garde paquet/config de la fabrique est
-        testée une fois dans test_electricore_client_fabrique.py, pas ici."""
-        wizard = self._wizard(mois)
-        with patcher_client_fabrique(client):
-            wizard.action_lancer()
-        return wizard
-
-    def test_delegue_au_service_et_formate_le_resultat(self):
-        """AC2 : le wizard délègue au service et formate le résumé (créées /
-        rafraîchies / inchangées / conservées / erreurs)."""
-        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
-        meta = _periode_meta(
-            ref_situation_contractuelle='RSC-00000000000001',
-            debut='2024-01-01',
-            fin='2024-02-01',
-        )
-        client = client_flux_factice('meta_periodes', [meta])
-
-        wizard = self._lancer_avec_client(client)
-
-        periode = self.env['souscription.periode'].search(
-            [('souscription_id', '=', self.souscription_base.id), ('mois', '=', date(2024, 1, 1))]
-        )
-        self.assertEqual(len(periode), 1)
-        self.assertIn('Créées : 1', wizard.resultat)
-        self.assertEqual(wizard.state, 'done')
-        client.meta_periodes.assert_called_once_with(mois='2024-01-01', rsc=['RSC-00000000000001'])
-
-    def test_empreinte_inchangee_delegue_correctement(self):
-        """AC1 : empreinte inchangée -> aucune écriture, bout en bout via le
-        wizard — preuve que le wizard ne ré-implémente pas la garde, il la
-        délègue au service (même politique que TestPullMetaPeriodesService)."""
-        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
-        existante = self.env['souscription.periode']._amorcer_depuis_meta(
-            self.souscription_base,
-            _periode_meta(
-                ref_situation_contractuelle='RSC-00000000000001',
-                debut='2024-01-01',
-                fin='2024-02-01',
-                source_hash='H1',
-                cta_eur=1.23,
-            ),
-        )
-
-        meta = _periode_meta(
-            ref_situation_contractuelle='RSC-00000000000001',
-            debut='2024-01-01',
-            fin='2024-02-01',
-            source_hash='H1',
-            cta_eur=999.0,
-        )
-        wizard = self._lancer_avec_client(client_flux_factice('meta_periodes', [meta]))
-
-        self.assertEqual(existante.cta_eur, 1.23)
-        self.assertIn('Inchangées : 1', wizard.resultat)
-        self.assertIn('Créées : 0', wizard.resultat)
-
-    def test_resume_les_souscriptions_sans_rsc(self):
-        """AC3 : résumé skip-and-report — souscriptions sans RSC comptées à
-        part (périmètre construit par le wizard, hors du service)."""
-        self.assertFalse(self.souscription_hphc.ref_situation_contractuelle)
-        wizard = self._lancer_avec_client(client_flux_factice('meta_periodes', []))
-        self.assertIn('Sans RSC (ignorées) :', wizard.resultat)
-        self.assertNotIn('Sans RSC (ignorées) : 0', wizard.resultat)
-
-    def test_souscription_en_instance_nee_du_raccordement_hors_pull(self):
-        """#101 AC5 : une Souscription *en instance* (née à l'acceptation,
-        sans RSC) reste hors du pull — comportement du pull clé RSC/mois
-        (AC3 ci-dessus), asserté ici sur une Souscription née du
-        Raccordement plutôt que sur une fixture directe."""
-        demande = self.env['raccordement.demande'].create(
-            {
-                'pdl': 'PDL_RACC_HORS_PULL',
-                'date_debut_souhaitee': date.today() + timedelta(days=30),
-                'puissance_souscrite': '6',
-                'type_tarif': 'base',
-                'provision_mensuelle_kwh': 250.0,
-                'contact_nom': 'Test',
-                'contact_email': 'racc-hors-pull@example.com',
-                'contact_street': 'Test Street',
-                'contact_zip': '12345',
-                'contact_city': 'Test City',
-                'mode_paiement': 'virement',
-            }
-        )
-        demande.stage_id = self.env.ref('souscriptions_odoo.stage_accepte_iban_verifie')
-        souscription = demande.souscription_id
-        self.assertTrue(souscription, "La Souscription devrait naître à l'acceptation")
-        self.assertEqual(souscription.etat, 'en_instance')
-
-        wizard = self._lancer_avec_client(client_flux_factice('meta_periodes', []))
-
-        self.assertIn(souscription.name, wizard.resultat)
-        periode = self.env['souscription.periode'].search([('souscription_id', '=', souscription.id)])
-        self.assertFalse(periode, 'Aucune période ne doit être amorcée pour une Souscription en instance')
-
-    def test_erreurs_du_service_apparaissent_dans_le_resume(self):
-        """Non-régression : le wizard ne ré-implémente pas skip-and-report —
-        il affiche tel quel ce que le service rend."""
-        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
-        meta_invalide = _periode_meta(
-            ref_situation_contractuelle='RSC-00000000000001',
-            debut=None,  # déclenche une erreur de mapping (Date invalide)
-            fin='2024-02-01',
-        )
-        wizard = self._lancer_avec_client(client_flux_factice('meta_periodes', [meta_invalide]))
-        self.assertIn('Erreurs : 1', wizard.resultat)
-
-    def test_erreur_de_service_propage_en_userror_par_le_wizard(self):
-        """Le wizard ne capture rien : une UserError du service (ex.
-        ingestion en cours) traverse `action_lancer` telle quelle — preuve de
-        délégation réelle, pas de ré-implémentation locale."""
-        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
-        client = client_flux_factice('meta_periodes', leve=service_module.IngestionEnCours('verrou'))
-        with self.assertRaises(UserError) as cm:
-            self._lancer_avec_client(client)
-        self.assertIn('plus tard', str(cm.exception))
-
-    def test_aucune_souscription_a_rsc_naboutit_pas_a_un_appel_de_flux(self):
-        """Aucune RSC facturable -> aucun flux n'est ouvert (pas de round-trip
-        réseau inutile), même si le client est acquis en tête (fast-fail,
-        ADR 0024 §5 : la construction elle-même n'ouvre aucune socket)."""
-        client = client_flux_factice('meta_periodes', [])
-        wizard = self._lancer_avec_client(client)
-        client.meta_periodes.assert_not_called()
-        self.assertIn('Sans RSC', wizard.resultat)
 
 
 @unittest.skipIf(

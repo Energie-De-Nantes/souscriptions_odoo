@@ -1,1 +1,1 @@
-from . import core, raccordement, wizard
+from . import core, raccordement

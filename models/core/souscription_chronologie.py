@@ -10,7 +10,7 @@ aucune donnée réseau (CONTEXT.md, ADR 0001/0019).
 Grain `rsc` uniquement (pas de repli `pdl` — une seconde action dédiée
 pourrait un jour exposer la vue point, hors périmètre ici). Exceptions du
 mapping ré-exportées par la fabrique (ADR 0024, #222), même posture que le
-wizard de pull des méta-périodes (`souscription_pull_meta_periodes_wizard.py`) :
+pull des méta-périodes (`souscription_pull_meta_periodes_service.py`) :
 la fabrique s'arrête à « rends-moi un client configuré », chaque appelant
 garde son appel d'endpoint et son propre mapping.
 """

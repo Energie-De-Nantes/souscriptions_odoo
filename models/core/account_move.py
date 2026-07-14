@@ -159,7 +159,7 @@ class AccountMove(models.Model):
             grille = self.env['grille.prix'].get_grille_active(periode.date_fin, regime=periode.regime_prix_periode)
             lignes = periode._composer_lignes(grille)
             prestas = periode.souscription_id._refacturations_a_rassembler(self)
-            return lignes + [presta._composer_ligne() for presta in prestas]
+            return lignes + prestas._composer_lignes_groupees()
         if self.regularisation_id:
             return self.regularisation_id._composer_lignes()
         return []

@@ -931,7 +931,7 @@ class Souscription(models.Model):
         prestas = self._refacturations_a_rassembler(facture)
         if not prestas:
             return
-        facture.write({'invoice_line_ids': [p._composer_ligne() for p in prestas]})
+        facture.write({'invoice_line_ids': prestas._composer_lignes_groupees()})
         prestas.facture_id = facture
 
     @api.model

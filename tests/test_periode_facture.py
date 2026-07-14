@@ -201,6 +201,63 @@ class TestPeriodeFactureRegenerationEmission(SouscriptionsTestCase):
         presta = self.souscription_base.refacturation_ids.filtered(lambda p: p.reference == 'F15-PRECOCE')
         self.assertEqual(presta.facture_id, facture)
 
+    def test_section_prestations_enedis_non_dupliquee_a_la_regeneration(self):
+        """#279 : une Refacturation déjà rassemblée à la création garde une
+        section « Prestations Enedis » UNIQUE après la re-génération à
+        l'émission — la recompose supprime puis recompose, pas d'empilement."""
+        self.env['souscription.refacturation'].create(
+            {
+                'souscription_id': self.souscription_base.id,
+                'reference': 'F15-SECDUP',
+                'libelle': 'Déplacement',
+                'prix': 25.0,
+                'quantite': 1.0,
+            }
+        )
+        self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        self.souscription_base.creer_factures()
+        facture = self.souscription_base.facture_ids
+
+        facture.action_post()
+
+        sections = facture.invoice_line_ids.filtered(
+            lambda l: l.display_type == 'line_section' and l.name == 'Prestations Enedis'
+        )
+        self.assertEqual(len(sections), 1, 'une seule section après re-génération')
+
+    def test_section_prestations_enedis_disparait_quand_la_file_se_vide(self):
+        """#279 : si la Refacturation quitte la file (mise en attente) avant
+        une recompose, la section disparaît — elle ne survit pas comme une
+        ligne orpheline."""
+        presta = self.env['souscription.refacturation'].create(
+            {
+                'souscription_id': self.souscription_base.id,
+                'reference': 'F15-SECVIDE',
+                'libelle': 'Déplacement',
+                'prix': 25.0,
+                'quantite': 1.0,
+            }
+        )
+        self.create_test_periode(self.souscription_base, provision_base_kwh=100.0)
+        self.souscription_base.creer_factures()
+        facture = self.souscription_base.facture_ids
+        self.assertTrue(
+            facture.invoice_line_ids.filtered(
+                lambda l: l.display_type == 'line_section' and l.name == 'Prestations Enedis'
+            )
+        )
+
+        presta.facture_id = False
+        presta.en_attente = True
+        facture._recomposer_lignes_generees()
+
+        self.assertFalse(
+            facture.invoice_line_ids.filtered(
+                lambda l: l.display_type == 'line_section' and l.name == 'Prestations Enedis'
+            ),
+            'la section disparaît quand plus aucune presta à rassembler',
+        )
+
     def test_suppression_directe_ligne_generee_refusee_en_brouillon(self):
         """Garde `ondelete` (#266) : suppression directe d'une ligne générée
         d'une facture d'énergie en brouillon refusée."""

@@ -680,10 +680,27 @@ class SouscriptionCampagneEtape(models.Model):
 
     # --- Drill-down (#157) : la liste filtrée des souscriptions concernées
     # par cette étape (pour les étapes à signal dérivé) ou, à défaut, toutes
-    # les souscriptions facturables du mois. ---
+    # les souscriptions facturables du mois. Exception (#282) : « Créer
+    # factures »/« Émettre factures » affichent un reste-à-faire côté
+    # souscriptions, mais la facturiste y travaille sur des FACTURES — le
+    # drill-down y ouvre donc les factures du mois plutôt que les
+    # souscriptions, groupées par statut (brouillon à émettre / comptabilisé
+    # déjà émis). Même action pour les deux étapes. ---
+
+    _CODES_DRILL_DOWN_FACTURES = ('creer_factures', 'emettre_factures')
 
     def action_drill_down(self):
         self.ensure_one()
+        if self.code in self._CODES_DRILL_DOWN_FACTURES:
+            factures = self.campagne_id._factures_du_mois()
+            return {
+                'type': 'ir.actions.act_window',
+                'name': ETAPES_CAMPAGNE.get(self.code, {}).get('label', self.code),
+                'res_model': 'account.move',
+                'view_mode': 'list,form',
+                'domain': [('id', 'in', factures.ids)],
+                'context': {'group_by': 'state'},
+            }
         if self.type_etape == 'derive':
             souscriptions = self.campagne_id._reste_a_faire(self.code)
         else:

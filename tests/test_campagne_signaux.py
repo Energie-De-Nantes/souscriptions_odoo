@@ -205,6 +205,37 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
         action = self._etape('pull_meta_periodes').action_drill_down()
         self.assertEqual(action['domain'][0][2], [self.souscription_hphc.id])
 
+    def test_drill_down_creer_factures_ouvre_les_factures_du_mois_groupees_par_etat(self):
+        """#282 : « Créer factures » n'ouvre plus le reste-à-faire
+        souscriptions mais les factures du mois (account.move), groupées par
+        statut — brouillon (reste à émettre) vs comptabilisé (émis) d'un
+        coup d'œil."""
+        p1 = self._periode(self.souscription_base)
+        p2 = self._periode(self.souscription_hphc)
+        p1._creer_facture()
+        p2._creer_facture().action_post()
+        self.campagne.invalidate_recordset()
+
+        action = self._etape('creer_factures').action_drill_down()
+
+        self.assertEqual(action['res_model'], 'account.move')
+        self.assertEqual(set(action['domain'][0][2]), set(self.campagne._factures_du_mois().ids))
+        group_by = action['context'].get('group_by')
+        self.assertIn('state', [group_by] if isinstance(group_by, str) else group_by)
+
+    def test_drill_down_emettre_factures_meme_action_que_creer_factures(self):
+        """#282 : les deux étapes partagent la même action de drill-down."""
+        p1 = self._periode(self.souscription_base)
+        p1._creer_facture()
+        self.campagne.invalidate_recordset()
+
+        action = self._etape('emettre_factures').action_drill_down()
+
+        self.assertEqual(action['res_model'], 'account.move')
+        self.assertEqual(set(action['domain'][0][2]), set(self.campagne._factures_du_mois().ids))
+        group_by = action['context'].get('group_by')
+        self.assertIn('state', [group_by] if isinstance(group_by, str) else group_by)
+
     # --- Décompte factures créées / émises du mois (AC) ---
 
     def test_compte_factures_creees_et_emises_du_mois(self):

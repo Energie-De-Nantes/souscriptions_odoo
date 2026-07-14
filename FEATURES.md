@@ -38,7 +38,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 ## Parcours : cycle mensuel de facturation
 
 - REQ-FAC-01 ✅ campagne mensuelle : DAG d'étapes + portes de vérification — preuve: tests/test_campagne_facturation.py · #156
-- REQ-FAC-02 ✅ signaux : statut par souscription, reste-à-faire, drill-down — preuve: tests/test_campagne_signaux.py · #157
+- REQ-FAC-02 ✅ signaux : statut par souscription, reste-à-faire, drill-down — souscriptions restantes pour les étapes dérivées, sauf « Créer factures »/« Émettre factures » qui ouvrent les factures du mois (`account.move`) groupées par statut, même action partagée — preuve: tests/test_campagne_signaux.py · #157, #282
 - REQ-FAC-03 ✅ boutons d'étape : pulls, créer puis émettre les factures — preuve: tests/test_campagne_etapes_actions.py · #158
 - REQ-FAC-04 ✅ notes de campagne reportées au mois suivant — preuve: tests/test_campagne_notes.py · #159
 - REQ-FAC-05 ✅ pull des méta-périodes electricore, idempotent — propriétaire durable extrait en service (`souscription.pull.meta.periodes.service`), consommé par la Campagne (coquille mince) ; le wizard ad-hoc a été retiré, la Campagne est le seul chemin de pull — preuve: tests/test_pull_meta_periodes.py · #77, #233, #278

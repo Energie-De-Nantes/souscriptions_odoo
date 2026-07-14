@@ -5,14 +5,6 @@
         <field name="model">souscription.periode</field>
         <field name="arch" type="xml">
             <list decoration-info="facture_legacy_ref and not facture_id">
-                <!-- Lance le wizard de pull méta-périodes (#154) : relocalisé
-                     depuis le menu top-level, l'action du wizard est réutilisée
-                     telle quelle (la campagne s'y accrochera plus tard). -->
-                <header>
-                    <button name="%(action_souscription_pull_meta_periodes_wizard)d"
-                            type="action" string="Récupérer les périodes du mois"
-                            class="btn-primary" display="always"/>
-                </header>
                 <field name="souscription_id"/>
                 <field name="pdl"/>
                 <field name="mois_annee"/>

@@ -134,10 +134,9 @@ souscriptions_odoo/
 ├── models/
 │   ├── core/         # Souscription, périodes, grilles, campagne, chèque énergie,
 │   │                 # refacturation, relevés, journal des actes, account.move
-│   ├── raccordement/ # Workflow kanban des demandes de raccordement
-│   └── wizard/       # Assistants (pull des méta-périodes electricore…)
+│   └── raccordement/ # Workflow kanban des demandes de raccordement
 ├── controllers/      # Routes du portail usager
-├── views/            # Vues Odoo (core, raccordement, wizard, portail)
+├── views/            # Vues Odoo (core, raccordement, portail)
 ├── reports/          # Facture d'énergie, conditions particulières, attestation (QWeb)
 ├── data/             # Configuration par défaut (produits, séquences, crons, mails)
 ├── demo/             # Données de démo

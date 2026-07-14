@@ -134,6 +134,30 @@ class TestInvoiceTemplate(TransactionCase):
         self.assertEqual(facture.souscription_id, self.souscription_base)
         self.assertEqual(facture.periode_id, periode)
 
+    def test_get_name_invoice_report_route_vers_le_document_energie(self):
+        """#289 : le hook natif d'Odoo (`_get_name_invoice_report`) est la
+        porte UNIQUE lue par `account.report_invoice` — portail, PDF email et
+        Imprimer/Télécharger par défaut la traversent tous. Une facture
+        d'énergie route vers le document dédié."""
+        _periode, facture = self._create_periode_and_invoice(
+            self.souscription_base, date(2024, 1, 1), date(2024, 1, 31)
+        )
+        self.assertEqual(facture._get_name_invoice_report(), 'souscriptions_odoo.report_facture_energie')
+
+    def test_get_name_invoice_report_fallback_hors_energie(self):
+        """Une facture hors énergie (`is_facture_energie = False`) retombe
+        sur le gabarit standard d'Odoo via `super()` — automatiquement, sans
+        liste d'exclusion à maintenir."""
+        facture_normale = self.env['account.move'].create(
+            {
+                'move_type': 'out_invoice',
+                'partner_id': self.partner.id,
+                'invoice_line_ids': [(0, 0, {'name': 'Produit test', 'quantity': 1, 'price_unit': 100.0})],
+            }
+        )
+        self.assertFalse(facture_normale.is_facture_energie)
+        self.assertEqual(facture_normale._get_name_invoice_report(), 'account.report_invoice_document')
+
     def test_template_rendering_base(self):
         """Test du rendu du template pour tarif Base"""
         periode, facture = self._create_periode_and_invoice(self.souscription_base, date(2024, 2, 1), date(2024, 2, 29))

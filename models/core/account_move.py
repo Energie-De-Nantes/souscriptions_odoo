@@ -221,3 +221,22 @@ class AccountMove(models.Model):
         if self.is_facture_energie and self.souscription_id:
             return f'Facture_Energie_{self.souscription_id.name}_{self.name}'
         return super()._get_report_base_filename()
+
+    def _get_name_invoice_report(self):
+        """Point d'extension natif d'Odoo — porte UNIQUE du design de facture
+        d'énergie (#289). `account.report_invoice` (héritée dans
+        reports/facture_energie_template.xml) lit ce hook pour choisir entre
+        le document standard et `souscriptions_odoo.report_facture_energie` ;
+        CE report est ce que le portail client (`get_portal_url`), le PDF
+        envoyé par email et Imprimer/Télécharger par défaut traversent tous
+        — un seul branchement couvre les trois surfaces.
+
+        Les factures hors énergie (mobilier, etc.) retombent sur `super()`
+        automatiquement, sans liste d'exclusion à maintenir. Les avoirs de
+        régularisation aussi (hors périmètre #289) : `is_facture_energie` est
+        False par conception dessus (`regularisation_id` est `copy=False`,
+        cf. `account_move.py` plus haut)."""
+        self.ensure_one()
+        if self.is_facture_energie:
+            return 'souscriptions_odoo.report_facture_energie'
+        return super()._get_name_invoice_report()

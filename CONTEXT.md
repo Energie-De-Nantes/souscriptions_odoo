@@ -220,6 +220,14 @@ produit (positions fiscales comprises), jamais d'un taux saisi sur la ligne (ADR
 choix. Le solidaire impose **deux exemplaires parallèles** de chaque produit (standard / solidaire),
 comptablement **isolés** (cf. *Tarif solidaire*, ADR 0013).
 _Éviter_ : *article* ; confondre avec la *Grille de prix* (qui porte le **prix**, pas le compte/la TVA).
+_Migré_ : les factures **migrées** portent leurs libellés **legacy verbatim** — nom du produit prod
+(`sale_subscription` : un produit par tarif×puissance×type×ère, « Abonnement Base 6 kVA ») **+** le
+suffixe de récurrence (« - 1 Mois\n<date> au <date> »). Ce sont des documents **postés** (registre
+légal de ce qui a été facturé) : on **ne les réécrit pas**. Le catalogue ci-dessus ne labellise que
+le **going-forward** (« Abonnement 6 kVA ») ; un libellé moche sur une facture n'est donc pas un bug
+de génération mais un artefact d'historique. Le vrai risque associé (des périodes **futures**
+postées d'avance en prod que la migration traînerait dans le parc vivant → **double-facturation**)
+est une question de **borne de bascule**, hors de ce module (`souscriptions_migration`).
 
 **Facture** :
 Le document comptable légal (`account.move`, *facture d'énergie*) émis à partir d'une *Période*

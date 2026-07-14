@@ -10,6 +10,7 @@ from . import (
     test_cloture_campagne,
     test_documents_contractuels,
     test_electricore_client_fabrique,
+    test_encaissement_une_clic,
     test_estimation_provisions,
     test_facturation,
     test_facture_document,

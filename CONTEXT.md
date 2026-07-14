@@ -97,6 +97,18 @@ catégorie`) ; la *Facture* en est une **projection** (dérive manuelle bornée 
 _Éviter_ : méta-période (concept amont, côté electricore), mois ; « instantané fidèle » (la Période
 est un brouillon facturable, pas une copie figée d'electricore).
 
+**Période d'ouverture** :
+Une *Période* backfillée par la migration (#107, ADR 0023 décision 3) pour un mois non
+régularisé d'un contrat *lissé*, dont la facture vit dans l'ancien système (Odoo 17) : le champ
+`facture_legacy_ref` la marque, **aucun** `account.move` n'est créé ici (pas de move fictif, ADR
+0004 — `facture_id` reste dérivé de `move_ids` et donc vide). Elle reste `type_periode='mensuelle'`
+— même périmètre qu'une Période facturée normale (régularisation #20). Une facture legacy est déjà
+**créée et émise** dans l'ancien système : la Période d'ouverture est donc **terminale** — statut
+`émise` — dans le **statut de facturation** dérivé par la *Campagne* (à tirer → à facturer →
+facturée → émise, cf. *Campagne de facturation*), exclue des deux reste-à-faire (créer, émettre)
+comme `creer_factures()` l'excluait déjà de la création (#284).
+_Éviter_ : la classer `à facturer` (bloque « Créer factures » et « Émettre factures » à vie, #284).
+
 **Énergie facturée** :
 La quantité d'énergie, par cadran facturé, que les *Factures* émises ont réellement portée pour
 une *Période* — le « facturé ». **N'évolue que par l'émission d'une facture qui la porte** :

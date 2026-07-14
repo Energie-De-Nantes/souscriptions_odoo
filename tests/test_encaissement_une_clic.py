@@ -11,6 +11,7 @@ résolu par `account.move._resoudre_journal_encaissement()` — jamais par nom
 (même idiome que `souscription.sepa.mandat._resoudre_journal_sdd`).
 """
 
+from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
 from .common import SouscriptionsTestCase
@@ -36,3 +37,81 @@ class TestJournalMonnaieLocaleField(SouscriptionsTestCase):
         )
         self.env.company.journal_monnaie_locale_id = journal
         self.assertEqual(self.env.company.journal_monnaie_locale_id, journal)
+
+
+@tagged('souscriptions', 'souscriptions_paiements', 'post_install', '-at_install')
+class TestResoudreJournalEncaissement(SouscriptionsTestCase):
+    """`account.move._resoudre_journal_encaissement()` : résolution jamais
+    par nom, garde explicite si absent/ambigu (même idiome que
+    `souscription.sepa.mandat._resoudre_journal_sdd`)."""
+
+    def _facture_avec_mode(self, mode_paiement, **periode_kwargs):
+        self.souscription_base.mode_paiement = mode_paiement
+        periode, facture = self.create_test_invoice(self.souscription_base, **periode_kwargs)
+        facture.action_post()
+        return facture
+
+    def _isoler_journaux_cash(self):
+        """Neutralise les journaux `cash` préexistants de la société (données
+        de démo/fixtures) pour rendre le test déterministe — la garde
+        cotise ensuite les journaux qu'on pose nous-mêmes, jamais un mélange
+        avec l'état ambiant."""
+        self.env['account.journal'].search([('type', '=', 'cash'), ('company_id', '=', self.env.company.id)]).write(
+            {'active': False}
+        )
+
+    # -- monnaie_locale --
+
+    def test_monnaie_locale_resout_le_journal_configure(self):
+        journal = self.env['account.journal'].create(
+            {'name': 'Moneko', 'code': 'MNLO', 'type': 'bank', 'company_id': self.env.company.id}
+        )
+        self.env.company.journal_monnaie_locale_id = journal
+        facture = self._facture_avec_mode('monnaie_locale')
+        self.assertEqual(facture._resoudre_journal_encaissement(), journal)
+
+    def test_monnaie_locale_absent_leve_erreur_explicite(self):
+        self.assertFalse(self.env.company.journal_monnaie_locale_id)
+        facture = self._facture_avec_mode('monnaie_locale')
+        with self.assertRaises(UserError) as cm:
+            facture._resoudre_journal_encaissement()
+        self.assertIn('Journal monnaie locale', str(cm.exception))
+
+    # -- especes --
+
+    def test_especes_resout_le_journal_cash_unique(self):
+        self._isoler_journaux_cash()
+        journal = self.env['account.journal'].create(
+            {'name': 'Caisse Test', 'code': 'CAISS', 'type': 'cash', 'company_id': self.env.company.id}
+        )
+        facture = self._facture_avec_mode('especes')
+        self.assertEqual(facture._resoudre_journal_encaissement(), journal)
+
+    def test_especes_absent_leve_erreur(self):
+        self._isoler_journaux_cash()
+        facture = self._facture_avec_mode('especes')
+        with self.assertRaises(UserError) as cm:
+            facture._resoudre_journal_encaissement()
+        self.assertIn('Aucun journal de caisse', str(cm.exception))
+
+    def test_especes_ambigu_leve_erreur(self):
+        self._isoler_journaux_cash()
+        self.env['account.journal'].create(
+            {'name': 'Caisse A', 'code': 'CAA', 'type': 'cash', 'company_id': self.env.company.id}
+        )
+        self.env['account.journal'].create(
+            {'name': 'Caisse B', 'code': 'CAB', 'type': 'cash', 'company_id': self.env.company.id}
+        )
+        facture = self._facture_avec_mode('especes')
+        with self.assertRaises(UserError) as cm:
+            facture._resoudre_journal_encaissement()
+        self.assertIn('Plusieurs', str(cm.exception))
+
+    # -- mode hors attestation-pure : défensif, ne devrait jamais être appelé
+    # (le bouton ne l'exhibe pas) mais ne devine jamais un journal si un
+    # appelant le fait quand même. --
+
+    def test_mode_hors_attestation_pure_leve_erreur(self):
+        facture = self._facture_avec_mode('virement')
+        with self.assertRaises(UserError):
+            facture._resoudre_journal_encaissement()

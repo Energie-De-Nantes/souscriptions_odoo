@@ -1,4 +1,4 @@
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 
@@ -240,3 +240,78 @@ class AccountMove(models.Model):
         if self.is_facture_energie:
             return 'souscriptions_odoo.report_facture_energie'
         return super()._get_name_invoice_report()
+
+    # === Encaissement une-clic pour les modes attestation-pure (#290, ADR 0033) ===
+    #
+    # `monnaie_locale` et `especes` n'ont **aucune** trace bancaire, jamais
+    # (CONTEXT.md « Mode de paiement ») : la facturiste est l'unique source de
+    # vérité de l'encaissement. Prélèvement, virement et chèque restent 100 %
+    # natifs — pas de bouton, pas de résolveur pour eux.
+
+    def _resoudre_journal_encaissement(self):
+        """Résout le journal cible de l'encaissement une-clic selon
+        `mode_paiement` — jamais par nom (même idiome que
+        `souscription.sepa.mandat._resoudre_journal_sdd`) :
+        - `monnaie_locale` -> pointeur société `journal_monnaie_locale_id`
+          (calqué sur `res.company.currency_exchange_journal_id`) ;
+        - `especes` -> journal `type='cash'` unique de la société, résolu à
+          la volée (pas de champ stocké, idiome de
+          `account.move._search_default_journal`).
+        Erreur explicite si le journal est absent ou ambigu — jamais de
+        journal deviné sur un chemin monétaire."""
+        self.ensure_one()
+        if self.mode_paiement == 'monnaie_locale':
+            journal = self.company_id.journal_monnaie_locale_id
+            if not journal:
+                raise UserError(
+                    _(
+                        'Aucun journal « monnaie locale » configuré pour %(societe)s : renseignez le champ '
+                        "Journal monnaie locale de la société avant d'encaisser.",
+                        societe=self.company_id.name,
+                    )
+                )
+            return journal
+        if self.mode_paiement == 'especes':
+            journaux = self.env['account.journal'].search(
+                [('type', '=', 'cash'), ('company_id', '=', self.company_id.id)]
+            )
+            if not journaux:
+                raise UserError(
+                    _(
+                        'Aucun journal de caisse (type « Espèces ») configuré pour %(societe)s : '
+                        "configurez-en un avant d'encaisser.",
+                        societe=self.company_id.name,
+                    )
+                )
+            if len(journaux) > 1:
+                raise UserError(
+                    _(
+                        'Plusieurs journaux de caisse existent pour %(societe)s, ambiguïté à résoudre avant '
+                        "d'encaisser : %(journaux)s.",
+                        societe=self.company_id.name,
+                        journaux=', '.join(journaux.mapped('name')),
+                    )
+                )
+            return journaux
+        raise UserError(
+            _(
+                'Encaissement une-clic indisponible pour le mode de paiement « %(mode)s ».',
+                mode=dict(self._fields['mode_paiement'].selection).get(self.mode_paiement, self.mode_paiement),
+            )
+        )
+
+    def action_encaisser(self):
+        """Le bouton une-clic de la vue « Règlements en attente » (#290, ADR
+        0033) : crée, poste et lettre un `account.payment` entrant du
+        reste-à-payer intégral sur le journal résolu — même gate que
+        `action_valider()` du chèque énergie (ADR 0026), en déléguant le
+        lettrage au wizard natif `account.payment.register._create_payments()`
+        plutôt qu'en le réimplémentant. Le paiement naît ICI, au clic —
+        jamais pré-créé à l'émission (ADR 0033) : sans l'Enterprise
+        `account_accountant`, l'enregistrer fait passer la facture
+        directement à `paid`, donc le créer c'est affirmer « encaissé »."""
+        self.ensure_one()
+        journal = self._resoudre_journal_encaissement()
+        self.env['account.payment.register'].with_context(active_model='account.move', active_ids=self.ids).create(
+            {'journal_id': journal.id, 'amount': self.amount_residual}
+        )._create_payments()

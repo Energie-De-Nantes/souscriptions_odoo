@@ -270,14 +270,22 @@ _Éviter_ : **« remise »** ou ligne négative sur la *Facture* (c'est un paiem
 La façon dont le·la *souscripteur·rice* règle le **solde** de ses *Factures*, portée par la
 **Souscription** (c'est le contrat qui fait foi, pas la personne : deux *Souscriptions* d'une même
 personne peuvent avoir des modes différents). Valeur **exclusive** parmi : prélèvement, monnaie
-locale (Moneko), espèces, virement, chèque. Sépare les factures en deux circuits de règlement :
-**prélèvement** (fichier SEPA en masse, adossé à un mandat) et **saisie manuelle** (tous les
-autres). Ne concerne que les factures à **reste à payer non nul** — une facture soldée (chèque
+locale (Moneko), espèces, virement, chèque. Sépare les factures en circuits de règlement selon
+**ce qui fait foi de l'encaissement** :
+- **prélèvement** — fichier SEPA en masse, adossé à un mandat ; l'outillage comptable encaisse.
+- **saisie manuelle**, scindée par la **traçabilité bancaire** de l'encaissement :
+  - **bancaire-rapprochable** (virement, chèque) — l'argent atterrit sur un **relevé bancaire** ; le
+    **rapprochement** fait foi, jamais une attestation ;
+  - **attestation-pure** (monnaie locale/Moneko, espèces) — **aucune trace bancaire, jamais** ;
+    l'encaissement n'a d'autre source de vérité que l'**attestation à la main** du·de la *facturiste*.
+
+Ne concerne que les factures à **reste à payer non nul** — une facture soldée (chèque
 énergie, 0 €) ne déclenche aucun règlement.
 _Éviter_ : le *Chèque énergie* comme mode de paiement (c'est un **tiers-payeur** qui s'impute
 avant règlement, le reste dû suit le mode de paiement normal) ; les **étiquettes** partenaire
 comme source de vérité du mode (non exclusives, non historisées, rattachées à la personne et non
-au contrat).
+au contrat) ; **attester à la main** l'encaissement d'un *virement* ou d'un *chèque* — le relevé
+bancaire fait foi, une attestation créerait une **double vérité** contre le rapprochement.
 
 **Mandat de prélèvement (SEPA)** :
 L'autorisation signée par le·la *souscripteur·rice* de débiter son compte, identifiée par un

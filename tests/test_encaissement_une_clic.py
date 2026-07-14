@@ -43,6 +43,27 @@ class TestJournalMonnaieLocaleField(SouscriptionsTestCase):
 
 
 @tagged('souscriptions', 'souscriptions_paiements', 'post_install', '-at_install')
+class TestJournalEspecesField(SouscriptionsTestCase):
+    """AC : `res.company.journal_especes_id`, `Many2one('account.journal',
+    domain=[('type','=','cash')], check_company=True)` (#298, ADR 0033
+    amendé) — même idiome que `journal_monnaie_locale_id`."""
+
+    def test_champ_existe_domaine_cash_check_company(self):
+        field = self.env['res.company']._fields['journal_especes_id']
+        self.assertEqual(field.type, 'many2one')
+        self.assertEqual(field.comodel_name, 'account.journal')
+        self.assertEqual(field.domain, [('type', '=', 'cash')])
+        self.assertTrue(field.check_company)
+
+    def test_champ_se_pose_et_se_lit(self):
+        journal = self.env['account.journal'].create(
+            {'name': 'Caisse Test', 'code': 'CAISS', 'type': 'cash', 'company_id': self.env.company.id}
+        )
+        self.env.company.journal_especes_id = journal
+        self.assertEqual(self.env.company.journal_especes_id, journal)
+
+
+@tagged('souscriptions', 'souscriptions_paiements', 'post_install', '-at_install')
 class TestResoudreJournalEncaissement(SouscriptionsTestCase):
     """`account.move._resoudre_journal_encaissement()` : résolution jamais
     par nom, garde explicite si absent/ambigu (même idiome que

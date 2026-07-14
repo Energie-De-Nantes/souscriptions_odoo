@@ -45,9 +45,10 @@ class SouscriptionSepaMandat(models.AbstractModel):
             de l'appelant se déroule à l'identique.
 
         Raises:
-            UserError: aucun ou plusieurs journaux comptables n'exposent la
-                méthode de paiement SDD (résolution interne, jamais exposée
-                à l'appelant).
+            UserError: aucun journal comptable n'expose la méthode de
+                paiement SDD, ou plusieurs l'exposent sans que le pointeur
+                société `journal_prelevement_sdd_id` ne tranche (résolution
+                interne, jamais exposée à l'appelant).
         """
         if 'sdd.mandate' not in self.env:
             return None

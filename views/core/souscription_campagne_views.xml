@@ -51,7 +51,12 @@
                     <notebook>
                         <page string="Étapes" name="etapes">
                             <field name="etape_ids" create="0" delete="0">
-                                <list editable="bottom" create="0" delete="0">
+                                <!-- Prochaine étape en évidence (#301), décorations XML pures :
+                                     faites grisées, prêtes-non-faites en gras. Le DAG peut avoir
+                                     plusieurs racines actionnables à la fois (#156) : le gras les
+                                     montre toutes, sans notion de « la » prochaine étape unique. -->
+                                <list editable="bottom" create="0" delete="0"
+                                      decoration-muted="fait" decoration-bold="etat_prerequis == 'prete' and not fait">
                                     <field name="sequence" widget="handle"/>
                                     <field name="code" readonly="1"/>
                                     <field name="type_etape" column_invisible="1"/>

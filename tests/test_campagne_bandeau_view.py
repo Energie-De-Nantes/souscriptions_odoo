@@ -50,3 +50,24 @@ class TestCampagneBandeauButtonBox(SouscriptionsTestCase):
         restent sur le modèle (#157), juste plus affichés ici."""
         groupes = self.arch.findall(".//group[@string='Factures du mois']")
         self.assertFalse(groupes)
+
+
+@tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
+class TestCampagneEtapesDecorations(SouscriptionsTestCase):
+    """AC #301 : décorations XML pures sur la matrice des étapes — lignes
+    faites grisées, étapes prêtes non faites en gras. Avec le DAG, plusieurs
+    étapes peuvent être prêtes-non-faites à la fois (racines indépendantes) :
+    le gras les montre toutes, c'est la sémantique voulue (aucune notion de
+    « prochaine » étape unique)."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        view = cls.env['souscription.campagne.facturation'].get_view(view_type='form')
+        cls.arch = etree.fromstring(view['arch'])
+
+    def test_liste_des_etapes_grise_les_lignes_faites_et_met_en_gras_les_pretes(self):
+        etape_list = self.arch.find(".//field[@name='etape_ids']/list")
+        self.assertIsNotNone(etape_list)
+        self.assertEqual(etape_list.get('decoration-muted'), 'fait')
+        self.assertEqual(etape_list.get('decoration-bold'), "etat_prerequis == 'prete' and not fait")

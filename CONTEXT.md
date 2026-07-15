@@ -297,6 +297,16 @@ est la porte humaine (IBAN vérifié, mandat signé exigé), pas de re-validatio
 _Éviter_ : un second circuit de validation du mandat (l'acceptation de la demande est la porte) ;
 prélever sans mandat actif ; re-saisir à la main ce que la demande de raccordement porte déjà.
 
+**Résolution du journal de prélèvement** :
+Le journal comptable portant la méthode `sdd` est résolu dynamiquement, jamais nommé en dur.
+Un seul journal `sdd` fait foi. **Plusieurs** (cas prod : `sdd` exposée sur Nef, Livret bleu,
+Crédit mutuel, Moneko — un seul mandaté) sont désambiguïsés par le pointeur société
+**`journal_prelevement_sdd_id`**, même idiome que `journal_monnaie_locale_id`
+([ADR 0033](docs/adr/0033-encaissement-une-clic-attestation-pure-reouverture-bornee-option-b.md)) :
+le rôle « journal de prélèvement » vit sur `res.company`, jamais comme marqueur sur
+`account.journal`. Pointeur absent ou hors des journaux `sdd` → erreur explicite (jamais de
+mandat rattaché au mauvais journal). Surfacé plus tard dans la config « Souscriptions » (#291).
+
 **Configuration Enedis** :
 La configuration *réseau* d'un PDL — FTA, calendrier distributeur, puissance réseau, cadrans
 réseau — propriété d'electricore (source : C15). Détermine le coût d'acheminement (TURPE).

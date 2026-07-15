@@ -45,9 +45,10 @@ class SouscriptionSepaMandat(models.AbstractModel):
             de l'appelant se déroule à l'identique.
 
         Raises:
-            UserError: aucun ou plusieurs journaux comptables n'exposent la
-                méthode de paiement SDD (résolution interne, jamais exposée
-                à l'appelant).
+            UserError: aucun journal comptable n'expose la méthode de
+                paiement SDD, ou plusieurs l'exposent sans que le pointeur
+                société `journal_prelevement_sdd_id` ne tranche (résolution
+                interne, jamais exposée à l'appelant).
         """
         if 'sdd.mandate' not in self.env:
             return None
@@ -58,8 +59,14 @@ class SouscriptionSepaMandat(models.AbstractModel):
     def _resoudre_journal_sdd(self):
         """Résout dynamiquement le journal comptable portant la méthode de
         paiement SDD (prélèvement SEPA) — jamais configuré en dur (#187).
-        Erreur explicite si aucun journal ne l'expose ou si plusieurs le
-        font : pas de mandat silencieusement rattaché au mauvais journal."""
+
+        Aucun journal ne l'expose -> erreur explicite. Un seul -> il fait
+        foi. Plusieurs (cas prod réel : `sdd` exposée sur 4 journaux, un
+        seul mandaté, #292) -> désambiguïsés par le pointeur société
+        `journal_prelevement_sdd_id` (même idiome que
+        `journal_monnaie_locale_id`, ADR 0033) : s'il est posé et fait
+        partie des journaux trouvés, il fait foi ; sinon erreur explicite —
+        jamais de mandat silencieusement rattaché au mauvais journal."""
         journaux = self.env['account.journal'].search(
             [
                 ('company_id', '=', self.env.company.id),
@@ -72,9 +79,14 @@ class SouscriptionSepaMandat(models.AbstractModel):
                 "configurez-en un dans l'outillage comptable avant de créer un mandat en prélèvement."
             )
         if len(journaux) > 1:
+            pointeur = self.env.company.journal_prelevement_sdd_id
+            if pointeur and pointeur in journaux:
+                return pointeur
             raise UserError(
                 'Plusieurs journaux comptables exposent la méthode de paiement SDD (prélèvement SEPA), '
-                f'ambiguïté à résoudre avant création du mandat : {", ".join(journaux.mapped("name"))}.'
+                f'ambiguïté à résoudre avant création du mandat : {", ".join(journaux.mapped("name"))}. '
+                'Désignez le journal de prélèvement dans la configuration Souscriptions '
+                '(société, champ « Journal de prélèvement SDD »).'
             )
         return journaux
 

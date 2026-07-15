@@ -186,18 +186,29 @@ Barème **fournisseur** daté (`grille.prix`), **tout-compris** : le TURPE y est
 refacturé ligne à ligne (ADR 0002). Porte le prix d'abonnement **affine** — prix de base 3 kVA +
 coefficient par kVA supplémentaire (ADR 0018) — et le prix de l'énergie par cadran facturé.
 Chaque grille appartient à un *régime de prix* ; elle est sélectionnée par le régime de la
-*Souscription* et les dates d'une *Période*, ce qui permet de facturer une *régularisation* aux prix
-historiques. C'est aussi l'unique **moteur de prix** : la règle qui assemble barème et configuration
-— abonnement affine, prix par cadran facturé, *Majoration PRO*, choix du *Produit de facturation*
-(standard ou solidaire) — n'a qu'une implémentation, portée par la grille, que la *Facture* et les
-*conditions particulières* **projettent** chacune avec **sa** grille : historique (aux dates de la
-*Période*) pour la Facture, engagée (à la date de début) pour la CP. Les **valeurs** divergent donc
+*Souscription* et la **date de début** d'une *Période*, ce qui permet de facturer une
+*régularisation* aux prix historiques. Sa validité est **demi-ouverte** comme celle de la *Période*
+(`[début, fin)` — même convention de borne partout : une grille se termine le jour où la suivante
+commence, jamais la veille), et un changement de grille **tombe toujours un 1er du mois** : aucune
+*Période* n'enjambe donc deux grilles, et sa seule date de début suffit à la désigner — il n'existe
+pas de prix au prorata. La **fin** de validité est **dérivée** (le début de la grille suivante du
+même régime) : elle s'affiche, elle ne se saisit ni ne se stocke — une grille en vigueur est
+simplement la plus récente à avoir commencé. C'est aussi l'unique **moteur de prix** : la règle qui
+assemble barème et configuration — abonnement affine, prix par cadran facturé, *Majoration PRO*,
+choix du *Produit de facturation* (standard ou solidaire) — n'a qu'une implémentation, portée par la
+grille, que la *Facture* et les *conditions particulières* **projettent** chacune avec **sa** grille :
+historique (à la date de début de la *Période*) pour la Facture, engagée (à la date de début de la
+*Souscription*) pour la CP. Les **valeurs** divergent donc
 dans le temps — c'est le domaine ; la **règle**, jamais. Une grille incapable de prixer une
 configuration **échoue bruyamment** — jamais de prix nul par défaut sur un document.
 _Éviter_ : tarif (collision avec la FTA / tarif d'acheminement réseau), barème ; « prix par palier »
 (l'abonnement est **affine**, pas tabulé par puissance) ; « aligner » les prix de la CP sur les
 factures (la divergence de **valeurs** est voulue — seule la **règle** est unique) ; un prix à 0
-quand la grille est incomplète (échec bruyant).
+quand la grille est incomplète (échec bruyant) ; une grille qui change **en cours de mois** (la
+borne est le 1er — sinon un mois se facture en entier au mauvais prix, sans erreur) ; une **fin de
+validité saisie** ou fermée à la main (elle est dérivée de la suivante) ; sélectionner la grille sur
+la date de **fin** d'une *Période* (c'est la grille du mois **suivant** — la borne de fin est
+exclue).
 
 **Régime de prix** :
 L'axe qui désigne **quel barème** s'applique à une *Souscription* : **standard** ou **Moulin**.

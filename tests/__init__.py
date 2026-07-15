@@ -1,4 +1,5 @@
 from . import (
+    test_avoir_facture_energie,
     test_basic,
     test_campagne_bandeau_stats,
     test_campagne_bandeau_view,

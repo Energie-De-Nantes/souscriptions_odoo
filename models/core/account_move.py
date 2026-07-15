@@ -59,6 +59,20 @@ class AccountMove(models.Model):
         for move in self:
             move.is_facture_energie = bool((move.periode_id or move.regularisation_id) and move.souscription_id)
 
+    def _facture_de_la_source(self):
+        """LA facture de ma source — autorité unique (celle du gel,
+        `souscription.periode._est_facturee_emise` / `regularisation.
+        facture_id`), jamais le lien brut `periode_id`/`regularisation_id`
+        (#318). Un avoir PORTE sa source (`periode_id` n'a pas `copy=False`
+        — CONTEXT.md « Avoir » : traçabilité, Souscription, Mode de
+        paiement) mais n'est jamais SA facture : `facture_id` ne désigne que
+        l'`out_invoice` (`souscription.periode._compute_facture_id` filtre
+        sur `move_type == 'out_invoice'`). `_post()` s'appuie là-dessus pour
+        ne régénérer que la vraie facture de la source, jamais un avoir qui
+        la reverse."""
+        self.ensure_one()
+        return (self.periode_id or self.regularisation_id).facture_id
+
     def _post(self, soft=True):
         """Point de couture de l'émission — **unique événement de gel** (ADR
         0032) : tampon de provision Période (ADR 0030 décision 2, #234,
@@ -93,8 +107,17 @@ class AccountMove(models.Model):
 
         L'imputation elle-même (recherche FIFO des chèques validés,
         lettrage) vit sur `souscription.cheque_energie.imputer()` — ce point
-        de couture ne fait plus que l'appeler (#255, revue d'architecture)."""
-        a_regenerer = self.filtered(lambda m: m.is_facture_energie and m.state == 'draft')
+        de couture ne fait plus que l'appeler (#255, revue d'architecture).
+
+        Le filtre de régénération passe par `_facture_de_la_source()`, pas
+        par le lien brut (#318) : un avoir (`out_refund`) émis sur une
+        Facture d'énergie porte `periode_id`/`regularisation_id` (pas
+        `copy=False`, CONTEXT.md « Avoir ») mais n'est jamais *la* facture
+        de sa source — sans ce filtre il serait recomposé depuis la Période
+        (lignes doublées) et raflerait les Refacturations en file."""
+        a_regenerer = self.filtered(
+            lambda m: m.is_facture_energie and m.state == 'draft' and m._facture_de_la_source() == m
+        )
         for move in a_regenerer:
             if move.periode_id:
                 move.periode_id._tamponner_provision()

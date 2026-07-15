@@ -64,15 +64,15 @@
         </record>
 
         <!-- ============================================================== -->
-        <!-- Grille historique 2024 : explicitement fermée (date_fin) pour  -->
-        <!-- ne pas chevaucher la grille 2025 ouverte. Démontre la sélection -->
-        <!-- par date (get_grille_active) et la régularisation aux prix      -->
-        <!-- historiques : facturer un mois 2024 utilise ces tarifs.        -->
+        <!-- Grille historique 2024 : date_fin est dérivée (2025-01-01, le   -->
+        <!-- date_debut de la grille 2025 ci-dessus) — rien à saisir ici.    -->
+        <!-- Démontre la sélection par date (get_grille_active) et la       -->
+        <!-- régularisation aux prix historiques : facturer un mois 2024    -->
+        <!-- utilise ces tarifs.                                            -->
         <!-- ============================================================== -->
         <record id="grille_prix_2024" model="grille.prix">
             <field name="name">Grille tarifaire 2024</field>
             <field name="date_debut">2024-01-01</field>
-            <field name="date_fin">2024-12-31</field>
         </record>
 
         <!-- Abonnement affine 2024 (tarifs plus bas qu'en 2025) -->

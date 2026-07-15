@@ -1,10 +1,5 @@
-import logging
-from datetime import date, timedelta
-
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
-
-_logger = logging.getLogger(__name__)
 
 # Puissance de référence (kVA) du tarif d'abonnement affine : base à 3 kVA,
 # coefficient appliqué au-delà (ADR 0018).
@@ -23,7 +18,12 @@ class GrillePrix(models.Model):
     name = fields.Char('Nom de la grille', required=True)
     date_debut = fields.Date('Valable à partir du', required=True)
     date_fin = fields.Date(
-        "Valable jusqu'au", readonly=True, help="Calculé automatiquement lors de la création d'une nouvelle grille"
+        "Valable jusqu'au (exclu)",
+        compute='_compute_date_fin',
+        help='Dérivée, jamais saisie : le début de la grille suivante du même '
+        'régime, vide si aucune (grille encore ouverte). Borne EXCLUE — '
+        'demi-ouverte comme la Période (CONTEXT.md « Grille de prix ») : la '
+        'grille se termine le jour où la suivante commence.',
     )
     active = fields.Boolean('Active', default=True)
 
@@ -53,48 +53,38 @@ class GrillePrix(models.Model):
         for grille in self:
             grille.nb_lignes = len(grille.ligne_ids)
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        for vals in vals_list:
-            # Une grille créée inactive est un brouillon hors timeline (ex. copie
-            # à retravailler en grille Moulin) : elle ne ferme aucune sœur.
-            if vals.get('active', True) is False:
+    @api.depends('date_debut', 'regime_prix')
+    def _compute_date_fin(self):
+        """Dérivée : le `date_debut` de la grille suivante du même régime, vide
+        si aucune (grille encore ouverte). Rien n'est stocké ni fermé par un
+        effet de bord (cf. CONTEXT.md « Grille de prix ») — supprimer ou
+        corriger une grille ne laisse donc jamais de trou de période ni de
+        grille périmée à retenir à jour."""
+        for grille in self:
+            if not grille.date_debut:
+                grille.date_fin = False
                 continue
-
-            date_debut_nouvelle = vals['date_debut']
-            regime = vals.get('regime_prix') or 'standard'
-
-            # Fermer la grille précédente DU MÊME RÉGIME (la plus récente avant
-            # cette date) : chaque régime versionne ses grilles indépendamment
-            # (CONTEXT.md « Régime de prix ») — une nouvelle grille Moulin ne
-            # ferme jamais une grille standard, et réciproquement.
-            grille_precedente = self.search(
+            suivante = self.search(
                 [
-                    ('date_debut', '<', date_debut_nouvelle),
-                    ('date_fin', '=', False),  # Grille ouverte
-                    ('regime_prix', '=', regime),
+                    ('regime_prix', '=', grille.regime_prix),
+                    ('date_debut', '>', grille.date_debut),
+                    ('id', '!=', grille._origin.id),
                 ],
-                order='date_debut desc',
+                order='date_debut asc',
                 limit=1,
             )
-
-            if grille_precedente:
-                # Fermer la grille précédente la veille de la nouvelle
-                date_fin_precedente = fields.Date.from_string(date_debut_nouvelle) - timedelta(days=1)
-                grille_precedente.date_fin = date_fin_precedente
-                _logger.info(f'Grille {grille_precedente.name} fermée au {date_fin_precedente}')
-
-        return super().create(vals_list)
+            grille.date_fin = suivante.date_debut if suivante else False
 
     @api.model
     def get_grille_active(self, date_facture=None, regime='standard'):
-        """Récupère la grille du régime donné dont la période de validité couvre
-        la date donnée.
+        """Récupère la grille du régime donné en vigueur à la date donnée.
 
-        La sélection se fait sur ``(régime, plage [date_debut, date_fin])``
-        (date_fin vide = grille ouverte), et non sur le drapeau ``is_current`` :
-        une facturation rétroactive utilise ainsi la grille en vigueur à la date
-        concernée, pour le régime de la Souscription/Période facturée.
+        La grille en vigueur est simplement la plus récente à avoir commencé
+        (CONTEXT.md « Grille de prix ») : sélection sur la seule
+        ``date_debut``, jamais sur ``date_fin`` (dérivée, non filtrable en
+        SQL) — une facturation rétroactive utilise ainsi la grille en vigueur
+        à la date concernée, pour le régime de la Souscription/Période
+        facturée.
         """
         if date_facture is None:
             date_facture = fields.Date.today()
@@ -103,9 +93,6 @@ class GrillePrix(models.Model):
             [
                 ('regime_prix', '=', regime),
                 ('date_debut', '<=', date_facture),
-                '|',
-                ('date_fin', '=', False),
-                ('date_fin', '>=', date_facture),
             ],
             order='date_debut desc',
             limit=1,
@@ -119,32 +106,22 @@ class GrillePrix(models.Model):
 
         return grille
 
-    @api.constrains('date_debut', 'date_fin', 'regime_prix')
-    def _check_no_overlap(self):
-        """Interdit le chevauchement des périodes de validité entre grilles DU
-        MÊME RÉGIME. Deux grilles de régimes différents (standard, Moulin) ne se
-        gênent jamais, même sur des dates identiques (CONTEXT.md « Régime de
-        prix » : chaque régime versionne ses grilles indépendamment)."""
+    @api.constrains('date_debut')
+    def _check_date_debut_premier_du_mois(self):
+        """Un changement de grille tombe toujours un 1er du mois (CONTEXT.md
+        « Grille de prix ») : aucune Période ne peut alors enjamber deux
+        grilles, sa seule date de début suffisant à la désigner — il n'existe
+        pas de prix au prorata. Non rétroactif par nature (``@api.constrains``
+        ne revalide que les grilles créées ou modifiées) : les grilles
+        existantes démarrant en cours de mois ne sont pas requalifiées ici,
+        c'est voulu (cf. issue #309, hors périmètre inter-dépôt)."""
         for grille in self:
-            # Un brouillon inactif est hors timeline (cf. create()) : il ne ferme
-            # aucune sœur et ne déclenche pas l'anti-chevauchement. Sans ce skip,
-            # dupliquer une grille ouverte lèverait un chevauchement contre elle.
-            if not grille.active:
-                continue
-            if not grille.date_debut:
-                continue
-            start_a = grille.date_debut
-            end_a = grille.date_fin or date.max
-            if start_a > end_a:
-                raise ValidationError(f"La grille '{grille.name}' a une date de fin antérieure à sa date de début.")
-            for other in self.search([('id', '!=', grille.id), ('regime_prix', '=', grille.regime_prix)]):
-                start_b = other.date_debut
-                end_b = other.date_fin or date.max
-                if start_a <= end_b and start_b <= end_a:
-                    raise ValidationError(
-                        f"La période de la grille '{grille.name}' chevauche celle de la grille '{other.name}' "
-                        f'(régime {grille.regime_prix}).'
-                    )
+            if grille.date_debut and grille.date_debut.day != 1:
+                raise ValidationError(
+                    f"La grille '{grille.name}' doit débuter un 1er du mois "
+                    f"({grille.date_debut} ne l'est pas) : un changement de "
+                    f'grille ne tombe jamais en cours de mois.'
+                )
 
     # Cadrans facturés par type de tarif : (code, libellé). Carte unique de la
     # partition (ADR 0029) — Base : un seul cadran ; HP/HC : toujours les deux,
@@ -253,8 +230,15 @@ class GrillePrix(models.Model):
         """
         self.ensure_one()
 
-        # Date de départ indicative : l'utilisateur la corrige avant activation.
+        # Date de départ indicative : le 1er du mois suivant, seule date qui ne
+        # viole jamais la contrainte « 1er du mois » (contrairement à `today`,
+        # qui la viole tout jour sauf le 1er) — l'utilisateur l'ajuste avant
+        # activation si besoin.
         today = fields.Date.today()
+        if today.month == 12:
+            date_debut_suggeree = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            date_debut_suggeree = today.replace(month=today.month + 1, day=1)
 
         # Préparer les lignes à copier
         lignes_vals = []
@@ -278,8 +262,7 @@ class GrillePrix(models.Model):
         nouvelle_grille = self.create(
             {
                 'name': f'Copie de {self.name}',
-                'date_debut': today,
-                'date_fin': False,
+                'date_debut': date_debut_suggeree,
                 'regime_prix': self.regime_prix,
                 'active': False,
                 'ligne_ids': lignes_vals,

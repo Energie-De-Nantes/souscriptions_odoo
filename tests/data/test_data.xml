@@ -9,7 +9,6 @@
         <record id="test_grille_prix_complete" model="grille.prix">
             <field name="name">Grille Test Complète</field>
             <field name="date_debut">2024-01-01</field>
-            <field name="date_fin">2024-12-31</field>
             <field name="active">True</field>
         </record>
 

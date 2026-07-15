@@ -257,7 +257,6 @@ class PortalTestCase(SouscriptionsTestMixin, HttpCase):
             {
                 'name': 'Grille Test 2023',
                 'date_debut': date(2023, 1, 1),
-                'date_fin': date(2023, 12, 31),
                 'active': True,
             }
         )

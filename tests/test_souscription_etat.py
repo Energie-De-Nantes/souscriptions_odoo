@@ -274,7 +274,6 @@ class TestEtatEnAttenteCloture(SouscriptionsTestCase):
             {
                 'name': name,
                 'date_debut': date(2024, 1, 1),
-                'date_fin': date(2024, 12, 31),
                 'active': True,
                 'regime_prix': 'moulin',
             }

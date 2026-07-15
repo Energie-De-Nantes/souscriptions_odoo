@@ -312,10 +312,10 @@ class TestPeriodeComposition(SouscriptionsTestCase):
     # === Régime de prix (standard | Moulin) — #105 ===
 
     def _grille_moulin(self, **kwargs):
+        # date_fin est dérivée (#309) : jamais passée en création.
         vals = {
             'name': 'Grille Moulin Test',
             'date_debut': date(2024, 1, 1),
-            'date_fin': date(2024, 12, 31),
             'regime_prix': 'moulin',
         }
         vals.update(kwargs)

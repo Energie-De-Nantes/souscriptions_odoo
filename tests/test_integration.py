@@ -20,11 +20,11 @@ class TestIntegration(TransactionCase):
         )
 
         # Grille de test résolue par date (get_grille_active), pas par drapeau.
+        # date_fin est dérivée (#309) : pas de grille suivante, elle reste ouverte.
         self.grille = self.env['grille.prix'].create(
             {
                 'name': 'Grille Intégration',
                 'date_debut': date(2024, 1, 1),
-                'date_fin': date(2024, 12, 31),
                 'active': True,
             }
         )

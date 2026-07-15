@@ -78,12 +78,12 @@ class TestRegularisationCandidats(SouscriptionsTestCase):
             }
         )
 
-    def _grille_moulin(self, name='Grille Moulin', date_debut=date(2024, 1, 1), date_fin=False, prix_base=0.15):
+    def _grille_moulin(self, name='Grille Moulin', date_debut=date(2024, 1, 1), prix_base=0.15):
+        # date_fin est dérivée (#309) : jamais passée en création.
         grille = self.env['grille.prix'].create(
             {
                 'name': name,
                 'date_debut': date_debut,
-                'date_fin': date_fin,
                 'active': True,
                 'regime_prix': 'moulin',
             }
@@ -161,10 +161,11 @@ class TestRegularisationCandidats(SouscriptionsTestCase):
         grille), chacune aux prix de sa sous-période."""
         souscription = self._souscription_lissee(ref='RSC-REGUL-AC2', pdl='PDL_REGUL_AC2')
         grille1 = self._grille_moulin(name='Grille AC2 - 1', date_debut=date(2024, 1, 1), prix_base=0.15)
-        # Nouvelle grille moulin à partir du 2 juillet : ferme automatiquement
-        # grille1 au 1er juillet (date de clôture = veille) — la Période de
-        # juin (date_fin = 2024-07-01) reste donc bien sur grille1.
-        grille2 = self._grille_moulin(name='Grille AC2 - 2', date_debut=date(2024, 7, 2), prix_base=0.20)
+        # Nouvelle grille moulin à partir du 1er juillet (un changement de
+        # grille tombe toujours un 1er, #309) : la Période de juin
+        # (date_debut = 2024-06-01) sélectionne toujours grille1, celle de
+        # juillet (date_debut = 2024-07-01) sélectionne grille2.
+        grille2 = self._grille_moulin(name='Grille AC2 - 2', date_debut=date(2024, 7, 1), prix_base=0.20)
 
         for m in range(1, 7):  # janvier à juin : écart 10 kWh/mois -> grille1
             self._periode_facturee(souscription, m, energie_base_kwh=210.0)

@@ -150,6 +150,22 @@ class SouscriptionCampagneFacturation(models.Model):
     nb_factures_creees = fields.Integer(string='Factures créées', compute='_compute_stats_factures')
     nb_factures_emises = fields.Integer(string='Factures émises', compute='_compute_stats_factures')
 
+    # --- Bandeau de stats natif (#301) : buckets EXACTS du statut de
+    # facturation par souscription — Périmètre = somme des quatre buckets, une
+    # souscription dans EXACTEMENT un bucket (cf. _souscriptions_par_bucket),
+    # à l'inverse du reste-à-faire CUMULATIF amont de la matrice des étapes
+    # (#157, _reste_a_faire), qui garde sa sémantique propre et n'est pas
+    # touché ici. Tout dérivé, store=False (esprit ADR 0025). ---
+    currency_id = fields.Many2one('res.currency', string='Devise', compute='_compute_currency_id')
+    nb_perimetre = fields.Integer(string='Périmètre', compute='_compute_stats_bandeau')
+    nb_a_tirer = fields.Integer(string='À tirer', compute='_compute_stats_bandeau')
+    nb_a_facturer = fields.Integer(string='À facturer', compute='_compute_stats_bandeau')
+    nb_facturees_brouillon = fields.Integer(string='Facturées', compute='_compute_stats_bandeau')
+    nb_emises_bucket = fields.Integer(string='Émises', compute='_compute_stats_bandeau')
+    total_emis_ttc = fields.Monetary(
+        string='Total émis TTC', compute='_compute_stats_bandeau', currency_field='currency_id'
+    )
+
     _unique_mois = models.Constraint(
         'UNIQUE(mois)',
         'Une campagne de facturation existe déjà pour ce mois.',
@@ -318,6 +334,83 @@ class SouscriptionCampagneFacturation(models.Model):
             factures = campagne._factures_du_mois()
             campagne.nb_factures_creees = len(factures)
             campagne.nb_factures_emises = len(factures.filtered(lambda f: f.state == 'posted'))
+
+    @api.depends('mois')
+    def _compute_currency_id(self):
+        for campagne in self:
+            campagne.currency_id = self.env.company.currency_id
+
+    def _souscriptions_par_bucket(self):
+        """Partitionne le Périmètre de campagne en buckets EXACTS du statut de
+        facturation (#301) — une souscription dans exactement un bucket,
+        contrairement au reste-à-faire cumulatif (#157, `_reste_a_faire`).
+
+        ponytail: une requête par souscription facturable, même échelle que
+        `_reste_a_faire` — upgrade en une seule requête groupée si ça devient
+        lent un jour."""
+        self.ensure_one()
+        buckets = {statut: self.env['souscription.souscription'] for statut in self._STATUTS_ORDONNES}
+        for souscription in self._souscriptions_facturables():
+            buckets[self._statut_facturation(souscription)] |= souscription
+        return buckets
+
+    @api.depends('mois')
+    def _compute_stats_bandeau(self):
+        for campagne in self:
+            buckets = campagne._souscriptions_par_bucket()
+            campagne.nb_a_tirer = len(buckets['a_tirer'])
+            campagne.nb_a_facturer = len(buckets['a_facturer'])
+            campagne.nb_facturees_brouillon = len(buckets['facturee'])
+            campagne.nb_emises_bucket = len(buckets['emise'])
+            campagne.nb_perimetre = sum(len(bucket) for bucket in buckets.values())
+            factures_emises = campagne._factures_du_mois().filtered(lambda f: f.state == 'posted')
+            campagne.total_emis_ttc = sum(factures_emises.mapped('amount_total'))
+
+    # --- Drill-down des tuiles du bandeau (#301) : chaque tuile ouvre la
+    # liste filtrée exacte qu'elle affiche — un helper générique par nature de
+    # cible (souscriptions / factures), aucune logique de bucket dupliquée
+    # (délègue à _souscriptions_par_bucket / _factures_du_mois). ---
+
+    def _action_liste_souscriptions(self, souscriptions, label):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': label,
+            'res_model': 'souscription.souscription',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', souscriptions.ids)],
+        }
+
+    def action_drill_down_perimetre(self):
+        self.ensure_one()
+        return self._action_liste_souscriptions(self._souscriptions_facturables(), _('Périmètre de campagne'))
+
+    def action_drill_down_a_tirer(self):
+        self.ensure_one()
+        return self._action_liste_souscriptions(self._souscriptions_par_bucket()['a_tirer'], _('À tirer'))
+
+    def action_drill_down_a_facturer(self):
+        self.ensure_one()
+        return self._action_liste_souscriptions(self._souscriptions_par_bucket()['a_facturer'], _('À facturer'))
+
+    def action_drill_down_facturees(self):
+        self.ensure_one()
+        return self._action_liste_souscriptions(self._souscriptions_par_bucket()['facturee'], _('Facturées'))
+
+    def action_drill_down_emises(self):
+        self.ensure_one()
+        return self._action_liste_souscriptions(self._souscriptions_par_bucket()['emise'], _('Émises'))
+
+    def action_drill_down_total_emis(self):
+        self.ensure_one()
+        factures = self._factures_du_mois().filtered(lambda f: f.state == 'posted')
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Total émis'),
+            'res_model': 'account.move',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', factures.ids)],
+        }
 
     # --- Préparer les prélèvements (#186, PRD #183) : domaine partagé entre
     # le bouton (toutes périodes) et le signal dérivé « fait » (mois de la

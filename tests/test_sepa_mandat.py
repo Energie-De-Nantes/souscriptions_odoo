@@ -104,7 +104,9 @@ class TestResoudreJournalSdd(SouscriptionsTestMixin, TransactionCase):
         self._donner_methode_sdd(journal)
         self.assertEqual(self.service._resoudre_journal_sdd(), journal)
 
-    def test_leve_si_journaux_ambigus(self):
+    def test_leve_si_journaux_ambigus_et_pointeur_absent(self):
+        """Ambiguïté (>1 journal sdd) sans pointeur société : lève, ne
+        devine jamais (#292)."""
         journal_a = self.env['account.journal'].create(
             {'name': 'Journal SDD A', 'code': 'SDDA', 'type': 'bank', 'company_id': self.env.company.id}
         )
@@ -113,6 +115,39 @@ class TestResoudreJournalSdd(SouscriptionsTestMixin, TransactionCase):
         )
         self._donner_methode_sdd(journal_a)
         self._donner_methode_sdd(journal_b)
+        with self.assertRaises(UserError) as cm:
+            self.service._resoudre_journal_sdd()
+        self.assertIn('Plusieurs', str(cm.exception))
+
+    def test_resout_via_pointeur_societe_si_journaux_ambigus(self):
+        """Ambiguïté (>1 journal sdd) avec pointeur société pointant vers
+        l'un d'eux : résout ce journal-là, sans lever (#292)."""
+        journal_a = self.env['account.journal'].create(
+            {'name': 'Journal SDD A', 'code': 'SDDA', 'type': 'bank', 'company_id': self.env.company.id}
+        )
+        journal_b = self.env['account.journal'].create(
+            {'name': 'Journal SDD B', 'code': 'SDDB', 'type': 'bank', 'company_id': self.env.company.id}
+        )
+        self._donner_methode_sdd(journal_a)
+        self._donner_methode_sdd(journal_b)
+        self.env.company.journal_prelevement_sdd_id = journal_b
+        self.assertEqual(self.service._resoudre_journal_sdd(), journal_b)
+
+    def test_leve_si_pointeur_societe_hors_des_journaux_sdd(self):
+        """Le pointeur société pointe vers un journal qui n'expose pas sdd :
+        lève plutôt que de retourner le mauvais journal (#292)."""
+        journal_a = self.env['account.journal'].create(
+            {'name': 'Journal SDD A', 'code': 'SDDA', 'type': 'bank', 'company_id': self.env.company.id}
+        )
+        journal_b = self.env['account.journal'].create(
+            {'name': 'Journal SDD B', 'code': 'SDDB', 'type': 'bank', 'company_id': self.env.company.id}
+        )
+        autre_journal = self.env['account.journal'].create(
+            {'name': 'Journal Sans SDD', 'code': 'NOSDD', 'type': 'bank', 'company_id': self.env.company.id}
+        )
+        self._donner_methode_sdd(journal_a)
+        self._donner_methode_sdd(journal_b)
+        self.env.company.journal_prelevement_sdd_id = autre_journal
         with self.assertRaises(UserError) as cm:
             self.service._resoudre_journal_sdd()
         self.assertIn('Plusieurs', str(cm.exception))

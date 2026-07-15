@@ -931,7 +931,10 @@ class SouscriptionPeriode(models.Model):
     def _creer_facture(self):
         """Crée la facture (``account.move``) de cette période, en **brouillon**.
 
-        Sélectionne la grille active à la date de fin, compose les lignes
+        Sélectionne la grille active à la date de DÉBUT — la grille engagée,
+        la plus récente à avoir commencé (CONTEXT.md « Grille de prix ») ; la
+        Période est demi-ouverte et sa date de fin est le 1er du mois
+        suivant, celle de la grille suivante —, compose les lignes
         (``_composer_lignes``) et crée le move en posant ``periode_id``
         (source unique du lien Période ↔ Facture, ADR 0004). Ne tamponne
         PLUS la provision ici (``_tamponner_provision`` a migré à
@@ -945,7 +948,7 @@ class SouscriptionPeriode(models.Model):
         #264, #265 ; tranche 3, #267).
         """
         self.ensure_one()
-        grille = self.env['grille.prix'].get_grille_active(self.date_fin, regime=self.regime_prix_periode)
+        grille = self.env['grille.prix'].get_grille_active(self.date_debut, regime=self.regime_prix_periode)
         return self.env['account.move'].create(
             {
                 'move_type': 'out_invoice',

@@ -139,8 +139,9 @@ class AccountMove(models.Model):
 
         Source Période (mensuelle) : ses lignes propres (sections,
         abonnement, énergie, notes TURPE — snapshot figé, ADR 0006, même
-        grille qu'à la création : ``get_grille_active`` sur ``date_fin``/
-        ``regime_prix_periode``) + les Refacturations actuellement *à
+        grille qu'à la création : ``get_grille_active`` sur ``date_debut``/
+        ``regime_prix_periode`` — la grille engagée, en lockstep avec la
+        création, ADR 0032) + les Refacturations actuellement *à
         refacturer* de la Souscription (ADR 0009) — même règle qu'à la
         création (`souscription._facturer_refacturations`) : une Refacturation
         entrée en file après la création du brouillon est donc rassemblée ici
@@ -156,7 +157,7 @@ class AccountMove(models.Model):
         self.ensure_one()
         if self.periode_id:
             periode = self.periode_id
-            grille = self.env['grille.prix'].get_grille_active(periode.date_fin, regime=periode.regime_prix_periode)
+            grille = self.env['grille.prix'].get_grille_active(periode.date_debut, regime=periode.regime_prix_periode)
             lignes = periode._composer_lignes(grille)
             prestas = periode.souscription_id._refacturations_a_rassembler(self)
             return lignes + prestas._composer_lignes_groupees()

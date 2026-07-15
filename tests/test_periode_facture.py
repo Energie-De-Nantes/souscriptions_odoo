@@ -9,7 +9,7 @@ from datetime import date
 
 from odoo.tests.common import tagged
 
-from .common import SouscriptionsTestCase
+from .common import SouscriptionsTestCase, build_grille_lignes
 
 
 @tagged('souscriptions', 'souscriptions_periode_facture', 'post_install', '-at_install')
@@ -292,6 +292,59 @@ class TestPeriodeFactureRegenerationEmission(SouscriptionsTestCase):
         facture.unlink()  # ne lève rien : cascade autorisée
 
         self.assertFalse(periode.facture_id)
+
+
+@tagged('souscriptions', 'souscriptions_periode_facture', 'souscriptions_grille_prix', 'post_install', '-at_install')
+class TestPeriodeFactureSelectionGrilleSurDateDebut(SouscriptionsTestCase):
+    """Sélection de la grille sur `periode.date_debut`, en lockstep sur les
+    trois chemins Période (#309, ADR 0029/0032). La Période est demi-ouverte
+    (`date_fin` = 1er du mois suivant) : sélectionner sur `date_fin` prixait
+    un mois à la grille du mois suivant dès qu'un changement de grille
+    tombait entre les deux — ce défaut n'avait jamais mordu faute d'un mois
+    enjambant un changement de grille dans les fixtures existantes."""
+
+    def test_facture_de_juin_utilise_la_grille_de_juin_pas_celle_de_juillet(self):
+        """Non-régression du défaut #309 : une Période de juin, avec une
+        grille B commençant le 1er juillet (même régime), se facture à la
+        grille de JUIN — pas à celle que sa `date_fin` (2024-07-01) désigne."""
+        grille_juillet = self.env['grille.prix'].create({'name': 'Grille Juillet 2024', 'date_debut': date(2024, 7, 1)})
+        build_grille_lignes(self.env, grille_juillet, prix_base=0.99, prix_hp=0.99, prix_hc=0.99)
+
+        periode = self.create_test_periode(
+            self.souscription_base, date_debut=date(2024, 6, 1), date_fin=date(2024, 7, 1), provision_base_kwh=100.0
+        )
+        facture = periode._creer_facture()
+
+        ligne = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie Base')
+        self.assertAlmostEqual(
+            ligne.price_unit, 0.15, places=6, msg='grille de juin (common.py), jamais celle de juillet (0.99)'
+        )
+
+    def test_creation_et_regeneration_a_lemission_resolvent_la_meme_grille(self):
+        """Lockstep (ADR 0032) : `_creer_facture` (création du brouillon) et
+        `_composer_lignes_generees` (régénération à l'émission) résolvent
+        la MÊME grille pour la même Période — une grille future apparue
+        entre les deux ne doit rien changer, sous peine de changer
+        silencieusement le prix d'une facture à son émission."""
+        periode = self.create_test_periode(
+            self.souscription_base, date_debut=date(2024, 6, 1), date_fin=date(2024, 7, 1), provision_base_kwh=100.0
+        )
+        facture = periode._creer_facture()
+        prix_creation = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie Base').price_unit
+
+        # Une grille future apparaît après la création du brouillon, avant l'émission.
+        grille_future = self.env['grille.prix'].create({'name': 'Grille Août 2024', 'date_debut': date(2024, 8, 1)})
+        build_grille_lignes(self.env, grille_future, prix_base=0.99, prix_hp=0.99, prix_hc=0.99)
+
+        facture.action_post()
+
+        ligne_apres = facture.invoice_line_ids.filtered(lambda l: l.name == 'Énergie Base')
+        self.assertAlmostEqual(
+            ligne_apres.price_unit, prix_creation, places=6, msg='même grille à la création et à l’émission'
+        )
+        self.assertAlmostEqual(
+            ligne_apres.price_unit, 0.15, places=6, msg='toujours la grille de juin, pas la future d’août'
+        )
 
 
 @tagged('souscriptions', 'souscriptions_periode_facture', 'souscriptions_provenance', 'post_install', '-at_install')

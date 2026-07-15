@@ -133,6 +133,32 @@ doit **jamais** être édité à la main — c'est la maladie qu'on soigne. Sans
 `-u souscriptions_odoo` ré-affirme notre version et **répare** un édit manuel ou un clic sur
 Reset Template. Auto-cicatrisant par déploiement.
 
+**« Le corps part de l'existant prod » est une contrainte dure, pas une préférence de style.**
+Le corps de prod est en **tutoiement** ; il est aussi le texte d'où la toute première *Lettre du
+mois* est collée à l'amorçage. Un squelette réécrit en vouvoiement produit donc un premier mail
+à **deux registres dans le même message** — la voix d'EDN dans la lettre, celle de l'usine
+autour. Reprendre prod veut dire son **texte et ses faits**, débarrassés des styles inline que
+l'éditeur HTML y a déposés (`box-sizing`, `base-fs`, `mso-hide`…), et non un texte neuf de même
+sens. Les seuls écarts volontaires sont les deux correctifs identifiés ici (la salutation, le
+sign-off). Précision ajoutée au grill du 2026-07-15 (troisième passage) : la première
+implémentation a réécrit le squelette en vouvoiement et, ce faisant, a **réécrit deux faits de
+paiement** — « le 10 du mois en cours » devenu « le 10 du mois prochain », et l'échéance Moneko
+(« d'ici le 10 de ce mois ») remplacée par un « virement sur nos coordonnées bancaires
+habituelles » factuellement faux, un virement Moneko se faisant *dans* Moneko. D'où la règle :
+sur un chemin d'argent, on ne paraphrase pas, on cite.
+
+**Le QR-code Moneko est un champ téléversable, pas un asset git.** Révision du grill du
+2026-07-15 (troisième passage), qui écarte le « asset statique du module » envisagé au premier
+passage. La ligne de partage n'est pas *paiement vs éditorial* mais *ce que le mail affirme vs
+ce qu'il affiche* : les phrases et les dates restent en git, revues et testées ; l'image vit
+dans le même foyer de configuration que les *Textes permanents* (ACL du module, entrée de menu,
+cf. `CONTEXT.md`). Un QR figé en git périme le jour où Moneko le réémet, et sa réémission
+coûterait alors un dev et un déploiement pour un fichier. Conséquence héritée du contrat de la
+Lettre : l'asset peut être **vide**, donc le corps ne le promet jamais — la marche à suivre
+in-app et l'échéance tiennent seules (prod les donne déjà en alternative), le QR s'ajoute s'il
+existe. L'inverse — un corps qui annonce « flashe ce QR-code » au-dessus d'un asset absent —
+est la panne que le placeholder 1×1 de la première implémentation aurait livrée telle quelle.
+
 **La duplication était déjà en train de coûter, mais pas là où on croyait.** Le texte des deux
 copies est byte-identique (empreinte identique, mêmes typos synchronisées) : le copier-coller
 tient. Le vrai coût est ailleurs — **les corrections ne se propagent pas**. Le sign-off a été
@@ -155,6 +181,24 @@ manquante, l'invariant s'impose sur la Souscription. Il n'est pas tenu aujourd'h
 la production distingue Moneko par un **tag partenaire**, pas par un champ). C'est une
 dépendance du chantier **migration**, même classe de décision que `puissance required` — pas
 un problème de mail.
+
+**« Aucune branche de repli » veut dire : pas de `t-else`, jamais.** Précision ajoutée au grill
+du 2026-07-15 (troisième passage) après que la première implémentation ait écrit exactement le
+contraire de cette décision en croyant l'appliquer : un `t-if monnaie_locale / t-else
+prélèvement`. Un `t-else` **est** une branche de repli — il affirme simplement le prélèvement
+par défaut. Or `mode_paiement` a **cinq** valeurs (`prelevement`, `monnaie_locale`, `especes`,
+`virement`, `cheque`, cf. `CONTEXT.md` « Mode de paiement »), et un champ vide est *falsy* :
+espèces, virement, chèque **et** les 63 % de modes non renseignés tombaient donc tous dans le
+`t-else`, s'entendant annoncer « le prélèvement automatique interviendra le 10 sur votre
+compte » — sans mandat. C'est la classe de bug que l'extension ci-dessous reproche à la
+production sur l'axe *situation* (matrice à cellules non remplies), rejouée sur l'axe *mode*.
+
+Donc : **chaque mode est une branche explicite**, testée sur sa valeur, et l'absence de branche
+est le comportement voulu — pas de bloc de paiement du tout. Le mail n'a jamais de raison
+d'affirmer un moyen de règlement qu'il ne connaît pas ; la facture PDF jointe porte le montant.
+Aujourd'hui, seuls `prelevement` et `monnaie_locale` ont un texte, parce que ce sont les seuls
+que la production sait dire : les trois autres circuits n'ont **aucun ancêtre prod** (le mail de
+prod ne connaît que deux circuits), et leur texte revient à EDN, pas à un agent.
 
 ## Extension : les mails sans mois (régularisation, avoir, clôture)
 

@@ -273,6 +273,23 @@ d'édition — jamais de deuxième couche) ; éditer une ligne **générée** (l
 corrigent à la source, les euros par ligne manuelle) ; supprimer le brouillon pour « défiger »
 (rien n'est figé avant l'émission).
 
+**Avoir** :
+Le document comptable (`account.move`, `out_refund`) par lequel le·la *facturiste* corrige une
+*Facture* **émise** — avec la *Régularisation*, l'une des deux seules portes de correction (une
+facture émise est définitive, cf. *Facture*). **Autonome** : ses lignes sont écrites **à la
+main**, jamais une projection d'une *Période* ni d'une *Régularisation*. Il **porte le lien**
+vers sa source (`periode_id`) — traçabilité, rattachement à la *Souscription*, suivi des
+*Modes de paiement* — mais n'est **jamais _la_ Facture de cette source** : `facture_id`, qui ne
+désigne que l'`out_invoice`, ne le retient pas. C'est cette distinction qui **gouverne** : le
+gel, la re-génération des lignes générées et le rassemblement des *Refacturations* s'adressent
+tous à `facture_id`, jamais au lien brut — un avoir n'est donc ni recomposé, ni pourvoyeur de
+*Refacturations*.
+_Éviter_ : **recomposer un avoir depuis sa source** (il doublerait ses lignes et raflerait les
+*Refacturations* en file — le bug que cette définition ferme) ; « avoir » pour désigner une
+*Régularisation* à net négatif (elle s'émet **en tant qu'**`out_refund` mais reste une
+Régularisation **projetée**, avec sa ventilation typée) ; corriger un avoir émis (immuable comme
+toute facture émise : compenser).
+
 **Chèque énergie** :
 Aide de l'État versée **au fournisseur à la place** du·de la *souscripteur·rice* (`souscription.cheque_energie`). C'est un **tiers-payeur**, **jamais une remise** : la fourniture n'est pas moins chère, une partie est payée par l'État — le **chiffre d'affaires et la TVA de la _Facture_ restent intacts**. Sur la *Facture*, il apparaît en **« payé / reste à payer »**, pas en ligne négative. Porte une **valeur nominale**, un **numéro** (unique), une **date d'expiration** (~mars N+1) et un **cycle de vie** : **reçu** (saisi, sans effet) → **validé** (la **porte** : saisie *à la main* sur le site étatique par le·la *facturiste* — aucun signal dérivable — qui le rend **imputable**) → **rejeté / expiré**. Rattaché au·à la *souscripteur·rice* (nominatif à la personne, pas au contrat) ; s'impute sur ses *Factures* **à leur émission**, à hauteur de `min(solde, total)` sans jamais rendre la facture négative, **FIFO par expiration** quand la personne en détient plusieurs (renouvellement annuel). L'expiration borne la **validation** (la porte étatique), jamais l'imputation : un chèque **validé** est une créance acquise sur l'État et reste imputable après sa date — à l'imputation, la date ne sert qu'à l'ordre FIFO, l'**état** est la seule porte. Le **solde** (portion non encore imputée) est **dérivé**, pas saisi. Un rejet/expiration *après* imputation se corrige **à la main** (pas d'automatisme). Le modèle **possède** l'identité et le cycle de vie ; la mécanique de solde et de lettrage est **déléguée** (cf. ADR 0026), non réimplémentée.
 _Éviter_ : **« remise »** ou ligne négative sur la *Facture* (c'est un paiement tiers, pas une minoration du prix ni de la TVA) ; imputer un chèque **non validé** (le site étatique est la porte) ; **écarter de l'imputation un chèque validé à date passée** (l'expiration gouverne la validation, pas l'imputation) ; « solde saisi » (il est dérivé).

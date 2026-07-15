@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Facture d'énergie : Envoi (#313, ADR 0034) — remplace les deux copies de
+         production (« Facture : Envoi EDN » / « Facture : Envoi EDN Moneko »),
+         qui ne différaient que par la région paiement/QR-code une fois
+         l'éditorial mensuel sorti sur la Campagne (lettre_mois). Ce corps ne
+         porte QUE le squelette transactionnel : salutation, n°/montant/période,
+         instruction de paiement, sign-off — et le t-out de la Lettre du mois.
+         Wording provisoire, le définitif viendra d'EDN (même convention que
+         data/mail_templates_raccordement.xml et data/mail_templates_bienvenue.xml).
+
+         SANS noupdate (contrairement aux modèles de bienvenue, ADR 0034) :
+         ce modèle ne doit JAMAIS être édité à la main — un `-u
+         souscriptions_odoo` doit réaffirmer notre version et réparer tout
+         édit manuel ou clic sur Reset Template. L'éditorial vit exclusivement
+         dans le champ `lettre_mois` de la Campagne, jamais dans ce corps. -->
+    <data>
+        <record id="mail_template_facture_energie" model="mail.template">
+            <field name="name">Facture d'énergie : Envoi</field>
+            <field name="model_id" ref="account.model_account_move"/>
+            <field name="subject">Votre facture Énergie De Nantes {{ object.name or '' }}</field>
+            <field name="partner_to">{{ object.partner_id.id }}</field>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="auto_delete" eval="True"/>
+            <field name="body_html" type="html">
+                <div style="margin: 0px; padding: 0px;">
+                    <p>
+                        Bonjour <t t-out="object.partner_id.name or ''"/><t t-if="object.partner_id.parent_id"> (<t t-out="object.partner_id.parent_id.name or ''"/>)</t>,
+                    </p>
+                    <p>
+                        Voici votre facture <strong t-out="object.name or ''"/><t t-if="object.periode_id"> pour la période
+                        <t t-out="object.periode_id.mois_annee or ''"/></t>, d'un montant de
+                        <strong t-out="format_amount(object.amount_total, object.currency_id) or ''"/>.
+                    </p>
+                    <t t-if="object.mode_paiement == 'monnaie_locale'">
+                        <p>
+                            Vous réglez en monnaie locale (Moneko) : flashez le QR-code ci-dessous pour payer, ou
+                            réglez par virement sur nos coordonnées bancaires habituelles.
+                        </p>
+                        <p>
+                            <img src="/souscriptions_odoo/static/img/qr_moneko.png" alt="QR-code Moneko"
+                                 style="max-width: 150px;"/>
+                        </p>
+                    </t>
+                    <t t-else="">
+                        <p>
+                            Le prélèvement automatique de
+                            <strong t-out="format_amount(object.amount_total, object.currency_id) or ''"/>
+                            interviendra le 10 du mois prochain sur votre compte.
+                        </p>
+                    </t>
+                    <t t-if="object.lettre_du_mois">
+                        <div>
+                            <t t-out="object.lettre_du_mois"/>
+                        </div>
+                    </t>
+                    <p>N'hésitez pas à nous contacter pour toute question.</p>
+                    <t t-if="not is_html_empty(object.invoice_user_id.signature)">
+                        <t t-out="object.invoice_user_id.signature or ''"/>
+                    </t>
+                    <p>À très bientôt !<br/>L'équipe Énergie De Nantes</p>
+                </div>
+            </field>
+        </record>
+    </data>
+</odoo>

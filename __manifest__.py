@@ -57,6 +57,7 @@ models/core/electricore_client_fabrique.py et ne lève qu'à l'appel du pull.
         'reports/souscription_attestation_report.xml',
         'reports/facture_energie_template.xml',
         'data/mail_templates_bienvenue.xml',
+        'data/mail_templates_facture_energie.xml',
         'views/core/souscription_views.xml',
         'views/core/souscription_chronologie_views.xml',
         'views/core/res_partner_views.xml',

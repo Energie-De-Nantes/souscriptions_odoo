@@ -22,6 +22,7 @@ from . import (
     test_grille_prix,
     test_integration,
     test_invoice_template,
+    test_mail_facture_energie,
     test_mails_raccordement,
     test_meta_exhaustivite,
     test_migration_energie_facturee,

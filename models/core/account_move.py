@@ -52,6 +52,23 @@ class AccountMove(models.Model):
         readonly=True,
     )
 
+    # Lettre du mois (#313, ADR 0034) : compute NON stocké — la facture
+    # TIRE la lettre via son propre mois (`periode_id.mois` -> campagne du
+    # même mois, `UNIQUE(mois)` rend la résolution non ambiguë), la campagne
+    # ne pousse jamais rien. Pas de période (régularisation) -> pas de
+    # campagne -> lettre vide, sans cas particulier : la source
+    # `souscription.campagne.facturation.lettre_mois` porte l'éditorial,
+    # jamais la Facture.
+    lettre_du_mois = fields.Html(string='Lettre du mois', compute='_compute_lettre_du_mois')
+
+    @api.depends('periode_id.mois')
+    def _compute_lettre_du_mois(self):
+        Campagne = self.env['souscription.campagne.facturation']
+        for move in self:
+            mois = move.periode_id.mois
+            campagne = Campagne.search([('mois', '=', mois)], limit=1) if mois else Campagne
+            move.lettre_du_mois = campagne.lettre_mois
+
     @api.depends('periode_id', 'regularisation_id', 'souscription_id')
     def _compute_is_facture_energie(self):
         """Détermine si c'est une facture d'énergie (souscription électricité) —
@@ -241,6 +258,24 @@ class AccountMove(models.Model):
         if self.is_facture_energie:
             return 'souscriptions_odoo.report_facture_energie'
         return super()._get_name_invoice_report()
+
+    def _get_mail_template(self):
+        """Racine UNIQUE de résolution du modèle d'envoi (#313, ADR 0034) :
+        consommée aussi bien par le bouton unitaire que par l'envoi en masse
+        (`account.move.send._get_default_mail_template_id`), donc un renvoi
+        manuel produit exactement le même mail que la première émission —
+        jamais un mail Odoo nu, sans la Lettre du mois.
+
+        Scopé sur facture CLIENT d'énergie (`move_type == 'out_invoice'` ET
+        `is_facture_energie`) : un avoir n'a jamais `is_facture_energie` vrai
+        par construction (`regularisation_id`/les lignes générées sont
+        `copy=False`, cf. plus haut), mais le garde-fou sur `move_type` est
+        gardé explicite plutôt que délégué à cet effet de bord. Toute facture
+        hors énergie ou tout avoir retombe sur `super()` — le modèle standard
+        d'Odoo."""
+        if self.is_facture_energie and self.move_type == 'out_invoice':
+            return self.env.ref('souscriptions_odoo.mail_template_facture_energie')
+        return super()._get_mail_template()
 
     # === Encaissement une-clic pour les modes attestation-pure (#290, ADR 0033) ===
     #

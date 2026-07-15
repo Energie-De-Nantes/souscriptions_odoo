@@ -32,6 +32,28 @@ class TestCampagneLettreMois(SouscriptionsTestCase):
 
         self.assertIn('Tarif solidaire', juin.lettre_mois)
 
+    def test_lettre_passee_a_la_creation_prime_sur_le_report(self):
+        """Le report ne fait que PRÉ-remplir : une lettre écrite à la création
+        est la volonté du·de la Facturiste et n'est pas écrasée par celle de
+        M-1. Contrairement aux notes (des enfants qu'on ajoute), la lettre est
+        un champ scalaire — sans garde, le report l'écraserait."""
+        self._campagne(date(2026, 5, 1), lettre_mois='<p>Lettre de mai.</p>')
+
+        juin = self._campagne(date(2026, 6, 1), lettre_mois='<p>Lettre de juin.</p>')
+
+        self.assertIn('Lettre de juin', juin.lettre_mois)
+        self.assertNotIn('Lettre de mai', juin.lettre_mois)
+
+    def test_lettre_videe_dans_lediteur_a_la_creation_se_prefile_quand_meme(self):
+        """`<p><br></p>` est ce que l'éditeur HTML envoie pour un champ vidé :
+        c'est une absence de lettre, donc le report doit s'appliquer — d'où
+        `is_html_empty` plutôt qu'un simple `not`."""
+        self._campagne(date(2026, 5, 1), lettre_mois='<p>Permanences le mardi.</p>')
+
+        juin = self._campagne(date(2026, 6, 1), lettre_mois='<p><br></p>')
+
+        self.assertIn('Permanences le mardi', juin.lettre_mois)
+
     def test_chainage_m_moins_1_vers_m_vers_m_plus_1(self):
         """AC : le chaînage M-1 -> M -> M+1 tient — la lettre copiée devient
         elle-même la source du report suivant."""

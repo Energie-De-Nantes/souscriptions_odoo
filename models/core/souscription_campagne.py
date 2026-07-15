@@ -12,6 +12,7 @@ from datetime import timedelta
 from babel.dates import format_date
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+from odoo.tools import is_html_empty
 
 # Catalogue des étapes (#156, ADR 0025 §1) : le DAG est déclaré en code, pas de
 # modèle de configuration ni de moteur de workflow. L'ordre d'insertion EST un
@@ -266,8 +267,16 @@ class SouscriptionCampagneFacturation(models.Model):
         Chaîne naturellement (N -> N+1 -> N+2…) : la lettre copiée redevient
         elle-même la source du report suivant. Chaîne rompue (pas de
         campagne pour le mois précédent) : rien à reporter, aucune erreur —
-        même contrat que les notes."""
+        même contrat que les notes.
+
+        Ne PRÉ-remplit que : une lettre passée à la création est la volonté du·
+        de la Facturiste et prime sur le report. Contrairement aux notes (des
+        enfants qu'on ajoute), la lettre est un champ scalaire — la réassigner
+        sans garde écraserait la valeur explicite. `is_html_empty` et non
+        `not` : l'éditeur HTML envoie `<p><br></p>` pour un champ vidé."""
         for campagne in self:
+            if not is_html_empty(campagne.lettre_mois):
+                continue
             mois_precedent = (campagne.mois - timedelta(days=1)).replace(day=1)
             precedente = self.search([('mois', '=', mois_precedent)], limit=1)
             if precedente:

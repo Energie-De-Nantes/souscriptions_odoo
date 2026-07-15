@@ -1,0 +1,23 @@
+<odoo>
+    <!-- Page « Souscriptions » sous Paramètres (#291) : amorce, un seul champ.
+         Réservée à account.group_account_manager (droits de config comptable),
+         même idiome que le bloc « Invoicing » du module account. -->
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.souscriptions</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Souscriptions" string="Souscriptions" name="souscriptions_odoo"
+                     groups="account.group_account_manager">
+                    <block title="Encaissement" id="souscriptions_encaissement">
+                        <setting id="journal_monnaie_locale"
+                                 help="Journal bancaire dédié à la monnaie locale (Moneko), cible de l'encaissement une-clic (ADR 0033).">
+                            <field name="journal_monnaie_locale_id"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

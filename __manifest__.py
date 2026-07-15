@@ -67,6 +67,7 @@ models/core/electricore_client_fabrique.py et ne lève qu'à l'appel du pull.
         'views/core/souscription_campagne_views.xml',
         'views/core/souscription_cheque_energie_views.xml',
         'views/core/account_move_views.xml',
+        'views/core/res_config_settings_views.xml',
         'views/portal_templates.xml',
         'views/raccordement/raccordement_demande_views.xml',
         'views/raccordement/raccordement_menu.xml',

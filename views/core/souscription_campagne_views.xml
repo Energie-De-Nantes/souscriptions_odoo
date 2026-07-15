@@ -111,6 +111,7 @@
                 <field name="etapes_faites" string="Étapes faites"/>
                 <field name="nb_factures_emises" string="Factures émises"/>
                 <field name="total_emis_ttc" string="Total TTC"/>
+                <field name="currency_id" column_invisible="1"/>
             </list>
         </field>
     </record>

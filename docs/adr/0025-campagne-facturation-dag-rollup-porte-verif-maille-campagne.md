@@ -101,3 +101,18 @@ sans empêcher une granularité plus fine si le besoin se précise un jour. Les 
 répondent : un DAG d'étapes **dérivées** ne peut fonctionner que si le peu d'état qu'il
 persiste (les validations manuelles) est lui-même localisé au même endroit que
 l'orchestration — la Campagne, pas les modèles qu'elle survole.
+
+## Amendement (#325) — le cron est l'automate annoncé par la décision 3
+
+La décision 3 anticipait un DAG « rejouable par un automate […] sans distinguer un parcours
+humain d'un parcours automatisé ». [ADR 0035](0035-campagne-etapes-lourdes-tache-de-fond-intention-vidange.md)
+(PRD #324) fournit cet automate : un cron `ir.cron` natif vidange en tâche de fond les deux
+étapes que la mesure (parc réel, #324/#325) désigne comme trop lourdes pour une requête HTTP
+(`creer_factures`, `emettre_factures`). Ce n'est pas une entorse à la décision 3, c'est son
+exploitation prévue.
+
+Corollaire précisé à cette occasion : pour une étape de type `action` dont le lancement
+déclenche un traitement qui peut dépasser la durée d'une requête, `lance` **devient une
+intention** posée au clic (« demandé »), pas un accompli. Le `fait` d'une telle étape se lit
+alors, comme pour toute étape `derive`, dans le **reste-à-faire dérivé** — jamais dans `lance`
+seul. Détail complet, options écartées et mesures : ADR 0035.

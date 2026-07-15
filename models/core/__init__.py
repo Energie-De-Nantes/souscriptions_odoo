@@ -12,6 +12,7 @@ from . import (
     souscription_cheque_energie,
     souscription_chronologie,
     souscription_consentement,
+    souscription_mail_config,
     souscription_periode,
     souscription_produit,
     souscription_pull_meta_periodes_service,

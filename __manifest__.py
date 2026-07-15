@@ -57,6 +57,10 @@ models/core/electricore_client_fabrique.py et ne lève qu'à l'appel du pull.
         'reports/souscription_attestation_report.xml',
         'reports/facture_energie_template.xml',
         'data/mail_templates_bienvenue.xml',
+        # Avant le template de facture d'énergie : le compute de résolution
+        # du QR (account_move.py) suppose le foyer de config posé, même si
+        # rien ne le référence par XML id à ce stade.
+        'data/souscription_mail_config_data.xml',
         'data/mail_templates_facture_energie.xml',
         'views/core/souscription_views.xml',
         'views/core/souscription_chronologie_views.xml',
@@ -69,6 +73,7 @@ models/core/electricore_client_fabrique.py et ne lève qu'à l'appel du pull.
         'views/core/souscription_cheque_energie_views.xml',
         'views/core/account_move_views.xml',
         'views/core/res_config_settings_views.xml',
+        'views/core/souscription_mail_config_views.xml',
         'views/portal_templates.xml',
         'views/raccordement/raccordement_demande_views.xml',
         'views/raccordement/raccordement_menu.xml',

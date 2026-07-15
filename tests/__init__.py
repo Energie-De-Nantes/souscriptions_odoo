@@ -1,5 +1,7 @@
 from . import (
     test_basic,
+    test_campagne_bandeau_stats,
+    test_campagne_bandeau_view,
     test_campagne_etapes_actions,
     test_campagne_facturation,
     test_campagne_notes,

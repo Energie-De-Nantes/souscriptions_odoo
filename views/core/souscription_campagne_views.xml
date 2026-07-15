@@ -9,6 +9,37 @@
         <field name="arch" type="xml">
             <form string="Campagne de facturation">
                 <sheet>
+                    <!-- Bandeau de stats natif (#301) : stat buttons standard Odoo, pas de
+                         CSS custom. Entonnoir (à tirer/à facturer/facturées/émises) en
+                         buckets EXACTS (#301, _souscriptions_par_bucket) — à ne pas
+                         confondre avec le reste-à-faire CUMULATIF de la matrice des étapes
+                         ci-dessous (#157). Remplace le groupe « Factures du mois ». -->
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object" name="action_drill_down_perimetre" icon="fa-users">
+                            <field name="nb_perimetre" widget="statinfo" string="Périmètre"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_drill_down_a_tirer" icon="fa-cloud-download">
+                            <field name="nb_a_tirer" widget="statinfo" string="À tirer"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_drill_down_a_facturer" icon="fa-file-text-o">
+                            <field name="nb_a_facturer" widget="statinfo" string="À facturer"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_drill_down_facturees" icon="fa-pencil-square-o">
+                            <field name="nb_facturees_brouillon" widget="statinfo" string="Facturées"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_drill_down_emises" icon="fa-check-circle">
+                            <field name="nb_emises_bucket" widget="statinfo" string="Émises"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_drill_down_total_emis" icon="fa-eur">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="total_emis_ttc" widget="monetary"/>
+                                </span>
+                                <span class="o_stat_text">Total émis TTC</span>
+                            </div>
+                        </button>
+                    </div>
+                    <field name="currency_id" invisible="1"/>
                     <div class="oe_title">
                         <h1>
                             <field name="name" readonly="1"/>
@@ -17,14 +48,15 @@
                     <group>
                         <field name="mois"/>
                     </group>
-                    <group string="Factures du mois">
-                        <field name="nb_factures_creees"/>
-                        <field name="nb_factures_emises"/>
-                    </group>
                     <notebook>
                         <page string="Étapes" name="etapes">
                             <field name="etape_ids" create="0" delete="0">
-                                <list editable="bottom" create="0" delete="0">
+                                <!-- Prochaine étape en évidence (#301), décorations XML pures :
+                                     faites grisées, prêtes-non-faites en gras. Le DAG peut avoir
+                                     plusieurs racines actionnables à la fois (#156) : le gras les
+                                     montre toutes, sans notion de « la » prochaine étape unique. -->
+                                <list editable="bottom" create="0" delete="0"
+                                      decoration-muted="fait" decoration-bold="etat_prerequis == 'prete' and not fait">
                                     <field name="sequence" widget="handle"/>
                                     <field name="code" readonly="1"/>
                                     <field name="type_etape" column_invisible="1"/>
@@ -66,7 +98,9 @@
         </field>
     </record>
 
-    <!-- Liste triée mois décroissant = l'historique (#156). -->
+    <!-- Liste triée mois décroissant = l'historique (#156). Colonnes
+         enrichies (#301) : l'historique se lit sans ouvrir chaque mois —
+         toutes dérivées, aucun nouveau champ stocké (esprit ADR 0025). -->
     <record id="view_souscription_campagne_facturation_list" model="ir.ui.view">
         <field name="name">souscription.campagne.facturation.list</field>
         <field name="model">souscription.campagne.facturation</field>
@@ -74,6 +108,10 @@
             <list string="Campagnes de facturation">
                 <field name="name"/>
                 <field name="mois"/>
+                <field name="etapes_faites" string="Étapes faites"/>
+                <field name="nb_factures_emises" string="Factures émises"/>
+                <field name="total_emis_ttc" string="Total TTC"/>
+                <field name="currency_id" column_invisible="1"/>
             </list>
         </field>
     </record>

@@ -61,7 +61,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 
 - REQ-REG-01 ✅ mode de paiement porté par la facture (dérivé de la souscription) ; vue « Règlements en attente » : postées à reste-à-payer, hors prélèvement, groupées par mode — preuve: tests/test_paiements_reglements_attente.py · #185
 - REQ-REG-02 ✅ étape de campagne « Préparer les prélèvements » après l'émission : toutes les factures prélèvement ouvertes (rattrapages compris), « fait » dérivé — preuve: tests/test_campagne_etapes_actions.py::TestCampagneEtapePreparerPrelevements · #186
-- REQ-REG-03 ✅ encaissement une-clic pour les modes attestation-pure (monnaie locale / espèces, aucune trace bancaire jamais) : bouton sur la vue « Règlements en attente », crée/poste/lettre un `account.payment` du reste-à-payer intégral via le wizard natif `account.payment.register`, journal résolu jamais par nom (`res.company.journal_monnaie_locale_id` ou journal `cash` unique) ; prélèvement/virement/chèque restent 100 % natifs — preuve: tests/test_encaissement_une_clic.py · #290, ADR 0033
+- REQ-REG-03 ✅ encaissement une-clic pour les modes attestation-pure (monnaie locale / espèces, aucune trace bancaire jamais) : bouton sur la vue « Règlements en attente », crée/poste/lettre un `account.payment` du reste-à-payer intégral via le wizard natif `account.payment.register`, journal résolu jamais par `type` mais par pointeur société (`res.company.journal_monnaie_locale_id` / `journal_especes_id`, robuste au journal CHEN du chèque énergie) ; prélèvement/virement/chèque restent 100 % natifs — preuve: tests/test_encaissement_une_clic.py · #290/#298, ADR 0033
 
 ## Parcours : espace usager (portail)
 

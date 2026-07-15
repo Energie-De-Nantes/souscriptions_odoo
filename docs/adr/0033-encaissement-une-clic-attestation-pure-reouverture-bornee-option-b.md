@@ -82,3 +82,32 @@ l'encaissement est un acte aval, daté du jour où l'argent arrive.
   latent de `_resoudre_journal_sdd`, qui lève dès que **plusieurs** journaux exposent la méthode
   `sdd` (le cas de la prod réelle : 4 journaux, mais un seul mandaté) (#292) ; (3) une action
   groupée « Encaisser » multi-sélection, seulement si le clic ligne-à-ligne devient une gêne.
+
+## Amendement (#298) — espèces résout aussi par pointeur société, jamais par `type`
+
+La décision initiale (section « Résolution du journal ») traitait `especes` différemment de
+`monnaie_locale` : un journal `type='cash'` **unique**, résolu **à la volée** par recherche,
+sans champ stocké. Ce raisonnement s'est révélé faux en pratique : le journal **CHEN** du
+chèque énergie ([ADR 0026](0026-cheque-energie-tiers-payeur-modele-propre-delegue-paiement.md))
+est **lui aussi** `type='cash'`, posé par le `post_init_hook` à **chaque** install. Dès qu'une
+caisse espèces réelle est configurée à côté de CHEN, la recherche « cash unique » cesse d'être
+unique et lève une ambiguïté sur un chemin qui n'en a, du point de vue métier, **aucune** — la
+facturiste sait parfaitement quelle est *sa* caisse.
+
+**Ce qui change.** `especes` résout désormais par le même idiome que `monnaie_locale` : un
+pointeur **`res.company.journal_especes_id`**
+(`Many2one('account.journal', domain=[('type','=','cash')], check_company=True)`). Le `search`
+« cash unique » et ses deux `UserError` (absence, ambiguïté) sont **supprimés** — remplacés par
+la seule garde « pointeur non renseigné ». `monnaie_locale` et le journal CHEN sont inchangés.
+
+**Le principe, gravé pour ne plus être redécouvert au prix d'un bug** : un rôle de journal
+**possédé par la société** est **toujours** un pointeur `Many2one` sur `res.company`, **jamais**
+résolu par `type` — `type` classe une **famille** de journaux (`bank`, `cash`, `sale`…), il ne
+nomme **jamais** un rôle singulier au sein de cette famille. C'était déjà l'idiome de
+`monnaie_locale` (calqué sur `res.company.currency_exchange_journal_id` du core) ; ce n'était,
+à tort, pas encore celui d'`especes`. Deux précédents core le confirment sans ambiguïté :
+`res.company.currency_exchange_journal_id` (`type='bank'` groupe des journaux bancaires, un
+seul est *le* journal d'écart de change) et `res.company.tax_cash_basis_journal_id` (`type` ne
+distingue pas non plus *le* journal de la comptabilité d'engagement). Toute future extension
+d'un rôle de journal société (prélèvement compris, #292) suit ce même principe — jamais une
+résolution ad hoc par `type`.

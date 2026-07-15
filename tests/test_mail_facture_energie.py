@@ -90,8 +90,9 @@ class TestGetMailTemplateFactureEnergie(SouscriptionsTestCase):
 
         self.assertFalse(facture.lettre_du_mois)
         template = facture._get_mail_template()
+        self.assertEqual(template, self.env.ref('souscriptions_odoo.mail_template_facture_energie'))
         body = template._render_field('body_html', facture.ids)[facture.id]
-        self.assertIn(facture.name or '', body)
+        self.assertIn('À très bientôt', body, 'le rendu doit aboutir (pas d’erreur), squelette intact')
 
 
 @tagged('souscriptions', 'souscriptions_facturation', 'post_install', '-at_install')

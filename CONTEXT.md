@@ -279,8 +279,8 @@ Le document comptable (`account.move`, `out_refund`) par lequel le·la *facturis
 facture émise est définitive, cf. *Facture*). **Autonome** : ses lignes sont écrites **à la
 main**, jamais une projection d'une *Période* ni d'une *Régularisation*. Il **porte le lien**
 vers sa source (`periode_id`) — traçabilité, rattachement à la *Souscription*, suivi des
-*Modes de paiement* — mais n'est **jamais _la_ Facture de cette source** : `facture_id`, qui ne
-désigne que l'`out_invoice`, ne le retient pas. C'est cette distinction qui **gouverne** : le
+*Modes de paiement* — mais n'est **jamais _la_ Facture de cette source** : `periode.facture_id`,
+qui ne désigne que l'`out_invoice`, ne le retient pas. C'est cette distinction qui **gouverne** : le
 gel, la re-génération des lignes générées et le rassemblement des *Refacturations* s'adressent
 tous à `facture_id`, jamais au lien brut — un avoir n'est donc ni recomposé, ni pourvoyeur de
 *Refacturations*.

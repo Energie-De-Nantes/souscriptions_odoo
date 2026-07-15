@@ -69,7 +69,14 @@ class AccountMove(models.Model):
         l'`out_invoice` (`souscription.periode._compute_facture_id` filtre
         sur `move_type == 'out_invoice'`). `_post()` s'appuie là-dessus pour
         ne régénérer que la vraie facture de la source, jamais un avoir qui
-        la reverse."""
+        la reverse.
+
+        Asymétrie porteuse côté Régularisation : son `_compute_facture_id`
+        retient `out_invoice` **et** `out_refund` — une Régularisation à net
+        négatif s'émet EN TANT QU'avoir et reste SA facture, donc régénérée
+        et tamponnée normalement (CONTEXT.md « Avoir »). Un avoir de
+        CORRECTION, lui, n'atteint jamais cette branche : `regularisation_id`
+        est `copy=False` (#259)."""
         self.ensure_one()
         return (self.periode_id or self.regularisation_id).facture_id
 

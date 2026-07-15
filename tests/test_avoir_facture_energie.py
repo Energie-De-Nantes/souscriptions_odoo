@@ -111,3 +111,17 @@ class TestAvoirSurFactureEnergie(SouscriptionsTestCase):
 
         self.assertEqual(periode.facture_id, facture, "la facture de la Période reste l'originale")
         self.assertTrue(periode._est_facturee_emise(), 'la Période reste gelée')
+
+    def test_avoir_conserve_le_lien_vers_sa_source(self):
+        """L'avoir GARDE `periode_id` — donc `souscription_id`, donc sa place
+        dans « Règlements en attente » et les compteurs de Campagne. Le
+        `copy=False` de #259 est explicitement rejeté : rendre l'avoir
+        orphelin de sa Souscription serait un trou comptable. Pin : sans lui,
+        les quatre tests ci-dessus passeraient aussi avec `copy=False`."""
+        periode, facture = self._periode_facturee_emise()
+
+        avoir = facture._reverse_moves([{'invoice_date': facture.invoice_date}])
+        avoir.action_post()
+
+        self.assertEqual(avoir.periode_id, periode, "l'avoir porte sa source")
+        self.assertEqual(avoir.souscription_id, self.souscription_base, "l'avoir reste rattaché à sa Souscription")

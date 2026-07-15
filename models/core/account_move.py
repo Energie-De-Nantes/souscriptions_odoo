@@ -69,7 +69,7 @@ class AccountMove(models.Model):
             campagne = Campagne.search([('mois', '=', mois)], limit=1) if mois else Campagne
             move.lettre_du_mois = campagne.lettre_mois
 
-    # QR-code Moneko (#313, ADR 0034 « Extension : les mails sans mois ») :
+    # QR-code Moneko (#313, ADR 0034 « Conséquences non évidentes ») :
     # compute NON stocké, même idiome que `lettre_du_mois` — le template
     # reste bête (un `t-if` + un `t-att-src`, aucun `search`), la résolution
     # vit ici. Pas de `@api.depends` porteur : la source n'est pas un champ

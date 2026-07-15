@@ -41,7 +41,7 @@ class SouscriptionMailConfig(models.Model):
 
     def _qr_moneko_image_url(self):
         """URL affichable par un·e destinataire NON AUTHENTIFIÉ·E dans son
-        client mail (#313, ADR 0034 § « INCONNUE TECHNIQUE »). `False` si
+        client mail (#313, ADR 0034 § « Conséquences non évidentes »). `False` si
         aucun QR n'est configuré.
 
         Mécanisme retenu : `qr_code_moneko` (Binary/Image, `attachment=True`

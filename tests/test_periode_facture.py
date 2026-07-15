@@ -326,6 +326,13 @@ class TestPeriodeFactureSelectionGrilleSurDateDebut(SouscriptionsTestCase):
         la MÊME grille pour la même Période — une grille future apparue
         entre les deux ne doit rien changer, sous peine de changer
         silencieusement le prix d'une facture à son émission."""
+        # La grille de juillet existe DÈS la création : c'est elle que
+        # `periode.date_fin` (2024-07-01) désignerait. Sans elle, les deux
+        # chemins résolvent la grille de juin même non corrigés — le test ne
+        # discriminerait alors rien (#309).
+        grille_juillet = self.env['grille.prix'].create({'name': 'Grille Juillet 2024', 'date_debut': date(2024, 7, 1)})
+        build_grille_lignes(self.env, grille_juillet, prix_base=0.99, prix_hp=0.99, prix_hc=0.99)
+
         periode = self.create_test_periode(
             self.souscription_base, date_debut=date(2024, 6, 1), date_fin=date(2024, 7, 1), provision_base_kwh=100.0
         )

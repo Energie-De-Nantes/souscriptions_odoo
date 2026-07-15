@@ -28,10 +28,10 @@ class GrillePrix(models.Model):
     active = fields.Boolean('Active', default=True)
 
     # Régime de prix (CONTEXT.md « Régime de prix ») : quel barème s'applique.
-    # Chaque régime versionne ses grilles indépendamment — l'unicité et la
-    # fermeture automatique (create()) jouent PAR régime, jamais tous régimes
-    # confondus. Le Tarif Moulin n'introduit aucun produit dédié : seul ce prix
-    # change, le catalogue (souscription.produit) reste inchangé.
+    # Chaque régime versionne ses grilles indépendamment — la sélection
+    # (get_grille_active) et la dérivation de date_fin jouent PAR régime, jamais
+    # tous régimes confondus. Le Tarif Moulin n'introduit aucun produit dédié :
+    # seul ce prix change, le catalogue (souscription.produit) reste inchangé.
     regime_prix = fields.Selection(
         [('standard', 'Standard'), ('moulin', 'Moulin')],
         string='Régime de prix',
@@ -39,8 +39,8 @@ class GrillePrix(models.Model):
         required=True,
         help='Barème appliqué par cette grille. Chaque régime versionne ses '
         'grilles indépendamment : une grille Moulin ouverte coexiste avec une '
-        'grille standard ouverte (anti-chevauchement et fermeture automatique '
-        'scopés par régime).',
+        'grille standard ouverte (sélection et fin dérivée scopées par '
+        'régime).',
     )
 
     ligne_ids = fields.One2many('grille.prix.ligne', 'grille_id', string='Lignes de prix')
@@ -224,9 +224,9 @@ class GrillePrix(models.Model):
 
         La copie est créée en **brouillon (inactive)** : dupliquer sert à
         amorcer une nouvelle grille (ex. une grille Moulin) sans perturber la
-        timeline en cours. Tant qu'elle est inactive, elle ne ferme aucune
-        grille sœur et ne déclenche pas l'anti-chevauchement. L'utilisateur
-        ajuste régime/dates puis l'active.
+        timeline en cours. Tant qu'elle est inactive elle reste hors timeline :
+        `get_grille_active` et la dérivation de `date_fin` l'ignorent
+        (`active_test`). L'utilisateur ajuste régime/dates puis l'active.
         """
         self.ensure_one()
 

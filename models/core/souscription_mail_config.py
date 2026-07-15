@@ -56,12 +56,15 @@ class SouscriptionMailConfig(models.Model):
         prod citée dans la demande (`/web/image/6486-346edfbd/...
         ?access_token=…`).
 
-        Non vérifiable en boîte noire depuis ce chantier (pas de docker, pas
-        de réseau) : c'est l'API `ir.attachment` telle que connue à
-        l'entraînement, PAS relue sur les sources réelles de l'image
-        `odoo:19.0` comme demandé — à confirmer par quiconque fait tourner
-        la suite (un test qui inspecte le HTML produit ne prouve jamais
-        qu'un client mail réel affiche l'image)."""
+        Vérifié sur les sources réelles d'Odoo 19.0-20260630 : la route
+        `/web/image/<int:id>` existe et est déclarée `auth='public'` ;
+        `ir_binary._find_record` accepte le token via
+        `record._can_return_content(field, access_token)`, dont
+        l'implémentation `ir.attachment` compare le token en `consteq` puis
+        renvoie l'enregistrement en `sudo()`. Le chemin tient donc sans
+        session. Et il est tenu par un vrai test HTTP non authentifié
+        (`TestQrMonekoServiSansSession`) : un test qui inspecte le HTML
+        produit ne prouverait jamais qu'un tiers peut charger l'image."""
         self.ensure_one()
         if not self.qr_code_moneko:
             return False

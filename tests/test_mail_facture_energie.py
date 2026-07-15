@@ -19,9 +19,9 @@ est vérifié ici.
 import base64
 from datetime import date
 
-from odoo.tests.common import tagged
+from odoo.tests.common import HttpCase, tagged
 
-from .common import SouscriptionsTestCase
+from .common import SouscriptionsTestCase, SouscriptionsTestMixin
 
 # PNG 1x1 transparent valide (67 octets) — suffisant pour passer la
 # validation Pillow de `fields.Image`, jamais un vrai QR-code (peu importe
@@ -320,3 +320,53 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
         body = self._rendre(facture)
 
         self.assertIn('très bientôt', body)
+
+
+@tagged('souscriptions', 'souscriptions_facturation', 'post_install', '-at_install')
+class TestQrMonekoServiSansSession(SouscriptionsTestMixin, HttpCase):
+    """Le seul test qui prouve vraiment le QR (#313, ADR 0034).
+
+    Les assertions sur le corps rendu (classe ci-dessus) montrent que le lien
+    est ÉCRIT ; elles ne montrent pas qu'il est SERVI. Or le·la destinataire
+    d'une facture n'a pas de session Odoo : si l'URL exige une authentification,
+    le QR est un carré cassé dans son client mail, et la suite reste verte —
+    exactement le faux-vert que le placeholder 1x1 aurait livré.
+
+    On tire donc l'URL en HTTP réel, sans être connecté·e.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.setUpSouscriptionsData()
+
+    def test_url_du_qr_chargeable_par_un_tiers_non_connecte(self):
+        config = self.env.ref('souscriptions_odoo.souscription_mail_config_singleton')
+        config.qr_code_moneko = base64.b64encode(_PNG_1X1)
+        attendu = base64.b64decode(config.qr_code_moneko)
+
+        url = config._qr_moneko_image_url()
+        self.assertTrue(url, "un QR est configuré : l'URL doit exister")
+
+        # url_open n'authentifie pas : c'est le point du test.
+        response = self.url_open(url)
+
+        self.assertEqual(response.status_code, 200, f'QR non servi à un tiers non connecté : {url}')
+        # On compare les OCTETS, pas le code HTTP : /web/image répond 200 avec
+        # une image *placeholder* quand l'accès est refusé (cf. le test
+        # ci-dessous). Un assert sur le status seul passerait au vert sur ce
+        # placeholder — soit précisément le carré cassé qu'on veut exclure.
+        self.assertEqual(response.content, attendu, 'octets servis != QR configuré (placeholder ?)')
+
+    def test_sans_token_odoo_sert_un_placeholder_pas_le_qr(self):
+        """Le token n'est pas décoratif — mais Odoo ne refuse pas : il répond
+        200 avec une image de remplacement. D'où la comparaison d'octets du
+        test ci-dessus ; c'est le seul discriminant."""
+        config = self.env.ref('souscriptions_odoo.souscription_mail_config_singleton')
+        config.qr_code_moneko = base64.b64encode(_PNG_1X1)
+        attendu = base64.b64decode(config.qr_code_moneko)
+        url_sans_token = config._qr_moneko_image_url().split('?')[0]
+
+        response = self.url_open(url_sans_token)
+
+        self.assertNotEqual(response.content, attendu, 'sans token, le QR ne doit pas être servi')

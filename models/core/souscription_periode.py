@@ -679,6 +679,16 @@ class SouscriptionPeriode(models.Model):
 
         lines_vals = []
 
+        # Unités de facturation (#304) : énergie en kWh, abonnement en jours,
+        # posées sur la LIGNE (`product_uom_id`) et non sur le produit — Odoo
+        # interdit de changer l'unité d'un produit déjà présent sur des écritures
+        # comptabilisées (account `_check_uom_not_in_invoice`), et les produits
+        # legacy facturent en kg. La ligne fixe l'affichage pour tous les
+        # contrats, anciens comme neufs, sans jamais toucher `product.uom_id` ni
+        # regénérer les factures déjà émises.
+        uom_energie = self.env.ref('uom.product_uom_kwh')
+        uom_abonnement = self.env.ref('uom.product_uom_day')
+
         # Section Abonnement
         lines_vals.append((0, 0, {'display_type': 'line_section', 'name': 'Abonnement'}))
 
@@ -695,6 +705,7 @@ class SouscriptionPeriode(models.Model):
                     'name': f'{produit_abo.name} {puissance_desc} {type_client}',
                     'quantity': self.jours,
                     'price_unit': composants['abonnement']['prix_jour'],
+                    'product_uom_id': uom_abonnement.id,
                 },
             )
         )
@@ -716,6 +727,7 @@ class SouscriptionPeriode(models.Model):
                         'name': composant['produit'].name,
                         'quantity': self._quantite_facturee(composant['cadran']),
                         'price_unit': composant['prix_kwh'],
+                        'product_uom_id': uom_energie.id,
                     },
                 )
             )

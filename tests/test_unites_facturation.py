@@ -1,26 +1,17 @@
 """Unités de facturation : énergie en kWh, abonnement en jours (#304).
 
-Les 6 produits d'énergie (Base/HP/HC × standard/solidaire) pointaient sur
-`kg` (placeholder) et les 2 produits d'abonnement n'avaient pas d'unité
-(défaut Odoo `Units`) : une ligne de facture d'énergie se lisait
-« 1234 kg » au lieu de « 1234 kWh ». Deux surfaces à couvrir :
+Les produits legacy facturent en `kg` (placeholder) / `Units` : une ligne de
+facture d'énergie se lisait « 1234 kg » au lieu de « 1234 kWh ». Deux surfaces :
 
-- AC1 : une installation neuve résout directement les bonnes unités
-  (`data/produits_energie.xml`, `data/produits_abonnement_simple.xml`) ;
-- AC2 : le helper de migration `_repointer_unites`
-  (`migrations/19.0.1.18.0/post-migrate.py`, pour les 8 produits déjà en
-  prod) est idempotent et gardé — il ne re-pointe que ce qui est encore sur
-  le placeholder d'origine, jamais un choix manuel déjà fait.
-
-Chargé par chemin (`runpy.run_path`, même idiome que
-`test_migration_energie_facturee.py` / `test_releve.py` : le dossier de
-version n'est pas un identifiant Python importable) et appelé directement
-sur le helper `_repointer_unites(env)` — pas `migrate(cr, version)` — pour
-tester la logique sans passer par le SQL brut de `api.Environment`.
+- AC1 : une installation NEUVE résout directement les bonnes unités sur le
+  produit (`data/produits_energie.xml`, `data/produits_abonnement_simple.xml`) ;
+- AC2 : la ligne de facture porte l'unité via `product_uom_id`
+  (`souscription.periode._composer_lignes`), pas le produit. Odoo interdit de
+  changer l'unité d'un produit déjà présent sur des écritures comptabilisées
+  (`account._check_uom_not_in_invoice`), et les produits legacy restent en kg —
+  mais chaque ligne générée affiche kWh / jour, sans écraser le prix unitaire ni
+  toucher `product.uom_id` (les factures déjà émises gardent donc leur unité).
 """
-
-import os
-import runpy
 
 from odoo.tests.common import TransactionCase, tagged
 
@@ -58,55 +49,53 @@ class TestUnitesFacturationInstallNeuve(TransactionCase):
             self.assertEqual(self._ref(xmlid).uom_id, jour, f'{xmlid} doit être en jours')
 
 
-@tagged('souscriptions', 'souscriptions_migration', 'post_install', '-at_install')
-class TestMigrationUnitesFacturation(SouscriptionsTestCase):
-    """AC2 : le helper de migration `_repointer_unites` est idempotent et
-    gardé sur le placeholder d'origine."""
+@tagged('souscriptions', 'souscriptions_catalogue', 'post_install', '-at_install')
+class TestUnitesFacturationLignes(SouscriptionsTestCase):
+    """AC2 : la ligne générée porte kWh (énergie) / jour (abonnement), quelle que
+    soit l'unité du produit, sans écraser le prix unitaire."""
 
-    @staticmethod
-    def _repointer(env):
-        chemin = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), 'migrations', '19.0.1.18.0', 'post-migrate.py'
-        )
-        module = runpy.run_path(chemin)
-        module['_repointer_unites'](env)
+    def _lignes_produit(self, facture):
+        return facture.invoice_line_ids.filtered(lambda ligne: ligne.display_type == 'product')
 
-    def test_energie_idempotent_repointe_puis_rejoue_sans_effet(self):
-        produit = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
+    def test_lignes_portent_kwh_et_jours(self):
+        periode = self.create_test_periode(self.souscription_base)
+        facture = periode._creer_facture()
+        kwh = self.env.ref('uom.product_uom_kwh')
+        jour = self.env.ref('uom.product_uom_day')
+        abo = self.env.ref('souscriptions_odoo.souscriptions_product_abonnement_standard')
+
+        lignes = self._lignes_produit(facture)
+        self.assertTrue(lignes, 'la facture doit porter des lignes produit')
+        for ligne in lignes:
+            attendue = jour if ligne.product_id == abo else kwh
+            self.assertEqual(ligne.product_uom_id, attendue, f'{ligne.name} : unité inattendue')
+
+    def test_ligne_energie_conserve_le_prix_grille(self):
+        """Le prix unitaire (€/kWh de la grille) n'est PAS écrasé par une
+        conversion produit→ligne (les produits ont un `list_price` nul : une
+        conversion donnerait 0)."""
+        periode = self.create_test_periode(self.souscription_base)
+        facture = periode._creer_facture()
+        base = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
+        ligne = facture.invoice_line_ids.filtered(lambda ligne: ligne.product_id == base)
+        self.assertTrue(ligne, 'ligne énergie base attendue')
+        self.assertEqual(ligne.price_unit, 0.15, 'prix_base de la grille de test')
+
+    def test_produit_legacy_en_kg_facture_quand_meme_en_kwh(self):
+        """Cas prod réel : un produit resté en kg (data `noupdate`, jamais migré
+        — car Odoo l'interdit sur un produit déjà facturé) est facturé en kWh via
+        la ligne, sans déclencher `account._check_uom_not_in_invoice` ni changer
+        l'unité du produit."""
+        base = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
         kg = self.env.ref('uom.product_uom_kgm')
         kwh = self.env.ref('uom.product_uom_kwh')
-        produit.uom_id = kg
+        base.uom_id = kg  # simule un produit legacy non migré (aucune écriture postée ici)
 
-        self._repointer(self.env)
-        produit.invalidate_recordset()
-        self.assertEqual(produit.uom_id, kwh)
+        periode = self.create_test_periode(self.souscription_base)
+        facture = periode._creer_facture()
 
-        self._repointer(self.env)  # rejoué : déjà en kWh — no-op
-        produit.invalidate_recordset()
-        self.assertEqual(produit.uom_id, kwh)
-
-    def test_abonnement_idempotent_repointe_puis_rejoue_sans_effet(self):
-        produit = self.env.ref('souscriptions_odoo.souscriptions_product_abonnement_standard')
-        unite = self.env.ref('uom.product_uom_unit')
-        jour = self.env.ref('uom.product_uom_day')
-        produit.uom_id = unite
-
-        self._repointer(self.env)
-        produit.invalidate_recordset()
-        self.assertEqual(produit.uom_id, jour)
-
-        self._repointer(self.env)  # rejoué : déjà en jours — no-op
-        produit.invalidate_recordset()
-        self.assertEqual(produit.uom_id, jour)
-
-    def test_guard_ne_touche_pas_une_unite_deliberement_differente(self):
-        """Un produit déjà sur une TROISIÈME unité (choix manuel en prod, ni
-        placeholder ni cible) n'est pas écrasé — le helper ne garde que le
-        placeholder d'origine, jamais « tout ce qui n'est pas la cible »."""
-        produit = self.env.ref('souscriptions_odoo.souscriptions_product_energie_base')
-        autre = self.env.ref('uom.product_uom_unit')
-        produit.uom_id = autre
-
-        self._repointer(self.env)
-        produit.invalidate_recordset()
-        self.assertEqual(produit.uom_id, autre)
+        ligne = facture.invoice_line_ids.filtered(lambda ligne: ligne.product_id == base)
+        self.assertTrue(ligne, 'ligne énergie base attendue')
+        self.assertEqual(ligne.product_uom_id, kwh, 'la ligne affiche kWh malgré un produit en kg')
+        self.assertEqual(ligne.price_unit, 0.15, 'prix grille préservé malgré la divergence kg→kWh')
+        self.assertEqual(base.uom_id, kg, 'le produit legacy reste en kg — jamais touché')

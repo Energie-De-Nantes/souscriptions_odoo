@@ -156,6 +156,68 @@ la production distingue Moneko par un **tag partenaire**, pas par un champ). C'e
 dépendance du chantier **migration**, même classe de décision que `puissance required` — pas
 un problème de mail.
 
+## Extension : les mails sans mois (régularisation, avoir, clôture)
+
+Le même partage s'applique aux mails qui n'ont **pas** de mois — les projections d'une
+*Régularisation* — mais il y bute sur une contrainte que le cas mensuel masquait. Instruit au
+grill du 2026-07-15 (second passage), sur les constats de production suivants : le·la
+Facturiste choisit son modèle **à la main** dans une matrice **(situation × mode de
+paiement)** de 5 × 2, dont **une seule** cellule Moneko est remplie (la facture ordinaire) ;
+et cette sélection humaine a déjà produit la panne exacte que la refonte doit empêcher — un
+avoir de 54,25 € s'est vu envoyer le modèle Moneko « paie-nous par QR-code », et dort impayé
+depuis 20 mois.
+
+**Un seul modèle, qui branche — pas N modèles.** Le core d'Odoo sélectionne des modèles
+distincts (facture / avoir / auto-facturation) ; on diverge délibérément. Raison : une fois la
+lettre sortie (champ) et le paiement sorti (bloc), ce qui reste par situation est une phrase
+d'ouverture et une formule de fin. N modèles, ce serait N salutations, N signatures, N blocs
+de paiement à garder d'accord **à la main** — c'est-à-dire la maladie soignée plus haut,
+rejouée en pire. Le bug du « Bonjour » existe en double *parce que* le squelette existe en
+double. Le coût assumé est un corps à ~8 branches : banal pour du QWeb, et surtout **un seul
+fichier à lire** pour savoir ce que reçoit n'importe quel·le usager·ère, au lieu de quatre à
+differ pour vérifier qu'ils sont d'accord. Corollaire : la surcharge de `_get_mail_template()`
+doit intercepter les **avoirs** avant que le core ne les route vers son modèle d'avoir.
+
+**L'instruction de paiement est orthogonale à la situation.** Les modèles de régularisation
+sont prélèvement-only *parce que* le paragraphe de paiement est cuit dans chaque corps.
+Sorti une fois en bloc conditionnel (mode × facture/avoir), les cellules Moneko vides se
+remplissent **toutes**, définitivement. C'est l'axe qui manquait à la production.
+
+**`noupdate` et le stylo du·de la Facturiste sont mutuellement exclusifs — d'où : l'éditorial
+est TOUJOURS un champ, jamais le corps.** C'est la contrainte structurante, et elle n'a pas
+d'échappatoire :
+
+| | qui tient le stylo | le module peut-il corriger après install ? |
+| --- | --- | --- |
+| `noupdate=False` (retenu) | le module | oui — mais tout édit manuel est **silencieusement écrasé** au déploiement suivant |
+| `noupdate=True` | le·la Facturiste | **non, jamais** — avec une seule install de production, chaque correctif futur devient manuel |
+
+`noupdate=True` condamnerait le module à ne plus jamais réparer son propre corps de mail (le
+correctif du « Bonjour » n'atteindrait jamais la base). `noupdate=False` sans champs
+transformerait toute édition en piège : ça marche, puis ça disparaît au déploiement suivant.
+Il n'y a donc qu'une zone d'écriture sûre : **les champs**.
+
+**Conséquence : une surface de config pour l'éditorial sans rythme.** L'éditorial des
+régularisations — paragraphe difficultés (FSL, chèque énergie, étalement), appel au don sur
+les avoirs, « ta résiliation est bien prise en compte » — est **écrit par les facturistes**
+(les modèles de régularisation en production sont signés par le rôle Facturiste, pas par le
+mainteniste). Le mettre en git leur retire le stylo sur le texte le plus humain qu'EDN
+envoie. Mais il n'a **pas** de rythme mensuel, donc pas de foyer sur la *Campagne*.
+
+D'où deux foyers éditoriaux, distingués par le **rythme**, pas par le contenu :
+
+- **rythme mensuel** → la *Lettre du mois*, sur la Campagne, reportée de M-1 à M ;
+- **sans rythme** → des champs de **configuration** propres au module, avec notre ACL.
+
+La configuration n'est **pas** portée par `res.company` : sa colonne d'écriture exige
+`base.group_erp_manager` (« Access Rights »), et `res.config.settings` exige
+`base.group_system` — aucun des deux n'est atteignable par un·e Facturiste, et les lui
+accorder pour trois paragraphes serait donner les droits d'accès de la base. Un modèle de
+config propre borne exactement ce qu'ils peuvent toucher.
+
+**Ce qui reste délibérément en git** : l'instruction de paiement, y compris ses dates. C'est
+un chemin d'argent — il doit être revu, testé, versionné, pas édité un vendredi soir.
+
 ## Voies écartées, pour ne pas les réinstruire
 
 - **Le layout de notification** (`_get_mail_layout()` + vue héritée `primary`) est un vrai

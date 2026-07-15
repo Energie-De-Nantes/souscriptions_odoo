@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo noupdate="1">
     <!-- Produits d'abonnement simplifiés -->
-    
+
     <!-- Abonnement standard -->
     <record id="souscriptions_product_abonnement_standard" model="product.product">
         <field name="name">Abonnement</field>
@@ -10,6 +10,7 @@
         <field name="purchase_ok" eval="False"/>
         <field name="list_price">0.0</field>
         <field name="standard_price">0.0</field>
+        <field name="uom_id" ref="uom.product_uom_day"/>
     </record>
 
     <!-- Abonnement solidaire -->
@@ -20,6 +21,7 @@
         <field name="purchase_ok" eval="False"/>
         <field name="list_price">0.0</field>
         <field name="standard_price">0.0</field>
+        <field name="uom_id" ref="uom.product_uom_day"/>
         <field name="taxes_id" eval="[(6, 0, [])]"/>
     </record>
 </odoo>

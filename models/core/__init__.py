@@ -5,6 +5,7 @@ from . import (
     electricore_rsc_service,
     grille_prix,
     res_company,
+    res_config_settings,
     res_partner,
     souscription,
     souscription_campagne,

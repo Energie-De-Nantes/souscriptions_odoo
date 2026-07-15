@@ -45,6 +45,7 @@ from . import (
     test_regularisation_tampon,
     test_releve,
     test_releve_demo,
+    test_res_config_settings,
     test_res_partner,
     test_rsc_service,
     test_security,

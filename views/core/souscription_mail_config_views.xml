@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_souscription_mail_config_form" model="ir.ui.view">
+        <field name="name">souscription.mail.config.form</field>
+        <field name="model">souscription.mail.config</field>
+        <field name="arch" type="xml">
+            <form string="Configuration des mails">
+                <sheet>
+                    <group>
+                        <field name="qr_code_moneko" widget="image"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action ouvrant DIRECTEMENT l'enregistrement unique (res_id) — pas de
+         vue liste, pas de bouton « Nouveau » : un seul enregistrement posé
+         par data/souscription_mail_config_data.xml. -->
+    <record id="action_souscription_mail_config" model="ir.actions.act_window">
+        <field name="name">Configuration des mails</field>
+        <field name="res_model">souscription.mail.config</field>
+        <field name="view_mode">form</field>
+        <field name="res_id" eval="ref('souscription_mail_config_singleton')"/>
+        <field name="target">current</field>
+    </record>
+
+    <menuitem
+        id="menu_souscription_mail_config"
+        name="Configuration des mails"
+        parent="menu_souscription_root"
+        action="action_souscription_mail_config"
+        groups="souscriptions_odoo.group_souscriptions_manager"
+        sequence="90"/>
+</odoo>

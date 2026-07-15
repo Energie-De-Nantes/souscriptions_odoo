@@ -57,6 +57,10 @@ models/core/electricore_client_fabrique.py et ne lève qu'à l'appel du pull.
         'reports/souscription_attestation_report.xml',
         'reports/facture_energie_template.xml',
         'data/mail_templates_bienvenue.xml',
+        # Avant les vues de config : leur action résout le singleton par
+        # `ref()` AU CHARGEMENT. Le compute du QR, lui, s'en moque — il fait
+        # un search runtime et tolère l'absence.
+        'data/souscription_mail_config_data.xml',
         'data/mail_templates_facture_energie.xml',
         'views/core/souscription_views.xml',
         'views/core/souscription_chronologie_views.xml',
@@ -69,6 +73,7 @@ models/core/electricore_client_fabrique.py et ne lève qu'à l'appel du pull.
         'views/core/souscription_cheque_energie_views.xml',
         'views/core/account_move_views.xml',
         'views/core/res_config_settings_views.xml',
+        'views/core/souscription_mail_config_views.xml',
         'views/portal_templates.xml',
         'views/raccordement/raccordement_demande_views.xml',
         'views/raccordement/raccordement_menu.xml',

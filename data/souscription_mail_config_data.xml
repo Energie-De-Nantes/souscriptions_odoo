@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- L'unique enregistrement de configuration des mails (#313, ADR 0034).
+         `noupdate="1"` : contrairement au mail_template_facture_energie
+         (qu'un `-u` doit réaffirmer), CE record porte des données saisies
+         par le·la Facturiste (le QR-code aujourd'hui, les Textes permanents
+         de la tranche #316 demain) — même raisonnement que les modèles de
+         bienvenue (data/mail_templates_bienvenue.xml) : un module qui
+         réaffirme la config à chaque upgrade écraserait le travail
+         humain. -->
+    <data noupdate="1">
+        <record id="souscription_mail_config_singleton" model="souscription.mail.config">
+            <field name="qr_code_moneko" eval="False"/>
+        </record>
+    </data>
+</odoo>

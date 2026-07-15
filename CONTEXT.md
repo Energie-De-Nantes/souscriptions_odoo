@@ -522,6 +522,14 @@ pas de *Campagne* d'où se reporter. D'où un second foyer — des champs de **c
 au module, sous ACL du module. La ligne de partage entre les deux foyers est le **rythme**, pas le
 contenu : mensuel → la Lettre, sans rythme → les Textes permanents. Ce qui n'est **pas** éditorial
 (l'instruction de paiement et ses dates — un chemin d'argent) reste en git, revu et testé.
+
+Le même foyer de configuration porte les **assets** du paiement — aujourd'hui le seul QR-code
+Moneko. Nuance qui tient toute la ligne : ce que le mail **affirme** (« le prélèvement sera
+déclenché le 10 du mois en cours », « d'ici le 10 de ce mois ») reste en git ; l'**image** qu'il
+affiche est téléversable. Un QR figé en git périmerait le jour où Moneko le réémet, et sa
+réémission demanderait un dev et un déploiement pour un fichier. Corollaire du même contrat que
+la Lettre : l'asset peut être **vide**, donc le corps ne le promet jamais — la marche à suivre
+in-app et l'échéance tiennent seules, le QR s'ajoute s'il existe.
 _Éviter_ : les porter par `res.company` / `res.config.settings` (écriture réservée à
 `base.group_erp_manager` / `base.group_system` — hors d'atteinte du·de la Facturiste) ; les laisser
 dans le corps du *template* (le module le ré-affirme au déploiement : tout édit manuel y est

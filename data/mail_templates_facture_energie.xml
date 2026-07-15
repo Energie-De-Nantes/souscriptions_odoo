@@ -6,18 +6,47 @@
          l'éditorial mensuel sorti sur la Campagne (lettre_mois). Ce corps ne
          porte QUE le squelette transactionnel : salutation, n°/montant/période,
          instruction de paiement, sign-off — et le t-out de la Lettre du mois.
-         Wording provisoire, le définitif viendra d'EDN (même convention que
-         data/mail_templates_raccordement.xml et data/mail_templates_bienvenue.xml).
+
+         Wording repris MOT POUR MOT de la prod (relevé sur l'instance le
+         2026-07-15, débarrassé des styles inline de l'éditeur — box-sizing,
+         base-fs, mso-hide, <font>…), en tutoiement (registre prod) : sur un
+         chemin d'argent on cite, on ne paraphrase pas (ADR 0034, grill 3e
+         passage). Seule la mention de période (« pour la période ... ») est
+         un écart VOLONTAIRE à prod (qui dit « pour le mois qui vient de
+         s'écouler », faux sur une facture renvoyée plus tard).
+
+         Instruction de paiement : une branche EXPLICITE par valeur de
+         `mode_paiement` (5 valeurs, CONTEXT.md « Mode de paiement »),
+         JAMAIS de `t-else` — un `t-else` affirmerait un prélèvement par
+         défaut aux 3 circuits qui n'ont aucun texte prod (espèces, virement,
+         chèque) et aux souscriptions dont le mode est encore vide. Seuls
+         `prelevement` et `monnaie_locale` ont un bloc ; les 3 autres et le
+         mode vide n'obtiennent AUCUN bloc — la facture PDF jointe porte le
+         montant, leur texte revient à EDN (#320).
+
+         QR-code Moneko : téléversable (`souscriptions_odoo.mail_config`,
+         ADR 0034), jamais un asset git — l'URL vient d'un compute NON
+         stocké sur account.move (`qr_moneko_image_url`), le template reste
+         bête (un `t-if` + un `t-att-src`, aucun `search`). Absent -> aucune
+         promesse de QR, la marche à suivre in-app et l'échéance tiennent
+         seules.
 
          SANS noupdate (contrairement aux modèles de bienvenue, ADR 0034) :
          ce modèle ne doit JAMAIS être édité à la main — un `-u
          souscriptions_odoo` doit réaffirmer notre version et réparer tout
          édit manuel ou clic sur Reset Template. L'éditorial vit exclusivement
-         dans le champ `lettre_mois` de la Campagne, jamais dans ce corps. -->
+         dans le champ `lettre_mois` de la Campagne, jamais dans ce corps.
+
+         `use_default_to=False` : le défaut True (Odoo 19) court-circuiterait
+         `partner_to` au profit de `_message_get_default_recipients()` — cf.
+         le commentaire de data/mail_templates_bienvenue.xml, qui documente
+         déjà ce comportement v19. Les deux copies prod posent la même
+         combinaison. -->
     <data>
         <record id="mail_template_facture_energie" model="mail.template">
             <field name="name">Facture d'énergie : Envoi</field>
             <field name="model_id" ref="account.model_account_move"/>
+            <field name="use_default_to" eval="False"/>
             <field name="subject">Votre facture Énergie De Nantes {{ object.name or '' }}</field>
             <field name="partner_to">{{ object.partner_id.id }}</field>
             <field name="lang">{{ object.partner_id.lang }}</field>
@@ -28,41 +57,40 @@
                         Bonjour <t t-out="object.partner_id.name or ''"/><t t-if="object.partner_id.parent_id"> (<t t-out="object.partner_id.parent_id.name or ''"/>)</t>,
                     </p>
                     <p>
-                        Voici votre facture <strong t-out="object.name or ''"/><t t-if="object.periode_id"> pour la période
+                        Voici ta facture d'électricité <strong t-out="object.name or ''"/><t
+                        t-if="object.invoice_origin"> (avec référence : <t t-out="object.invoice_origin"/>)</t><t
+                        t-if="object.periode_id"> pour la période
                         <t t-out="object.periode_id.mois_annee or ''"/></t>, d'un montant de
                         <strong t-out="format_amount(object.amount_total, object.currency_id) or ''"/>.
                     </p>
+                    <t t-if="object.mode_paiement == 'prelevement'">
+                        <p>Le prélèvement automatique sera déclenché le 10 du mois en cours.</p>
+                    </t>
                     <t t-if="object.mode_paiement == 'monnaie_locale'">
                         <p>
-                            Vous réglez en monnaie locale (Moneko) : flashez le QR-code ci-dessous pour payer, ou
-                            réglez par virement sur nos coordonnées bancaires habituelles.
+                            En tant que payeur·euse en Moneko, nous t'invitons à réaliser le paiement
+                            d'ici le 10 de ce mois, sur ton compte Moneko : rubrique « Opérations »,
+                            « effectuer un virement », tape EDN dans la barre de recherche et entre
+                            le montant de ta facture.
                         </p>
-                        <!-- ATTENTION : qr_moneko.png est un PLACEHOLDER 1x1 transparent (68
-                             octets), pas un vrai QR-code. Tel quel, un·e payeur·euse Moneko
-                             reçoit « flashez le QR-code ci-dessous » suivi d'un pixel invisible.
-                             À remplacer par le QR-code EDN réel AVANT tout déploiement. -->
-                        <p>
-                            <img src="/souscriptions_odoo/static/img/qr_moneko.png" alt="QR-code Moneko"
-                                 style="max-width: 150px;"/>
-                        </p>
-                    </t>
-                    <t t-else="">
-                        <p>
-                            Le prélèvement automatique de
-                            <strong t-out="format_amount(object.amount_total, object.currency_id) or ''"/>
-                            interviendra le 10 du mois prochain sur votre compte.
-                        </p>
+                        <t t-if="object.qr_moneko_image_url">
+                            <p>Ou flashe directement ce QR-code :</p>
+                            <p>
+                                <img t-att-src="object.qr_moneko_image_url" alt="QR-code Moneko"
+                                     style="max-width: 150px;"/>
+                            </p>
+                        </t>
                     </t>
                     <t t-if="object.lettre_du_mois">
                         <div>
                             <t t-out="object.lettre_du_mois"/>
                         </div>
                     </t>
-                    <p>N'hésitez pas à nous contacter pour toute question.</p>
+                    <p>N'hésite pas à nous contacter pour toute question.</p>
                     <t t-if="not is_html_empty(object.invoice_user_id.signature)">
                         <t t-out="object.invoice_user_id.signature or ''"/>
                     </t>
-                    <p>À très bientôt !<br/>L'équipe Énergie De Nantes</p>
+                    <p>A très bientôt !<br/>L'équipe Énergie De Nantes</p>
                 </div>
             </field>
         </record>

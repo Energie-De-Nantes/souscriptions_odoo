@@ -476,6 +476,26 @@ résiliées depuis (concernées par M, mais devenues *Résiliée*). Corollaire :
 **dépend** de la fiabilité de `date_debut` / `date_fin`.
 _Éviter_ : cadrer le périmètre sur `etat == 'en_service'` (instantané, pas maille-mois).
 
+**Lettre du mois** :
+Le corps **éditorial** du mail qui accompagne les factures mensuelles — porté par la *Campagne de
+facturation*, donc **une par mois**, historisée, jamais écrasée. Rédigée par le·la *Facturiste* et
+**reportée depuis la campagne précédente** à sa création (même idiome que les *notes* « à
+reporter », qui chaînent N → N+1 → N+2…) : l'evergreen — permanences, tarif solidaire, appels à
+bénévoles — se transmet sans retype **ni déploiement**, seules les dates changent. Le *template*
+de mail, lui, vit en git et ne porte que le **squelette transactionnel** — bonjour, n° et montant
+de facture, instruction de paiement, signature — qu'un édit éditorial ne doit **jamais** pouvoir
+casser. La *Facture* **tire** la lettre via son propre mois (`periode_id.mois` → campagne du mois,
+`UNIQUE(mois)` rend la résolution non ambiguë) ; la campagne ne la pousse pas — le corps est rendu
+une fois **par facture**, avec le montant et le client que seule la facture connaît. Une **porte**
+manuelle ferme la fenêtre éditoriale avant l'envoi : valider avec une lettre **vide** est
+légitime (« rien à dire ce mois-ci ») — la porte valide une **décision**, pas une écriture.
+_Éviter_ : « mot du mois » / « encart » / « blurb » (ce n'est pas un bloc inséré dans un texte
+permanent — c'est **tout** l'éditorial, evergreen compris, sinon changer un horaire de permanence
+redemande un dev) ; « newsletter » au sens `mass_mailing` (elle ne part jamais seule, elle
+chevauche la facture) ; porter la lettre sur `res.company` (globale, écrasée d'un mois sur
+l'autre, et hors d'atteinte du·de la *Facturiste*, qui n'a pas `base.group_system`) ; la faire
+porter par les factures de **régularisation** (une clôture est la facture de quelqu'un qui part).
+
 **Accueilliste** :
 Rôle métier qui instruit les demandes de *raccordement* au quotidien : accueil des nouvelles
 demandes, demandes SGE selon la *situation d'entrée* (F120 / F130), saisie de l'*id_Affaire*,

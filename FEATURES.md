@@ -34,6 +34,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-GRI-03 ✅ régime de prix standard | Moulin par souscription — preuve: tests/test_grille_prix.py::test_get_grille_active_par_regime · #105
 - REQ-GRI-04 ✅ duplication en brouillon inactif sans périmer la grille en cours — preuve: tests/test_grille_prix.py::test_dupliquer_grille_ne_perime_pas_la_sœur
 - REQ-GRI-05 ✅ catalogue de produits résolu par univers (standard/solidaire) — preuve: tests/test_catalogue.py
+- REQ-GRI-06 ✅ unités de facturation : les 6 produits d'énergie facturent en kWh (`uom.product_uom_kwh`), les 2 produits d'abonnement en jours (`uom.product_uom_day`) — fin du placeholder kg/Units ; `post-migrate` idempotent et gardé re-pointe les 8 produits déjà en prod, sans toucher les factures déjà comptabilisées (snapshot figé sur la ligne) — preuve: tests/test_unites_facturation.py · #304
 
 ## Parcours : cycle mensuel de facturation
 

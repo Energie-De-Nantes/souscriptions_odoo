@@ -37,6 +37,10 @@
                             Vous réglez en monnaie locale (Moneko) : flashez le QR-code ci-dessous pour payer, ou
                             réglez par virement sur nos coordonnées bancaires habituelles.
                         </p>
+                        <!-- ATTENTION : qr_moneko.png est un PLACEHOLDER 1x1 transparent (68
+                             octets), pas un vrai QR-code. Tel quel, un·e payeur·euse Moneko
+                             reçoit « flashez le QR-code ci-dessous » suivi d'un pixel invisible.
+                             À remplacer par le QR-code EDN réel AVANT tout déploiement. -->
                         <p>
                             <img src="/souscriptions_odoo/static/img/qr_moneko.png" alt="QR-code Moneko"
                                  style="max-width: 150px;"/>

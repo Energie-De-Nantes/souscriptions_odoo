@@ -267,12 +267,13 @@ class AccountMove(models.Model):
         jamais un mail Odoo nu, sans la Lettre du mois.
 
         Scopé sur facture CLIENT d'énergie (`move_type == 'out_invoice'` ET
-        `is_facture_energie`) : un avoir n'a jamais `is_facture_energie` vrai
-        par construction (`regularisation_id`/les lignes générées sont
-        `copy=False`, cf. plus haut), mais le garde-fou sur `move_type` est
-        gardé explicite plutôt que délégué à cet effet de bord. Toute facture
-        hors énergie ou tout avoir retombe sur `super()` — le modèle standard
-        d'Odoo."""
+        `is_facture_energie`) : le test sur `move_type` est **porteur**, pas un
+        garde-fou redondant — un avoir de Régularisation porte bien
+        `regularisation_id` et une `souscription_id`
+        (`souscription_regularisation._creer_facture`, `move_type='out_refund'`),
+        donc `is_facture_energie` y vaut **True**. C'est `move_type` seul qui
+        renvoie les avoirs sur `super()` — le modèle standard d'Odoo. Toute
+        facture hors énergie y retombe aussi."""
         if self.is_facture_energie and self.move_type == 'out_invoice':
             return self.env.ref('souscriptions_odoo.mail_template_facture_energie')
         return super()._get_mail_template()

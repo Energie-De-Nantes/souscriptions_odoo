@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo noupdate="1">
     <!-- Produits d'énergie -->
-    
+
     <!-- Énergie Base -->
     <record id="souscriptions_product_energie_base" model="product.product">
         <field name="name">Énergie Base</field>
@@ -10,7 +10,7 @@
         <field name="purchase_ok" eval="False"/>
         <field name="list_price">0.0</field>
         <field name="standard_price">0.0</field>
-        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="uom_id" ref="uom.product_uom_kwh"/>
     </record>
 
     <!-- Énergie Heures Pleines -->
@@ -21,7 +21,7 @@
         <field name="purchase_ok" eval="False"/>
         <field name="list_price">0.0</field>
         <field name="standard_price">0.0</field>
-        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="uom_id" ref="uom.product_uom_kwh"/>
     </record>
 
     <!-- Énergie Heures Creuses -->
@@ -32,7 +32,7 @@
         <field name="purchase_ok" eval="False"/>
         <field name="list_price">0.0</field>
         <field name="standard_price">0.0</field>
-        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="uom_id" ref="uom.product_uom_kwh"/>
     </record>
 
     <!-- Énergie solidaire (ADR 0013 : isolation comptable standard / solidaire).
@@ -46,7 +46,7 @@
         <field name="purchase_ok" eval="False"/>
         <field name="list_price">0.0</field>
         <field name="standard_price">0.0</field>
-        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="uom_id" ref="uom.product_uom_kwh"/>
         <field name="taxes_id" eval="[(6, 0, [])]"/>
     </record>
 
@@ -57,7 +57,7 @@
         <field name="purchase_ok" eval="False"/>
         <field name="list_price">0.0</field>
         <field name="standard_price">0.0</field>
-        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="uom_id" ref="uom.product_uom_kwh"/>
         <field name="taxes_id" eval="[(6, 0, [])]"/>
     </record>
 
@@ -68,7 +68,7 @@
         <field name="purchase_ok" eval="False"/>
         <field name="list_price">0.0</field>
         <field name="standard_price">0.0</field>
-        <field name="uom_id" ref="uom.product_uom_kgm"/>
+        <field name="uom_id" ref="uom.product_uom_kwh"/>
         <field name="taxes_id" eval="[(6, 0, [])]"/>
     </record>
 

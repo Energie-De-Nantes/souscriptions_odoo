@@ -166,6 +166,11 @@ class SouscriptionCampagneFacturation(models.Model):
         string='Total émis TTC', compute='_compute_stats_bandeau', currency_field='currency_id'
     )
 
+    # Colonne « Étapes faites (X/Y) » de la liste des campagnes (#301) :
+    # lecture de l'historique sans ouvrir chaque mois — Char plutôt que deux
+    # Integer, plus simple à afficher tel quel dans la liste.
+    etapes_faites = fields.Char(string='Étapes faites', compute='_compute_etapes_faites')
+
     _unique_mois = models.Constraint(
         'UNIQUE(mois)',
         'Une campagne de facturation existe déjà pour ce mois.',
@@ -339,6 +344,13 @@ class SouscriptionCampagneFacturation(models.Model):
     def _compute_currency_id(self):
         for campagne in self:
             campagne.currency_id = self.env.company.currency_id
+
+    @api.depends('etape_ids.fait')
+    def _compute_etapes_faites(self):
+        for campagne in self:
+            total = len(campagne.etape_ids)
+            faites = len(campagne.etape_ids.filtered('fait'))
+            campagne.etapes_faites = f'{faites}/{total}'
 
     def _souscriptions_par_bucket(self):
         """Partitionne le Périmètre de campagne en buckets EXACTS du statut de

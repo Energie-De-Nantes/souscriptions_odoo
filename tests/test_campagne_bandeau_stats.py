@@ -136,6 +136,17 @@ class TestCampagneBandeauStats(SouscriptionsTestCase):
         self.assertEqual(action['res_model'], 'account.move')
         self.assertEqual(action['domain'][0][2], [facture_emise.id])
 
+    # --- Étapes faites X/Y (AC #301, liste des campagnes enrichie) ---
+
+    def test_etapes_faites_compte_x_sur_y(self):
+        total = len(self.campagne.etape_ids)
+        self.assertEqual(self.campagne.etapes_faites, f'0/{total}')
+
+        self.campagne.etape_ids.filtered(lambda e: e.code == 'verif_periodes').write({'valide': True})
+        self.campagne.invalidate_recordset()
+
+        self.assertEqual(self.campagne.etapes_faites, f'1/{total}')
+
     # --- 0 champ stocké (AC #301, esprit ADR 0025) ---
 
     def test_les_nouveaux_compteurs_sont_des_computes_non_stockes(self):
@@ -146,6 +157,7 @@ class TestCampagneBandeauStats(SouscriptionsTestCase):
             'nb_facturees_brouillon',
             'nb_emises_bucket',
             'total_emis_ttc',
+            'etapes_faites',
         )
         Campagne = self.env['souscription.campagne.facturation']
         for nom_champ in champs_bandeau:

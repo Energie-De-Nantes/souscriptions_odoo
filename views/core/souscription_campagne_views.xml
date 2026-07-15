@@ -98,7 +98,9 @@
         </field>
     </record>
 
-    <!-- Liste triée mois décroissant = l'historique (#156). -->
+    <!-- Liste triée mois décroissant = l'historique (#156). Colonnes
+         enrichies (#301) : l'historique se lit sans ouvrir chaque mois —
+         toutes dérivées, aucun nouveau champ stocké (esprit ADR 0025). -->
     <record id="view_souscription_campagne_facturation_list" model="ir.ui.view">
         <field name="name">souscription.campagne.facturation.list</field>
         <field name="model">souscription.campagne.facturation</field>
@@ -106,6 +108,9 @@
             <list string="Campagnes de facturation">
                 <field name="name"/>
                 <field name="mois"/>
+                <field name="etapes_faites" string="Étapes faites"/>
+                <field name="nb_factures_emises" string="Factures émises"/>
+                <field name="total_emis_ttc" string="Total TTC"/>
             </list>
         </field>
     </record>

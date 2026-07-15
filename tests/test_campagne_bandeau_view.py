@@ -71,3 +71,20 @@ class TestCampagneEtapesDecorations(SouscriptionsTestCase):
         self.assertIsNotNone(etape_list)
         self.assertEqual(etape_list.get('decoration-muted'), 'fait')
         self.assertEqual(etape_list.get('decoration-bold'), "etat_prerequis == 'prete' and not fait")
+
+
+@tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
+class TestCampagneListeEnrichie(SouscriptionsTestCase):
+    """AC #301 : la liste des campagnes affiche Étapes faites (X/Y),
+    Factures émises et Total TTC — l'historique se lit sans ouvrir chaque
+    mois."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        view = cls.env['souscription.campagne.facturation'].get_view(view_type='list')
+        cls.arch = etree.fromstring(view['arch'])
+
+    def test_colonnes_etapes_faites_factures_emises_total_ttc(self):
+        noms_colonnes = {f.get('name') for f in self.arch.findall('./field')}
+        self.assertTrue({'etapes_faites', 'nb_factures_emises', 'total_emis_ttc'} <= noms_colonnes)

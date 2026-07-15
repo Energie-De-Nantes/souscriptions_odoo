@@ -105,8 +105,9 @@
                 Créer votre première grille de prix
             </p>
             <p>
-                Les grilles de prix définissent les tarifs applicables à partir d'une date donnée.
-                La création d'une nouvelle grille ferme automatiquement la précédente.
+                Les grilles de prix définissent les tarifs applicables à partir d'une date donnée
+                (toujours un 1er du mois). La fin de validité affichée se déduit de la grille
+                suivante du même régime — rien à fermer manuellement.
             </p>
         </field>
     </record>

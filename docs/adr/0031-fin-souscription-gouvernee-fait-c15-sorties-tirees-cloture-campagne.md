@@ -113,3 +113,17 @@ deux endroits qui comptent (`_compute_etat`, périmètre de campagne).
 - Tests : cycle complet `en_service` → `en_attente_cloture` → `resiliee` ; les critères
   d'acceptation de #21 (dernière facture aux jours exacts, plus aucune période ni facture après,
   statut reflété) sont couverts par ce modèle.
+
+## Amendement (#309) — la convention de borne s'étend à la Grille de prix
+
+La *Grille de prix* adopte la même convention de borne demi-ouverte que la *Période*
+(`[date_debut, date_fin)`) — décidé dans l'amendement d'[ADR-0029](0029-grille-moteur-prix-unique-composants-projections.md),
+en corrigeant un bug de sélection qui prixait un mois à la grille du mois suivant dès qu'un
+changement de grille tombait entre les deux. Ce document ne re-décide rien sur la grille (le
+fait C15 et la clôture de campagne restent son sujet propre) ; il documente que la convention
+de borne qu'il pose pour la Période ci-dessus n'est plus locale à la Période — elle est
+partagée par tout ce qui verse le temps en `[début, fin)` dans ce module. Trois bornes
+différentes coexistent dans le domaine, chacune assumée : la Période et la Grille sont
+demi-ouvertes ; la Souscription (`date_fin`) reste **inclusive** — « dernier jour servi »,
+décision 2 ci-dessus, choisie précisément pour préserver la lecture inclusive déjà codée. Ne
+pas confondre les deux en lisant l'une des dates de l'autre convention.

@@ -97,11 +97,11 @@ class TestPeriodeClotureAuReel(SouscriptionsTestCase):
         )
 
     def _grille_moulin(self, name):
+        # date_fin est dérivée (#309) : jamais passée en création.
         grille = self.env['grille.prix'].create(
             {
                 'name': name,
                 'date_debut': date(2024, 1, 1),
-                'date_fin': date(2024, 12, 31),
                 'active': True,
                 'regime_prix': 'moulin',
             }
@@ -215,11 +215,11 @@ class TestRegulariserClotures(SouscriptionsTestCase):
         )
 
     def _grille_moulin(self, name):
+        # date_fin est dérivée (#309) : jamais passée en création.
         grille = self.env['grille.prix'].create(
             {
                 'name': name,
                 'date_debut': date(2024, 1, 1),
-                'date_fin': date(2024, 12, 31),
                 'active': True,
                 'regime_prix': 'moulin',
             }

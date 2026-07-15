@@ -353,7 +353,6 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
             {
                 'name': 'Grille Moulin Test',
                 'date_debut': date(2024, 1, 1),
-                'date_fin': date(2024, 12, 31),
                 'regime_prix': 'moulin',
                 'active': True,
             }

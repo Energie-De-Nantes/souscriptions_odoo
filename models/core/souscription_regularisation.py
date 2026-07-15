@@ -214,7 +214,7 @@ class SouscriptionRegularisation(models.Model):
             if not any(ecarts.values()):
                 continue  # écart nul ce mois-ci : rien à régulariser
 
-            grille = Grille.get_grille_active(periode.date_fin, regime=periode.regime_prix_periode)
+            grille = Grille.get_grille_active(periode.date_debut, regime=periode.regime_prix_periode)
             note = '' if periode.mois in fraiches else ' (estimation locale)'
             for cadran, ecart in ecarts.items():
                 if not ecart:

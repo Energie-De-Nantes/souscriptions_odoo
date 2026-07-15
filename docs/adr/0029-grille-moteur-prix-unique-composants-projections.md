@@ -82,3 +82,43 @@ Deux documents opposables projetaient chacun leur propre assemblage de prix ; ri
 que la discipline ne les gardait sous la même règle. Concentrer la règle dans le module qui
 possède déjà les prix — la grille — et paramétrer par la grille rend la divergence *voulue*
 (valeurs, dans le temps) structurellement distincte de la divergence *interdite* (règle).
+
+## Amendement (#309) — borne demi-ouverte, sélection sur le début, fin dérivée
+
+Décision §2 corrigée : elle décrivait la Facture prixant « avec la grille historique (active à
+`date_fin` de la Période) ». C'était le bug — pas la règle. Une *Période* est bornée en
+**demi-ouvert** (`[date_debut, date_fin)`), donc `date_fin` est le 1er du mois **suivant** :
+sélectionner dessus prixait juin à la grille de juillet dès qu'un changement de grille tombait
+entre les deux. `souscription.py` (`_prix_documents`, grille **engagée**) portait déjà la bonne
+réponse ; seuls les chemins Période (composition des lignes, régénération à l'émission,
+régularisation) avaient dérivé. CONTEXT.md « Grille de prix » (#308) porte déjà la correction ;
+cet amendement aligne l'ADR.
+
+1. **Borne demi-ouverte partout.** La *Grille de prix* adopte la même convention que la
+   *Période* : `[date_debut, date_fin)`, la fin exclue. Une grille se termine le jour où la
+   suivante commence, jamais la veille — supprime la question « inclusif ou exclusif » qui
+   permettait au bug de passer inaperçu.
+
+2. **Sélection sur la date de DÉBUT, dans les deux projections.** La Facture prixe avec la
+   grille en vigueur à `date_debut` de la Période (historique — une régularisation rejoue
+   ainsi les prix de son mois) ; la CP avec la grille en vigueur à `date_debut` de la
+   Souscription (engagée). Les deux résolvent donc la même règle : *la grille en vigueur est
+   la plus récente à avoir commencé*. Seule la date **passée** à cette règle diverge (Période
+   vs Souscription) — jamais la borne interrogée (toujours le début).
+
+3. **La fin est dérivée, jamais stockée.** `grille.prix.date_fin` se calcule (`date_debut` de
+   la grille suivante du même régime) au lieu d'être écrit par un effet de bord de `create()`.
+   Un champ stocké tenu par un effet de bord est le **défaut structurel**, pas un simple
+   symptôme du bug de sélection : il rendait `write()` (correction d'un `date_debut` sans
+   toucher le prédécesseur), `unlink()` (trou de période) et le chargement hors-ordre
+   irreprésentables sans code dédié pour chaque cas. Dériver le champ élimine la classe
+   entière — rien à fermer, rien à laisser périmé.
+
+4. **Un changement de grille tombe toujours un 1er du mois — jamais de prorata.** Contrainte
+   sur `date_debut` (1er du mois), non rétroactive par nature. Alternative écartée : prixer un
+   mois à cheval au prorata des deux grilles — aucune mesure commerciale ne justifie de
+   découper un mois d'énergie entre deux barèmes ; la contrainte au 1er rend la situation
+   structurellement impossible plutôt que de coder un cas que personne ne demande.
+
+Voir aussi l'extension symétrique de la convention de borne dans l'amendement (#309) d'
+[ADR-0031](0031-fin-souscription-gouvernee-fait-c15-sorties-tirees-cloture-campagne.md).

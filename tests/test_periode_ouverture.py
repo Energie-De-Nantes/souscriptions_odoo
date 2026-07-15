@@ -47,7 +47,7 @@ class TestPeriodeOuverture(SouscriptionsTestCase):
     def test_porte_provision_base_jours_et_prix_via_grille(self):
         """AC2 (Base) : provision facturée et jours sont portés par la Période ;
         le prix appliqué reste résolvable par la même mécanique que toute
-        Période (grille sélectionnée par régime + date de fin, ADR 0002/0006 —
+        Période (grille sélectionnée par régime + date de DÉBUT, ADR 0002/0006/0029 —
         jamais recopié sur la Période)."""
         self.souscription_base.lisse = True
         periode = self._periode_ouverture(
@@ -60,7 +60,7 @@ class TestPeriodeOuverture(SouscriptionsTestCase):
         self.assertEqual(periode.provision_base_kwh, 280.0)
         self.assertEqual(periode.jours, 30)
 
-        grille = self.env['grille.prix'].get_grille_active(periode.date_fin, regime=periode.regime_prix_periode)
+        grille = self.env['grille.prix'].get_grille_active(periode.date_debut, regime=periode.regime_prix_periode)
         composants = grille.composants(
             periode.type_tarif_periode,
             periode.puissance_souscrite_periode,

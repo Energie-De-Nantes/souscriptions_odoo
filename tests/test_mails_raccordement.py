@@ -112,13 +112,12 @@ class TestPackBienvenueRaccordement(SouscriptionsTestMixin, TransactionCase):
         # La CP jointe au pack se rend à la date de début de la Souscription
         # (date_debut_souhaitee = aujourd'hui + 30 j) : grille ouverte à
         # partir de 2025 pour couvrir cette date quel que soit le jour du
-        # run — la grille 2024 du mixin ne couvre que les fixtures
-        # historiques (pas de chevauchement).
+        # run — la grille 2024 du mixin devient historique, sa date_fin se
+        # dérive automatiquement au 2025-01-01 (#309).
         grille_courante = cls.env['grille.prix'].create(
             {
                 'name': 'Grille Test courante',
                 'date_debut': date(2025, 1, 1),
-                'date_fin': False,
                 'active': True,
             }
         )

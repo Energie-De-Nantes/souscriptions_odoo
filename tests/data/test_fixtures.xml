@@ -51,7 +51,6 @@
     <record id="grille_prix_test" model="grille.prix">
         <field name="name">Grille Prix Test</field>
         <field name="date_debut">2024-01-01</field>
-        <field name="date_fin">2024-12-31</field>
         <field name="active">True</field>
     </record>
 

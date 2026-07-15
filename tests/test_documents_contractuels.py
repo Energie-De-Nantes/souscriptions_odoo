@@ -251,7 +251,6 @@ class TestConditionsParticulieres(SouscriptionsTestMixin, HttpCase):
             {
                 'name': 'Grille Moulin CP',
                 'date_debut': date(2024, 1, 1),
-                'date_fin': date(2024, 12, 31),
                 'regime_prix': 'moulin',
             }
         )

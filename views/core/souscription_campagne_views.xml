@@ -9,6 +9,37 @@
         <field name="arch" type="xml">
             <form string="Campagne de facturation">
                 <sheet>
+                    <!-- Bandeau de stats natif (#301) : stat buttons standard Odoo, pas de
+                         CSS custom. Entonnoir (à tirer/à facturer/facturées/émises) en
+                         buckets EXACTS (#301, _souscriptions_par_bucket) — à ne pas
+                         confondre avec le reste-à-faire CUMULATIF de la matrice des étapes
+                         ci-dessous (#157). Remplace le groupe « Factures du mois ». -->
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object" name="action_drill_down_perimetre" icon="fa-users">
+                            <field name="nb_perimetre" widget="statinfo" string="Périmètre"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_drill_down_a_tirer" icon="fa-cloud-download">
+                            <field name="nb_a_tirer" widget="statinfo" string="À tirer"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_drill_down_a_facturer" icon="fa-file-text-o">
+                            <field name="nb_a_facturer" widget="statinfo" string="À facturer"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_drill_down_facturees" icon="fa-pencil-square-o">
+                            <field name="nb_facturees_brouillon" widget="statinfo" string="Facturées"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_drill_down_emises" icon="fa-check-circle">
+                            <field name="nb_emises_bucket" widget="statinfo" string="Émises"/>
+                        </button>
+                        <button class="oe_stat_button" type="object" name="action_drill_down_total_emis" icon="fa-eur">
+                            <div class="o_stat_info">
+                                <span class="o_stat_value">
+                                    <field name="total_emis_ttc" widget="monetary"/>
+                                </span>
+                                <span class="o_stat_text">Total émis TTC</span>
+                            </div>
+                        </button>
+                    </div>
+                    <field name="currency_id" invisible="1"/>
                     <div class="oe_title">
                         <h1>
                             <field name="name" readonly="1"/>
@@ -16,10 +47,6 @@
                     </div>
                     <group>
                         <field name="mois"/>
-                    </group>
-                    <group string="Factures du mois">
-                        <field name="nb_factures_creees"/>
-                        <field name="nb_factures_emises"/>
                     </group>
                     <notebook>
                         <page string="Étapes" name="etapes">

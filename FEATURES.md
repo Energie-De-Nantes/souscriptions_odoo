@@ -29,7 +29,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 
 ## Parcours : grilles de prix & catalogue
 
-- REQ-GRI-01 ✅ grille active sélectionnée par date, chevauchement interdit — preuve: tests/test_grille_prix.py::test_get_grille_active_par_date · #16
+- REQ-GRI-01 ✅ grille active sélectionnée sur la plus récente `date_debut <= date` (borne demi-ouverte, `date_fin` dérivée de la grille suivante du même régime, jamais stockée ni saisie ; changement de grille contraint au 1er du mois, non rétroactif) — preuve: tests/test_grille_prix.py::test_get_grille_active_selectionne_la_plus_recente_a_avoir_commence, tests/test_grille_prix.py::test_date_fin_derivee_du_debut_de_la_grille_suivante, tests/test_grille_prix.py::test_supprimer_la_grille_la_plus_recente_ne_laisse_pas_de_trou, tests/test_periode_facture.py::TestPeriodeFactureSelectionGrilleSurDateDebut · #16, #309, ADR 0029/0031
 - REQ-GRI-02 ✅ abonnement affine : base 3 kVA + coefficient par kVA — preuve: tests/test_grille_prix.py::test_abonnement_affine_lineaire_dans_la_puissance · #66
 - REQ-GRI-03 ✅ régime de prix standard | Moulin par souscription — preuve: tests/test_grille_prix.py::test_get_grille_active_par_regime · #105
 - REQ-GRI-04 ✅ duplication en brouillon inactif sans périmer la grille en cours — preuve: tests/test_grille_prix.py::test_dupliquer_grille_ne_perime_pas_la_sœur

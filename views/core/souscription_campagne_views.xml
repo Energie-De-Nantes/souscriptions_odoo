@@ -92,6 +92,14 @@
                                 </list>
                             </field>
                         </page>
+                        <!-- Lettre du mois (#313, ADR 0034) : TOUT l'éditorial du mail de
+                             facture — pré-remplie depuis le mois précédent à la création
+                             (_reporter_lettre_precedente), réécrite ici chaque mois par le·la
+                             Facturiste. Tirée par la Facture via son propre mois
+                             (account.move.lettre_du_mois) — jamais poussée. -->
+                        <page string="Lettre du mois" name="lettre_mois">
+                            <field name="lettre_mois" widget="html"/>
+                        </page>
                     </notebook>
                 </sheet>
             </form>

@@ -496,6 +496,22 @@ chevauche la facture) ; porter la lettre sur `res.company` (globale, écrasée d
 l'autre, et hors d'atteinte du·de la *Facturiste*, qui n'a pas `base.group_system`) ; la faire
 porter par les factures de **régularisation** (une clôture est la facture de quelqu'un qui part).
 
+**Textes permanents** (des mails de facture) :
+L'**éditorial sans rythme** des mails de facture — paragraphe difficultés (aides, étalement),
+appel au don sur les avoirs, accusé de prise en compte d'une résiliation. Même nature que la
+*Lettre du mois* (écrit par le·la *Facturiste*, c'est sa voix et sa politique sociale, jamais du
+squelette), mais **sans mois** : il accompagne les projections d'une *Régularisation*, qui n'ont
+pas de *Campagne* d'où se reporter. D'où un second foyer — des champs de **configuration** propres
+au module, sous ACL du module. La ligne de partage entre les deux foyers est le **rythme**, pas le
+contenu : mensuel → la Lettre, sans rythme → les Textes permanents. Ce qui n'est **pas** éditorial
+(l'instruction de paiement et ses dates — un chemin d'argent) reste en git, revu et testé.
+_Éviter_ : les porter par `res.company` / `res.config.settings` (écriture réservée à
+`base.group_erp_manager` / `base.group_system` — hors d'atteinte du·de la Facturiste) ; les laisser
+dans le corps du *template* (le module le ré-affirme au déploiement : tout édit manuel y est
+silencieusement écrasé — cf. ADR 0034, « l'éditorial est toujours un champ ») ; en faire une
+variante de mail **par mode de paiement** (le paiement est un bloc **orthogonal** à la situation,
+c'est ce qui remplit d'un coup les cases Moneko manquantes).
+
 **Accueilliste** :
 Rôle métier qui instruit les demandes de *raccordement* au quotidien : accueil des nouvelles
 demandes, demandes SGE selon la *situation d'entrée* (F120 / F130), saisie de l'*id_Affaire*,

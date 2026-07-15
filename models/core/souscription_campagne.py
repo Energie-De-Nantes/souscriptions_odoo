@@ -12,6 +12,7 @@ from datetime import timedelta
 from babel.dates import format_date
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+from odoo.tools import is_html_empty
 
 # Catalogue des étapes (#156, ADR 0025 §1) : le DAG est déclaré en code, pas de
 # modèle de configuration ni de moteur de workflow. L'ordre d'insertion EST un
@@ -145,6 +146,14 @@ class SouscriptionCampagneFacturation(models.Model):
     etape_ids = fields.One2many('souscription.campagne.etape', 'campagne_id', string='Étapes')
     note_ids = fields.One2many('souscription.campagne.note', 'campagne_id', string='Notes')
 
+    # Lettre du mois (#313, ADR 0034) : TOUT l'éditorial du mail de facture —
+    # dates du mois, evergreen (tarif solidaire, permanences, bénévoles),
+    # rappels — jamais un encart. Reportée depuis la campagne précédente à la
+    # création (_reporter_lettre_precedente, même idiome que les notes) : la
+    # facture TIRE cette lettre via son propre mois (account.move,
+    # _compute_lettre_du_mois) — la campagne ne pousse rien.
+    lettre_mois = fields.Html(string='Lettre du mois')
+
     # Décompte factures créées/émises du mois (#157) : dérivé, non stocké — cf.
     # _factures_du_mois().
     nb_factures_creees = fields.Integer(string='Factures créées', compute='_compute_stats_factures')
@@ -198,6 +207,7 @@ class SouscriptionCampagneFacturation(models.Model):
         campagnes = super().create(vals_list)
         campagnes._seed_etapes()
         campagnes._reporter_notes_precedentes()
+        campagnes._reporter_lettre_precedente()
         return campagnes
 
     def write(self, vals):
@@ -246,6 +256,31 @@ class SouscriptionCampagneFacturation(models.Model):
                         'origine_note_id': note.id,
                     }
                 )
+
+    def _reporter_lettre_precedente(self):
+        """Pré-remplit la lettre du mois M avec celle de M-1 à la création
+        (#313, ADR 0034 « Le second détour ») — même idiome que
+        `_reporter_notes_precedentes` : c'est ce report qui rend l'evergreen
+        (permanences, tarif solidaire, bénévoles) viable sans retype ni
+        déploiement, seules les dates changent d'un mois sur l'autre.
+
+        Chaîne naturellement (N -> N+1 -> N+2…) : la lettre copiée redevient
+        elle-même la source du report suivant. Chaîne rompue (pas de
+        campagne pour le mois précédent) : rien à reporter, aucune erreur —
+        même contrat que les notes.
+
+        Ne PRÉ-remplit que : une lettre passée à la création est la volonté du·
+        de la Facturiste et prime sur le report. Contrairement aux notes (des
+        enfants qu'on ajoute), la lettre est un champ scalaire — la réassigner
+        sans garde écraserait la valeur explicite. `is_html_empty` et non
+        `not` : l'éditeur HTML envoie `<p><br></p>` pour un champ vidé."""
+        for campagne in self:
+            if not is_html_empty(campagne.lettre_mois):
+                continue
+            mois_precedent = (campagne.mois - timedelta(days=1)).replace(day=1)
+            precedente = self.search([('mois', '=', mois_precedent)], limit=1)
+            if precedente:
+                campagne.lettre_mois = precedente.lettre_mois
 
     # --- Signaux dérivés (#157) : 0 champ ajouté sur souscription.souscription.
     # Statut de facturation par (souscription, mois de la campagne) et

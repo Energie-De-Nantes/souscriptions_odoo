@@ -139,13 +139,16 @@ class TestCampagneBandeauStats(SouscriptionsTestCase):
     # --- Étapes faites X/Y (AC #301, liste des campagnes enrichie) ---
 
     def test_etapes_faites_compte_x_sur_y(self):
+        # Campagne fraîche : « préparer les prélèvements » est déjà faite par
+        # construction — son « fait » est un signal dérivé (#186) et il n'y a
+        # encore aucune facture prélèvement due. Le compteur part donc de 1.
         total = len(self.campagne.etape_ids)
-        self.assertEqual(self.campagne.etapes_faites, f'0/{total}')
+        self.assertEqual(self.campagne.etapes_faites, f'1/{total}')
 
         self.campagne.etape_ids.filtered(lambda e: e.code == 'verif_periodes').write({'valide': True})
         self.campagne.invalidate_recordset()
 
-        self.assertEqual(self.campagne.etapes_faites, f'1/{total}')
+        self.assertEqual(self.campagne.etapes_faites, f'2/{total}')
 
     # --- 0 champ stocké (AC #301, esprit ADR 0025) ---
 

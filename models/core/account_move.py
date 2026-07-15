@@ -69,6 +69,34 @@ class AccountMove(models.Model):
             campagne = Campagne.search([('mois', '=', mois)], limit=1) if mois else Campagne
             move.lettre_du_mois = campagne.lettre_mois
 
+    # QR-code Moneko (#313, ADR 0034 « Extension : les mails sans mois ») :
+    # compute NON stocké, même idiome que `lettre_du_mois` — le template
+    # reste bête (un `t-if` + un `t-att-src`, aucun `search`), la résolution
+    # vit ici. Pas de `@api.depends` porteur : la source n'est pas un champ
+    # de CE move mais la config globale du module (`souscription.mail.
+    # config`), donc pas de champ à déclarer en dépendance — recalculé à
+    # chaque nouvel accès (cache par recordset fraîchement browsé), comme
+    # `lettre_du_mois` recalcule à chaque facture nouvellement composée.
+    # `sudo()` : la config n'accorde la lecture qu'au groupe manager
+    # (ADR 0034) — un envoi déclenché par un compte qui n'a que
+    # `group_souscriptions_user` ne doit jamais planter sur cette
+    # résolution annexe (pas plus qu'une absence de QR ne doit être une
+    # erreur : « pas de donnée -> pas de bloc »).
+    # ponytail: `@api.depends()` vide -> pas d'invalidation automatique si
+    # le QR change APRÈS un premier accès sur le même recordset, dans le
+    # même environnement (cache ORM). Sans ceiling pratique aujourd'hui : un
+    # envoi de mail browse une facture fraîche. Si un jour un long-vécu
+    # (cron, session) lit ce champ avant ET après un changement de QR,
+    # invalider explicitement (`move.invalidate_recordset(['qr_moneko_image_url'])`).
+    qr_moneko_image_url = fields.Char(string='URL du QR-code Moneko', compute='_compute_qr_moneko_image_url')
+
+    @api.depends()
+    def _compute_qr_moneko_image_url(self):
+        config = self.env['souscription.mail.config'].sudo().search([], limit=1)
+        url = config._qr_moneko_image_url() if config else False
+        for move in self:
+            move.qr_moneko_image_url = url
+
     @api.depends('periode_id', 'regularisation_id', 'souscription_id')
     def _compute_is_facture_energie(self):
         """Détermine si c'est une facture d'énergie (souscription électricité) —
@@ -303,8 +331,16 @@ class AccountMove(models.Model):
         (`souscription_regularisation._creer_facture`, `move_type='out_refund'`),
         donc `is_facture_energie` y vaut **True**. C'est `move_type` seul qui
         renvoie les avoirs sur `super()` — le modèle standard d'Odoo. Toute
-        facture hors énergie y retombe aussi."""
-        if self.is_facture_energie and self.move_type == 'out_invoice':
+        facture hors énergie y retombe aussi.
+
+        `all(...)` sur `self`, jamais `self.is_facture_energie` nu (grill
+        2026-07-15, 3e passage) : le core appelle ce hook sur un recordset
+        potentiellement multi-facture (envoi en masse), et lire un champ
+        scalaire sur un `self` de plusieurs enregistrements lève `Expected
+        singleton` — un renvoi groupé de plusieurs factures d'énergie
+        plantait avant même d'atteindre l'envoi. `all(...)` rend le même
+        verdict qu'avant pour un singleton, et ne casse plus sur un lot."""
+        if all(m.is_facture_energie and m.move_type == 'out_invoice' for m in self):
             return self.env.ref('souscriptions_odoo.mail_template_facture_energie')
         return super()._get_mail_template()
 

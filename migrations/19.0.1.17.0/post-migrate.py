@@ -20,17 +20,32 @@ SQL direct (comme 19.0.1.14.0/19.0.1.16.0/post-migrate.py) : `type_etape` est
 posé à la valeur que `_compute_type_etape` calculerait de toute façon pour ce
 code ('porte', cf. ETAPES_CAMPAGNE) — un backfill SQL brut d'un champ stocké
 compute n'est jamais recalculé tout seul par un simple accès ORM ultérieur.
-`valide`/`lance` à FALSE (porte non validée, jamais lancée) : l'état de
-départ normal d'une porte fraîchement seedée. Idempotent : n'insère que pour
-les campagnes qui n'ont pas encore la ligne.
+`valide` + le drapeau de lancement à FALSE (porte non validée, jamais
+lancée) : l'état de départ normal d'une porte fraîchement seedée. Idempotent :
+n'insère que pour les campagnes qui n'ont pas encore la ligne.
+
+Nom de colonne détecté à l'exécution (`lance` OU `demande`) : dans un `-u`
+multi-versions, Odoo exécute TOUS les pre-migrate applicables (par ordre de
+version) AVANT le moindre post-migrate — sur une base < 1.17.0, le pre-1.19.0
+(#326, renommage `lance` -> `demande`) tourne donc avant CE script, dont
+l'INSERT à liste de colonnes explicite planterait sur `lance`. Même idiome
+de garde `information_schema.columns` que le pre-1.19.0.
 """
 
 
 def migrate(cr, version):
     cr.execute(
         """
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'souscription_campagne_etape' AND column_name IN ('lance', 'demande')
+        """
+    )
+    (colonne_lancement,) = cr.fetchone()
+    cr.execute(
+        f"""
         INSERT INTO souscription_campagne_etape
-            (campagne_id, code, sequence, type_etape, valide, lance, create_uid, write_uid, create_date, write_date)
+            (campagne_id, code, sequence, type_etape, valide, {colonne_lancement},
+             create_uid, write_uid, create_date, write_date)
         SELECT c.id, 'gestes_commerciaux', 65, 'porte', FALSE, FALSE, 1, 1, NOW(), NOW()
         FROM souscription_campagne_facturation c
         WHERE NOT EXISTS (

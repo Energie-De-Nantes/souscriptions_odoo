@@ -419,7 +419,20 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
                 'name': 'Facturiste identité test',
                 'login': 'facturiste-identite-emission',
                 'email': 'facturiste-identite@souscriptions.test',
-                'group_ids': [(6, 0, [self.env.ref('souscriptions_odoo.group_souscriptions_manager').id])],
+                # Corollaire assumé du with_user (#326) : les droits du·de la
+                # demandeur·se s'appliquent à la vidange — il lui faut donc le
+                # groupe Facturation natif pour poster une facture, en plus du
+                # groupe métier du module.
+                'group_ids': [
+                    (
+                        6,
+                        0,
+                        [
+                            self.env.ref('souscriptions_odoo.group_souscriptions_manager').id,
+                            self.env.ref('account.group_account_invoice').id,
+                        ],
+                    )
+                ],
             }
         )
         periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
@@ -861,7 +874,11 @@ class TestCampagneEtapeGestesCommerciaux(SouscriptionsTestCase):
             self.campagne.action_emettre_factures()
 
     def test_emettre_factures_debloquee_une_fois_gestes_commerciaux_validee(self):
-        """AC : une fois la porte validée, Émettre factures tourne."""
+        """AC : une fois la porte validée, Émettre factures tourne — c'est-à-
+        dire, depuis #326 (tâche de fond), passe la porte et pose l'intention
+        sans lever. Le POSTAGE effectif est couvert par le cron réel dans
+        TestCampagneEtapeEmettreFactures ; ici seul le déblocage de la porte
+        est le sujet."""
         facture = self._facture_creee()
         self._etape('gestes_commerciaux').write({'valide': True})
         self.campagne.etape_ids.invalidate_recordset()
@@ -869,7 +886,8 @@ class TestCampagneEtapeGestesCommerciaux(SouscriptionsTestCase):
         self.assertEqual(self._etape('emettre_factures').etat_prerequis, 'prete')
         self.campagne.action_emettre_factures()
 
-        self.assertEqual(facture.state, 'posted')
+        self.assertTrue(self._etape('emettre_factures').demande, "la porte ouverte, l'intention est posée")
+        self.assertEqual(facture.state, 'draft', 'le clic ne poste plus lui-même (#326) — le cron le fera')
 
 
 @tagged('souscriptions', 'souscriptions_migration', 'post_install', '-at_install')

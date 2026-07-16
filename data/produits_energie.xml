@@ -71,23 +71,4 @@
         <field name="uom_id" ref="uom.product_uom_kwh"/>
         <field name="taxes_id" eval="[(6, 0, [])]"/>
     </record>
-
-    <!-- Produits TURPE -->
-    <record id="souscriptions_product_turpe_fixe" model="product.product">
-        <field name="name">TURPE Fixe</field>
-        <field name="type">service</field>
-        <field name="sale_ok" eval="True"/>
-        <field name="purchase_ok" eval="False"/>
-        <field name="list_price">0.0</field>
-        <field name="standard_price">0.0</field>
-    </record>
-
-    <record id="souscriptions_product_turpe_variable" model="product.product">
-        <field name="name">TURPE Variable</field>
-        <field name="type">service</field>
-        <field name="sale_ok" eval="True"/>
-        <field name="purchase_ok" eval="False"/>
-        <field name="list_price">0.0</field>
-        <field name="standard_price">0.0</field>
-    </record>
 </odoo>

@@ -157,8 +157,6 @@ class SouscriptionChronologieLigne(models.Model):
 class Souscription(models.Model):
     _inherit = 'souscription.souscription'
 
-    chronologie_ligne_ids = fields.One2many('souscription.chronologie.ligne', 'souscription_id', string='Chronologie')
-
     def action_ouvrir_chronologie(self):
         """Bouton « Chronologie » (#200) : tire la frise electricore au grain
         RSC pour `self`, purge les lignes déjà affichées pour cette

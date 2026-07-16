@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-Le portal usager·ère utilise le framework Portal standard d'Odoo pour permettre aux usager·ères de consulter leurs souscriptions électriques. Cette approche suit les bonnes pratiques d'Odoo 18 et s'intègre naturellement avec les autres modules.
+Le portal usager·ère utilise le framework Portal standard d'Odoo pour permettre aux usager·ères de consulter leurs souscriptions électriques. Cette approche suit les bonnes pratiques d'Odoo 19 et s'intègre naturellement avec les autres modules.
 
 ## Accès
 
@@ -35,7 +35,7 @@ Le portal usager·ère utilise le framework Portal standard d'Odoo pour permettr
 ## Architecture technique
 
 ### Contrôleur Portal (`controllers/portal.py`)
-- Hérite de `CustomerPortal` 
+- Hérite de `CustomerPortal`
 - Surcharge `_prepare_home_portal_values` pour le compteur
 - Routes sécurisées avec vérification partner_id
 - Support de la pagination

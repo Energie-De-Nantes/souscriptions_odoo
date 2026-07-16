@@ -7,9 +7,8 @@ reportées, #159) — tout le reste est dérivé à la volée depuis les donnée
 existantes (#157).
 """
 
-from datetime import timedelta
-
 from babel.dates import format_date
+from dateutil.relativedelta import relativedelta
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import is_html_empty
@@ -203,9 +202,9 @@ class SouscriptionCampagneFacturation(models.Model):
     @api.model
     def _default_mois(self):
         """1er du mois précédent — même calcul que le wizard de pull (on ferme
-        le mois qui vient de s'écouler), sans dépendance à dateutil."""
+        le mois qui vient de s'écouler)."""
         premier_mois_courant = fields.Date.context_today(self).replace(day=1)
-        return (premier_mois_courant - timedelta(days=1)).replace(day=1)
+        return premier_mois_courant - relativedelta(months=1)
 
     @api.depends('mois')
     def _compute_name(self):
@@ -256,7 +255,7 @@ class SouscriptionCampagneFacturation(models.Model):
         campagne pour le mois précédent) : rien à reporter, aucune erreur."""
         Note = self.env['souscription.campagne.note']
         for campagne in self:
-            mois_precedent = (campagne.mois - timedelta(days=1)).replace(day=1)
+            mois_precedent = campagne.mois - relativedelta(months=1)
             precedente = self.search([('mois', '=', mois_precedent)], limit=1)
             if not precedente:
                 continue
@@ -292,7 +291,7 @@ class SouscriptionCampagneFacturation(models.Model):
         for campagne in self:
             if not is_html_empty(campagne.lettre_mois):
                 continue
-            mois_precedent = (campagne.mois - timedelta(days=1)).replace(day=1)
+            mois_precedent = campagne.mois - relativedelta(months=1)
             precedente = self.search([('mois', '=', mois_precedent)], limit=1)
             if precedente:
                 campagne.lettre_mois = precedente.lettre_mois

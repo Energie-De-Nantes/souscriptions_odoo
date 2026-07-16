@@ -72,7 +72,9 @@
                                     <!-- Étapes dérivées/action (#158) : un seul bouton générique qui
                                          dispatche vers l'action de la Campagne (pull/sync/créer/émettre).
                                          Seules les portes se valident via la case `valide` ci-dessus ;
-                                         sync F15 (action) est « faite » dès son lancement (`lance`). -->
+                                         sync F15 (action) est « faite » dès sa demande (`demande`).
+                                         Émettre factures (#326, ADR 0035) : le clic pose l'intention
+                                         et déclenche le cron de vidange — rend la main immédiatement. -->
                                     <button name="action_executer" type="object" string="Lancer"
                                             class="btn-link" invisible="type_etape == 'porte'"/>
                                     <button name="action_drill_down" type="object" string="Voir" icon="fa-search"/>

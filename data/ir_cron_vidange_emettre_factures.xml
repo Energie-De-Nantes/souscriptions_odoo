@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Vidange en tâche de fond de l'étape « Émettre factures » (#326,
+             ADR 0035) : le bouton (`action_emettre_factures`) pose
+             l'intention (`demande`) et déclenche ce cron via `_trigger()` —
+             exécuté dans les secondes qui suivent, pas à l'heure ronde.
+             `interval_type`/`interval_number` ne servent que de filet de
+             sécurité quotidien (un cron INACTIF jette les déclenchements
+             immédiats ; les lignes `ir_cron_trigger`, elles, survivent à un
+             redémarrage — la vidange reprend seule). -->
+        <record id="ir_cron_vidange_emettre_factures" model="ir.cron">
+            <field name="name">Souscriptions : vidange émission factures (campagne)</field>
+            <field name="model_id" ref="model_souscription_campagne_etape"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_vidanger_emettre_factures()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+    </data>
+</odoo>

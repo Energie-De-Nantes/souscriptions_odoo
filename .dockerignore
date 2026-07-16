@@ -22,7 +22,6 @@ odoo-server.log
 unittest.cfg
 
 # Démonstration locale (scripts non Docker)
-demo/launch_*.sh
 demo/load_demo_data.sh
 toggle_metier.sh
 

@@ -21,10 +21,6 @@ tests/
 odoo-server.log
 unittest.cfg
 
-# Démonstration locale (scripts non Docker)
-demo/load_demo_data.sh
-toggle_metier.sh
-
 # VSCode/IDE
 .vscode/
 .idea/

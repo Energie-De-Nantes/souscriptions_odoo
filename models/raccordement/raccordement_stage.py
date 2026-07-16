@@ -25,5 +25,3 @@ class RaccordementStage(models.Model):
         help="Le drag-in manuel est refusé sur cette étape : elle n'avance que par "
         "un automatisme (saisie de l'id_Affaire, acquisition de la RSC).",
     )
-
-    demande_ids = fields.One2many('raccordement.demande', 'stage_id', string='Demandes')

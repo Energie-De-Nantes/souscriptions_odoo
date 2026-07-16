@@ -186,6 +186,22 @@ class TestCampagneEtapeSyncF15(SouscriptionsTestCase):
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneEtapeCreerFactures(SouscriptionsTestCase):
+    """#327, ADR 0035 : « créer factures » rejoint le harnais posé pour
+    l'émission (#326) — migration ASSUMÉE et VISIBLE des tests qui
+    attendaient une création synchrone, même idiome que
+    TestCampagneEtapeEmettreFactures. Deux seams :
+
+    - seam 1, `action_executer()`/`action_creer_factures()` : la porte
+      (gate), l'intention (`demande`) posée avec son auteur
+      (`demande_par_id`) — ne fait PLUS le travail elle-même ;
+    - seam 2, le cron RÉEL dédié (`ir_cron_vidange_creer_factures`, #327) :
+      `method_direct_trigger()` dans `self.enter_registry_test_mode()`.
+
+    Aucun test ici ne s'accroche à la taille de paquet, au nombre de passes
+    du cron, ni au contenu d'`ir.cron.progress` — `_vider()` boucle jusqu'à
+    convergence (`etape.demande` retombée) sans présumer combien de passes
+    ça prend."""
+
     MOIS = date(2024, 3, 1)
     FIN_MOIS = date(2024, 3, 31)
 
@@ -198,46 +214,235 @@ class TestCampagneEtapeCreerFactures(SouscriptionsTestCase):
             {'ref_situation_contractuelle': 'RSC-CAMPAGNE-CREER'}
         )
         self.campagne = self.env['souscription.campagne.facturation'].create({'mois': self.MOIS})
+        self.cron = self.env.ref('souscriptions_odoo.ir_cron_vidange_creer_factures')
 
     def _valider(self, code):
         self.campagne.etape_ids.filtered(lambda e: e.code == code).write({'valide': True})
 
+    def _etape(self, code='creer_factures'):
+        return self.campagne.etape_ids.filtered(lambda e: e.code == code)
+
+    def _preparer_gates(self):
+        self._valider('verif_periodes')
+        self._valider('verif_refacturations')
+
+    def _vider(self, max_passes=5):
+        """Vidange réellement, via le second seam (#327) : le cron dédié
+        réel. Plusieurs passes tolérées — la règle « pas de progrès » (ADR
+        0035 décision 3) ne retombe l'intention qu'à une passe qui n'a RIEN
+        traité."""
+        etape = self._etape()
+        with self.enter_registry_test_mode():
+            for _ in range(max_passes):
+                self.cron.method_direct_trigger()
+                etape.invalidate_recordset()
+                if not etape.demande:
+                    break
+
+    def _creer_et_vider(self):
+        """Clic (pose l'intention, déclenche le cron) puis vidange réelle —
+        remplace l'ancien appel synchrone unique à `action_creer_factures()`."""
+        self.campagne.action_creer_factures()
+        self._vider()
+
     def test_creer_factures_bloque_si_les_deux_portes_ne_sont_pas_validees(self):
         with self.assertRaises(UserError):
             self.campagne.action_creer_factures()
+        self.assertFalse(self._etape().demande, "la porte a bloqué avant même de poser l'intention")
 
     def test_creer_factures_bloque_si_une_seule_porte_validee(self):
         self._valider('verif_periodes')
         with self.assertRaises(UserError):
             self.campagne.action_creer_factures()
 
-    def test_creer_factures_delegue_une_fois_les_deux_portes_validees(self):
-        """AC : créer factures tourne, gated sur les deux vérifs — délègue à
-        (recordset).creer_factures(), déjà couvert (test_periode_facture.py)."""
+    def test_clic_rend_la_main_immediatement_et_ne_cree_rien(self):
+        """AC #327 : le clic (seam 1) rend la main immédiatement — pose
+        l'intention et son auteur, mais AUCUNE facture n'est créée avant que
+        le cron (seam 2) n'ait tourné."""
         self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
-        self._valider('verif_periodes')
-        self._valider('verif_refacturations')
+        self._preparer_gates()
+        self.campagne.etape_ids.invalidate_recordset()
+        etape = self._etape()
 
-        self.campagne.action_creer_factures()
+        etape.action_executer()
+
+        self.assertTrue(etape.demande, "l'intention est posée")
+        self.assertEqual(etape.demande_par_id, self.env.user, "l'intention porte son auteur")
+        self.assertEqual(len(self.souscription_base.facture_ids), 0, 'le clic ne fait pas le travail lui-même')
+
+    def test_creer_factures_delegue_une_fois_les_deux_portes_validees(self):
+        """AC : créer factures tourne, gated sur les deux vérifs — désormais
+        en tâche de fond (#327) : le clic déclenche, le cron réel fait le
+        travail, délègue à (recordset).creer_factures(), déjà couvert
+        (test_periode_facture.py)."""
+        self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        self._preparer_gates()
+        self.campagne.etape_ids.invalidate_recordset()
+        self.assertEqual(self._etape().nb_reste_a_faire, 1, 'reste-à-faire dérivé, avant vidange')
+
+        self._creer_et_vider()
 
         self.assertEqual(len(self.souscription_base.facture_ids), 1)
+        self.assertEqual(self.souscription_base.facture_ids.state, 'draft', 'créer ne poste pas')
+        self.assertEqual(
+            self._etape().nb_reste_a_faire, 0, 'le reste-à-faire décroît tout seul, aucun champ de progression'
+        )
 
     def test_creer_factures_idempotent(self):
+        """AC #327 : recliquer ne crée aucun doublon — l'anti-doublon par
+        période suffit, rien n'est ajouté pour la vidange."""
         self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
-        self._valider('verif_periodes')
-        self._valider('verif_refacturations')
-
-        self.campagne.action_creer_factures()
+        self._preparer_gates()
         self.campagne.etape_ids.invalidate_recordset()
-        self.campagne.action_creer_factures()
+
+        self._creer_et_vider()
+        self.campagne.etape_ids.invalidate_recordset()
+        self._creer_et_vider()  # reclic sur une étape déjà terminée
 
         self.assertEqual(len(self.souscription_base.facture_ids), 1, 'idempotent : pas de doublon')
+        self.assertFalse(self._etape().demande, "l'intention ne reste jamais posée sans travail")
 
     def test_bouton_generique_dispatch_vers_creer_factures(self):
-        self._valider('verif_periodes')
-        self._valider('verif_refacturations')
-        etape = self.campagne.etape_ids.filtered(lambda e: e.code == 'creer_factures')
+        self._preparer_gates()
+        etape = self._etape()
+
         etape.action_executer()  # ne doit pas lever
+
+        self.assertTrue(etape.demande)
+
+    def test_brouillons_portent_le_facturiste_demandeur(self):
+        """AC #327 : les brouillons portent le·la Facturiste demandeur·se,
+        jamais l'utilisateur technique du cron (`with_user(demande_par_id)`,
+        même identité que l'émission #326)."""
+        facturiste = self.env['res.users'].create(
+            {
+                'name': 'Facturiste identité test création',
+                'login': 'facturiste-identite-creation',
+                'email': 'facturiste-identite-creation@souscriptions.test',
+                'group_ids': [
+                    (
+                        6,
+                        0,
+                        [
+                            self.env.ref('souscriptions_odoo.group_souscriptions_manager').id,
+                            self.env.ref('account.group_account_invoice').id,
+                        ],
+                    )
+                ],
+            }
+        )
+        self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        self._preparer_gates()
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.campagne.with_user(facturiste).action_creer_factures()
+        self.assertEqual(
+            self._etape().demande_par_id, facturiste, "l'intention porte l'auteur du clic, pas l'exécutant du test"
+        )
+        self._vider()  # le cron réel tourne sous SON propre user_id (Administrator par défaut)
+
+        self.assertEqual(len(self.souscription_base.facture_ids), 1)
+        self.assertEqual(
+            self.souscription_base.facture_ids.create_uid,
+            facturiste,
+            'le brouillon porte le·la demandeur·se, jamais le cron',
+        )
+
+    def test_notification_finale_arrive_chez_le_demandeur_via_bus(self):
+        """AC #327 : une notification de fin arrive chez le·la demandeur·se
+        avec le nombre de créées et d'échecs — via `bus.bus._sendone`
+        (natif, même mécanique que l'émission #326)."""
+        self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        self._preparer_gates()
+        self.campagne.etape_ids.invalidate_recordset()
+
+        with patch.object(type(self.env['bus.bus']), '_sendone') as mock_sendone:
+            self._creer_et_vider()
+
+        mock_sendone.assert_called_once()
+        partner, notif_type, payload = mock_sendone.call_args[0]
+        self.assertEqual(partner, self.env.user.partner_id)
+        self.assertEqual(notif_type, 'simple_notification')
+        self.assertIn('Créées : 1', payload['message'])
+        self.assertEqual(payload['type'], 'success')
+        self.assertFalse(payload['sticky'])
+
+    # --- Isolation d'erreur par souscription (#327, même pattern que
+    # l'isolation par facture #268/#326) : une souscription impossible à
+    # facturer (régime Moulin sans Grille de prix DU TOUT — l'échec se
+    # matérialise dès `_creer_facture()`, pas seulement à la re-génération
+    # de l'émission) n'emporte pas les autres ; sa cause va à SON chatter,
+    # pas à celui d'une facture qui n'existe pas encore à ce stade. ---
+
+    def _souscription_sans_grille(self, ref):
+        souscription = self.env['souscription.souscription'].create(
+            {
+                'partner_id': self.souscription_base.partner_id.id,
+                'pdl': 'PDL_TEST_CREATION_KO',
+                'puissance_souscrite': '6',
+                'type_tarif': 'base',
+                'regime_prix': 'moulin',
+                'date_debut': self.MOIS,
+                'provision_mensuelle_kwh': 300.0,
+            }
+        )
+        souscription.with_context(rsc_automatisme=True).write({'ref_situation_contractuelle': ref})
+        return souscription
+
+    def _preparer_lot_avec_un_echec(self):
+        souscription_ko = self._souscription_sans_grille('RSC-CAMPAGNE-CREATION-MOULIN-KO')
+        self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        self.create_test_periode(souscription_ko, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        self._preparer_gates()
+        self.campagne.etape_ids.invalidate_recordset()
+        return souscription_ko
+
+    def test_lot_partiel_isole_lechec_et_cree_le_reste(self):
+        souscription_ko = self._preparer_lot_avec_un_echec()
+
+        self._creer_et_vider()
+
+        self.assertEqual(
+            len(self.souscription_base.facture_ids), 1, 'la souscription saine est facturée malgré l’échec de l’autre'
+        )
+        self.assertEqual(len(souscription_ko.facture_ids), 0, 'la souscription en échec reste sans facture')
+
+    def test_echec_laisse_la_cause_au_chatter_de_la_souscription(self):
+        """AC #327 : la cause va dans le chatter de la SOUSCRIPTION, pas
+        d'une facture — qui n'existe pas encore à ce stade."""
+        souscription_ko = self._preparer_lot_avec_un_echec()
+
+        self._creer_et_vider()
+
+        self.assertTrue(
+            any('Création de facture impossible' in (m.body or '') for m in souscription_ko.message_ids),
+            'la cause est lisible dans le chatter de la souscription fautive',
+        )
+
+    def test_relancer_letape_apres_correction_est_idempotent(self):
+        """AC #327 : relancer l'étape après avoir corrigé la cause de
+        l'échec (création tardive de la Grille Moulin) crée la facture
+        restée en échec — sans doublonner celle déjà créée."""
+        souscription_ko = self._preparer_lot_avec_un_echec()
+        self._creer_et_vider()
+        self.assertEqual(len(self.souscription_base.facture_ids), 1)
+        self.assertEqual(len(souscription_ko.facture_ids), 0)
+
+        grille = self.env['grille.prix'].create(
+            {
+                'name': 'Grille Moulin Test Création',
+                'date_debut': date(2024, 1, 1),
+                'regime_prix': 'moulin',
+                'active': True,
+            }
+        )
+        build_grille_lignes(self.env, grille, prix_base=0.10, prix_hp=0.12, prix_hc=0.08)
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self._creer_et_vider()
+
+        self.assertEqual(len(souscription_ko.facture_ids), 1, "l'échec est retenté et réussit une fois corrigé")
+        self.assertEqual(len(self.souscription_base.facture_ids), 1, 'déjà créée, pas de doublon')
 
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')

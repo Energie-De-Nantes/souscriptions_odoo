@@ -1,6 +1,7 @@
 import logging
-from datetime import date, timedelta
+from datetime import date
 
+from dateutil.relativedelta import relativedelta
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError
 
@@ -311,8 +312,7 @@ class Souscription(models.Model):
         sur-compte les Souscriptions entrées après `M` et sous-compte celles
         résiliées depuis (ADR 0025)."""
         premier_jour = fields.Date.to_date(mois).replace(day=1)
-        premier_jour_suivant = (premier_jour + timedelta(days=31)).replace(day=1)
-        dernier_jour = premier_jour_suivant - timedelta(days=1)
+        dernier_jour = premier_jour + relativedelta(day=31)
         return self.search(
             [
                 ('ref_situation_contractuelle', '!=', False),
@@ -945,7 +945,7 @@ class Souscription(models.Model):
         premier_mois_courant = date.today().replace(day=1)
 
         # 1er jour du mois précédent
-        premier_mois_precedent = (premier_mois_courant - timedelta(days=1)).replace(day=1)
+        premier_mois_precedent = premier_mois_courant - relativedelta(months=1)
 
         souscriptions = self.search([('active', '=', True)])
         periodes_creees = 0

@@ -40,8 +40,9 @@ Deux scopes partagent cette politique (ADR 0030 conséquences) :
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 
+from dateutil.relativedelta import relativedelta
 from odoo import fields, models
 from odoo.exceptions import UserError
 
@@ -110,9 +111,9 @@ class SouscriptionPullMetaPeriodesService(models.AbstractModel):
 
     @staticmethod
     def _mois_suivant(mois):
-        """1er du mois suivant `mois` — sans dépendance à dateutil (même
-        idiome que `souscription.campagne.facturation._default_mois`)."""
-        return date(mois.year + (mois.month // 12), mois.month % 12 + 1, 1)
+        """1er du mois suivant `mois` (déjà un 1er du mois — appelants :
+        `debut` normalisé et `_mois_suivant` lui-même)."""
+        return mois + relativedelta(months=1)
 
     def _pull_un_mois(self, souscriptions, mois, *, creer_manquantes):
         """Un seul appel de flux `meta_periodes` pour `mois`, appliqué selon

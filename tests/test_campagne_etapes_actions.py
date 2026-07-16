@@ -13,7 +13,7 @@ import os
 import runpy
 from datetime import date
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from odoo.addons.souscriptions_odoo.models.core import souscription_refacturation as refacturation_module
 from odoo.exceptions import UserError
@@ -242,6 +242,22 @@ class TestCampagneEtapeCreerFactures(SouscriptionsTestCase):
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
+    """#326, ADR 0035 : « émettre factures » s'exécute en tâche de fond —
+    migration ASSUMÉE et VISIBLE des tests qui attendaient une émission
+    synchrone (PRD #324). Deux seams, comme arrêté par #324 :
+
+    - seam 1, `action_executer()`/`action_emettre_factures()` : la porte
+      (gate), l'intention (`demande`) posée avec son auteur
+      (`demande_par_id`) — ne fait PLUS le travail elle-même ;
+    - seam 2, le cron RÉEL : `method_direct_trigger()` dans
+      `self.enter_registry_test_mode()`, même idiome que
+      `odoo/addons/account/tests/test_account_move_auto_post.py`.
+
+    Aucun test ici ne s'accroche à la taille de paquet, au nombre de passes
+    du cron, ni au contenu d'`ir.cron.progress` (#326) — `_vider()` boucle
+    jusqu'à convergence (`etape.demande` retombée) sans présumer combien de
+    passes ça prend."""
+
     MOIS = date(2024, 3, 1)
     FIN_MOIS = date(2024, 3, 31)
 
@@ -260,28 +276,85 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
         # elle-même (blocage/déblocage) est testée dédiée,
         # TestCampagneEtapeGestesCommerciaux ci-dessous.
         self._valider('gestes_commerciaux')
+        self.cron = self.env.ref('souscriptions_odoo.ir_cron_vidange_emettre_factures')
 
     def _valider(self, code):
         self.campagne.etape_ids.filtered(lambda e: e.code == code).write({'valide': True})
+
+    def _etape(self, code='emettre_factures'):
+        return self.campagne.etape_ids.filtered(lambda e: e.code == code)
+
+    def _vider(self, max_passes=5):
+        """Vidange réellement, via le second seam (#324) : le cron réel.
+        Plusieurs passes tolérées — la règle « pas de progrès » (ADR 0035
+        décision 3) ne retombe l'intention qu'à une passe qui n'a RIEN
+        traité ; une passe mixte succès/échec ne conclut pas encore."""
+        etape = self._etape()
+        with self.enter_registry_test_mode():
+            for _ in range(max_passes):
+                self.cron.method_direct_trigger()
+                etape.invalidate_recordset()
+                if not etape.demande:
+                    break
+
+    def _emettre_et_vider(self):
+        """Clic (pose l'intention, déclenche le cron) puis vidange réelle —
+        remplace l'ancien appel synchrone unique à `action_emettre_factures()`."""
+        self.campagne.action_emettre_factures()
+        self._vider()
 
     def test_emettre_factures_bloque_si_creer_factures_pas_fait(self):
         """`creer_factures` n'est « fait » que si 0 souscription facturable
         reste « à facturer » (#157). Ici souscription_base a une période sans
         facture (« à facturer ») : creer_factures reste non fait, emettre
         reste bloquée (gestes_commerciaux, l'autre prérequis, est déjà
-        validée par setUp — seul creer_factures manque ici)."""
+        validée par setUp — seul creer_factures manque ici). La porte du DAG
+        est vérifiée AVANT toute pose d'intention (#326) : comportement
+        inchangé."""
         self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
         self.campagne.etape_ids.invalidate_recordset()
         with self.assertRaises(UserError):
             self.campagne.action_emettre_factures()
+        self.assertFalse(self._etape().demande, "la porte a bloqué avant même de poser l'intention")
+
+    def test_action_pose_lintention_marque_lauteur_et_ne_travaille_pas(self):
+        """AC #326 : le clic (seam 1) rend la main immédiatement — pose
+        l'intention et son auteur, mais AUCUNE facture n'est postée avant
+        que le cron (seam 2) n'ait tourné."""
+        periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        facture = periode._creer_facture()
+        self.campagne.etape_ids.invalidate_recordset()
+        etape = self._etape()
+
+        etape.action_executer()
+
+        self.assertTrue(etape.demande, "l'intention est posée")
+        self.assertEqual(etape.demande_par_id, self.env.user, "l'intention porte son auteur")
+        self.assertEqual(facture.state, 'draft', 'le clic ne fait pas le travail lui-même')
+
+    def test_reclic_sur_etape_deja_terminee_nemet_rien(self):
+        """AC #326 : recliquer une étape déjà terminée ne trouve rien à
+        faire — pas de double émission, pas de nouveau travail."""
+        periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        periode._creer_facture()
+        self.campagne.etape_ids.invalidate_recordset()
+        self._emettre_et_vider()
+        self.assertEqual(periode.facture_id.state, 'posted')
+
+        self._emettre_et_vider()  # reclic : l'étape est déjà faite
+
+        self.assertEqual(periode.facture_id.state, 'posted', 'toujours postée, une seule fois')
+        self.assertFalse(self._etape().demande, "l'intention ne reste jamais posée sans travail")
 
     def test_emettre_factures_poste_les_brouillons_du_mois(self):
-        """AC : émettre pose les brouillons, gated sur créer factures."""
+        """AC : émettre pose les brouillons, gated sur créer factures —
+        désormais en tâche de fond (#326) : le clic déclenche, le cron
+        réel fait le travail."""
         periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
         periode._creer_facture()
         self.campagne.etape_ids.invalidate_recordset()
 
-        self.campagne.action_emettre_factures()
+        self._emettre_et_vider()
 
         self.assertEqual(periode.facture_id.state, 'posted')
 
@@ -290,9 +363,9 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
         periode._creer_facture()
         self.campagne.etape_ids.invalidate_recordset()
 
-        self.campagne.action_emettre_factures()
+        self._emettre_et_vider()
         self.campagne.etape_ids.invalidate_recordset()
-        self.campagne.action_emettre_factures()  # 2e appel : plus rien en brouillon, no-op
+        self._emettre_et_vider()  # 2e appel : plus rien en brouillon, no-op
 
         self.assertEqual(periode.facture_id.state, 'posted')
 
@@ -300,19 +373,20 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
         periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
         periode._creer_facture()
         self.campagne.etape_ids.invalidate_recordset()
-        etape = self.campagne.etape_ids.filtered(lambda e: e.code == 'emettre_factures')
+        etape = self._etape()
 
         etape.action_executer()
+        self._vider()
 
         self.assertEqual(periode.facture_id.state, 'posted')
 
     def test_emettre_factures_impute_les_cheques_energie_valides(self):
         """Couture campagne (#172, ADR 0026, tranche 1 du PRD #264, #265) : le
         brouillon créé par `creer_factures` reste sans imputation tant que
-        l'étape « Émettre factures » ne l'a pas postée — c'est
-        `action_emettre_factures` (donc `action_post`, donc `account.move.
-        _post()`) qui déclenche l'imputation FIFO, à la maille campagne comme
-        à la maille facture individuelle."""
+        l'étape « Émettre factures » ne l'a pas postée — c'est la vidange
+        (donc `action_post`, donc `account.move._post()`) qui déclenche
+        l'imputation FIFO, à la maille campagne comme à la maille facture
+        individuelle."""
         cheque = self.env['souscription.cheque_energie'].create(
             {
                 'numero': 'CHQ-CAMPAGNE-A',
@@ -330,11 +404,59 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
         self.assertAlmostEqual(cheque.solde, cheque.montant, places=2)
         self.campagne.etape_ids.invalidate_recordset()
 
-        self.campagne.action_emettre_factures()
+        self._emettre_et_vider()
 
         self.assertEqual(facture.state, 'posted')
         self.assertAlmostEqual(facture.amount_residual, facture.amount_total - 10.0, places=2)
         self.assertAlmostEqual(cheque.solde, 0.0, places=2)
+
+    def test_travail_execute_sous_lidentite_du_demandeur_pas_du_cron(self):
+        """AC #326 : les écritures comptables portent le·la Facturiste
+        demandeur·se, jamais l'utilisateur technique du cron
+        (`with_user(demande_par_id)`, ADR 0035 décision 5)."""
+        facturiste = self.env['res.users'].create(
+            {
+                'name': 'Facturiste identité test',
+                'login': 'facturiste-identite-emission',
+                'email': 'facturiste-identite@souscriptions.test',
+                'group_ids': [(6, 0, [self.env.ref('souscriptions_odoo.group_souscriptions_manager').id])],
+            }
+        )
+        periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        periode._creer_facture()
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.campagne.with_user(facturiste).action_emettre_factures()
+        self.assertEqual(
+            self._etape().demande_par_id, facturiste, "l'intention porte l'auteur du clic, pas l'exécutant du test"
+        )
+        self._vider()  # le cron réel tourne sous SON propre user_id (Administrator par défaut)
+
+        self.assertEqual(periode.facture_id.state, 'posted')
+        self.assertEqual(
+            periode.facture_id.write_uid,
+            facturiste,
+            "l'écriture comptable (state -> posted) porte le·la demandeur·se, jamais l'utilisateur du cron",
+        )
+
+    def test_notification_finale_arrive_chez_le_demandeur_via_bus(self):
+        """AC #326 : une notification de fin arrive chez le·la demandeur·se
+        avec le nombre d'émises et le nombre d'échecs — via `bus.bus._sendone`
+        (natif, `simple_notification`), zéro JS."""
+        periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        periode._creer_facture()
+        self.campagne.etape_ids.invalidate_recordset()
+
+        with patch.object(type(self.env['bus.bus']), '_sendone') as mock_sendone:
+            self._emettre_et_vider()
+
+        mock_sendone.assert_called_once()
+        partner, notif_type, payload = mock_sendone.call_args[0]
+        self.assertEqual(partner, self.env.user.partner_id)
+        self.assertEqual(notif_type, 'simple_notification')
+        self.assertIn('Émises : 1', payload['message'])
+        self.assertEqual(payload['type'], 'success')
+        self.assertFalse(payload['sticky'])
 
     # --- Isolation d'erreur par facture (#268, tranche 4 du PRD #264) ---
     #
@@ -395,59 +517,65 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
         return facture_ok, facture_ko, souscription_ko, grille_moulin
 
     def test_lot_partiel_isole_lechec_et_emet_le_reste(self):
-        """AC #268 : une facture en échec n'emporte plus le lot — reprend le
-        pattern du cron natif `account.move._autopost_draft_entries` (lot
-        sous savepoint, repli un par un). La facture saine s'émet, l'échec
-        est rapporté (souscription, période, cause) dans la notification,
-        sticky."""
-        facture_ok, facture_ko, souscription_ko, _grille = self._preparer_lot_avec_un_echec()
+        """AC #268/#326 : une facture en échec n'emporte plus le lot —
+        reprend le pattern du cron natif `account.move._autopost_draft_entries`
+        (lot sous savepoint, repli un par un). La facture saine s'émet,
+        l'échec reste en brouillon — vidé via le cron réel (#326)."""
+        facture_ok, facture_ko, _souscription_ko, _grille = self._preparer_lot_avec_un_echec()
 
-        action = self.campagne.action_emettre_factures()
+        self._emettre_et_vider()
 
         self.assertEqual(facture_ok.state, 'posted', "la facture saine s'émet malgré l'échec de l'autre")
         self.assertEqual(facture_ko.state, 'draft', 'la facture en échec reste en brouillon, rejouable')
 
-        params = action['params']
-        self.assertEqual(params['type'], 'warning')
-        self.assertTrue(params['sticky'], 'un échec -> toast sticky, le temps de le lire')
-        self.assertIn('Émises : 1', params['message'])
-        self.assertIn('Échecs : 1', params['message'])
-        self.assertIn(souscription_ko.name, params['message'], 'la souscription en échec est nommée')
+    def test_echec_laisse_la_cause_au_chatter_de_la_facture(self):
+        """AC #326 : « le chatter de chaque facture fautive dit pourquoi » —
+        le drill-down existant (action_drill_down) dit lesquelles, la
+        notification finale ne porte plus le détail par échec (cf.
+        test_notification_finale_arrive_chez_le_demandeur_via_bus)."""
+        _facture_ok, facture_ko, _souscription_ko, _grille = self._preparer_lot_avec_un_echec()
+
+        self._emettre_et_vider()
+
+        self.assertTrue(
+            any('Émission impossible' in (m.body or '') for m in facture_ko.message_ids),
+            'la cause est lisible dans le chatter de la facture fautive',
+        )
 
     def test_lot_partiel_reste_a_faire_reflete_letat_reel(self):
         """AC #268 : le reste-à-faire dérivé de « émettre factures » (#157)
         ne montre plus que la souscription en échec après un lot partiel —
-        aucun champ de suivi ajouté, l'état découle des factures elles-mêmes."""
+        aucun champ de suivi ajouté, l'état découle des factures elles-mêmes.
+        La porte du DAG reste fermée (étape pas « faite ») tant que l'échec
+        subsiste (#326)."""
         _facture_ok, _facture_ko, souscription_ko, _grille = self._preparer_lot_avec_un_echec()
 
-        self.campagne.action_emettre_factures()
-        self.campagne.etape_ids.invalidate_recordset()
+        self._emettre_et_vider()
 
-        etape = self.campagne.etape_ids.filtered(lambda e: e.code == 'emettre_factures')
+        etape = self._etape()
         self.assertFalse(etape.fait, "l'étape n'est pas faite tant qu'un échec subsiste")
         self.assertEqual(etape.nb_reste_a_faire, 1)
         self.assertEqual(self.campagne._reste_a_faire('emettre_factures'), souscription_ko)
 
     def test_relancer_letape_apres_correction_est_idempotent(self):
-        """AC #268 : relancer l'étape après avoir corrigé la cause de
+        """AC #268/#326 : relancer l'étape après avoir corrigé la cause de
         l'échec (ici : la grille Moulin est réactivée) émet la facture
         restée en échec — sans re-poster celle déjà émise (idempotence :
-        `state == 'draft'` l'exclut du lot, cf. `action_emettre_factures`)."""
+        `state == 'draft'` l'exclut du lot de travail). Reclic = une
+        nouvelle intention, qui ne reprend que les échecs (#326)."""
         facture_ok, facture_ko, _souscription_ko, grille_moulin = self._preparer_lot_avec_un_echec()
 
-        self.campagne.action_emettre_factures()
+        self._emettre_et_vider()
         self.assertEqual(facture_ok.state, 'posted')
         self.assertEqual(facture_ko.state, 'draft')
 
         grille_moulin.active = True  # corrige la cause
         self.campagne.etape_ids.invalidate_recordset()
 
-        action = self.campagne.action_emettre_factures()
+        self._emettre_et_vider()
 
         self.assertEqual(facture_ko.state, 'posted', "l'échec est retenté et réussit une fois corrigé")
         self.assertEqual(facture_ok.state, 'posted', 'la facture déjà émise le reste, sans double émission')
-        self.assertIn('Émises : 1', action['params']['message'], 'seule la facture retentée compte ici (idempotence)')
-        self.assertEqual(action['params']['type'], 'success')
 
     def test_emission_individuelle_et_emission_en_masse_produisent_les_memes_effets(self):
         """AC #268 : l'émission individuelle (bouton produit, clôture, fil de
@@ -497,7 +625,7 @@ class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):
         self.campagne.etape_ids.invalidate_recordset()
 
         facture_individuelle.action_post()  # émission individuelle : le bouton produit
-        self.campagne.action_emettre_factures()  # émission en masse : l'étape de campagne
+        self._emettre_et_vider()  # émission en masse : l'étape de campagne, en tâche de fond (#326)
 
         for facture, periode, cheque in (
             (facture_individuelle, periode_individuelle, cheque_individuel),

@@ -1,6 +1,6 @@
 {
     'name': 'Souscriptions Électricité',
-    'version': '19.0.1.19.0',
+    'version': '19.0.1.20.0',
     'depends': ['base', 'mail', 'contacts', 'account', 'base_iban', 'portal'],
     'author': 'Virgile Daugé',
     'category': 'Energy',
@@ -53,6 +53,7 @@ models/core/electricore_client_fabrique.py et ne lève qu'à l'appel du pull.
         'data/raccordement_stages.xml',
         'data/ir_cron_poll_affaires_enedis.xml',
         'data/ir_cron_vidange_emettre_factures.xml',
+        'data/ir_cron_vidange_creer_factures.xml',
         'data/mail_templates_raccordement.xml',
         'reports/souscription_conditions_particulieres_report.xml',
         'reports/souscription_attestation_report.xml',

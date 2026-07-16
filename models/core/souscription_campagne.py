@@ -84,6 +84,14 @@ ETAPES_CAMPAGNE = {
         'type': 'porte',
         'prerequis': ('sync_f15',),
     },
+    # Tâche de fond (#327, ADR 0035 — second client du harnais posé en #326
+    # pour `emettre_factures`) : le bouton POSE l'intention (`demande`) et
+    # déclenche son propre `ir.cron` — il ne crée plus les factures
+    # lui-même. Même lecture de `fait` que les autres étapes 'derive'
+    # (`nb_reste_a_faire == 0`, inchangé) : `demande` ne sert PAS à lire
+    # « fait », il sert à la vidange (cf.
+    # SouscriptionCampagneEtape._vidanger_un_paquet, partagée avec
+    # `emettre_factures`).
     'creer_factures': {
         'label': 'Créer factures',
         'type': 'derive',
@@ -100,8 +108,9 @@ ETAPES_CAMPAGNE = {
         'type': 'porte',
         'prerequis': ('creer_factures',),
     },
-    # Tâche de fond (#326, ADR 0035) : le bouton POSE l'intention (`demande`
-    # sur la ligne d'étape) et déclenche `ir.cron` — il ne poste plus les
+    # Tâche de fond (#326, ADR 0035 — premier client du harnais, rejoint par
+    # `creer_factures` en #327) : le bouton POSE l'intention (`demande` sur
+    # la ligne d'étape) et déclenche `ir.cron` — il ne poste plus les
     # factures lui-même. `fait` reste dérivé de `nb_reste_a_faire == 0`
     # (type 'derive', inchangé) : `demande` ne sert PAS à lire « fait », il
     # sert à la vidange à savoir qu'il reste un travail à reprendre (cf.
@@ -634,12 +643,23 @@ class SouscriptionCampagneFacturation(models.Model):
         return self.env['souscription.refacturation'].synchroniser_depuis_electricore()
 
     def action_creer_factures(self):
-        """Gated sur les deux portes de vérif (#158) ; délègue à
-        `creer_factures()`, déjà idempotent (anti-doublon par période,
-        test_periode_facture.py)."""
+        """Gated sur les deux portes de vérif (#158) : pose l'intention et
+        déclenche le cron de vidange dédié — elle ne crée plus les factures
+        elle-même (#327, ADR 0035 : second client du harnais posé en #326,
+        même bascule « le bouton demande, il ne fait plus »). Rend la main
+        immédiatement ; la vidange vit dans
+        ``SouscriptionCampagneEtape._vidanger_un_paquet`` (partagée avec
+        « émettre factures »), sous l'identité du·de la Facturiste
+        demandeur·se (``with_user(demande_par_id)``).
+
+        Idempotent par construction, sans état de retry dédié : l'anti-
+        doublon par période déjà présent dans `creer_factures()` (une
+        souscription déjà facturée pour le mois n'est jamais refacturée)
+        fait l'idempotence — rien n'est ajouté ici, comme pour l'émission."""
         self.ensure_one()
         self._verifier_gate('creer_factures')
-        self._souscriptions_facturables().creer_factures()
+        self._etape('creer_factures').write({'demande': True})
+        self.env.ref('souscriptions_odoo.ir_cron_vidange_creer_factures')._trigger()
 
     def action_emettre_factures(self):
         """Gated sur créer factures + gestes commerciaux (#158) : pose
@@ -877,72 +897,119 @@ class SouscriptionCampagneEtape(models.Model):
             self.demande = True
         return resultat
 
-    # --- Vidange en tâche de fond de « émettre factures » (#326, ADR 0035) ---
+    # --- Vidange en tâche de fond (#326/#327, ADR 0035) : deux clients,
+    # « émettre factures » (#326) et « créer factures » (#327) ---
     #
-    # Le bouton (`action_emettre_factures`, ci-dessus sur la Campagne) pose
-    # l'intention (`demande`) et déclenche ce cron ; ce qui suit VIDE cette
-    # intention par paquets, sous l'identité du·de la Facturiste demandeur·se
-    # (jamais l'utilisateur technique du cron). Une étape, un paquet, pas de
-    # boucle : c'est `ir.cron._run_job` qui rappelle ce code tant qu'une
-    # passe progresse (API de progression native, Odoo 17+ — aucune
-    # dépendance ajoutée).
+    # Le bouton d'étape (`action_emettre_factures`/`action_creer_factures`,
+    # ci-dessus sur la Campagne) pose l'intention (`demande`) et déclenche le
+    # cron dédié à SON étape ; ce qui suit VIDE cette intention par paquets,
+    # sous l'identité du·de la Facturiste demandeur·se (jamais l'utilisateur
+    # technique du cron). Une étape, un paquet, pas de boucle : c'est
+    # `ir.cron._run_job` qui rappelle ce code tant qu'une passe progresse
+    # (API de progression native, Odoo 17+ — aucune dépendance ajoutée).
+    # `_vidanger_un_paquet` est UNE seule méthode pour les deux étapes
+    # (dispatch sur `self.code` dans les trois hooks ci-dessous) — seule la
+    # liste de travail et l'action unitaire varient, la mécanique de paquet
+    # (verrouillage, tentative en lot, repli unitaire sous savepoint, règle
+    # « pas de progrès », notification) est strictement la même pour les
+    # deux (cf. note de généricité dans la PR #327).
     #
     # Taille de paquet dérivée de `MIN_RUNS_PER_JOB = 10` (plancher de passes
-    # par exécution du worker) : `10 × 50 × 88 ms` (mesure ADR 0035) reste
-    # sous `limit_time_real` (120 s), ~44 s de marge. Réglage de performance
-    # pur — aucun test ne s'y accroche.
-    _TAILLE_PAQUET_EMISSION = 50
+    # par exécution du worker) : `10 × 50 × 88 ms` (mesure ADR 0035, sur
+    # l'émission) reste sous `limit_time_real` (120 s), ~44 s de marge.
+    # Réglage de performance pur — aucun test ne s'y accroche. Réutilisée
+    # telle quelle pour la création (81 s / 810 factures mesurés, ADR 0035 —
+    # même ordre de grandeur par facture).
+    _TAILLE_PAQUET_VIDANGE = 50
 
     def _liste_de_travail(self, limit):
-        """Prochain paquet de factures brouillon du mois de la campagne —
-        distinct de `_reste_a_faire` (ADR 0035 décision 4) : celui-ci répond
-        « combien de souscriptions restent, pour la porte du DAG », celui-là
-        « quelles factures traiter au prochain paquet, pour le cron »."""
+        """Prochain paquet de travail du mois de la campagne — distinct de
+        `_reste_a_faire` (ADR 0035 décision 4) : celui-ci répond « combien de
+        souscriptions restent, pour la porte du DAG », celui-là « quelles
+        unités traiter au prochain paquet, pour le cron ». Deux étapes,
+        deux listes : les brouillons du mois à émettre, ou les souscriptions
+        du mois encore à facturer (bucket EXACT « à facturer », #301 — pas le
+        reste-à-faire cumulatif : une souscription encore « à tirer », sans
+        Période, n'est pas du travail pour CETTE étape)."""
         self.ensure_one()
+        if self.code == 'creer_factures':
+            a_facturer = self.campagne_id._souscriptions_par_bucket()['a_facturer']
+            return a_facturer[:limit]
         a_emettre = self.campagne_id._factures_du_mois().filtered(lambda f: f.state == 'draft')
         return a_emettre[:limit]
 
     def _compter_liste_de_travail(self):
         self.ensure_one()
+        if self.code == 'creer_factures':
+            return len(self.campagne_id._souscriptions_par_bucket()['a_facturer'])
         return len(self.campagne_id._factures_du_mois().filtered(lambda f: f.state == 'draft'))
 
     def _traiter_le_paquet(self, travail):
-        """Tentative en lot : le natif (`account.move._post()`) poste tout
-        un lot pour 7,7 ms/facture pièce (mesure ADR 0035) — bien moins cher
-        qu'un repli facture par facture quand le lot est sain."""
+        """Tentative en lot. Émission : le natif (`account.move._post()`)
+        poste tout un lot pour 7,7 ms/facture pièce (mesure ADR 0035) — bien
+        moins cher qu'un repli facture par facture quand le lot est sain.
+        Création : délègue à `souscription.souscription.creer_factures()`
+        (#158, déjà idempotent par période) — même levée `UserError` sur un
+        échec, qui fait retomber sur le repli unitaire ci-dessous."""
+        if self.code == 'creer_factures':
+            travail.creer_factures()
+            return len(travail)
         travail.action_post()
         return len(travail)
 
-    def _vidanger_un_paquet(self):
-        """Vide UN paquet de l'étape « émettre factures » — appelée par le
-        cron (`_cron_vidanger_emettre_factures`), sous
-        `with_user(demande_par_id)`. Ne boucle pas : cf. le bloc de
-        commentaire ci-dessus.
+    def _traiter_une_unite(self, unite):
+        """Repli unitaire (#268/#327) : l'action tentée sur UNE unité du
+        paquet, sous savepoint individuel — cf. `_vidanger_un_paquet`. Le
+        type de `unite` varie avec l'étape (une facture pour l'émission, une
+        souscription pour la création) ; c'est pour ça que le chatter de
+        l'échec (`_message_echec`) atterrit naturellement sur le bon
+        enregistrement : la facture pour l'émission, la SOUSCRIPTION pour la
+        création — qui n'a pas encore de facture à ce stade (#327)."""
+        if self.code == 'creer_factures':
+            unite.creer_factures()
+        else:
+            unite.action_post()
 
-        Isolation d'erreur par facture (#268) : tente le lot entier ; si une
-        grille incapable de prixer (`UserError`, ADR 0029) ou toute autre
-        donnée manquante sur UNE facture fait échouer le lot, réessaie
-        facture par facture sous savepoint individuel, cause au chatter de
-        l'unité fautive (idiome natif, `account.move._autopost_draft_entries`).
+    def _message_echec(self, exc):
+        if self.code == 'creer_factures':
+            return _('Création de facture impossible : %(erreur)s', erreur=exc)
+        return _('Émission impossible : %(erreur)s', erreur=exc)
+
+    def _vidanger_un_paquet(self):
+        """Vide UN paquet de l'étape courante (« émettre factures », #326,
+        ou « créer factures », #327) — appelée par le cron dédié à cette
+        étape (`_cron_vidanger_emettre_factures`/`_cron_vidanger_creer_factures`),
+        sous `with_user(demande_par_id)`. Ne boucle pas : cf. le bloc de
+        commentaire ci-dessus. Un seul corps pour les deux étapes — seuls
+        `_liste_de_travail`/`_traiter_le_paquet`/`_traiter_une_unite`/
+        `_message_echec` varient avec `self.code`.
+
+        Isolation d'erreur par unité (#268/#327) : tente le lot entier ; si
+        une grille incapable de prixer (`UserError`, ADR 0029) ou toute
+        autre donnée manquante sur UNE unité fait échouer le lot, réessaie
+        unité par unité sous savepoint individuel, cause au chatter de
+        l'unité fautive — une facture pour l'émission, une SOUSCRIPTION pour
+        la création, qui n'a pas encore de facture à ce stade (idiome natif,
+        `account.move._autopost_draft_entries`).
 
         Règle d'arrêt « pas de progrès » (ADR 0035 décision 3) : une passe
         qui n'a RIEN traité (zéro succès) retombe l'intention — sinon une
-        facture à Grille de prix manquante ferait retourner le cron en
-        boucle serrée sur un travail qui ne peut pas aboutir avant qu'un
-        humain n'ait corrigé la donnée en cause."""
+        Grille de prix manquante ferait retourner le cron en boucle serrée
+        sur un travail qui ne peut pas aboutir avant qu'un humain n'ait
+        corrigé la donnée en cause."""
         self.ensure_one()
         cron = self.env['ir.cron']
-        travail = self._liste_de_travail(limit=self._TAILLE_PAQUET_EMISSION)
-        restants = len(travail) if len(travail) < self._TAILLE_PAQUET_EMISSION else self._compter_liste_de_travail()
+        travail = self._liste_de_travail(limit=self._TAILLE_PAQUET_VIDANGE)
+        restants = len(travail) if len(travail) < self._TAILLE_PAQUET_VIDANGE else self._compter_liste_de_travail()
         cron._commit_progress(remaining=restants)
 
         if not travail:
             self.demande = False
-            self._notifier_fin_emission()
+            self._notifier_fin()
             return
 
         # Verrou avant traitement (comme le natif) : évite qu'un deuxième
-        # worker ne reprenne les mêmes factures en parallèle.
+        # worker ne reprenne les mêmes unités en parallèle.
         travail.try_lock_for_update()
 
         try:
@@ -950,55 +1017,79 @@ class SouscriptionCampagneEtape(models.Model):
             cron._commit_progress(traites)
             if not self._compter_liste_de_travail():
                 self.demande = False
-                self._notifier_fin_emission()
+                self._notifier_fin()
             return
         except UserError:
             self.env.cr.rollback()
 
         aucun_progres = True
-        for facture in travail:
+        for unite in travail:
             try:
                 with self.env.cr.savepoint():
-                    facture.action_post()
+                    self._traiter_une_unite(unite)
                 aucun_progres = False
             except UserError as exc:
-                facture.message_post(body=_('Émission impossible : %(erreur)s', erreur=exc))
+                unite.message_post(body=self._message_echec(exc))
             finally:
                 cron._commit_progress(1)
 
         if aucun_progres:
             self.demande = False
-            self._notifier_fin_emission()
+            self._notifier_fin()
 
-    def _notifier_fin_emission(self):
-        """Notification de fin (#326) : compteurs émises/échecs uniquement —
-        le drill-down existant (`action_drill_down`) dit LESQUELLES, le
-        chatter de chaque facture fautive dit POURQUOI (posé ci-dessus). Émise
-        par `bus.bus._sendone` (natif, `simple_notification`) chez le·la
-        demandeur·se — zéro JS, le payload (title/message/type/sticky) est
-        celui qu'`action_emettre_factures` retournait hier en synchrone."""
+    # Libellé du compteur de succès dans la notification de fin (#326/#327) —
+    # seule variation entre les deux étapes, le reste du payload est partagé
+    # (cf. `_construire_notification`). Chaîne brute non traduite, même
+    # convention que les labels d'`ETAPES_CAMPAGNE` (module French-only).
+    _LIBELLE_REUSSITE_PAR_ETAPE = {
+        'creer_factures': 'Créées',
+        'emettre_factures': 'Émises',
+    }
+
+    def _notifier_fin(self):
+        """Notification de fin (#326, généralisée #327) : compteurs
+        réussites/échecs uniquement — le drill-down existant
+        (`action_drill_down`) dit LESQUELLES, le chatter de l'unité fautive
+        dit POURQUOI (posé ci-dessus). Émise par `bus.bus._sendone` (natif,
+        `simple_notification`) chez le·la demandeur·se — zéro JS.
+
+        Émission : compte les factures du mois postées/brouillon. Création :
+        compte les souscriptions du mois déjà facturées (bucket « facturée »
+        ou « émise », #301) contre celles encore « à facturer » — ce
+        deuxième bucket est exactement ce que `creer_factures()` n'a pas
+        réussi à faire avancer (une souscription encore « à tirer », sans
+        Période, n'a jamais été du travail pour cette étape)."""
         self.ensure_one()
         demandeur = self.demande_par_id
         if not demandeur:
             return
-        factures = self.campagne_id._factures_du_mois()
-        nb_emises = len(factures.filtered(lambda f: f.state == 'posted'))
-        nb_echecs = len(factures.filtered(lambda f: f.state == 'draft'))
+        if self.code == 'creer_factures':
+            buckets = self.campagne_id._souscriptions_par_bucket()
+            nb_ok = len(buckets['facturee']) + len(buckets['emise'])
+            nb_echecs = len(buckets['a_facturer'])
+        else:
+            factures = self.campagne_id._factures_du_mois()
+            nb_ok = len(factures.filtered(lambda f: f.state == 'posted'))
+            nb_echecs = len(factures.filtered(lambda f: f.state == 'draft'))
+        libelle_ok = self._LIBELLE_REUSSITE_PAR_ETAPE[self.code]
         self.env['bus.bus']._sendone(
-            demandeur.partner_id, 'simple_notification', self._construire_notification(nb_emises, nb_echecs)
+            demandeur.partner_id, 'simple_notification', self._construire_notification(nb_ok, nb_echecs, libelle_ok)
         )
 
-    def _construire_notification(self, nb_emises, nb_echecs):
+    def _construire_notification(self, nb_ok, nb_echecs, libelle_ok):
+        titre = ETAPES_CAMPAGNE[self.code]['label']
         if not nb_echecs:
             return {
-                'title': _('Émettre factures'),
-                'message': _('Émises : %(nb)s.', nb=nb_emises),
+                'title': titre,
+                'message': _('%(libelle)s : %(nb)s.', libelle=libelle_ok, nb=nb_ok),
                 'type': 'success',
                 'sticky': False,
             }
         return {
-            'title': _('Émettre factures'),
-            'message': _('Émises : %(nb_emises)s · Échecs : %(nb_echecs)s', nb_emises=nb_emises, nb_echecs=nb_echecs),
+            'title': titre,
+            'message': _(
+                '%(libelle)s : %(nb_ok)s · Échecs : %(nb_echecs)s', libelle=libelle_ok, nb_ok=nb_ok, nb_echecs=nb_echecs
+            ),
             'type': 'warning',
             'sticky': True,
         }
@@ -1012,6 +1103,21 @@ class SouscriptionCampagneEtape(models.Model):
         sous l'identité du·de la Facturiste demandeur·se — jamais celle,
         technique, du cron."""
         etape = self.search([('code', '=', 'emettre_factures'), ('demande', '=', True)], limit=1)
+        if not etape:
+            self.env['ir.cron']._commit_progress(remaining=0)
+            return
+        etape.with_user(etape.demande_par_id.id or self.env.user.id)._vidanger_un_paquet()
+
+    @api.model
+    def _cron_vidanger_creer_factures(self):
+        """Point d'entrée du cron dédié (`data/ir_cron_vidange_creer_factures.xml`,
+        déclenché par `_trigger()` — #327). Même mécanique que
+        `_cron_vidanger_emettre_factures` (#326), en cron SÉPARÉ plutôt que
+        généralisé : celui de l'émission cible `emettre_factures` en dur, il
+        ne dispatche pas déjà sur toutes les étapes demandées — deux crons
+        jumeaux plutôt que de forcer une généralisation qui n'existait pas
+        encore côté #326 (cf. note de généricité, PR #327)."""
+        etape = self.search([('code', '=', 'creer_factures'), ('demande', '=', True)], limit=1)
         if not etape:
             self.env['ir.cron']._commit_progress(remaining=0)
             return

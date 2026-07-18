@@ -201,8 +201,7 @@ class SouscriptionCampagneFacturation(models.Model):
 
     @api.model
     def _default_mois(self):
-        """1er du mois précédent — même calcul que le wizard de pull (on ferme
-        le mois qui vient de s'écouler)."""
+        """1er du mois précédent (on ferme le mois qui vient de s'écouler)."""
         premier_mois_courant = fields.Date.context_today(self).replace(day=1)
         return premier_mois_courant - relativedelta(months=1)
 
@@ -600,22 +599,32 @@ class SouscriptionCampagneFacturation(models.Model):
             },
         }
 
-    def action_pull_meta_periodes(self):
-        """Lance le tirage en un clic (#176), sans fenêtre intermédiaire :
-        cible le Périmètre de campagne (#175) pour `self.mois` — aucun mois
-        re-proposé, la scope est déjà celle de la campagne — et délègue au
-        propriétaire durable du pull, `souscription.pull.meta.periodes.service`
-        (#233, scope facturation `pull()`, même couture réseau
-        `_ouvrir_flux`/fabrique client, ADR 0024 — partagée avec le wizard
-        ad-hoc). Retourne une notification résumant créées/rafraîchies/
-        conservées/erreurs (politique gardée par l'empreinte, ADR 0030
-        décision 1, #235) — sticky si des erreurs, auto-dismiss sinon — aucun
-        résumé persisté."""
+    def _pull_meta_periodes_donnees(self):
+        """Méthode-données du pull des méta-périodes (#341, ADR 0036 décision
+        13) : cible le Périmètre de campagne (#175) pour `self.mois` — aucun
+        mois re-proposé, le scope est déjà celle de la campagne — et délègue
+        au propriétaire durable du pull, `souscription.pull.meta.periodes.
+        service` (#233, scope facturation `pull()`, même couture réseau
+        `_ouvrir_flux`/fabrique client, ADR 0024).
+
+        Returns:
+            tuple[list[str], list[str], list[str], list[str], list[str]] :
+            `(creees, rafraichies, inchangees, conservees, erreurs)`, même
+            gabarit que les deux autres pulls (sorties C15, sync F15) —
+            consommé par le bouton `action_pull_meta_periodes` (toast) et par
+            tout appelant non-UI (automate d'amorçage, tests)."""
         self.ensure_one()
         cibles = self._souscriptions_facturables()
-        creees, rafraichies, inchangees, conservees, erreurs = self.env['souscription.pull.meta.periodes.service'].pull(
-            cibles, self.mois
-        )
+        return self.env['souscription.pull.meta.periodes.service'].pull(cibles, self.mois)
+
+    def action_pull_meta_periodes(self):
+        """Lance le tirage en un clic (#176), sans fenêtre intermédiaire :
+        emballe `_pull_meta_periodes_donnees` en toast (#341, ADR 0036
+        décision 13) résumant créées/rafraîchies/conservées/erreurs
+        (politique gardée par l'empreinte, ADR 0030 décision 1, #235) —
+        sticky si des erreurs, auto-dismiss sinon — aucun résumé persisté."""
+        self.ensure_one()
+        creees, rafraichies, inchangees, conservees, erreurs = self._pull_meta_periodes_donnees()
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',

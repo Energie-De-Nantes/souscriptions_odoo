@@ -829,7 +829,12 @@ class SouscriptionCampagneEtape(models.Model):
     # souscriptions, mais la facturiste y travaille sur des FACTURES — le
     # drill-down y ouvre donc les factures du mois plutôt que les
     # souscriptions, groupées par statut (brouillon à émettre / comptabilisé
-    # déjà émis). Même action pour les deux étapes. ---
+    # déjà émis). Même action pour les deux étapes. Autre exception (#336) :
+    # les deux portes de vérif (verif_periodes, verif_refacturations)
+    # ouvrent ce qu'elles vérifient (périodes du mois / écran ADR 0012),
+    # jamais le fallback souscriptions — seule méthode de dispatch (ADR
+    # 0025 « une seule source de vérité »), aucune logique dupliquée
+    # ailleurs. ---
 
     # gestes_commerciaux (#287) : même drill-down — la porte n'a pas de
     # reste-à-faire propre, c'est sur CES factures du mois que se pose la
@@ -838,6 +843,14 @@ class SouscriptionCampagneEtape(models.Model):
 
     def action_drill_down(self):
         self.ensure_one()
+        if self.code == 'verif_periodes':
+            return {
+                'type': 'ir.actions.act_window',
+                'name': ETAPES_CAMPAGNE.get(self.code, {}).get('label', self.code),
+                'res_model': 'souscription.periode',
+                'view_mode': 'list,form',
+                'domain': [('mois', '=', self.campagne_id.mois), ('type_periode', '=', 'mensuelle')],
+            }
         if self.code in self._CODES_DRILL_DOWN_FACTURES:
             factures = self.campagne_id._factures_du_mois()
             return {

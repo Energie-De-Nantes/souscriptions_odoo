@@ -253,6 +253,28 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
         group_by = action['context'].get('group_by')
         self.assertIn('state', [group_by] if isinstance(group_by, str) else group_by)
 
+    def test_drill_down_verif_periodes_ouvre_les_periodes_mensuelles_du_mois(self):
+        """#336 : la porte « Vérif périodes » ouvre les périodes du modèle
+        souscription.periode, filtrées (mois de la campagne, mensuelle) — pas
+        le fallback « souscriptions facturables ». Une période d'un autre
+        mois n'apparaît pas (ADR 0031 : une régularisation ne produit aucune
+        souscription.periode, le filtre type_periode='mensuelle' est la garde
+        explicite demandée par le ticket)."""
+        p1 = self._periode(self.souscription_base)
+        p2 = self._periode(self.souscription_hphc)
+        autre_mois = self.create_test_periode(
+            self.souscription_base, date_debut=date(2024, 4, 1), date_fin=date(2024, 4, 30)
+        )
+
+        action = self._etape('verif_periodes').action_drill_down()
+
+        self.assertEqual(action['res_model'], 'souscription.periode')
+        self.assertIn(('mois', '=', self.MOIS), action['domain'])
+        self.assertIn(('type_periode', '=', 'mensuelle'), action['domain'])
+        trouvees = self.env['souscription.periode'].search(action['domain'])
+        self.assertEqual(set(trouvees.ids), {p1.id, p2.id})
+        self.assertNotIn(autre_mois.id, trouvees.ids)
+
     # --- Décompte factures créées / émises du mois (AC) ---
 
     def test_compte_factures_creees_et_emises_du_mois(self):

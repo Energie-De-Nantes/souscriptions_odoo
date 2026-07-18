@@ -1,7 +1,7 @@
 """Fabrique unique du client electricore (#88/#77, ADR 0024).
 
-Avant cet ADR, le service RSC (#88) et le wizard de pull des méta-périodes
-(#77) portaient chacun leur propre garde d'import, leur propre drapeau de
+Avant cet ADR, le service RSC (#88) et le pull des méta-périodes (#77)
+portaient chacun leur propre garde d'import, leur propre drapeau de
 disponibilité, leur propre lecture de config et leur propre `_client()` —
 le tout copié à l'identique. Ce module concentre les quatre dans une unique
 couture : un `AbstractModel` (`souscription.electricore.client`, méthode

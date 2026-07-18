@@ -66,7 +66,7 @@ class SouscriptionRegularisation(models.Model):
 
     # Signalements de la dernière exécution de `_recalculer()` (mois hors
     # candidats, souscription non communicante écartée…) — surface de review
-    # du·de la facturiste, même idiome que `wizard.resultat`.
+    # du·de la facturiste.
     signalements = fields.Text(string='Signalements', readonly=True)
 
     # Lien Régularisation ↔ Facture (ADR 0030 décision 5) : `account.move.

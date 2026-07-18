@@ -485,11 +485,26 @@ dépendance ajoutée. Le succès continue de se lire **uniquement** dans le rest
 l'étape, jamais dans le fait d'avoir été lancée : `lance` (étapes de type *action*) devient une
 **intention** posée au clic, pas un accompli. Un échec de paquet va au chatter de l'enregistrement
 fautif (souscription, période, facture), jamais sur la Campagne elle-même.
+
+**La campagne naît tirée** (ADR 0036, amende ADR 0025) : sa création — gardée par un invariant dur
+**« mois strictement révolu »** (`UserError` sinon) — **amorce seule les trois pulls** (sorties C15,
+méta-périodes, sync F15) en tâche de fond. La création reste instantanée et sans réseau ; elle déclenche un
+cron qui descend le catalogue en **une passe séquentielle** (au plus une tentative par étape), pose
+`demande` au succès, s'exécute sous l'identité du créateur (`with_user(create_uid)`), et **s'arrête net aux
+portes** — l'automate ne franchit jamais une vérif, ne crée/n'émet jamais de factures : *tirer de la donnée
+= machine ; juger et engager comptablement = humain*. Les boutons manuels restent pour re-tirer en cours de
+mois. Les erreurs par souscription (mapping, contrainte) vont au **chatter de la souscription fautive**,
+chemin manuel **comme** automate ; la fin de passe émet un récapitulatif bus (comptes, **durées par étape**,
+erreurs). Le catalogue des étapes (`ETAPES_CAMPAGNE`) est l'**interface complète du DAG** — chaque entrée
+déclare tout ce qu'est son étape (phase, dureté de porte, méthode d'amorçage, stratégie de vidange,
+drill-down), le moteur est générique (zéro branche par étape). Les étapes se lisent en **quatre phases** :
+**Tirer / Vérifier / Facturer / Solder**.
 _Éviter_ : **cycle de facturation** pour l'instance (c'est la *récurrence* / le nom du menu, pas
 l'enregistrement mensuel) ; **pipeline linéaire** (les étapes forment un DAG) ; instrumenter les
 *Périodes* / *Refacturations* d'un drapeau « vérifiée » (la vérif est une porte à la maille
 campagne) ; confondre `lance` (une intention posée au clic) avec `fait` (un accompli dérivé des
-données, ADR 0035).
+données, ADR 0035) ; croire que l'automate d'amorçage crée ou émet des factures (il ne fait que les
+**trois pulls**, s'arrête aux portes).
 
 **Périmètre de campagne** (souscriptions concernées par le mois M) :
 L'ensemble des *Souscriptions* qu'une *Campagne de facturation* du mois M doit traiter — base de

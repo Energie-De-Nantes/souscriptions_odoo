@@ -851,6 +851,11 @@ class SouscriptionCampagneEtape(models.Model):
                 'view_mode': 'list,form',
                 'domain': [('mois', '=', self.campagne_id.mois), ('type_periode', '=', 'mensuelle')],
             }
+        if self.code == 'verif_refacturations':
+            # #336 : réutilise l'écran de vérification des prestations
+            # existant (ADR 0012, groupé par état) par référence à son XML
+            # id — aucune vue ni domaine dupliqués ici.
+            return self.env['ir.actions.act_window']._for_xml_id('souscriptions_odoo.action_souscription_refacturation')
         if self.code in self._CODES_DRILL_DOWN_FACTURES:
             factures = self.campagne_id._factures_du_mois()
             return {

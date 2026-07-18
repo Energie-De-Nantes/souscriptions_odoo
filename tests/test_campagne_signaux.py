@@ -275,6 +275,17 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
         self.assertEqual(set(trouvees.ids), {p1.id, p2.id})
         self.assertNotIn(autre_mois.id, trouvees.ids)
 
+    def test_drill_down_verif_refacturations_ouvre_lecran_prestations_adr0012(self):
+        """#336 : la porte « Vérif refacturations » réutilise l'action
+        existante de l'écran de vérification des prestations (ADR 0012) par
+        référence à son XML id — aucune vue ni domaine dupliqués."""
+        attendue = self.env.ref('souscriptions_odoo.action_souscription_refacturation')
+
+        action = self._etape('verif_refacturations').action_drill_down()
+
+        self.assertEqual(action['res_model'], 'souscription.refacturation')
+        self.assertEqual(action.get('id'), attendue.id)
+
     # --- Décompte factures créées / émises du mois (AC) ---
 
     def test_compte_factures_creees_et_emises_du_mois(self):

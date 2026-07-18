@@ -138,6 +138,18 @@ class TestPullSortiesService(SouscriptionsTestCase):
         self.assertEqual(len(ecrites), 1)
         self.assertEqual(self.souscription_hphc.date_fin, date(2024, 6, 11))
 
+    def test_erreur_par_souscription_va_au_chatter_de_la_souscription_fautive(self):
+        """#341, ADR 0036 décision 8a : même geste que le pull méta-périodes —
+        l'erreur skip-and-report va au chatter de la souscription fautive, au
+        point d'échec dans le service, chemin manuel comme futur automate."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        client = client_sorties_factice([ligne_sortie('RSC-00000000000001', None)])
+
+        self._pull_sorties(client, self.souscription_base)
+
+        messages = self.souscription_base.message_ids.mapped('body')
+        self.assertTrue(any('Pull sorties C15' in m for m in messages), 'erreur tracée au chatter')
+
     def test_ingestion_en_cours_mappee_en_userror_reessayable(self):
         self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
         client = client_sorties_factice(leve=service_module.IngestionEnCours('verrou'))

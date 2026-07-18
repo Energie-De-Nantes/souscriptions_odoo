@@ -388,6 +388,22 @@ class TestPullMetaPeriodesService(SouscriptionsTestCase):
         )
         self.assertEqual(len(erreurs), 1)
 
+    def test_erreur_par_souscription_va_au_chatter_de_la_souscription_fautive(self):
+        """#341, ADR 0036 décision 8a : l'erreur skip-and-report est postée au
+        chatter de la souscription fautive, au point d'échec dans le service
+        — pour que le chemin manuel ET le futur automate d'amorçage (#343)
+        en héritent gratuitement."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        meta_invalide = _periode_meta(
+            ref_situation_contractuelle='RSC-00000000000001',
+            debut=None,  # déclenche une erreur de mapping (Date invalide)
+            fin='2024-02-01',
+        )
+        self._pull(client_flux_factice('meta_periodes', [meta_invalide]), self.souscription_base)
+
+        messages = self.souscription_base.message_ids.mapped('body')
+        self.assertTrue(any('Pull méta-périodes' in m for m in messages), 'erreur tracée au chatter')
+
     # --- Politique d'écriture gardée par l'empreinte (ADR 0030 décision 1, #235) ---
 
     def test_empreinte_inchangee_naboutit_a_aucune_ecriture(self):

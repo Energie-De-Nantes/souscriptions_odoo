@@ -238,3 +238,19 @@ class TestActionTirerSortiesC15(SouscriptionsTestCase):
 
         self.assertEqual(notification['type'], 'ir.actions.client')
         self.assertIn('1', notification['params']['message'])
+
+    def test_methode_donnees_rend_le_tuple_sans_passer_par_le_toast(self):
+        """#341, ADR 0036 décision 13 : `_pull_sorties_c15_donnees` — la
+        méthode-données consommée par le bouton — est exercée directement,
+        sans passer par le payload `display_notification`. Même gabarit que
+        `souscription.pull.meta.periodes.service.pull_sorties`."""
+        self.souscription_base.ref_situation_contractuelle = 'RSC-00000000000001'
+        client = client_sorties_factice([ligne_sortie('RSC-00000000000001', date(2024, 6, 12))])
+
+        with patcher_client_fabrique(client):
+            ecrites, corrigees, inchangees, erreurs = self.env['souscription.souscription']._pull_sorties_c15_donnees()
+
+        self.assertEqual(ecrites, [self.souscription_base.name])
+        self.assertFalse(corrigees)
+        self.assertFalse(inchangees)
+        self.assertFalse(erreurs)

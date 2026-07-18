@@ -6,16 +6,36 @@
         <field name="arch" type="xml">
             <list decoration-info="facture_legacy_ref and not facture_id">
                 <field name="souscription_id"/>
-                <field name="pdl"/>
+                <field name="pdl" optional="hide"/>
                 <field name="mois_annee"/>
-                <field name="date_debut"/>
-                <field name="date_fin"/>
-                <field name="config_cadrans"/>
-                <field name="lisse"/>
-                <field name="jours"/>
+                <field name="date_debut" optional="hide"/>
+                <field name="date_fin" optional="hide"/>
+                <field name="config_cadrans" optional="hide"/>
+                <field name="lisse" optional="hide"/>
+                <field name="jours" optional="hide"/>
+                <!-- Énergies : champs stockés (energie_base_kwh dérive déjà le
+                     total HP+HC en config hp_hc/4_cadrans, ADR 0005), donc
+                     triables au clic de colonne nativement (aucun calcul
+                     ajouté ici) — HP/HC sortis en optionnel pour repérer un
+                     cadran défaillant isolément sur un contrat HP/HC (« trier
+                     par valeur, repérer l'aberrant »). -->
                 <field name="energie_base_kwh" string="Énergie (kWh)"/>
-                <field name="turpe_fixe"/>
-                <field name="turpe_variable"/>
+                <field name="energie_hp_kwh" string="Énergie HP (kWh)" optional="show"/>
+                <field name="energie_hc_kwh" string="Énergie HC (kWh)" optional="show"/>
+                <!-- Verdicts electricore (ADR 0020 §4/§7, méta-périodes v3) :
+                     lecture seule, servis tels quels par le pull — aucun
+                     calcul local. -->
+                <field name="qualite" widget="badge"
+                       decoration-success="qualite == 'réelle'"
+                       decoration-warning="qualite == 'estimée'"
+                       decoration-danger="qualite == 'incalculable'"/>
+                <field name="statut_communication" widget="badge"
+                       decoration-success="statut_communication == 'communicante'"
+                       decoration-warning="statut_communication == 'non_communicante'"
+                       optional="show"/>
+                <field name="has_changement" optional="show"/>
+                <field name="turpe_fixe" optional="hide"/>
+                <field name="turpe_variable" optional="hide"/>
                 <field name="facture_id"/>
                 <field name="facture_state" widget="badge"
                        decoration-success="facture_state == 'posted'"
@@ -23,7 +43,7 @@
                 <!-- Période d'ouverture (#107) : facturée côté legacy, pas
                      d'account.move — la référence prod est le marqueur
                      d'identification, mise en évidence par la couleur de ligne. -->
-                <field name="facture_legacy_ref"/>
+                <field name="facture_legacy_ref" optional="hide"/>
             </list>
         </field>
     </record>
@@ -177,11 +197,47 @@
         </field>
     </record>
 
+    <!-- Search view (#337, ADR 0020 §4/§7, PRD #335) : filtres sur chaque
+         verdict electricore et sur le lissage, groupages qualité / statut de
+         communication / souscription / mois — le geste « scanner la masse,
+         vérifier les lignes douteuses ». Aucun moteur de filtres custom : les
+         combinaisons se composent et s'enregistrent via les filtres favoris
+         natifs d'Odoo. -->
+    <record id="view_souscription_periode_search" model="ir.ui.view">
+        <field name="name">souscription.periode.search</field>
+        <field name="model">souscription.periode</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="souscription_id"/>
+                <field name="pdl"/>
+                <field name="mois_annee"/>
+                <filter string="Qualité réelle" name="qualite_reelle" domain="[('qualite', '=', 'réelle')]"/>
+                <filter string="Qualité estimée" name="qualite_estimee" domain="[('qualite', '=', 'estimée')]"/>
+                <filter string="Incalculable" name="qualite_incalculable" domain="[('qualite', '=', 'incalculable')]"/>
+                <separator/>
+                <filter string="Communicante" name="communicante" domain="[('statut_communication', '=', 'communicante')]"/>
+                <filter string="Non communicante" name="non_communicante" domain="[('statut_communication', '=', 'non_communicante')]"/>
+                <separator/>
+                <filter string="Changement pendant la période" name="has_changement" domain="[('has_changement', '=', True)]"/>
+                <separator/>
+                <filter string="Lissé" name="lisse_periode" domain="[('lisse_periode', '=', True)]"/>
+                <filter string="Non lissé" name="non_lisse_periode" domain="[('lisse_periode', '=', False)]"/>
+                <group>
+                    <filter string="Qualité" name="group_qualite" context="{'group_by': 'qualite'}"/>
+                    <filter string="Statut de communication" name="group_statut_communication" context="{'group_by': 'statut_communication'}"/>
+                    <filter string="Souscription" name="group_souscription" context="{'group_by': 'souscription_id'}"/>
+                    <filter string="Mois" name="group_mois" context="{'group_by': 'mois'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
     <record id="action_souscription_periode" model="ir.actions.act_window">
         <field name="name">Périodes de facturation</field>
         <field name="res_model">souscription.periode</field>
         <field name="view_mode">list,form</field>
         <field name="view_id" ref="view_souscription_periode_list"/>
+        <field name="search_view_id" ref="view_souscription_periode_search"/>
     </record>
 
     <menuitem

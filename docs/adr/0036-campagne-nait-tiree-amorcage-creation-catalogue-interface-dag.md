@@ -1,8 +1,9 @@
 # La campagne naît tirée — amorçage à la création, catalogue-interface du DAG
 
 *Statut : accepté. Instruit le PRD **#339** (« la campagne naît tirée »), tranche `docs` (#340)
-d'une pile linéaire de cinq tranches : #340 (docs) → #341 (coutures-données) → #342 (catalogue-interface,
-grand A) → #343 (amorçage à la création) ; #344 (vue en phases) dépend de #342 et va en parallèle de #343.
+d'une pile de cinq tranches : #340 (docs) → #341 (coutures-données) → #342 (catalogue-interface,
+grand A) → #343 (amorçage à la création), linéaires dans cet ordre ; #344 (vue en phases) dépend de #342 et
+va en parallèle de #343.
 Cet ADR fixe l'architecture avant que le code n'atterrisse, comme ADR 0025 l'a fait pour la Campagne
 elle-même et ADR 0035 pour la tâche de fond. Il **n'ouvre aucune nouvelle porte de vérification** (ADR 0025
 §2 reste entier) et ne re-décide ni la forme DAG-rollup (ADR 0025) ni le mécanisme de vidange en tâche de

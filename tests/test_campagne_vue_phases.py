@@ -108,16 +108,24 @@ class TestCampagnePhaseChampsEtRecherche(SouscriptionsTestCase):
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneVueEnPhases(SouscriptionsTestCase):
-    """AC #344 : le formulaire rend `etape_ids` en quatre sections titrées —
-    même motif que TestCampagneBandeauButtonBox/TestCampagneEtapesDecorations
-    (tests/test_campagne_bandeau_view.py) : arch résolu, assertions lxml,
-    aucune donnée requise."""
+    """AC #344/#374 : le formulaire rend quatre sections titrées, une par
+    champ etape_<phase>_ids — même motif que TestCampagneBandeauButtonBox/
+    TestCampagneEtapesDecorations (tests/test_campagne_bandeau_view.py) :
+    arch résolu, assertions lxml, aucune donnée requise. Depuis #374, chaque
+    `<field>` est nu (le filtre vit côté Python sur le champ, pas dans un
+    domain XML qui ne filtrerait pas l'affichage) et le contenu de liste
+    (décorations, boutons, bloquee_par...) est résolu une seule fois, sur la
+    vue liste partagée du comodèle."""
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         view = cls.env['souscription.campagne.facturation'].get_view(view_type='form')
         cls.arch = etree.fromstring(view['arch'])
+        vue_etape = cls.env['souscription.campagne.etape'].get_view(
+            view_id=cls.env.ref('souscriptions_odoo.view_souscription_campagne_etape_list').id, view_type='list'
+        )
+        cls.arch_liste_etape = etree.fromstring(vue_etape['arch'])
 
     _PHASES_ATTENDUES = [
         ('tirer', 'Tirer'),
@@ -126,47 +134,54 @@ class TestCampagneVueEnPhases(SouscriptionsTestCase):
         ('solder', 'Solder'),
     ]
 
-    def test_quatre_sections_filtrees_par_phase_dans_lordre(self):
-        """AC #344 : le même one2many rendu quatre fois, filtré par `phase`
-        (#342) — une occurrence par phase, dans l'ordre Tirer/Vérifier/
-        Facturer/Solder."""
+    def test_quatre_sections_un_champ_nu_par_phase_dans_lordre(self):
+        """AC #374 : un champ etape_<phase>_ids par phase, SANS enfants (pas
+        de domain XML — le filtre vit dans la définition Python du champ),
+        dans l'ordre Tirer/Vérifier/Facturer/Solder."""
         etape_page = self.arch.find(".//page[@name='etapes']")
         self.assertIsNotNone(etape_page)
-        champs_etape_ids = etape_page.findall(".//field[@name='etape_ids']")
-        self.assertEqual(len(champs_etape_ids), 4, 'le one2many est rendu une fois par phase')
-        for (code, _label), champ in zip(self._PHASES_ATTENDUES, champs_etape_ids, strict=True):
-            domaine = champ.get('domain') or ''
-            self.assertIn(f"'{code}'", domaine, f"la section {code} doit filtrer etape_ids sur phase == '{code}'")
+        champs = [e for e in etape_page if e.tag == 'field']
+        self.assertEqual(len(champs), 4, 'un champ par phase, plus de duplication')
+        for (code, _label), champ in zip(self._PHASES_ATTENDUES, champs, strict=True):
+            self.assertEqual(champ.get('name'), f'etape_{code}_ids')
+            self.assertIsNone(champ.get('domain'), 'le filtre vit côté Python, plus en domain XML')
+            self.assertEqual(list(champ), [], 'champ nu : la vue liste vient du comodèle')
 
     def test_chaque_section_est_precedee_dun_separateur_titre(self):
-        """« Même idiome que la ligne de séparation énergie/abonnement d'une
-        facture » : un séparateur TITRÉ précède chaque section."""
+        """Un séparateur TITRÉ précède chaque section."""
         etape_page = self.arch.find(".//page[@name='etapes']")
         separateurs = [e for e in etape_page if e.tag == 'separator']
         titres = [s.get('string') for s in separateurs]
         self.assertEqual(titres, [label for _code, label in self._PHASES_ATTENDUES])
 
-    def test_toutes_les_sections_gardent_les_decorations_existantes(self):
-        """Restructuration pure : les décorations grisé/gras de #301 (motif
-        déjà couvert par test_campagne_bandeau_view.py) survivent au
-        découpage en quatre listes."""
-        listes = self.arch.findall(".//field[@name='etape_ids']/list")
-        self.assertEqual(len(listes), 4)
-        for etape_list in listes:
-            self.assertEqual(etape_list.get('decoration-muted'), 'fait')
-            self.assertEqual(etape_list.get('decoration-bold'), "etat_prerequis == 'prete' and not fait")
+    def test_une_seule_definition_de_liste_garde_les_decorations_existantes(self):
+        """AC #374 : une seule liste d'étapes dans le XML — les décorations
+        grisé/gras de #301 (motif déjà couvert par test_campagne_bandeau_view.py)
+        survivent à la déduplication."""
+        self.assertEqual(self.arch_liste_etape.get('decoration-muted'), 'fait')
+        self.assertEqual(self.arch_liste_etape.get('decoration-bold'), "etat_prerequis == 'prete' and not fait")
 
     def test_pas_de_poignee_de_tri_sur_les_lignes_detape(self):
         """AC #344 : le catalogue est fixe et topologique — drag-to-reorder
         est un mensonge d'affichage, la poignée disparaît."""
-        etape_page = self.arch.find(".//page[@name='etapes']")
-        poignees = etape_page.findall(".//field[@widget='handle']")
+        poignees = self.arch_liste_etape.findall(".//field[@widget='handle']")
         self.assertFalse(poignees, "aucune poignée de réordonnancement sur les lignes d'étape")
 
-    def test_bloquee_par_affiche_une_fois_par_section(self):
-        """AC #344 : « Bloquée par : X » — visible seulement quand
-        etat_prerequis == 'bloquee', dans chacune des quatre sections."""
-        champs = self.arch.findall(".//field[@name='etape_ids']//field[@name='bloquee_par']")
-        self.assertEqual(len(champs), 4, 'une occurrence par section')
-        for champ in champs:
-            self.assertEqual(champ.get('invisible'), "etat_prerequis != 'bloquee'")
+    def test_boutons_lancer_et_voir_intacts(self):
+        """AC #374 : boutons Lancer/Voir intacts après déduplication."""
+        boutons = {b.get('string') for b in self.arch_liste_etape.findall('.//button')}
+        self.assertEqual(boutons, {'Lancer', 'Voir'})
+
+    def test_bloquee_par_present_une_seule_fois(self):
+        """AC #374 : « Bloquée par : X » — visible seulement quand
+        etat_prerequis == 'bloquee', une seule définition partagée par les
+        quatre sections (au lieu d'une par section avant #374)."""
+        champs = self.arch_liste_etape.findall(".//field[@name='bloquee_par']")
+        self.assertEqual(len(champs), 1)
+        self.assertEqual(champs[0].get('invisible'), "etat_prerequis != 'bloquee'")
+
+    def test_toggle_valide_present_une_seule_fois(self):
+        """AC #374 : le toggle de porte (valide) survit à la déduplication."""
+        champs = self.arch_liste_etape.findall(".//field[@name='valide']")
+        self.assertEqual(len(champs), 1)
+        self.assertEqual(champs[0].get('widget'), 'boolean_toggle')

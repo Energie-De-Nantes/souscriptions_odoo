@@ -58,19 +58,23 @@ class TestCampagneEtapesDecorations(SouscriptionsTestCase):
     faites grisées, étapes prêtes non faites en gras. Avec le DAG, plusieurs
     étapes peuvent être prêtes-non-faites à la fois (racines indépendantes) :
     le gras les montre toutes, c'est la sémantique voulue (aucune notion de
-    « prochaine » étape unique)."""
+    « prochaine » étape unique).
+
+    Depuis #374, la liste n'est plus inline dans le formulaire (quatre
+    champs etape_<phase>_ids nus, cf. test_campagne_vue_phases.py) : les
+    décorations vivent sur la vue liste partagée du comodèle."""
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        view = cls.env['souscription.campagne.facturation'].get_view(view_type='form')
+        view = cls.env['souscription.campagne.etape'].get_view(
+            view_id=cls.env.ref('souscriptions_odoo.view_souscription_campagne_etape_list').id, view_type='list'
+        )
         cls.arch = etree.fromstring(view['arch'])
 
     def test_liste_des_etapes_grise_les_lignes_faites_et_met_en_gras_les_pretes(self):
-        etape_list = self.arch.find(".//field[@name='etape_ids']/list")
-        self.assertIsNotNone(etape_list)
-        self.assertEqual(etape_list.get('decoration-muted'), 'fait')
-        self.assertEqual(etape_list.get('decoration-bold'), "etat_prerequis == 'prete' and not fait")
+        self.assertEqual(self.arch.get('decoration-muted'), 'fait')
+        self.assertEqual(self.arch.get('decoration-bold'), "etat_prerequis == 'prete' and not fait")
 
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')

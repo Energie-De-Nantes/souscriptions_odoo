@@ -118,7 +118,8 @@ partie la plus faible du prototype :
 - **Odoo 19** : `odoo.osv.expression` déprécié (→ `odoo.fields.Domain`),
   `_sql_constraints` → `models.Constraint()`, manifeste sans `version: "19.0.x.y.z"`.
 - **Docs contradictoires** : plan.md décrit une architecture 3 modules jamais réalisée,
-  README_ARCHITECTURE décrit le toggle métier, CLAUDE.md nie l'existence des tests.
+  CLAUDE.md nie l'existence des tests. (README_ARCHITECTURE.md, également drifté,
+  supprimé depuis — son unique contenu à valeur replié dans CONTEXT.md, #352.)
   Une seule source de vérité à réécrire après refonte.
 - **Pas de CI** : la suite de tests n'est exécutée nulle part.
 

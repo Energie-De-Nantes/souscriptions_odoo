@@ -139,6 +139,85 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
         self.assertEqual(self._etape('emettre_factures').nb_reste_a_faire, 0)
         self.assertTrue(self._etape('emettre_factures').fait)
 
+    # --- Envoyer factures (#314) : reste-à-faire dérivé d'`is_move_sent`,
+    # champ NATIF d'account.move — zéro champ ajouté. Brouillons et
+    # régularisations hors portée par construction (`_factures_du_mois`). ---
+
+    def test_envoyer_factures_reste_a_faire_compte_les_postees_non_envoyees(self):
+        p1 = self._periode(self.souscription_base)
+        p2 = self._periode(self.souscription_hphc)
+        f1 = p1._creer_facture()
+        f1.action_post()
+        p2._creer_facture()  # reste en brouillon : hors portée de l'envoi
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.assertEqual(self._etape('envoyer_factures').nb_reste_a_faire, 1)
+        self.assertEqual(self.campagne._factures_a_envoyer_du_mois(), f1)
+        self.assertFalse(self._etape('envoyer_factures').fait)
+
+    def test_envoyer_factures_reste_a_faire_decroit_quand_is_move_sent_passe(self):
+        """AC : le reste-à-faire décroît quand `is_move_sent` passe — aucun
+        appel à la machinerie d'envoi n'est nécessaire pour le prouver, le
+        signal est le champ natif lui-même."""
+        p1 = self._periode(self.souscription_base)
+        p2 = self._periode(self.souscription_hphc)
+        f1 = p1._creer_facture()
+        f2 = p2._creer_facture()
+        f1.action_post()
+        f2.action_post()
+        self.campagne.etape_ids.invalidate_recordset()
+        self.assertEqual(self._etape('envoyer_factures').nb_reste_a_faire, 2)
+
+        f1.is_move_sent = True
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.assertEqual(self._etape('envoyer_factures').nb_reste_a_faire, 1)
+        self.assertFalse(self._etape('envoyer_factures').fait)
+
+    def test_envoyer_factures_fait_quand_toutes_envoyees(self):
+        p1 = self._periode(self.souscription_base)
+        f1 = p1._creer_facture()
+        f1.action_post()
+        f1.is_move_sent = True
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.assertEqual(self._etape('envoyer_factures').nb_reste_a_faire, 0)
+        self.assertTrue(self._etape('envoyer_factures').fait)
+
+    def test_envoyer_factures_exclut_les_brouillons(self):
+        periode = self._periode(self.souscription_base)
+        periode._creer_facture()  # reste en brouillon
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.assertEqual(self.campagne._factures_a_envoyer_du_mois(), self.env['account.move'])
+
+    def test_envoyer_factures_exclut_les_regularisations(self):
+        """AC : une facture de régularisation n'est jamais dans la portée —
+        elle ne porte pas `periode_id` (`_factures_du_mois` ne la rassemble
+        donc jamais), sans cas particulier à écrire."""
+        regularisation = self.env['souscription.regularisation'].create(
+            {'souscription_id': self.souscription_base.id, 'date_debut': date(2024, 1, 1), 'date_fin': date(2024, 4, 1)}
+        )
+        self.env['souscription.regularisation.ligne'].create(
+            {
+                'regularisation_id': regularisation.id,
+                'grille_id': self.grille_prix.id,
+                'date_debut': date(2024, 1, 1),
+                'date_fin': date(2024, 2, 1),
+                'tarif_solidaire': False,
+                'cadran': 'base',
+                'ecart_kwh': 50.0,
+                'prix_kwh': 0.15,
+                'detail': 'Janvier 2024 : +50.00 kWh',
+            }
+        )
+        facture_regul = regularisation._creer_facture()
+        facture_regul.action_post()
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.assertNotIn(facture_regul, self.campagne._factures_a_envoyer_du_mois())
+        self.assertNotIn(facture_regul, self.campagne._factures_du_mois())
+
     # --- Périmètre de campagne (#175, CONTEXT.md) : recouvrement de
     # l'intervalle de service avec le mois M, sur les dates propres de la
     # Souscription — jamais l'instantané vivant `etat == 'en_service'`. ---
@@ -305,3 +384,17 @@ class TestCampagneSignauxDerives(SouscriptionsTestCase):
             self.assertNotIn('statut_facturation', nom_champ)
             if nom_champ.startswith('campagne'):
                 self.fail(f'Champ inattendu lié à la campagne sur souscription.souscription : {nom_champ}')
+
+    def test_aucun_champ_denvoi_ajoute_pour_314(self):
+        """AC #314 : zéro champ ajouté pour porter l'état d'envoi sur
+        `account.move`/`souscription.periode`/`souscription.refacturation` —
+        le signal est le champ NATIF `account.move.is_move_sent`, jamais un
+        drapeau maison."""
+        interdits = ('envoye', 'envoi', 'sent_state', 'mot_du_mois')
+        natifs_ok = {'is_move_sent', 'move_sent_values', 'is_being_sent'}
+        for modele in ('account.move', 'souscription.periode', 'souscription.refacturation'):
+            for nom_champ in self.env[modele]._fields:
+                if nom_champ in natifs_ok:
+                    continue
+                for mot in interdits:
+                    self.assertNotIn(mot, nom_champ, f"{modele}.{nom_champ} : nouveau champ d'envoi suspecté")

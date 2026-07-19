@@ -123,13 +123,20 @@ class TestCatalogueCampagneStructurel(TransactionCase):
                 with self.assertRaises(UserError, msg=f'{code} : gate déclarée dure mais action non gardée'):
                     getattr(campagne, info['action'])()
 
-    def test_type_derive_porte_toujours_une_cible_statut(self):
-        """Toute étape 'derive' doit déclarer `cible_statut` (générique
-        `_compute_fait`/`_compute_nb_reste_a_faire`, #342) — sinon son
-        reste-à-faire retomberait silencieusement à 0 pour toujours."""
+    def test_type_derive_porte_toujours_une_cible_statut_ou_un_reste_a_faire(self):
+        """Toute étape 'derive' doit déclarer `cible_statut` OU `reste_a_faire`
+        (générique `_compute_fait`/`_compute_nb_reste_a_faire`, #342) — sinon
+        son reste-à-faire retomberait silencieusement à 0 pour toujours.
+        `reste_a_faire` seul (#314, `envoyer_factures`) : son signal
+        (`is_move_sent`) n'a pas de palier dans `_STATUTS_ORDONNES`
+        (qui s'arrête à « émise »), même raison que `preparer_prelevements`
+        (type 'action', déjà `reste_a_faire` seul)."""
         for code, info in ETAPES_CAMPAGNE.items():
             if info.get('type') == 'derive':
-                self.assertIn('cible_statut', info, f'{code} : type derive sans cible_statut')
+                self.assertTrue(
+                    'cible_statut' in info or 'reste_a_faire' in info,
+                    f'{code} : type derive sans cible_statut ni reste_a_faire',
+                )
 
     def test_les_methodes_plates_existent_sur_leur_modele(self):
         for code, info in ETAPES_CAMPAGNE.items():

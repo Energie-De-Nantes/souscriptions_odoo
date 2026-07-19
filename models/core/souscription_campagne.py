@@ -235,6 +235,43 @@ ETAPES_CAMPAGNE = {
         'prerequis': (),
         'phase': 'facturer',
     },
+    # L'envoi des factures mensuelles rentre dans le DAG (#314) : jusqu'ici
+    # l'étape hors DAG que le·la Facturiste faisait à la main depuis une
+    # liste de factures. « Fait »/reste-à-faire dérivés d'`is_move_sent` —
+    # champ NATIF d'`account.move` — donc ZÉRO champ ajouté (esprit ADR 0025
+    # §2 : « aucun drapeau de vérification sur les Périodes »). Reste-à-faire
+    # = factures POSTÉES du mois pas encore envoyées
+    # (`_factures_a_envoyer_du_mois`, pas `cible_statut` : le statut de
+    # facturation `_STATUTS_ORDONNES` s'arrête à « émise », il n'a pas de
+    # palier « envoyée » — même raison que `preparer_prelevements`, seule
+    # autre étape à porter `reste_a_faire` plutôt que `cible_statut`).
+    # Idempotent par construction, SANS état de retry dédié : les échecs
+    # restent non envoyés (`is_move_sent` ne bascule jamais sans PDF/pièce
+    # jointe liée avec succès, cf. `_link_invoice_documents` côté Odoo) et
+    # sont repris au clic suivant — même raisonnement que le filtre `draft`
+    # d'`emettre_factures`.
+    #
+    # Portée volontairement celle de `_factures_du_mois()` (périodes
+    # `mois == self.mois`) — donc les MENSUELLES seulement : une facture de
+    # régularisation ne porte jamais `periode_id` (CONTEXT.md « Régularisation
+    # (solde) »), elle n'apparaît donc jamais ici, sans cas particulier.
+    #
+    # Gate DURE (#342, ADR 0036 décision 11) : émettre est le gel comptable
+    # (ADR 0032), envoyer est de la communication — deux irréversibilités de
+    # nature différente qui restent deux étapes distinctes plutôt que
+    # fusionnées (une adresse mail invalide ne doit jamais pouvoir faire
+    # échouer, ni a fortiori faire rollback, le gel comptable d'un lot
+    # entier, cf. #268).
+    'envoyer_factures': {
+        'label': 'Envoyer factures',
+        'type': 'derive',
+        'prerequis': ('emettre_factures', 'mot_du_mois'),
+        'phase': 'facturer',
+        'gate': 'dure',
+        'reste_a_faire': '_factures_a_envoyer_du_mois',
+        'action': 'action_envoyer_factures',
+        'drill_down': '_drill_down_factures_du_mois',
+    },
     'regulariser_clotures': {
         'label': 'Régulariser les clôtures',
         'type': 'action',
@@ -653,6 +690,18 @@ class SouscriptionCampagneFacturation(models.Model):
         self.ensure_one()
         return self._factures_du_mois().filtered(lambda f: f.state == 'posted')
 
+    def _factures_a_envoyer_du_mois(self):
+        """Reste-à-faire d'« Envoyer factures » (#314) : les factures POSTÉES
+        du mois pas encore envoyées — `is_move_sent` natif d'`account.move`,
+        zéro champ ajouté. Un brouillon n'est jamais dans la portée (l'envoi
+        suit le gel comptable, jamais l'inverse) ; une facture de
+        régularisation non plus (`_factures_du_mois()` ne rassemble que les
+        factures rattachées à une `souscription.periode` du mois, régies par
+        `periode_id` — une régularisation n'en porte jamais, CONTEXT.md
+        « Régularisation (solde) »)."""
+        self.ensure_one()
+        return self._factures_du_mois().filtered(lambda f: f.state == 'posted' and not f.is_move_sent)
+
     @api.depends('mois')
     def _compute_stats_bandeau(self):
         for campagne in self:
@@ -775,7 +824,16 @@ class SouscriptionCampagneFacturation(models.Model):
         )
         etape = self._etape(code)
         if etape.etat_prerequis != 'prete':
-            raise UserError(_('Étape « %s » bloquée : prérequis non satisfaits.', ETAPES_CAMPAGNE[code]['label']))
+            # #314 AC : le message dit quoi faire — les libellés des
+            # prérequis manquants (`bloquee_par`, déjà calculé pour l'affichage
+            # « Bloquée par : X », #344), pas seulement « bloquée ».
+            raise UserError(
+                _(
+                    'Étape « %(label)s » bloquée : prérequis non satisfaits (%(manquants)s).',
+                    label=ETAPES_CAMPAGNE[code]['label'],
+                    manquants=etape.bloquee_par,
+                )
+            )
 
     # --- Journal de campagne (#366) : « toute fin de passe poste son
     # récapitulatif au journal » — un seul point d'écriture, appelé depuis
@@ -1196,6 +1254,41 @@ class SouscriptionCampagneFacturation(models.Model):
         self._verifier_gate('emettre_factures')
         self._etape('emettre_factures').write({'demande': True})
         self.env.ref('souscriptions_odoo.ir_cron_vidange_emettre_factures')._trigger()
+
+    def action_envoyer_factures(self):
+        """Gated sur émettre factures + mot du mois (#314) : délègue à la
+        machinerie NATIVE d'envoi (`account.move.send._generate_and_send_invoices`)
+        plutôt que de la réimplémenter — PDF, formats e-invoicing (Factur-X),
+        pièces jointes, partenaires sans email, archivage au chatter : rien de
+        tout ça n'est à écrire ici.
+
+        `allow_raising=False` : un échec d'envoi remonte sur le chatter de LA
+        facture fautive (native, ``_hook_if_errors``) sans faire échouer les
+        autres ni remonter d'exception ici — c'est cette isolation native,
+        déjà éprouvée par `emettre_factures`/#268 pour le POST comptable, qui
+        justifie que les deux étapes restent distinctes (poster = gel
+        comptable, ADR 0032 ; envoyer = communication).
+
+        Idempotent par construction, sans état de retry dédié : le
+        reste-à-faire (`_factures_a_envoyer_du_mois`, `is_move_sent=False`)
+        exclut déjà les factures parties — un reclic ne reprend QUE les
+        échecs, jamais de doublon sur celles déjà envoyées. Poste le
+        récapitulatif au journal de la Campagne (#366) — comptes seuls,
+        comme « régulariser les clôtures » : le chatter de la facture fautive
+        dit déjà pourquoi, le drill-down dit déjà lesquelles."""
+        self.ensure_one()
+        self._verifier_gate('envoyer_factures')
+        a_envoyer = self._factures_a_envoyer_du_mois()
+        if not a_envoyer:
+            return
+        nb_avant = len(a_envoyer)
+        self.env['account.move.send']._generate_and_send_invoices(a_envoyer, allow_raising=False)
+        a_envoyer.invalidate_recordset(['is_move_sent'])
+        nb_echecs = len(self._factures_a_envoyer_du_mois())
+        self._poster_recap_journal(
+            ETAPES_CAMPAGNE['envoyer_factures']['label'],
+            [_('Envoyées : %s', nb_avant - nb_echecs), _('Échecs : %s', nb_echecs)],
+        )
 
     # action_preparer_prelevements (#186) : déclarée plus haut, aux côtés du
     # domaine partagé avec le signal dérivé « fait ».

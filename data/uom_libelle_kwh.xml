@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- #307 (sous-tâche d'affichage de #304, mécanisme posé par #306) : le
+         core Odoo 19 livre `uom.product_uom_kwh.name` = « KWH » en en_US ET
+         fr_FR (la traduction fr_FR vaut littéralement KWH — écrire
+         seulement en_US ne suffit pas). kWh est un symbole SI, correct dans
+         toute langue : on force la casse plutôt que de « traduire ».
+         `uom.product_uom_day` est déjà correct (« Jours » en fr_FR), rien à
+         faire de ce côté.
+
+         SANS noupdate (rejoue à chaque -i ET -u) : ce n'est pas notre
+         enregistrement, une seule pose à l'install ne survivrait pas à un
+         futur module Odoo qui le réinitialiserait.
+
+         `_activate_lang('fr_FR')` d'abord : `update_field_translations`
+         refuse toute langue non installée (`res.lang.get_installed()`) — la
+         prod a déjà fr_FR actif, mais une base de test fraîche ne l'a pas
+         forcément. Pas de PO à charger (fr_FR existe déjà, inactif, dans la
+         data de base), l'activation est un simple flag, sans effet de bord
+         lourd. -->
+    <function model="res.lang" name="_activate_lang" eval="[[], 'fr_FR']"/>
+    <function model="uom.uom" name="update_field_translations"
+              eval="[[ref('uom.product_uom_kwh')], 'name', {'en_US': 'kWh', 'fr_FR': 'kWh'}]"/>
+</odoo>

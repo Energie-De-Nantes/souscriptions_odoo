@@ -36,6 +36,19 @@ class AccountMove(models.Model):
 
     is_facture_energie = fields.Boolean(string="Facture d'énergie", compute='_compute_is_facture_energie', store=True)
 
+    # Champs du passé (PRD #207/#208, ADR 0023 §3 amendé) : distingue d'un
+    # coup d'œil, en vue liste, une facture pré-module (créée par l'ETL de
+    # migration) d'une facture native — posé par l'ETL au backfill, jamais
+    # calculé. La clé TECHNIQUE de rattachement reste l'external id
+    # `__migration__` (module `souscriptions_migration`) ; ce booléen n'est
+    # qu'un filtre d'affichage, pas une seconde source de vérité.
+    origine_legacy = fields.Boolean(
+        string='Origine legacy',
+        default=False,
+        help="Facture pré-module, créée par l'ETL de migration (PRD #207/#208) — "
+        "l'external id __migration__ reste la clé technique de rattachement.",
+    )
+
     @api.depends('periode_id.souscription_id', 'regularisation_id.souscription_id')
     def _compute_souscription_id(self):
         for move in self:

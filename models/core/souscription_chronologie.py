@@ -12,7 +12,8 @@ pourrait un jour exposer la vue point, hors périmètre ici). Exceptions du
 mapping ré-exportées par la fabrique (ADR 0024, #222), même posture que le
 pull des méta-périodes (`souscription_pull_meta_periodes_service.py`) :
 la fabrique s'arrête à « rends-moi un client configuré », chaque appelant
-garde son appel d'endpoint et son propre mapping.
+garde son appel d'endpoint — la traduction du mapping, elle, est partagée
+(`traduire_exceptions_electricore()`, #360).
 """
 
 from __future__ import annotations
@@ -20,7 +21,15 @@ from __future__ import annotations
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
-from .electricore_client_fabrique import ContractVersionError, IngestionEnCours, PreconditionNonRemplie
+# ContractVersionError/IngestionEnCours/PreconditionNonRemplie ne sont plus
+# attrapées ici (mapping partagé, `traduire_exceptions_electricore()`, #360)
+# mais restent importées : couture de test (`chronologie_module.<Nom>(...)`).
+from .electricore_client_fabrique import (  # noqa: F401
+    ContractVersionError,
+    IngestionEnCours,
+    PreconditionNonRemplie,
+    traduire_exceptions_electricore,
+)
 
 
 class SouscriptionChronologieLigne(models.Model):
@@ -189,16 +198,9 @@ class Souscription(models.Model):
         Ligne = self.env['souscription.chronologie.ligne']
 
         vals_list = []
-        try:
-            with self._ouvrir_flux(client, self.ref_situation_contractuelle) as stream:
-                for ligne in stream:
-                    vals_list.append(Ligne._vals_depuis_ligne(self, ligne))
-        except IngestionEnCours:
-            raise UserError("L'ingestion electricore est en cours (verrou base) : réessayez plus tard.")
-        except PreconditionNonRemplie as exc:
-            raise UserError(f'Précondition non remplie côté electricore : {exc}')
-        except ContractVersionError as exc:
-            raise UserError(f'Contrat electricore obsolète : {exc}')
+        with traduire_exceptions_electricore(), self._ouvrir_flux(client, self.ref_situation_contractuelle) as stream:
+            for ligne in stream:
+                vals_list.append(Ligne._vals_depuis_ligne(self, ligne))
 
         Ligne.search([('souscription_id', '=', self.id)]).unlink()
         if vals_list:

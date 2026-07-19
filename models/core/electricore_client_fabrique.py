@@ -15,9 +15,10 @@ chargement du module, seul l'appel à `client()` échoue, avec un message
 actionnable.
 
 Chaque appelant garde son propre appel d'endpoint (`resoudre_rsc` en lot ↔
-`meta_periodes` en flux) et son propre mapping d'exceptions : cette fabrique
-s'arrête à « rends-moi un client configuré » (ADR 0024 §4, option écartée
-« fabrique de transport complète »).
+`meta_periodes` en flux) : cette fabrique s'arrête à « rends-moi un client
+configuré » (ADR 0024 §4, option écartée « fabrique de transport complète »).
+Seule la *traduction* du vocabulaire d'exceptions est partagée depuis #360
+(cf. plus bas) — pas l'appel d'endpoint lui-même.
 
 Ré-export des exceptions du contrat (#222, tranche 2 du PRD #219) : les
 quatre appelants (résolution RSC, pull méta-périodes, refacturation F15,
@@ -25,13 +26,21 @@ chronologie) importent `ContractVersionError`/`IngestionEnCours`/
 `PreconditionNonRemplie` depuis **ce** module plutôt que de porter chacun sa
 propre garde d'import + ses propres stubs de repli — un seul point d'origine,
 réel si le paquet est présent, stub sinon.
+
+`traduire_exceptions_electricore()` (#360) : la traduction de ce vocabulaire
+en `UserError` actionnable est elle aussi partagée — cinq sites la
+répétaient à l'identique (un seul `_()`, un seul `from exc`). Chaque
+appelant garde son propre appel d'endpoint et sa propre structure ; seul le
+corps du mapping, strictement identique partout, vit ici (ADR 0024, cf.
+amendement).
 """
 
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
 
-from odoo import models
+from odoo import _, models
 from odoo.exceptions import UserError
 
 try:
@@ -56,6 +65,21 @@ except ImportError:  # pragma: no cover - exercé par test_electricore_client_fa
 
     class PreconditionNonRemplie(Exception):
         """Repli si `electricore_client` est absent : jamais levée en pratique."""
+
+
+@contextmanager
+def traduire_exceptions_electricore():
+    """Traduit le vocabulaire d'exceptions electricore en UserError
+    actionnables. La structure par appelant reste (ADR 0024) — chaque
+    endpoint garde son appel ; seul le corps identique du mapping vit ici."""
+    try:
+        yield
+    except IngestionEnCours as exc:
+        raise UserError(_("L'ingestion electricore est en cours (verrou base) : réessayez plus tard.")) from exc
+    except PreconditionNonRemplie as exc:
+        raise UserError(_('Précondition non remplie côté electricore : %s', exc)) from exc
+    except ContractVersionError as exc:
+        raise UserError(_('Contrat electricore obsolète : %s', exc)) from exc
 
 
 class SouscriptionElectricoreClient(models.AbstractModel):

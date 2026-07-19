@@ -13,6 +13,10 @@ Odoo consomme electricore via le paquet fin `electricore-client` ([ADR-0019](001
 5. **Échec rapide et déterministe.** Chaque action acquiert le client **en tête** (`client()`), avant tout travail dépendant des données : un même clic produit toujours la même classe de résultat. La construction **n'ouvre aucune socket** (le HTTP n'a lieu qu'à l'ouverture du flux / à l'appel batch), donc l'échec précoce est gratuit.
 6. **Couture de test par endpoint.** Chaque appelant patche **sa** méthode de transport nommée (`_appeler` côté RSC — inchangée ; `_ouvrir_flux` côté pull) et retourne une réponse en boîte, sans construire de client. La **fabrique** a son propre petit test (paquet manquant / config manquante / construction), là où ces gardes se testaient auparavant **en double**.
 
+## Amendement (#360, 19/07)
+
+La *traduction* du vocabulaire d'exceptions (`IngestionEnCours`/`PreconditionNonRemplie`/`ContractVersionError` → `UserError`) vit désormais dans un unique `traduire_exceptions_electricore()` (module de la fabrique) ; la structure par appelant — chaque endpoint garde son appel, chacun sa forme (lot ↔ flux) — demeure inchangée. Ce n'est **pas** la « fabrique de transport complète » écartée ci-dessous (aucun appel d'endpoint ne bouge) : un futur audit ne doit pas lire ce context manager comme une violation de cet ADR.
+
 ## Conséquences
 
 - Le module reste **installable partout** ; le déploiement doit `pip install electricore-client` (odoo.sh / Docker) — une **étape de build**, pas une dépendance de manifeste.

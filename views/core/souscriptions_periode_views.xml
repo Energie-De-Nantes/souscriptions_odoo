@@ -226,7 +226,7 @@
                     <filter string="Qualité" name="group_qualite" context="{'group_by': 'qualite'}"/>
                     <filter string="Statut de communication" name="group_statut_communication" context="{'group_by': 'statut_communication'}"/>
                     <filter string="Souscription" name="group_souscription" context="{'group_by': 'souscription_id'}"/>
-                    <filter string="Mois" name="group_mois" context="{'group_by': 'mois'}"/>
+                    <filter string="Mois (canonique)" name="group_mois" context="{'group_by': 'mois'}"/>
                 </group>
             </search>
         </field>

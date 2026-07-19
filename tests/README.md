@@ -156,7 +156,6 @@ PDF/HTML) et `test_integration.py` (migration de tarif Base -> HP/HC).
 ### Helpers communs (`common.py`)
 - `SouscriptionsTestMixin`: Données et helpers partagés
 - `SouscriptionsTestCase`: Classe de base avec mixin
-- `SouscriptionsFormTestCase`: Spécialisée pour les formulaires
 
 ## 📊 Données de test
 

@@ -324,19 +324,15 @@ class SouscriptionsTestMixin:
         facture = periode._creer_facture()
         return periode, facture
 
-    def assert_invoice_structure(self, facture, expected_sections=None, expected_notes=None):
+    def assert_invoice_structure(self, facture):
         """
         Helper pour vérifier la structure d'une facture d'énergie.
 
         Args:
             facture: Instance de account.move
-            expected_sections: Liste des noms de sections attendues
-            expected_notes: Nombre minimum de notes TURPE attendues
         """
-        if expected_sections is None:
-            expected_sections = ['Abonnement', 'Énergie']
-        if expected_notes is None:
-            expected_notes = 2
+        expected_sections = ['Abonnement', 'Énergie']
+        expected_notes = 2
 
         lines = facture.invoice_line_ids
 
@@ -371,23 +367,3 @@ class SouscriptionsTestCase(SouscriptionsTestMixin, TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.setUpSouscriptionsData()
-
-
-class SouscriptionsFormTestCase(SouscriptionsTestMixin, TransactionCase):
-    """
-    Classe de base pour les tests de formulaires et vues.
-    Peut être étendue pour ajouter des helpers spécifiques aux formulaires.
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.setUpSouscriptionsData()
-
-    def create_form_view(self, model, view_type='form', res_id=None):
-        """Helper pour créer une vue formulaire en mode test."""
-        Model = self.env[model]
-        if res_id:
-            return Model.browse(res_id)
-        else:
-            return Model.new()

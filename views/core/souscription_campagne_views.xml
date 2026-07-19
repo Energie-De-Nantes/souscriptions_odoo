@@ -104,6 +104,13 @@
                         </page>
                     </notebook>
                 </sheet>
+                <!-- Journal de campagne (#366) : `mail.thread` seul (pas
+                     `mail.activity.mixin`) — reçoit le récapitulatif de
+                     chaque fin de passe (les trois pulls, régulariser les
+                     clôtures, les deux vidanges, l'amorçage). Les notes de
+                     campagne (#159, onglet ci-dessus) restent le modèle
+                     dédié pour « à reporter »/chaînage, inchangées. -->
+                <chatter open_attachments="True"/>
             </form>
         </field>
     </record>

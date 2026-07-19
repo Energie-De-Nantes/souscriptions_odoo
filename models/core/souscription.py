@@ -624,22 +624,23 @@ class Souscription(models.Model):
         main.
 
         Returns:
-            tuple[list[str], list[str], list[str], list[str]] : `(ecrites,
+            tuple[list[str], list[str], list[str], list[tuple]] : `(ecrites,
             corrigees, inchangees, erreurs)`, même gabarit que les deux
             autres pulls (méta-périodes, sync F15) — consommé par le bouton
             `action_tirer_sorties_c15` (toast) et par tout appelant non-UI
-            (automate d'amorçage, tests)."""
+            (automate d'amorçage, tests). `erreurs` porte des triplets
+            `(libellé, res_model, res_id)` (#366) — les trois autres listes
+            restent des libellés simples."""
         perimetre = self.search([('etat', '!=', 'resiliee'), ('ref_situation_contractuelle', '!=', False)])
         return self.env['souscription.pull.meta.periodes.service'].pull_sorties(perimetre)
 
-    def action_tirer_sorties_c15(self):
-        """Bouton autonome (motif sync F15, cf.
-        `souscription.refacturation.synchroniser_depuis_electricore`) :
-        emballe `_pull_sorties_c15_donnees` en toast (#341, ADR 0036 décision
-        13) — aucune couture réseau ici, seuls les comptes traversent la
-        frontière UI. Le câblage dans l'ordre de la campagne relève de la
-        tranche 3 du chantier #21."""
-        ecrites, corrigees, inchangees, erreurs = self._pull_sorties_c15_donnees()
+    def _toast_sorties_c15(self, ecrites, corrigees, inchangees, erreurs):
+        """Toast du pull des sorties C15 (#341) — extrait de
+        `action_tirer_sorties_c15` pour être réutilisé tel quel par
+        `souscription.campagne.facturation.action_pull_sorties_c15` (#366) :
+        la Campagne poste le récapitulatif au journal SANS dupliquer ce
+        toast, en appelant `_pull_sorties_c15_donnees` puis ce même
+        formatage."""
         message = _(
             'Sorties C15 : %(ecrites)s date(s) de fin écrite(s), %(corrigees)s corrigée(s), '
             '%(inchangees)s inchangée(s), %(erreurs)s en erreur.',
@@ -658,6 +659,16 @@ class Souscription(models.Model):
                 'sticky': False,
             },
         }
+
+    def action_tirer_sorties_c15(self):
+        """Bouton autonome (motif sync F15, cf.
+        `souscription.refacturation.synchroniser_depuis_electricore`) :
+        emballe `_pull_sorties_c15_donnees` en toast (#341, ADR 0036 décision
+        13) — aucune couture réseau ici, seuls les comptes traversent la
+        frontière UI. Le câblage dans l'ordre de la campagne relève de la
+        tranche 3 du chantier #21."""
+        ecrites, corrigees, inchangees, erreurs = self._pull_sorties_c15_donnees()
+        return self._toast_sorties_c15(ecrites, corrigees, inchangees, erreurs)
 
     # --- Poll quotidien des affaires Enedis (#89, ADR 0021 §3-4) ---
 

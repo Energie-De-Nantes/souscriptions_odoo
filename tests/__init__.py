@@ -11,6 +11,7 @@ from . import (
     test_campagne_lettre_mois,
     test_campagne_notes,
     test_campagne_signaux,
+    test_campagne_vue_phases,
     test_catalogue,
     test_cheque_energie,
     test_chronologie,

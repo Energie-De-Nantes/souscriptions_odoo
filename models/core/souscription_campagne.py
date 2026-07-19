@@ -1233,6 +1233,12 @@ class SouscriptionCampagneEtape(models.Model):
         string='Prérequis',
         compute='_compute_etat_prerequis',
     )
+    # « Bloquée par : X » (#344, PRD #339) : les LIBELLÉS des prérequis pas
+    # encore faits, pour ne pas demander au·à la Facturiste de connaître le
+    # DAG par cœur. Affichage seul — vide pour une étape prête ou faite,
+    # aucun champ nouveau persisté (même esprit que `etat_prerequis`, dont ce
+    # champ reprend le calcul plutôt que de le dupliquer).
+    bloquee_par = fields.Char(string='Bloquée par', compute='_compute_bloquee_par')
     # « Fait » : pour une porte manuelle, la validation ; pour une étape à
     # signal dérivé, son reste-à-faire (#157 : fait quand nb_reste_a_faire == 0) ;
     # pour une action (sync F15), sa demande (`demande`). Cf. le catalogue.
@@ -1314,6 +1320,21 @@ class SouscriptionCampagneEtape(models.Model):
                 continue
             freres = {e.code: e.fait for e in etape.campagne_id.etape_ids}
             etape.etat_prerequis = 'prete' if all(freres.get(p) for p in prerequis) else 'bloquee'
+
+    @api.depends('code', 'valide', 'type_etape', 'campagne_id.etape_ids.fait')
+    def _compute_bloquee_par(self):
+        """#344 : les libellés des prérequis pas encore `fait` — même lecture
+        du catalogue et des frères que `_compute_etat_prerequis`, dont ce
+        compute ne fait que garder la trace de CE qui manque plutôt que
+        seulement « bloquée »/« prête »."""
+        for etape in self:
+            if etape.etat_prerequis != 'bloquee':
+                etape.bloquee_par = False
+                continue
+            prerequis = ETAPES_CAMPAGNE.get(etape.code, {}).get('prerequis', ())
+            freres = {e.code: e.fait for e in etape.campagne_id.etape_ids}
+            manquants = [ETAPES_CAMPAGNE[code]['label'] for code in prerequis if not freres.get(code)]
+            etape.bloquee_par = ', '.join(manquants)
 
     # --- Drill-down (#157 ; générique #342, ADR 0036 décision 9) : la clé
     # `drill_down` du catalogue nomme une méthode de CETTE classe qui

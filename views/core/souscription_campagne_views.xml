@@ -50,19 +50,26 @@
                     </group>
                     <notebook>
                         <page string="Étapes" name="etapes">
-                            <field name="etape_ids" create="0" delete="0">
-                                <!-- Prochaine étape en évidence (#301), décorations XML pures :
-                                     faites grisées, prêtes-non-faites en gras. Le DAG peut avoir
-                                     plusieurs racines actionnables à la fois (#156) : le gras les
-                                     montre toutes, sans notion de « la » prochaine étape unique. -->
+                            <!-- La vue en phases (#344, PRD #339) : le même one2many rendu
+                                 QUATRE fois, chacun filtré par `phase` (#342) — même idiome que
+                                 la ligne de séparation énergie/abonnement d'une facture
+                                 (souscription_periode.py, display_type='line_section') : un
+                                 séparateur titré par section, natif, zéro JS. Plus de poignée de
+                                 tri (widget="handle") : le catalogue est fixe et topologique,
+                                 laisser glisser les lignes est un mensonge d'affichage. -->
+                            <separator string="Tirer"/>
+                            <field name="etape_ids" create="0" delete="0" domain="[('phase', '=', 'tirer')]">
                                 <list editable="bottom" create="0" delete="0"
                                       decoration-muted="fait" decoration-bold="etat_prerequis == 'prete' and not fait">
-                                    <field name="sequence" widget="handle"/>
                                     <field name="code" readonly="1"/>
                                     <field name="type_etape" column_invisible="1"/>
                                     <field name="etat_prerequis" widget="badge"
                                            decoration-success="etat_prerequis == 'prete'"
                                            decoration-warning="etat_prerequis == 'bloquee'"/>
+                                    <!-- « Bloquée par : X » (#344) : les libellés des prérequis
+                                         non faits, plutôt que le badge muet ci-dessus qui suppose
+                                         le DAG connu par cœur. Vide pour une étape prête/faite. -->
+                                    <field name="bloquee_par" invisible="etat_prerequis != 'bloquee'"/>
                                     <field name="valide" widget="boolean_toggle" invisible="type_etape != 'porte'"/>
                                     <field name="valide_par_id" readonly="1" invisible="not valide"/>
                                     <field name="valide_le" readonly="1" invisible="not valide"/>
@@ -75,6 +82,69 @@
                                          sync F15 (action) est « faite » dès sa demande (`demande`).
                                          Émettre factures (#326, ADR 0035) : le clic pose l'intention
                                          et déclenche le cron de vidange — rend la main immédiatement. -->
+                                    <button name="action_executer" type="object" string="Lancer"
+                                            class="btn-link" invisible="type_etape == 'porte'"/>
+                                    <button name="action_drill_down" type="object" string="Voir" icon="fa-search"/>
+                                </list>
+                            </field>
+                            <separator string="Vérifier"/>
+                            <field name="etape_ids" create="0" delete="0" domain="[('phase', '=', 'verifier')]">
+                                <list editable="bottom" create="0" delete="0"
+                                      decoration-muted="fait" decoration-bold="etat_prerequis == 'prete' and not fait">
+                                    <field name="code" readonly="1"/>
+                                    <field name="type_etape" column_invisible="1"/>
+                                    <field name="etat_prerequis" widget="badge"
+                                           decoration-success="etat_prerequis == 'prete'"
+                                           decoration-warning="etat_prerequis == 'bloquee'"/>
+                                    <field name="bloquee_par" invisible="etat_prerequis != 'bloquee'"/>
+                                    <field name="valide" widget="boolean_toggle" invisible="type_etape != 'porte'"/>
+                                    <field name="valide_par_id" readonly="1" invisible="not valide"/>
+                                    <field name="valide_le" readonly="1" invisible="not valide"/>
+                                    <field name="nb_reste_a_faire"
+                                           invisible="type_etape != 'derive' and code != 'preparer_prelevements'"/>
+                                    <field name="fait" widget="boolean" readonly="1"/>
+                                    <button name="action_executer" type="object" string="Lancer"
+                                            class="btn-link" invisible="type_etape == 'porte'"/>
+                                    <button name="action_drill_down" type="object" string="Voir" icon="fa-search"/>
+                                </list>
+                            </field>
+                            <separator string="Facturer"/>
+                            <field name="etape_ids" create="0" delete="0" domain="[('phase', '=', 'facturer')]">
+                                <list editable="bottom" create="0" delete="0"
+                                      decoration-muted="fait" decoration-bold="etat_prerequis == 'prete' and not fait">
+                                    <field name="code" readonly="1"/>
+                                    <field name="type_etape" column_invisible="1"/>
+                                    <field name="etat_prerequis" widget="badge"
+                                           decoration-success="etat_prerequis == 'prete'"
+                                           decoration-warning="etat_prerequis == 'bloquee'"/>
+                                    <field name="bloquee_par" invisible="etat_prerequis != 'bloquee'"/>
+                                    <field name="valide" widget="boolean_toggle" invisible="type_etape != 'porte'"/>
+                                    <field name="valide_par_id" readonly="1" invisible="not valide"/>
+                                    <field name="valide_le" readonly="1" invisible="not valide"/>
+                                    <field name="nb_reste_a_faire"
+                                           invisible="type_etape != 'derive' and code != 'preparer_prelevements'"/>
+                                    <field name="fait" widget="boolean" readonly="1"/>
+                                    <button name="action_executer" type="object" string="Lancer"
+                                            class="btn-link" invisible="type_etape == 'porte'"/>
+                                    <button name="action_drill_down" type="object" string="Voir" icon="fa-search"/>
+                                </list>
+                            </field>
+                            <separator string="Solder"/>
+                            <field name="etape_ids" create="0" delete="0" domain="[('phase', '=', 'solder')]">
+                                <list editable="bottom" create="0" delete="0"
+                                      decoration-muted="fait" decoration-bold="etat_prerequis == 'prete' and not fait">
+                                    <field name="code" readonly="1"/>
+                                    <field name="type_etape" column_invisible="1"/>
+                                    <field name="etat_prerequis" widget="badge"
+                                           decoration-success="etat_prerequis == 'prete'"
+                                           decoration-warning="etat_prerequis == 'bloquee'"/>
+                                    <field name="bloquee_par" invisible="etat_prerequis != 'bloquee'"/>
+                                    <field name="valide" widget="boolean_toggle" invisible="type_etape != 'porte'"/>
+                                    <field name="valide_par_id" readonly="1" invisible="not valide"/>
+                                    <field name="valide_le" readonly="1" invisible="not valide"/>
+                                    <field name="nb_reste_a_faire"
+                                           invisible="type_etape != 'derive' and code != 'preparer_prelevements'"/>
+                                    <field name="fait" widget="boolean" readonly="1"/>
                                     <button name="action_executer" type="object" string="Lancer"
                                             class="btn-link" invisible="type_etape == 'porte'"/>
                                     <button name="action_drill_down" type="object" string="Voir" icon="fa-search"/>

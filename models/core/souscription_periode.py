@@ -24,7 +24,6 @@ class SouscriptionPeriode(models.Model):
     mois = fields.Date(string='Mois (canonique)', compute='_compute_mois', store=True, readonly=True)
 
     pdl = fields.Char(string='pdl', readonly=True)
-    lisse = fields.Boolean(string='Lissé', readonly=True)  # related='souscription_id.lisse',  store=True)
 
     # Identité electricore (ADR 0010, ADR 0020 §3) : la Période snapshotte la RSC
     # de la Souscription à sa création — même logique que le snapshot des
@@ -309,7 +308,6 @@ class SouscriptionPeriode(models.Model):
                     'provision_mensuelle_kwh_periode': sous.provision_mensuelle_kwh,
                     'coeff_pro_periode': sous.coeff_pro,
                     'pdl': sous.pdl,  # Copie du PDL aussi
-                    'lisse': sous.lisse,  # Compatibilité ancien champ
                     'config_cadrans': sous.config_cadrans or ('4_cadrans' if sous.type_tarif == 'hphc' else 'base'),
                     # Snapshot de la RSC (ADR 0010, ADR 0020 §3) : même logique que
                     # le snapshot des paramètres contractuels (ADR 0006).
@@ -355,7 +353,6 @@ class SouscriptionPeriode(models.Model):
             'date_debut',
             'date_fin',
             'pdl',
-            'lisse',
             'config_cadrans',
             'type_periode',
             'provision_hp_kwh',

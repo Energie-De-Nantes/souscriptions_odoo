@@ -51,7 +51,7 @@
                             <div class="fe_eyebrow">
                                 <span t-if="o.move_type == 'out_refund'">Avoir</span>
                                 <span t-else="">Facture</span>
-                                <span t-if="periode.lisse" class="fe_pill">Mensualisée</span>
+                                <span t-if="periode.lisse_periode" class="fe_pill">Mensualisée</span>
                                 <span t-if="o.state == 'draft'" class="fe_pill">Brouillon</span>
                                 <span t-if="o.state == 'cancel'" class="fe_pill">Annulée</span>
                             </div>
@@ -164,7 +164,7 @@
                 <table class="fe_layout o_ignore_layout_styling" style="margin-top:12px;">
                     <tr>
                         <td style="width:58%; padding-right:14px;">
-                            <div t-if="periode.lisse" class="fe_callout">
+                            <div t-if="periode.lisse_periode" class="fe_callout">
                                 <strong>Option mensualisée.</strong> Cette facture correspond à votre
                                 consommation moyenne mensuelle estimée. L'écart avec votre consommation
                                 réelle est soldé lors d'une régularisation.

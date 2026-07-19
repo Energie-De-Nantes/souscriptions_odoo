@@ -340,7 +340,10 @@ class TestInvoiceTemplate(TransactionCase):
 
         self.assertIn("d'ici le 10 de ce mois", html_content)
         self.assertIn('Opérations', html_content)
-        self.assertNotIn('<img', html_content)
+        # Pas de QR dans le bloc Paiement (le logo d'en-tête, lui, est un <img> légitime)
+        idx = html_content.index('payeur·euse en Moneko')
+        bloc = html_content[html_content.rindex('<div', 0, idx) : html_content.index('</div>', idx)]
+        self.assertNotIn('<img', bloc)
         self.assertNotIn('Prélèvement automatique', html_content)
         self.assertIn("Pas d'escompte pour paiement anticipé", html_content)
         self.assertIn("Passée la date d'échéance", html_content)

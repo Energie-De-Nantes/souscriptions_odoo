@@ -12,7 +12,7 @@ from datetime import date
 
 from odoo.tests.common import TransactionCase, tagged
 
-from .common import ABO_ANNUEL_STD, SouscriptionsTestCase, build_grille_lignes
+from .common import ABO_ANNUEL_STD, SouscriptionsTestCase, abo_annuel_std, build_grille_lignes
 
 
 @tagged('souscriptions', 'souscriptions_composition', 'post_install', '-at_install')
@@ -177,6 +177,87 @@ class TestPeriodeComposition(SouscriptionsTestCase):
             d for d in self._dicts(periode._composer_lignes(self.grille_prix)) if d.get('name') == 'Énergie Base'
         )
         self.assertAlmostEqual(base['price_unit'], 0.15, places=6)
+
+    # === Puissance de l'abonnement : moyenne mesurée vs snapshot souscrit (#78) ===
+    #
+    # Le tarif d'abonnement est affine (ADR 0018) : prixer sur la puissance
+    # MOYENNE de la période (contrat v3, #76) vaut exactement la somme des
+    # sous-périodes en cas de changement de puissance en cours de mois — pas
+    # besoin de découper la Période. Repli sur le snapshot
+    # `puissance_souscrite_periode` (ADR 0006) quand la moyenne est absente
+    # (Période saisie à la main, pull pas encore passé).
+
+    def test_composer_lignes_puissance_moyenne_prixee_quand_presente(self):
+        """AC1 : une puissance moyenne différente de la souscrite pilote le
+        prix ET la quantité de la ligne d'abonnement — pas la souscrite."""
+        periode = self._periode(self.souscription_base, provision_base_kwh=100.0, puissance_moyenne_kva=9.0)
+        # La souscription est à 6 kVA ; la moyenne mesurée diverge volontairement.
+        self.assertEqual(periode.puissance_souscrite_periode, 6.0)
+
+        abo = next(
+            d
+            for d in self._dicts(periode._composer_lignes(self.grille_prix))
+            if d.get('product_id') and 'Abonnement' in d.get('name', '')
+        )
+        self.assertAlmostEqual(abo['price_unit'], abo_annuel_std(9.0) / 365.0, places=4)
+
+    def test_composer_lignes_sans_puissance_moyenne_repli_snapshot(self):
+        """AC2 : puissance moyenne absente (0.0, valeur par défaut) → repli
+        sur le snapshot souscrit, comportement actuel inchangé."""
+        periode = self._periode(self.souscription_base, provision_base_kwh=100.0)
+        self.assertEqual(periode.puissance_moyenne_kva, 0.0)
+
+        abo = next(
+            d
+            for d in self._dicts(periode._composer_lignes(self.grille_prix))
+            if d.get('product_id') and 'Abonnement' in d.get('name', '')
+        )
+        self.assertAlmostEqual(abo['price_unit'], ABO_ANNUEL_STD['6'] / 365.0, places=4)
+
+    def test_composer_lignes_libelle_abonnement_porte_la_puissance_facturee(self):
+        """AC3 : le libellé de la ligne d'abonnement affiche la puissance
+        FACTURÉE (la moyenne, quand présente) — jamais la souscrite en
+        désaccord avec le prix appliqué. La CP, elle, n'est pas concernée
+        (projection de la Souscription vivante, `_prix_documents`)."""
+        periode = self._periode(self.souscription_base, provision_base_kwh=100.0, puissance_moyenne_kva=9.0)
+
+        abo = next(
+            d
+            for d in self._dicts(periode._composer_lignes(self.grille_prix))
+            if d.get('product_id') and 'Abonnement' in d.get('name', '')
+        )
+        self.assertIn('9 kVA', abo['name'])
+        self.assertNotIn('6 kVA', abo['name'])
+
+    def test_composer_lignes_changement_puissance_mi_mois_montant_exact(self):
+        """AC4 (`has_changement`) : facturer sur la moyenne pondérée EST la
+        somme exacte de deux sous-périodes à puissance différente —
+        linéarité du tarif affine (#78). 10 jours à 6 kVA + 21 jours à
+        9 kVA, sur les 31 jours de janvier."""
+        jours_avant, kva_avant = 10, 6.0
+        jours_apres, kva_apres = 21, 9.0
+        jours_total = jours_avant + jours_apres
+        moyenne = (jours_avant * kva_avant + jours_apres * kva_apres) / jours_total
+
+        periode = self._periode(
+            self.souscription_base,
+            provision_base_kwh=100.0,
+            puissance_moyenne_kva=moyenne,
+            has_changement=True,
+        )
+        self.assertEqual(periode.jours, jours_total)
+
+        abo = next(
+            d
+            for d in self._dicts(periode._composer_lignes(self.grille_prix))
+            if d.get('product_id') and 'Abonnement' in d.get('name', '')
+        )
+        montant_moyenne = abo['quantity'] * abo['price_unit']
+
+        montant_exact = jours_avant * (abo_annuel_std(kva_avant) / 365.0) + jours_apres * (
+            abo_annuel_std(kva_apres) / 365.0
+        )
+        self.assertAlmostEqual(montant_moyenne, montant_exact, places=4)
 
     def test_creer_facture_pose_periode_id_et_partner(self):
         """La coquille _creer_facture émet le move avec periode_id et le bon partner."""

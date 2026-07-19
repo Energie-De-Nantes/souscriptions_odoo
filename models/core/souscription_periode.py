@@ -379,8 +379,9 @@ class SouscriptionPeriode(models.Model):
     # Champs du MESURÉ que la composition des lignes lit (suivi de review
     # #271) : exclus du verrou (mesuré vivant, ADR 0030) mais leur écriture
     # recompose un brouillon lié — un non-lissé non tamponné facture le mesuré
-    # en direct (`_quantite_facturee`), les notes TURPE lisent `turpe_*`, et
-    # les 4 cadrans saisonniers recalculent HP/HC (compute stocké).
+    # en direct (`_quantite_facturee`), les notes TURPE lisent `turpe_*`, la
+    # ligne d'abonnement lit `puissance_moyenne_kva` (#78), et les 4 cadrans
+    # saisonniers recalculent HP/HC (compute stocké).
     _CHAMPS_MESURE_COMPOSES = frozenset(
         {
             'energie_base_kwh',
@@ -392,6 +393,7 @@ class SouscriptionPeriode(models.Model):
             'energie_hcb_kwh',
             'turpe_fixe',
             'turpe_variable',
+            'puissance_moyenne_kva',
         }
     )
 
@@ -674,12 +676,28 @@ class SouscriptionPeriode(models.Model):
         flag de provenance, pour que TOUT chemin qui compose des lignes
         depuis une Période (création, re-génération à l'émission) le porte
         sans avoir à y penser.
+
+        Puissance de l'abonnement (#78) : le tarif est **affine**
+        (``prix_base_3kva + coef_kva × (puissance − 3)``, ADR 0018), donc
+        prixer sur la **moyenne pondérée** du mesuré (``puissance_moyenne_kva``,
+        contrat v3 #76) vaut la somme exacte des sous-périodes — un
+        changement de puissance en cours de mois se facture juste sans
+        découper la Période. Repli sur le snapshot
+        ``puissance_souscrite_periode`` (ADR 0006) quand la moyenne est
+        absente (Période saisie à la main, pull pas encore passé). Le
+        libellé de la ligne suit la même valeur — il affiche la puissance
+        **facturée**, jamais divergente du prix appliqué. Les conditions
+        particulières restent inchangées : elles projettent la puissance
+        **souscrite** de la Souscription vivante
+        (``souscription._prix_documents``), pas ce calcul.
         """
         self.ensure_one()
 
         # Snapshot figé typé — ADR 0006 (pas de repli sur la souscription live)
-        # et #14 (valeurs typées : aucun parsing à la facturation).
-        puissance_kva = self.puissance_souscrite_periode
+        # et #14 (valeurs typées : aucun parsing à la facturation). La
+        # puissance moyenne (mesuré, #76) prime quand elle est connue ; sinon
+        # repli sur le snapshot souscrit (#78).
+        puissance_kva = self.puissance_moyenne_kva or self.puissance_souscrite_periode
         coeff_pro_historise = self.coeff_pro_periode
 
         if not puissance_kva:

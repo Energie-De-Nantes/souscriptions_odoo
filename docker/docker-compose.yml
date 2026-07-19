@@ -37,6 +37,10 @@ services:
     volumes:
       - odoo-web-data:/var/lib/odoo
       - ../:/mnt/extra-addons/souscriptions_odoo:rw
+    # max-cron-threads=2 (pas 0) : le module dépend des crons (amorçage campagne,
+    # vidanges — ADR 0035/0036), et 2 threads (défaut Odoo) évitent qu'un amorçage
+    # long ne bloque les autres jobs. Aucun mail ne peut sortir pour autant : zéro
+    # ir.mail_server (garde-fou dev.sh) ni SMTP joignable.
     command: >
       odoo
       --db_host=db
@@ -44,7 +48,7 @@ services:
       --db_password=odoo
       --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
       --load-language=fr_FR
-      --max-cron-threads=0
+      --max-cron-threads=2
       --dev=reload,xml,qweb
 
 volumes:

@@ -20,8 +20,11 @@
 # Mode prod : pilote `../souscriptions_migration` (ADR 0003/0023, dépôt jetable **voisin**,
 # jamais fusionné ici) en shell-out — transform -> load --cible vierge (base fraîche : rien
 # à bind, `bind` sert le chemin bascule odoo.sh, hors sujet ici). Garde-fous fail-closed
-# (charte migration) vérifiés avant ET après chargement : crons coupés, aucun mail sortant,
-# aucun règlement SEPA groupé — une base non conforme arrête le script.
+# (charte migration) vérifiés avant ET après chargement : aucun mail sortant, aucun
+# règlement SEPA groupé — une base non conforme arrête le script. Les crons tournent
+# (--max-cron-threads=2 depuis le 19/07/2026) : le module en dépend (amorçage de
+# campagne, vidanges, poll RSC — ADR 0035/0036) ; le fail-closed mail repose sur
+# l'absence d'ir.mail_server (vérifiée ci-dessous) + aucun SMTP joignable du conteneur.
 #
 # Secrets electricore (ELECTRICORE_URL / _API_KEY) : injectés depuis Proton Pass —
 #   pr ./scripts/dev.sh              # pass-cli résout .env.pass -> env shell -> pass-through compose -> conteneur
@@ -127,12 +130,9 @@ fi
 
 # --- Mode prod : bring-up détaché, câblage souscriptions_migration, garde-fous ---
 
-# Garde-fou statique : crons coupés au niveau serveur (docker-compose.yml, partagé par
-# les deux modes) — vérifié ici pour que --data=prod s'arrête si jamais retiré.
-if ! grep -q -- '--max-cron-threads=0' "$REPO_ROOT/docker/docker-compose.yml"; then
-    echo "Garde-fou violé : --max-cron-threads=0 absent de docker-compose.yml (crons potentiellement actifs)." >&2
-    exit 1
-fi
+# Les crons tournent volontairement (le module en dépend : amorçage, vidanges, poll RSC).
+# Le fail-closed « aucun mail sortant » est porté par assert_garde_fous (ir.mail_server
+# vide) — un mail mis en file sans serveur SMTP finit en exception, il ne sort pas.
 
 assert_garde_fous() {
     # Garde-fous fail-closed niveau base (charte migration : aucun mail sortant, aucun SEPA
@@ -161,7 +161,7 @@ assert_garde_fous() {
         echo "Garde-fou violé ($1) : des règlements SEPA groupés existent sur '$DB'." >&2
         exit 1
     fi
-    echo "==> Garde-fous OK ($1) : crons coupés, mail sortant vide, aucun SEPA."
+    echo "==> Garde-fous OK ($1) : mail sortant vide, aucun SEPA (crons actifs, sans transport mail)."
 }
 
 "${COMPOSE[@]}" up -d --build odoo

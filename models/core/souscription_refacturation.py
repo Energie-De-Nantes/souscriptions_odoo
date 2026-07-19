@@ -262,7 +262,10 @@ class SouscriptionRefacturation(models.Model):
         que le·la facturiste voie tout de suite la ligne rassemblée sur le
         document qu'il·elle s'apprête à émettre. Aucun effet sur une facture
         déjà émise (filtre `state == 'draft'`) : la re-génération à
-        l'émission (#266) reste le filet de sécurité final."""
+        l'émission (#266) reste le filet de sécurité final.
+
+        Point d'entrée (c) : carte complète des 5 points d'entrée dans la
+        bannière « Régénération au fil de l'eau » de `account_move.py`."""
         if not souscription_ids:
             return
         brouillons = self.env['account.move'].search(

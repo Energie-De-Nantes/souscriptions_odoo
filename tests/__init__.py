@@ -28,6 +28,7 @@ from . import (
     test_integration,
     test_invoice_template,
     test_mail_facture_energie,
+    test_mail_regularisation,
     test_mails_raccordement,
     test_meta_exhaustivite,
     test_migration_energie_facturee,

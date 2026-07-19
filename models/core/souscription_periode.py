@@ -486,16 +486,29 @@ class SouscriptionPeriode(models.Model):
         """Un relevé `releve` porte-t-il au moins un index non nul de `famille` ?"""
         return any(releve[champ['field']] for champ in self._RELEVE_COLONNES[famille])
 
+    def _familles_du_releve(self, releve):
+        """Famille(s) de cadrans portées par UN relevé (#139) : sa
+        `famille_cadrans` — source autoritative electricore — quand elle est
+        renseignée ; repli sur l'inférence Tranche 1 (#138, au moins un index
+        non nul de la famille) quand le champ est vide (clé absente côté
+        electricore : calendrier inconnu, données anciennes, lacunes de
+        backfill). L'inférence permet en théorie plusieurs familles pour un
+        même relevé (fields disjoints en pratique) ; `famille_cadrans` en
+        désigne une seule."""
+        if releve.famille_cadrans:
+            return [releve.famille_cadrans]
+        return [f for f in self._FAMILLES if self._famille_non_vide(releve, f)]
+
     def _familles_relevees(self):
         """Familles de cadrans (`base`/`hp_hc`/`4_cadrans`) réellement portées
         par les relevés de cette Période, ordonnées superficiel → profond
         (#138). Un changement de compteur en cours de période peut faire
         cohabiter deux familles ; chaque relevé ne remplit que les registres de
         *son* compteur. Repli sur le `config_cadrans` déclaré si aucun relevé ne
-        porte le moindre index (saisie manuelle #12, qui doit garder des
-        colonnes où écrire)."""
+        désigne de famille — ni par `famille_cadrans` ni par inférence (saisie
+        manuelle #12, qui doit garder des colonnes où écrire)."""
         self.ensure_one()
-        presentes = [f for f in self._FAMILLES if any(self._famille_non_vide(r, f) for r in self.releve_ids)]
+        presentes = [f for f in self._FAMILLES if any(f in self._familles_du_releve(r) for r in self.releve_ids)]
         return presentes or [self.config_cadrans or 'base']
 
     def releve_colonnes(self):
@@ -517,6 +530,7 @@ class SouscriptionPeriode(models.Model):
         'releve_ids.index_hpb',
         'releve_ids.index_hch',
         'releve_ids.index_hcb',
+        'releve_ids.famille_cadrans',
     )
     def _compute_releve_show_familles(self):
         """Booléens calculés pour le gating XML du formulaire backend (#138) :

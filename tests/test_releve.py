@@ -185,6 +185,61 @@ class TestReleveColonnesUnionFamilles(SouscriptionsTestCase):
             ['index_hph', 'index_hpb', 'index_hch', 'index_hcb'],
         )
 
+    def test_compteur_neuf_famille_cadrans_pilote_malgre_index_a_zero(self):
+        """Compteur neuf : le registre est présent mais lit 0 (pas encore de
+        conso) — l'inférence Tranche 1 seule ne verrait aucune famille. La
+        `famille_cadrans` ingérée depuis electricore (#139) désigne quand même
+        la bonne famille."""
+        self.souscription_hphc.config_cadrans = 'hp_hc'
+        periode = self.create_test_periode(self.souscription_hphc)
+        self.env['souscription.releve'].create(
+            {
+                'periode_id': periode.id,
+                'date': date(2024, 1, 1),
+                'nature': 'reel',
+                'index_hp': 0,
+                'index_hc': 0,
+                'famille_cadrans': 'hp_hc',
+            }
+        )
+
+        self.assertEqual([c['field'] for c in periode.releve_colonnes()], ['index_hp', 'index_hc'])
+
+    def test_changement_compteur_familles_cadrans_differentes_union_affichee(self):
+        """Changement de compteur : deux relevés d'une même Période portent des
+        `famille_cadrans` différentes (#139) — les deux familles sont
+        affichées (union), comme pour l'inférence."""
+        self.souscription_hphc.config_cadrans = 'hp_hc'
+        periode = self.create_test_periode(self.souscription_hphc)
+        Releve = self.env['souscription.releve']
+        Releve.create(
+            {
+                'periode_id': periode.id,
+                'date': date(2024, 1, 1),
+                'nature': 'reel',
+                'index_hp': 8000,
+                'index_hc': 4000,
+                'famille_cadrans': 'hp_hc',
+            }
+        )
+        Releve.create(
+            {
+                'periode_id': periode.id,
+                'date': date(2024, 1, 31),
+                'nature': 'reel',
+                'index_hph': 10,
+                'index_hpb': 20,
+                'index_hch': 30,
+                'index_hcb': 40,
+                'famille_cadrans': '4_cadrans',
+            }
+        )
+
+        self.assertEqual(
+            [c['field'] for c in periode.releve_colonnes()],
+            ['index_hp', 'index_hc', 'index_hph', 'index_hpb', 'index_hch', 'index_hcb'],
+        )
+
     def test_booleens_releve_show_gatent_le_formulaire_backend(self):
         """`releve_show_base/hphc/4cadrans` (gating XML, `column_invisible` ne
         pouvant appeler une méthode) reflètent l'union — plusieurs peuvent être

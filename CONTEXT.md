@@ -362,12 +362,16 @@ calendrier de comptage distingue.
 **Calendrier distributeur** :
 L'identifiant **autoritatif** côté electricore du *calendrier de comptage* d'un PDL (source C15,
 propriété de la *Configuration Enedis*) — distinct de `config_cadrans`, sa copie **snapshottée à
-la main** côté Odoo tant que le contrat d'intégration manque (#12, ADR 0005). Consommé **à terme**
-pour remplacer la saisie manuelle par un pull ; en attendant, le justificatif des *Relevés*
-**infère** les familles de cadrans réellement présentes depuis les index saisis, avec repli sur
-`config_cadrans` déclaré si aucun index n'est renseigné (ADR 0015 amendé, #138).
-_Éviter_ : confondre avec `config_cadrans` (la copie Odoo, aujourd'hui déclarative et sujette à
-repli, pas encore reliée à ce calendrier autoritatif).
+la main** côté Odoo tant que le contrat d'intégration manque (#12, ADR 0005). Consommé côté
+justificatif des *Relevés* via `ObjetReleve.famille_cadrans` (contrat v3, #139) : chaque *Relevé*
+porte, quand electricore la connaît, sa propre famille de cadrans, ingérée telle quelle
+(`souscription.releve.famille_cadrans`) — c'est elle qui désigne la famille du relevé. Repli sur
+l'**inférence** des familles réellement présentes depuis les index saisis (Tranche 1, #138) quand
+le champ est vide (calendrier inconnu côté electricore, données anciennes, lacunes de backfill),
+elle-même repliée sur le `config_cadrans` déclaré si aucun relevé ne désigne de famille.
+_Éviter_ : confondre avec `config_cadrans` (la copie Odoo, déclarative, snapshot de la
+*Configuration fournisseur* — pas la famille propre à un relevé) ; croire l'inférence purement
+morte (elle reste le repli, #138).
 
 **Configuration fournisseur** :
 La configuration *commerciale* portée par la *Souscription* : formule tarifaire fournisseur

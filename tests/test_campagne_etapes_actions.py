@@ -458,6 +458,47 @@ class TestCampagneEtapeCreerFactures(SouscriptionsTestCase):
         self.assertEqual(len(souscription_ko.facture_ids), 1, "l'échec est retenté et réussit une fois corrigé")
         self.assertEqual(len(self.souscription_base.facture_ids), 1, 'déjà créée, pas de doublon')
 
+    def test_lot_mixte_conclut_dans_la_meme_execution_du_job(self):
+        """#383 : la vidange s'arrêtait avant la passe terminale quand un
+        échec était compté « traité ». Dans le repli unitaire, un `finally:
+        cron._commit_progress(1)` inconditionnel décrémentait le `remaining`
+        natif pour TOUTE unité — succès ou échec — donc `remaining` tombait
+        à 0 dès qu'un lot mixte était tenté une fois : `ir.cron._run_job`
+        concluait `FULLY_DONE` et ne rappelait plus la vidange. La passe
+        terminale (règle « pas de progrès », ADR 0035 décision 3) ne
+        tournait qu'au déclenchement externe SUIVANT du cron (le quotidien,
+        le lendemain) : `demande` restait levée et le récap (#366) n'était
+        jamais posté au journal.
+
+        D'où l'exception assumée à la règle de tête de classe (« aucun test
+        ne s'accroche au nombre de passes ») : ce test s'accroche à UNE
+        exécution du job — un seul `method_direct_trigger()`, PAS la boucle
+        de convergence `_vider()`, qui re-déclenche jusqu'à `demande`
+        retombée et papote exactement par-dessus ce bug. C'est la boucle
+        INTERNE d'`ir.cron._run_job` qui doit suffire : lot mixte (1 succès,
+        1 échec persistant — la grille Moulin manque toujours) → passe
+        mixte, puis passe terminale rappelée nativement (`remaining` resté
+        ≥ 1) → intention retombée et récap posté, sans nouveau
+        déclenchement externe."""
+        souscription_ko = self._preparer_lot_avec_un_echec()
+        self.campagne.action_creer_factures()
+        etape = self._etape()
+
+        with self.enter_registry_test_mode():
+            self.cron.method_direct_trigger()  # UNE seule exécution du job
+
+        etape.invalidate_recordset()
+        self.assertFalse(
+            etape.demande,
+            "la passe terminale a tourné dans la MÊME exécution du job — sans elle, l'intention resterait "
+            'levée jusqu’au passage quotidien suivant du cron',
+        )
+        messages = self.campagne.message_ids.mapped('body')
+        self.assertTrue(any('Créées : 1' in m for m in messages), 'récap posté au journal, dans le même job')
+        self.assertTrue(any('Échecs : 1' in m for m in messages))
+        self.assertEqual(len(self.souscription_base.facture_ids), 1, 'la souscription saine est facturée')
+        self.assertEqual(len(souscription_ko.facture_ids), 0, "l'échec persiste, aucune facture pour cette unité")
+
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneEtapeEmettreFactures(SouscriptionsTestCase):

@@ -301,6 +301,25 @@ class SouscriptionCampagneFacturation(models.Model):
     )
 
     etape_ids = fields.One2many('souscription.campagne.etape', 'campagne_id', string='Étapes')
+
+    # Vue en phases (#374, corrige #344) : quatre one2many, un par phase, le
+    # domain est posé ICI en Python — le seul endroit où un domain filtre
+    # réellement les lignes affichées d'un one2many (un `domain` XML sur le
+    # `<field>` ne fait que contraindre la sélection, jamais l'affichage).
+    # Partitionnent `etape_ids` (union complète, zéro recouvrement).
+    etape_tirer_ids = fields.One2many(
+        'souscription.campagne.etape', 'campagne_id', domain=[('phase', '=', 'tirer')], string='Étapes — Tirer'
+    )
+    etape_verifier_ids = fields.One2many(
+        'souscription.campagne.etape', 'campagne_id', domain=[('phase', '=', 'verifier')], string='Étapes — Vérifier'
+    )
+    etape_facturer_ids = fields.One2many(
+        'souscription.campagne.etape', 'campagne_id', domain=[('phase', '=', 'facturer')], string='Étapes — Facturer'
+    )
+    etape_solder_ids = fields.One2many(
+        'souscription.campagne.etape', 'campagne_id', domain=[('phase', '=', 'solder')], string='Étapes — Solder'
+    )
+
     note_ids = fields.One2many('souscription.campagne.note', 'campagne_id', string='Notes')
 
     # Lettre du mois (#313, ADR 0034) : TOUT l'éditorial du mail de facture —
@@ -1192,12 +1211,15 @@ class SouscriptionCampagneEtape(models.Model):
 
     # Phase (#342, ADR 0036 décision 14) : fonction pure de `code`, même
     # idiome que `type_etape` — aucune vue modifiée dans cette tranche (#344
-    # rendra les quatre sections).
+    # rendra les quatre sections). Cherchable (#374) : `search` traduit la
+    # comparaison en `code in [...]` via le catalogue, sans rien stocker de
+    # plus — le champ reste calculé.
     phase = fields.Selection(
         [('tirer', 'Tirer'), ('verifier', 'Vérifier'), ('facturer', 'Facturer'), ('solder', 'Solder')],
         compute='_compute_phase',
         store=True,
         string='Phase',
+        search='_search_phase',
     )
 
     # Porte manuelle (#156, ADR 0025 §2) : état persisté du DAG avec `demande`
@@ -1262,6 +1284,22 @@ class SouscriptionCampagneEtape(models.Model):
     def _compute_phase(self):
         for etape in self:
             etape.phase = ETAPES_CAMPAGNE.get(etape.code, {}).get('phase')
+
+    @api.model
+    def _search_phase(self, operator, value):
+        """#374 : `phase` n'est pas stocké, donc pas indexé — on traduit la
+        comparaison en `code in [...]` via le catalogue (source unique),
+        AVANT que la requête ne parte en base. `=`/`!=` (valeur str) et
+        `in`/`not in` (valeur liste) couvrent les usages réels (les quatre
+        one2many par phase, ci-dessous) ; les autres opérateurs (comparaison
+        d'ordre...) n'ont pas de sens sur une Selection et ne sont pas
+        supportés."""
+        if operator not in ('=', '!=', 'in', 'not in'):
+            raise NotImplementedError(f'phase : opérateur de recherche non supporté {operator!r}')
+        phases = {value} if isinstance(value, str) else set(value)
+        codes = [code for code, info in ETAPES_CAMPAGNE.items() if info.get('phase') in phases]
+        inclus = operator in ('=', 'in')
+        return [('code', 'in' if inclus else 'not in', codes)]
 
     def write(self, vals):
         if vals.get('valide'):

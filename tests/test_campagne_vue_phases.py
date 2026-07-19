@@ -12,6 +12,7 @@ Deux couches, comme le motif de test_campagne_bandeau_view.py :
 from datetime import date
 
 from lxml import etree
+from odoo.addons.souscriptions_odoo.models.core import souscription_campagne as campagne_module
 from odoo.tests.common import tagged
 
 from .common import SouscriptionsTestCase
@@ -55,6 +56,54 @@ class TestCampagneEtapeBloqueePar(SouscriptionsTestCase):
         campagne.etape_ids.invalidate_recordset()
         self.assertEqual(creer_factures.etat_prerequis, 'bloquee')
         self.assertEqual(creer_factures.bloquee_par, 'Vérif refacturations')
+
+
+@tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
+class TestCampagnePhaseChampsEtRecherche(SouscriptionsTestCase):
+    """#374 : `phase` cherchable (`_search_phase`) et les quatre one2many
+    `etape_<phase>_ids` qui partitionnent `etape_ids` — le fix du bug de la
+    vue en phases (le `domain` XML ne filtrait jamais l'affichage)."""
+
+    def _campagne(self, mois=date(2024, 7, 1)):
+        return self.env['souscription.campagne.facturation'].create({'mois': mois})
+
+    def test_les_quatre_champs_partitionnent_etape_ids(self):
+        campagne = self._campagne()
+        par_phase = {
+            'tirer': campagne.etape_tirer_ids,
+            'verifier': campagne.etape_verifier_ids,
+            'facturer': campagne.etape_facturer_ids,
+            'solder': campagne.etape_solder_ids,
+        }
+        # Union complète : aucune étape du catalogue n'est perdue.
+        union = campagne.env['souscription.campagne.etape']
+        for etapes in par_phase.values():
+            union |= etapes
+        self.assertEqual(set(union.ids), set(campagne.etape_ids.ids))
+        # Zéro recouvrement : chaque étape apparaît dans une seule phase.
+        self.assertEqual(sum(len(etapes) for etapes in par_phase.values()), len(campagne.etape_ids))
+        # Chaque champ ne contient que des étapes de sa propre phase.
+        for phase, etapes in par_phase.items():
+            self.assertTrue(etapes, f'aucune étape en phase {phase}')
+            self.assertTrue(all(e.phase == phase for e in etapes))
+
+    def test_search_phase_egalite_renvoie_les_bons_codes(self):
+        campagne = self._campagne()
+        trouvees = self.env['souscription.campagne.etape'].search(
+            [('phase', '=', 'tirer'), ('campagne_id', '=', campagne.id)]
+        )
+        codes_tirer = {code for code, info in campagne_module.ETAPES_CAMPAGNE.items() if info['phase'] == 'tirer'}
+        self.assertEqual(set(trouvees.mapped('code')), codes_tirer)
+
+    def test_search_phase_in_renvoie_lunion_des_phases(self):
+        campagne = self._campagne()
+        trouvees = self.env['souscription.campagne.etape'].search(
+            [('phase', 'in', ['tirer', 'solder']), ('campagne_id', '=', campagne.id)]
+        )
+        codes_attendus = {
+            code for code, info in campagne_module.ETAPES_CAMPAGNE.items() if info['phase'] in ('tirer', 'solder')
+        }
+        self.assertEqual(set(trouvees.mapped('code')), codes_attendus)
 
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')

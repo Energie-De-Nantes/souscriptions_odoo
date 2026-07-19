@@ -14,4 +14,9 @@
 # sont tous présents en 0.4.0. Lève le gate de déploiement du #147.
 # 0.5.0 : ajoute sorties() (requis par le pull des sorties C15 #246 / ADR 0031,
 # souscription_pull_meta_periodes_service._appeler_sorties). Surface vérifiée au tag.
+# 0.5.0 ajoute aussi provision_estimation() (requis par le bouton « Estimer
+# les provisions » du raccordement, #229 — referme la dernière brèche
+# `requests` hors fabrique, restaure ADR 0024) :
+# raccordement_demande._appeler_estimation devient un passe-plat d'une ligne
+# vers cette méthode, garde de version comprise côté client.
 electricore-client==0.5.0

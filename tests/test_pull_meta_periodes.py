@@ -111,6 +111,23 @@ class TestAmorcerDepuisMeta(SouscriptionsTestCase):
         self.assertEqual(periode.releve_ids.index_base, 0)
         self.assertIsInstance(periode.releve_ids.index_base, int)
 
+    def test_famille_cadrans_atterrit_sur_le_releve(self):
+        """`famille_cadrans` (#139, source autoritative electricore) atterrit
+        tel quel sur le relevé enfant — pas de mapping côté addon."""
+        meta = _periode_meta(releves_utilises=[_objet_releve(famille_cadrans='4_cadrans')])
+        periode = self.env['souscription.periode']._amorcer_depuis_meta(self.souscription_base, meta)
+
+        self.assertEqual(periode.releve_ids.famille_cadrans, '4_cadrans')
+
+    def test_famille_cadrans_absente_devient_vide(self):
+        """`famille_cadrans=None` (clé absente côté electricore — calendrier
+        inconnu ou données anciennes) laisse le champ vide, jamais une valeur
+        par défaut inventée."""
+        meta = _periode_meta(releves_utilises=[_objet_releve(famille_cadrans=None)])
+        periode = self.env['souscription.periode']._amorcer_depuis_meta(self.souscription_base, meta)
+
+        self.assertFalse(periode.releve_ids.famille_cadrans)
+
     def test_nature_corrige_devient_reel(self):
         """`nature_index='corrige'` (réel révisé) atterrit en `reel` (ADR 0020 §6)."""
         meta = _periode_meta(

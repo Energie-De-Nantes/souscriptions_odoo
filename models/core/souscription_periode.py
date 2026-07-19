@@ -774,7 +774,9 @@ class SouscriptionPeriode(models.Model):
         """Mappe un `ObjetReleve` (contrat v3) vers les vals d'un
         `souscription.releve` enfant (ADR 0020 §6) : provenance conservée
         (`releve_externe_id`, `origine`), nature réel/corrigé → `reel`,
-        estimé → `estime`."""
+        estimé → `estime`. `famille_cadrans` (#139) atterrit tel quel — source
+        autoritative du calendrier de comptage, `None` si electricore ne le
+        connaît pas (mapping DI→famille côté electricore, rien à porter ici)."""
         return {
             'date': fields.Date.to_date(releve.date_releve),
             'nature': self._NATURE_RELEVE.get(releve.nature_index, 'estime'),
@@ -787,6 +789,7 @@ class SouscriptionPeriode(models.Model):
             'index_hcb': releve.index_hcb_kwh or 0,
             'releve_externe_id': releve.releve_id,
             'origine': releve.evenement or releve.origine_releve,
+            'famille_cadrans': releve.famille_cadrans,
         }
 
     # Champs de l'atterrissage v3 rafraîchis EN BLOC par le pull (ADR 0030

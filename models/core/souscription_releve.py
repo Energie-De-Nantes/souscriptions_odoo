@@ -46,6 +46,19 @@ class SouscriptionReleve(models.Model):
     # d'index pertinentes à la saisie / à l'affichage.
     config_cadrans = fields.Selection(related='periode_id.config_cadrans', readonly=True)
 
+    # Calendrier de comptage AUTORITATIF de ce relevé précis, source
+    # electricore (`ObjetReleve.famille_cadrans`, contrat v3, #139) — stocké
+    # tel quel, sans mapping. Nullable : clé absente côté electricore
+    # (calendrier inconnu, données anciennes, lacunes de backfill) laisse le
+    # champ vide, auquel cas `_familles_relevees()` retombe sur l'inférence
+    # Tranche 1 (#138) depuis les index non nuls. Distinct de `config_cadrans`
+    # (déclaratif, snapshotté depuis la Souscription) : ce champ-ci est la
+    # famille réellement portée par CE relevé.
+    famille_cadrans = fields.Selection(
+        [('base', 'Base (mono-index)'), ('hp_hc', 'HP/HC'), ('4_cadrans', '4 cadrans saisonniers')],
+        string='Famille de cadrans (electricore)',
+    )
+
     date = fields.Date(required=True)
 
     # Mesure Enedis (reel) vs estimation electricore/facturiste (estime) :

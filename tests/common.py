@@ -136,7 +136,9 @@ def objet_releve(**overrides):
     """Stub duck-typé d'`ObjetReleve` (contrat v3) — stub enfant de
     `periode_meta` (même contrat, champ `releves_utilises`) : mêmes
     attributs, valeurs par défaut à None pour les champs optionnels du
-    contrat."""
+    contrat. `famille_cadrans` (#139, source autoritative du calendrier de
+    comptage) par défaut à `None` — clé absente côté electricore, comportement
+    des appelants existants inchangé."""
     base = dict(
         releve_id='ELC-RELEVE-001',
         date_releve='2024-01-31',
@@ -150,6 +152,7 @@ def objet_releve(**overrides):
         index_hch_kwh=None,
         index_hpb_kwh=None,
         index_hcb_kwh=None,
+        famille_cadrans=None,
     )
     base.update(overrides)
     return SimpleNamespace(**base)

@@ -6,9 +6,23 @@
         <field name="arch" type="xml">
             <form string="Configuration des mails">
                 <sheet>
-                    <group>
+                    <group string="Moneko">
                         <field name="qr_code_moneko" widget="image"/>
                     </group>
+                    <notebook>
+                        <!-- Textes permanents (#316, ADR 0034) : éditables par le
+                             groupe Facturiste (group_souscriptions_manager) sans
+                             group_system ni group_erp_manager — cf. ACL. -->
+                        <page string="Régularisation : difficultés de paiement">
+                            <field name="texte_regul_difficultes"/>
+                        </page>
+                        <page string="Avoir : appel au don">
+                            <field name="texte_regul_appel_don"/>
+                        </page>
+                        <page string="Clôture : accusé de résiliation">
+                            <field name="texte_regul_cloture"/>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>

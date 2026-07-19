@@ -1,48 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!-- Facture d'énergie : Envoi (#313, ADR 0034) — remplace les deux copies de
-         production (« Facture : Envoi EDN » / « Facture : Envoi EDN Moneko »),
-         qui ne différaient que par la région paiement/QR-code une fois
-         l'éditorial mensuel sorti sur la Campagne (lettre_mois). Ce corps ne
-         porte QUE le squelette transactionnel : salutation, n°/montant/période,
-         instruction de paiement, sign-off — et le t-out de la Lettre du mois.
+    <!-- Facture d'énergie : Envoi (#313, étendu #316, ADR 0034) — remplace les
+         deux copies de production (« Facture : Envoi EDN » / « Facture :
+         Envoi EDN Moneko ») ET la matrice (situation × mode de paiement)
+         choisie à la main en prod pour les Régularisations. UN SEUL corps qui
+         branche, jamais N modèles (ADR 0034 « les mails sans mois ») : une
+         phrase d'ouverture par situation (mensuelle / régularisation-facture
+         / régularisation-avoir / régularisation-clôture), un bloc Paiement
+         UNIQUE orthogonal (mode × facture/avoir), et le t-out des textes
+         éditoriaux (Lettre du mois pour la mensuelle, Textes permanents pour
+         les régularisations, `souscriptions_odoo.mail_config`, ADR 0034).
 
-         Wording repris MOT POUR MOT de la prod (relevé sur l'instance le
-         2026-07-15, débarrassé des styles inline de l'éditeur — box-sizing,
-         base-fs, mso-hide, <font>…), en tutoiement (registre prod) : sur un
-         chemin d'argent on cite, on ne paraphrase pas (ADR 0034, grill 3e
-         passage). Seule la mention de période (« pour la période ... ») est
-         un écart VOLONTAIRE à prod (qui dit « pour le mois qui vient de
-         s'écouler », faux sur une facture renvoyée plus tard).
+         Wording de la mensuelle repris MOT POUR MOT de la prod (#313) —
+         INCHANGÉ par cette tranche (AC #316) : sur un chemin d'argent on
+         cite, on ne paraphrase pas. Les branches régularisation sont NEUVES
+         (aucun ancêtre prod pour l'avoir/la clôture ; l'ouverture "avoir" et
+         "clôture" ci-dessous sont donc écrites pour cette tranche, jamais
+         citées).
 
-         Instruction de paiement : une branche EXPLICITE par valeur de
-         `mode_paiement` (5 valeurs, CONTEXT.md « Mode de paiement »),
-         JAMAIS de `t-else` — un `t-else` affirmerait un prélèvement par
-         défaut aux 3 circuits qui n'ont aucun texte prod (espèces, virement,
-         chèque) et aux souscriptions dont le mode est encore vide. Seuls
-         `prelevement` et `monnaie_locale` ont un bloc ; les 3 autres et le
-         mode vide n'obtiennent AUCUN bloc — la facture PDF jointe porte le
-         montant, leur texte revient à EDN (#320).
+         Situation (ouverture du corps) — priorité clôture > avoir > facture
+         régul > mensuelle, mutuellement exclusive :
+         - clôture : `object.is_regularisation_cloture` (#316, ADR 0031
+           décision 4) — AUCUN champ ajouté : dérivé de
+           `regularisation_id.periode_couverte_ids` ⊇ Période de clôture de
+           la Souscription, même prédicat que
+           `souscription.regularisation._marquer_regularisee_si_cloture`.
+         - avoir : `object.move_type == 'out_refund'` SEUL, pas conditionné à
+           `regularisation_id` — un avoir d'énergie reste `is_facture_energie`
+           même quand il reverse une mensuelle (`periode_id`, pas `copy=
+           False`, cf. `tests/test_avoir_facture_energie.py`) : cette branche
+           couvre donc TOUT avoir d'énergie qui atteint ce template, jamais
+           seulement ceux issus d'une Régularisation. Parle d'avoir, n'invite
+           JAMAIS à payer.
+         - facture de régularisation : `object.regularisation_id` (reste donc
+           forcément `out_invoice`, l'avoir étant déjà capté ci-dessus) —
+           parle de régularisation, jamais "pour le mois qui vient de
+           s'écouler".
+         - mensuelle : repli (`object.periode_id`, #313 inchangé).
 
-         QR-code Moneko : téléversable (`souscriptions_odoo.mail_config`,
-         ADR 0034), jamais un asset git — l'URL vient d'un compute NON
-         stocké sur account.move (`qr_moneko_image_url`), le template reste
-         bête (un `t-if` + un `t-att-src`, aucun `search`). Absent -> aucune
-         promesse de QR, la marche à suivre in-app et l'échéance tiennent
-         seules. Le QR n'existe QUE dans ce corps, jamais sur le PDF joint
-         (une Facture émise est immuable — un QR que Moneko réémet y
-         resterait figé faux, cf. reports/facture_energie_template.xml).
+         Paiement — LE bloc orthogonal (#316, décision centrale de la tranche) :
+         une seule paire de branches, keyée UNIQUEMENT par
+         (`move_type` × `mode_paiement`), jamais par la situation — ajouter une
+         situation ne redemande donc jamais d'écrire un paragraphe de paiement.
+         Quatre cellules déjà remplies (matrice de l'issue #316) :
+           prélèvement × facture -> prélèvement le 10 du mois en cours (texte
+             #313 INCHANGÉ, réutilisé tel quel par mensuelle ET régularisation) ;
+           monnaie_locale × facture -> QR-code Moneko (texte #313 INCHANGÉ) ;
+           prélèvement × avoir -> remboursement le prochain 10 du mois ;
+           monnaie_locale × avoir -> remboursement en Moneko direct — cellule
+             qui N'A JAMAIS EXISTÉ EN PRODUCTION (issue #316) : c'est elle qui
+             ferme le cas RFAC/2024/00001 (avoir Moneko envoyé sur le modèle
+             "paie-nous par QR-code", impayé 20 mois) — AUCUN QR, AUCUNE
+             invitation à payer sur cette branche.
+         Comme #313 : une branche EXPLICITE par valeur de `mode_paiement`
+         (5 valeurs, CONTEXT.md « Mode de paiement »), JAMAIS de `t-else` —
+         espèces, virement, chèque et mode vide n'obtiennent AUCUN bloc côté
+         facture NI côté avoir, sur les deux `move_type`.
+
+         QR-code Moneko : inchangé de #313 (téléversable, jamais un asset
+         git — cf. commentaire historique conservé ci-dessous dans le corps).
+
+         Textes permanents des régularisations (#316) : trois champs `Html`
+         de `souscription.mail.config` (`texte_regul_difficultes`,
+         `texte_regul_appel_don`, `texte_regul_cloture`), t-out comme la
+         Lettre du mois — vides -> aucun bloc, aucun résidu. Écrits par les
+         facturistes, jamais par ce module (ADR 0034).
 
          Chemin d'argent partagé avec le bloc Paiement du PDF
          (reports/facture_energie_template.xml, #369) : les mêmes phrases
-         (prélèvement / Moneko), les mêmes dates — toute modification se
-         synchronise À LA MAIN dans les deux fichiers.
+         (prélèvement / Moneko FACTURE), les mêmes dates — toute modification
+         se synchronise À LA MAIN dans les deux fichiers. Le PDF ne couvre
+         PAS l'avoir (hors périmètre #369) : rien à synchroniser côté avoir.
 
          SANS noupdate (contrairement aux modèles de bienvenue, ADR 0034) :
          ce modèle ne doit JAMAIS être édité à la main — un `-u
          souscriptions_odoo` doit réaffirmer notre version et réparer tout
          édit manuel ou clic sur Reset Template. L'éditorial vit exclusivement
-         dans le champ `lettre_mois` de la Campagne, jamais dans ce corps.
+         dans les champs `Html` (lettre_mois de la Campagne, Textes permanents
+         de la config), jamais dans ce corps.
 
          `use_default_to=False` : le défaut True (Odoo 19) court-circuiterait
          `partner_to` au profit de `_message_get_default_recipients()` — cf.
@@ -63,36 +98,99 @@
                     <p>
                         Bonjour <t t-out="object.partner_id.name or ''"/><t t-if="object.partner_id.parent_id"> (<t t-out="object.partner_id.parent_id.name or ''"/>)</t>,
                     </p>
-                    <p>
-                        Voici ta facture d'électricité <strong t-out="object.name or ''"/><t
-                        t-if="object.invoice_origin"> (avec référence : <t t-out="object.invoice_origin"/>)</t><t
-                        t-if="object.periode_id"> pour la période
-                        <t t-out="object.periode_id.mois_annee or ''"/></t>, d'un montant de
-                        <strong t-out="format_amount(object.amount_total, object.currency_id) or ''"/>.
-                    </p>
-                    <t t-if="object.mode_paiement == 'prelevement'">
-                        <p>Le prélèvement automatique sera déclenché le 10 du mois en cours.</p>
-                    </t>
-                    <t t-if="object.mode_paiement == 'monnaie_locale'">
+
+                    <!-- Ouverture — situation (#316) : clôture > avoir > facture régul > mensuelle -->
+                    <t t-if="object.is_regularisation_cloture">
                         <p>
-                            En tant que payeur·euse en Moneko, nous t'invitons à réaliser le paiement
-                            d'ici le 10 de ce mois, sur ton compte Moneko : rubrique « Opérations »,
-                            « effectuer un virement », tape EDN dans la barre de recherche et entre
-                            le montant de ta facture.
+                            Ta résiliation est bien prise en compte. Voici le document de clôture de ta
+                            souscription, <strong t-out="object.name or ''"/><t
+                            t-if="object.invoice_origin"> (avec référence : <t t-out="object.invoice_origin"/>)</t>,
+                            d'un montant de <strong t-out="format_amount(object.amount_total, object.currency_id) or ''"/>.
                         </p>
-                        <t t-if="object.qr_moneko_image_url">
-                            <p>Ou flashe directement ce QR-code :</p>
+                    </t>
+                    <t t-elif="object.move_type == 'out_refund'">
+                        <p>
+                            Voici ton avoir <strong t-out="object.name or ''"/><t
+                            t-if="object.invoice_origin"> (avec référence : <t t-out="object.invoice_origin"/>)</t>,
+                            d'un montant de <strong t-out="format_amount(object.amount_total, object.currency_id) or ''"/>.
+                        </p>
+                    </t>
+                    <t t-elif="object.regularisation_id">
+                        <p>
+                            Voici ta facture de régularisation <strong t-out="object.name or ''"/><t
+                            t-if="object.invoice_origin"> (avec référence : <t t-out="object.invoice_origin"/>)</t>,
+                            d'un montant de <strong t-out="format_amount(object.amount_total, object.currency_id) or ''"/>.
+                        </p>
+                    </t>
+                    <t t-else="">
+                        <p>
+                            Voici ta facture d'électricité <strong t-out="object.name or ''"/><t
+                            t-if="object.invoice_origin"> (avec référence : <t t-out="object.invoice_origin"/>)</t><t
+                            t-if="object.periode_id"> pour la période
+                            <t t-out="object.periode_id.mois_annee or ''"/></t>, d'un montant de
+                            <strong t-out="format_amount(object.amount_total, object.currency_id) or ''"/>.
+                        </p>
+                    </t>
+
+                    <!-- Paiement — bloc UNIQUE, orthogonal à la situation (#316) :
+                         keyé (move_type × mode_paiement), jamais par la situation. -->
+                    <t t-if="object.move_type == 'out_invoice'">
+                        <t t-if="object.mode_paiement == 'prelevement'">
+                            <p>Le prélèvement automatique sera déclenché le 10 du mois en cours.</p>
+                        </t>
+                        <t t-if="object.mode_paiement == 'monnaie_locale'">
                             <p>
-                                <img t-att-src="object.qr_moneko_image_url" alt="QR-code Moneko"
-                                     style="max-width: 150px;"/>
+                                En tant que payeur·euse en Moneko, nous t'invitons à réaliser le paiement
+                                d'ici le 10 de ce mois, sur ton compte Moneko : rubrique « Opérations »,
+                                « effectuer un virement », tape EDN dans la barre de recherche et entre
+                                le montant de ta facture.
+                            </p>
+                            <t t-if="object.qr_moneko_image_url">
+                                <p>Ou flashe directement ce QR-code :</p>
+                                <p>
+                                    <img t-att-src="object.qr_moneko_image_url" alt="QR-code Moneko"
+                                         style="max-width: 150px;"/>
+                                </p>
+                            </t>
+                        </t>
+                    </t>
+                    <t t-if="object.move_type == 'out_refund'">
+                        <t t-if="object.mode_paiement == 'prelevement'">
+                            <p>
+                                Le remboursement sera effectué le prochain 10 du mois, sur le compte
+                                bancaire enregistré pour ton prélèvement.
+                            </p>
+                        </t>
+                        <t t-if="object.mode_paiement == 'monnaie_locale'">
+                            <p>
+                                Ce montant te sera remboursé en Moneko direct, sur ton compte Moneko,
+                                d'ici le 10 de ce mois.
                             </p>
                         </t>
                     </t>
-                    <t t-if="object.lettre_du_mois">
+
+                    <!-- Éditorial — Lettre du mois (mensuelle) ou Textes permanents (régularisation) -->
+                    <t t-if="object.is_regularisation_cloture">
+                        <t t-if="object.texte_regul_cloture">
+                            <div><t t-out="object.texte_regul_cloture"/></div>
+                        </t>
+                    </t>
+                    <t t-elif="object.move_type == 'out_refund'">
+                        <t t-if="object.texte_regul_appel_don">
+                            <div><t t-out="object.texte_regul_appel_don"/></div>
+                        </t>
+                    </t>
+                    <t t-elif="object.regularisation_id">
+                        <t t-if="object.texte_regul_difficultes">
+                            <div><t t-out="object.texte_regul_difficultes"/></div>
+                        </t>
+                    </t>
+                    <t t-elif="object.lettre_du_mois">
                         <div>
                             <t t-out="object.lettre_du_mois"/>
                         </div>
                     </t>
+
                     <p>N'hésite pas à nous contacter pour toute question.</p>
                     <t t-if="not is_html_empty(object.invoice_user_id.signature)">
                         <t t-out="object.invoice_user_id.signature or ''"/>

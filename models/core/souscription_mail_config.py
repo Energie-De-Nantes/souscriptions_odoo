@@ -3,11 +3,11 @@ from odoo import fields, models
 
 class SouscriptionMailConfig(models.Model):
     """Foyer de configuration des mails de facture, propre au module (#313,
-    ADR 0034 « Extension : les mails sans mois »). Distinct de la *Lettre du
-    mois* (portée par la Campagne, rythme mensuel) : ce modèle porte ce qui
-    n'a PAS de rythme — aujourd'hui le seul QR-code Moneko, la tranche #316
-    y ajoutera les *Textes permanents* (champs `Html`, difficultés de
-    paiement, appel au don, accusé de résiliation).
+    #316, ADR 0034 « Extension : les mails sans mois »). Distinct de la
+    *Lettre du mois* (portée par la Campagne, rythme mensuel) : ce modèle
+    porte ce qui n'a PAS de rythme — le QR-code Moneko (#313) et les *Textes
+    permanents* des mails de Régularisation (#316) : difficultés de
+    paiement, appel au don sur les avoirs, accusé de clôture.
 
     Volontairement PAS `res.company` / PAS `res.config.settings` : les deux
     exigent `base.group_erp_manager` / `base.group_system`, hors d'atteinte
@@ -37,6 +37,30 @@ class SouscriptionMailConfig(models.Model):
         'affiché dans le mail de facture pour les payeur·euses en monnaie '
         'locale, en complément de la marche à suivre in-app. Peut rester '
         'vide — le corps du mail ne le promet alors jamais.',
+    )
+
+    # Textes permanents des mails de Régularisation (#316, ADR 0034
+    # « Extension : les mails sans mois ») : écrits par les facturistes
+    # (« l'éditorial des régularisations… est écrit par les facturistes »),
+    # sans rythme mensuel — donc pas de foyer sur la Campagne, contrairement
+    # à la Lettre du mois. `t-out` par le corps de `mail_template_facture_
+    # energie` (data/mail_templates_facture_energie.xml), jamais réaffirmés
+    # par `data/souscription_mail_config_data.xml` (noupdate=1, comme
+    # `qr_code_moneko`) : un `-u souscriptions_odoo` ne les écrase jamais.
+    # Vides -> aucun bloc, aucun résidu (même contrat que `lettre_mois`).
+    texte_regul_difficultes = fields.Html(
+        string='Difficultés de paiement (régularisation)',
+        help='Affiché sur une régularisation projetée en FACTURE (non clôture) : paragraphe '
+        "difficultés (aides, étalement, « réponds à ce mail qu'on s'arrange »). Vide -> aucun bloc.",
+    )
+    texte_regul_appel_don = fields.Html(
+        string='Appel au don (avoir)',
+        help='Affiché sur une régularisation projetée en AVOIR (non clôture) : appel au don. Vide -> aucun bloc.',
+    )
+    texte_regul_cloture = fields.Html(
+        string='Accusé de clôture (résiliation)',
+        help='Affiché sur une régularisation de CLÔTURE, que ce soit une facture ou un avoir : '
+        'accusé de prise en compte de la résiliation, registre du départ. Vide -> aucun bloc.',
     )
 
     def _qr_moneko_image_url(self):

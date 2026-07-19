@@ -33,8 +33,9 @@ _PNG_1X1 = base64.b64decode(
 
 @tagged('souscriptions', 'souscriptions_facturation', 'post_install', '-at_install')
 class TestGetMailTemplateFactureEnergie(SouscriptionsTestCase):
-    """AC : racine unique — facture d'énergie -> notre modèle ; facture
-    hors énergie / avoir -> le modèle standard d'Odoo, jamais le nôtre."""
+    """AC : racine unique — facture d'énergie (facture OU avoir, #316) ->
+    notre modèle ; facture hors énergie -> le modèle standard d'Odoo, dans
+    tous les cas (facture comme avoir)."""
 
     def test_facture_energie_route_vers_notre_modele(self):
         _periode, facture = self.create_test_invoice(
@@ -55,8 +56,29 @@ class TestGetMailTemplateFactureEnergie(SouscriptionsTestCase):
         template = facture_normale._get_mail_template()
         self.assertEqual(template, self.env.ref('account.email_template_edi_invoice'))
 
-    def test_avoir_de_regularisation_route_vers_le_modele_standard(self):
-        """Un avoir (écart négatif) n'est jamais routé vers notre modèle."""
+    def test_avoir_hors_energie_route_vers_le_modele_standard(self):
+        """AC #316 : « facture non-énergie -> modèle standard, dans tous les
+        cas » couvre aussi l'avoir — un avoir sans lien Période/Régularisation
+        n'est jamais intercepté."""
+        avoir_normal = self.env['account.move'].create(
+            {
+                'move_type': 'out_refund',
+                'partner_id': self.partner_test.id,
+                'invoice_line_ids': [(0, 0, {'name': 'Produit test', 'quantity': 1, 'price_unit': 100.0})],
+            }
+        )
+        self.assertFalse(avoir_normal.is_facture_energie)
+        template = avoir_normal._get_mail_template()
+        self.assertEqual(template, self.env.ref('account.email_template_edi_credit_note'))
+
+    def test_avoir_de_regularisation_route_vers_notre_modele(self):
+        """AC #316 (revient sur #313) : un avoir d'énergie est INTERCEPTÉ
+        avant que le core ne le route vers son modèle d'avoir standard — un
+        avoir de Régularisation porte `is_facture_energie=True` et doit
+        recevoir le corps qui connaît le mode de paiement (matrice mode ×
+        facture/avoir), jamais le modèle générique d'Odoo qui n'en a aucune
+        notion (cas RFAC/2024/00001 en production : QR-code envoyé à
+        quelqu'un qu'on remboursait)."""
         regularisation = self.env['souscription.regularisation'].create(
             {'souscription_id': self.souscription_base.id, 'date_debut': date(2024, 1, 1), 'date_fin': date(2024, 2, 1)}
         )
@@ -78,7 +100,7 @@ class TestGetMailTemplateFactureEnergie(SouscriptionsTestCase):
 
         template = avoir._get_mail_template()
 
-        self.assertEqual(template, self.env.ref('account.email_template_edi_credit_note'))
+        self.assertEqual(template, self.env.ref('souscriptions_odoo.mail_template_facture_energie'))
 
     def test_contrat_multi_record_honore_par_le_core(self):
         """AC : le core appelle `_get_mail_template()` sur un recordset de

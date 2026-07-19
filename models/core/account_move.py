@@ -117,6 +117,54 @@ class AccountMove(models.Model):
         for move in self:
             move.is_facture_energie = bool((move.periode_id or move.regularisation_id) and move.souscription_id)
 
+    # Détection de la régularisation de CLÔTURE (#316, ADR 0031 décision 4) :
+    # AUCUN champ ajouté sur `souscription.regularisation` — même prédicat de
+    # faits que `souscription.regularisation._marquer_regularisee_si_cloture`
+    # (« self couvre la Période de clôture de sa Souscription »), rejoué ici
+    # côté Facture pour piloter le branchement du corps de mail. Compute NON
+    # stocké, même idiome que `lettre_du_mois`/`qr_moneko_image_url` : le
+    # template reste bête (un seul `t-if`), la résolution vit en Python.
+    is_regularisation_cloture = fields.Boolean(
+        string='Régularisation de clôture', compute='_compute_is_regularisation_cloture'
+    )
+
+    @api.depends('regularisation_id.periode_couverte_ids', 'regularisation_id.souscription_id.date_fin')
+    def _compute_is_regularisation_cloture(self):
+        for move in self:
+            regul = move.regularisation_id
+            if not regul:
+                move.is_regularisation_cloture = False
+                continue
+            periode_cloture = regul.souscription_id._periode_cloture()
+            move.is_regularisation_cloture = bool(periode_cloture and periode_cloture in regul.periode_couverte_ids)
+
+    # Textes permanents des mails de régularisation (#316, ADR 0034
+    # « Extension : les mails sans mois ») : trois champs `Html` du foyer de
+    # config module (`souscription.mail.config`, ACL group_souscriptions_manager,
+    # jamais `res.company`/`res.config.settings`), passés tels quels — même
+    # idiome que `qr_moneko_image_url` (résolution en Python, `sudo()` pour
+    # qu'un envoi déclenché par un compte `group_souscriptions_user` ne
+    # plante jamais sur cette lecture annexe). Le template choisit LEQUEL
+    # afficher selon la situation (facture / avoir / clôture) ; ces champs ne
+    # portent que le contenu, jamais la logique de branchement.
+    texte_regul_difficultes = fields.Html(
+        string='Texte permanent : difficultés de paiement', compute='_compute_textes_permanents_regul'
+    )
+    texte_regul_appel_don = fields.Html(
+        string='Texte permanent : appel au don (avoir)', compute='_compute_textes_permanents_regul'
+    )
+    texte_regul_cloture = fields.Html(
+        string='Texte permanent : accusé de clôture', compute='_compute_textes_permanents_regul'
+    )
+
+    @api.depends()
+    def _compute_textes_permanents_regul(self):
+        config = self.env['souscription.mail.config'].sudo().search([], limit=1)
+        for move in self:
+            move.texte_regul_difficultes = config.texte_regul_difficultes if config else False
+            move.texte_regul_appel_don = config.texte_regul_appel_don if config else False
+            move.texte_regul_cloture = config.texte_regul_cloture if config else False
+
     def _facture_de_la_source(self):
         """LA facture de ma source — autorité unique (celle du gel,
         `souscription.periode._est_facturee_emise` / `regularisation.
@@ -369,20 +417,29 @@ class AccountMove(models.Model):
         return super()._get_name_invoice_report()
 
     def _get_mail_template(self):
-        """Racine UNIQUE de résolution du modèle d'envoi (#313, ADR 0034) :
-        consommée aussi bien par le bouton unitaire que par l'envoi en masse
-        (`account.move.send._get_default_mail_template_id`), donc un renvoi
-        manuel produit exactement le même mail que la première émission —
-        jamais un mail Odoo nu, sans la Lettre du mois.
+        """Racine UNIQUE de résolution du modèle d'envoi (#313, étendue #316,
+        ADR 0034) : consommée aussi bien par le bouton unitaire que par
+        l'envoi en masse (`account.move.send._get_default_mail_template_id`),
+        donc un renvoi manuel produit exactement le même mail que la
+        première émission — jamais un mail Odoo nu.
 
-        Scopé sur facture CLIENT d'énergie (`move_type == 'out_invoice'` ET
-        `is_facture_energie`) : le test sur `move_type` est **porteur**, pas un
-        garde-fou redondant — un avoir de Régularisation porte bien
-        `regularisation_id` et une `souscription_id`
-        (`souscription_regularisation._creer_facture`, `move_type='out_refund'`),
-        donc `is_facture_energie` y vaut **True**. C'est `move_type` seul qui
-        renvoie les avoirs sur `super()` — le modèle standard d'Odoo. Toute
-        facture hors énergie y retombe aussi.
+        Scope élargi de `periode_id` (mensuelle seule, #313) à
+        `is_facture_energie` (mensuelles ET Régularisations, #316) : une
+        Régularisation projetée en avoir (`out_refund`, net négatif,
+        `souscription.regularisation._creer_facture`) porte
+        `regularisation_id` et une `souscription_id`, donc `is_facture_energie`
+        y vaut **True** — élargir sans brancher SUR le corps (pas ici) est le
+        bug corrigé : le core routait ces avoirs vers son modèle d'avoir
+        standard, qui n'a aucune notion de mode de paiement (production : un
+        avoir de 54,25 € envoyé sur le modèle QR-code Moneko, impayé depuis
+        20 mois). Ce hook intercepte donc désormais `out_invoice` **et**
+        `out_refund` dès que `is_facture_energie` est vrai ; le branchement
+        facture/avoir/clôture vit dans le corps unique du template
+        (`t-if` sur `move_type`/`is_regularisation_cloture`), jamais ici.
+
+        Toute facture hors énergie (`is_facture_energie` faux — ni Période ni
+        Régularisation) retombe sur `super()` dans tous les cas : le modèle
+        standard d'Odoo (facture ou avoir).
 
         `all(...)` sur `self`, jamais `self.is_facture_energie` nu (grill
         2026-07-15, 3e passage) : le core appelle ce hook sur un recordset
@@ -391,7 +448,7 @@ class AccountMove(models.Model):
         singleton` — un renvoi groupé de plusieurs factures d'énergie
         plantait avant même d'atteindre l'envoi. `all(...)` rend le même
         verdict qu'avant pour un singleton, et ne casse plus sur un lot."""
-        if all(m.is_facture_energie and m.move_type == 'out_invoice' for m in self):
+        if all(m.is_facture_energie and m.move_type in ('out_invoice', 'out_refund') for m in self):
             return self.env.ref('souscriptions_odoo.mail_template_facture_energie')
         return super()._get_mail_template()
 

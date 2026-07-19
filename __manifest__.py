@@ -1,6 +1,6 @@
 {
     'name': 'Souscriptions Électricité',
-    'version': '19.0.1.24.0',
+    'version': '19.0.1.25.0',
     'depends': ['base', 'mail', 'contacts', 'account', 'base_iban', 'portal'],
     'author': 'Virgile Daugé',
     'category': 'Energy',

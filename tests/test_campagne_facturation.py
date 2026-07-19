@@ -23,7 +23,7 @@ from .common import SouscriptionsTestCase
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneFacturationSpine(SouscriptionsTestCase):
-    def _campagne(self, mois=date(2026, 7, 1)):
+    def _campagne(self, mois=date(2024, 7, 1)):
         return self.env['souscription.campagne.facturation'].create({'mois': mois})
 
     def _etape(self, campagne, code):
@@ -38,14 +38,14 @@ class TestCampagneFacturationSpine(SouscriptionsTestCase):
     def test_unicite_par_mois(self):
         """AC : une seconde campagne pour le même mois est rejetée — même à
         un autre jour du mois (unicité sur le mois, pas la date exacte)."""
-        self._campagne(date(2026, 7, 1))
+        self._campagne(date(2024, 7, 1))
         with self.assertRaises(Exception):
             with self.env.cr.savepoint():
-                self._campagne(date(2026, 7, 15))
+                self._campagne(date(2024, 7, 15))
 
     def test_mois_normalise_au_premier_du_mois(self):
-        campagne = self._campagne(date(2026, 7, 15))
-        self.assertEqual(campagne.mois, date(2026, 7, 1))
+        campagne = self._campagne(date(2024, 7, 15))
+        self.assertEqual(campagne.mois, date(2024, 7, 1))
 
     def test_racines_du_dag_toujours_pretes(self):
         """Les racines du DAG (pull sorties C15 + sync F15) sont toujours
@@ -131,12 +131,12 @@ class TestCampagneFacturationSpine(SouscriptionsTestCase):
 
     def test_liste_triee_mois_decroissant(self):
         """AC : l'historique EST la liste des campagnes, mois décroissant."""
-        c1 = self._campagne(date(2026, 5, 1))
-        c2 = self._campagne(date(2026, 6, 1))
-        c3 = self._campagne(date(2026, 7, 1))
+        c1 = self._campagne(date(2024, 5, 1))
+        c2 = self._campagne(date(2024, 6, 1))
+        c3 = self._campagne(date(2024, 7, 1))
         toutes = self.env['souscription.campagne.facturation'].search([('id', 'in', (c1 | c2 | c3).ids)])
         self.assertEqual(list(toutes), [c3, c2, c1])
 
     def test_nom_affiche_le_mois_en_toutes_lettres(self):
-        campagne = self._campagne(date(2026, 7, 3))
-        self.assertEqual(campagne.name, 'Juillet 2026')
+        campagne = self._campagne(date(2024, 7, 3))
+        self.assertEqual(campagne.name, 'Juillet 2024')

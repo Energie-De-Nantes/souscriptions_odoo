@@ -849,10 +849,11 @@ class SouscriptionPeriode(models.Model):
     def _est_periode_cloture(self):
         """Cette Période est-elle la Période de clôture de sa Souscription —
         celle qui contient `date_fin` (dernier jour servi, ADR 0031 décision
-        2) ? Même prédicat de bornes que
-        `souscription.souscription._periode_cloture()` (demi-ouvertes, bornes
-        v3 brutes), vu côté Période plutôt que côté Souscription — évite d'y
-        aller-retour pour une simple comparaison de bornes."""
+        2) ? Porteur unique de ce prédicat de bornes (demi-ouvertes, bornes
+        v3 brutes) — `souscription.souscription._periode_cloture()` ne fait
+        que le projeter sur `periode_ids` pour désigner la Période. Vu côté
+        Période plutôt que côté Souscription : évite d'y aller-retour pour
+        une simple comparaison de bornes, sur le chemin chaud `_a_tamponner`."""
         self.ensure_one()
         sous = self.souscription_id
         return bool(

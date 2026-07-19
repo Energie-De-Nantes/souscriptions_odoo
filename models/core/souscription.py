@@ -256,14 +256,13 @@ class Souscription(models.Model):
 
     def _periode_cloture(self):
         """La Période mensuelle contenant `date_fin` (dernier jour servi,
-        ADR 0031 décision 2) — bornes demi-ouvertes de la Période
-        (`date_debut <= date_fin < periode.date_fin`, ADR 0031)."""
+        ADR 0031 décision 2). Projection de sélection : le prédicat de bornes
+        vit côté Période (`souscription.periode._est_periode_cloture()`, seul
+        porteur) — ici on ne fait que le filtrer sur `periode_ids`."""
         self.ensure_one()
         if not self.date_fin:
             return self.env['souscription.periode']
-        return self.periode_ids.filtered(
-            lambda p: p.date_debut and p.date_fin and p.date_debut <= self.date_fin < p.date_fin
-        )[:1]
+        return self.periode_ids.filtered(lambda p: p._est_periode_cloture())[:1]
 
     def _cloture_soldee(self):
         """Prédicat de faits « clôture soldée » (ADR 0031 décision 3, #247) :

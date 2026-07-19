@@ -109,6 +109,19 @@ facturée → émise, cf. *Campagne de facturation*), exclue des deux reste-à-f
 comme `creer_factures()` l'excluait déjà de la création (#284).
 _Éviter_ : la classer `à facturer` (bloque « Créer factures » et « Émettre factures » à vie, #284).
 
+**Période de clôture** :
+La *Période* d'une *Souscription* sortie qui contient sa `date_fin` (dernier jour servi, ADR 0031) —
+bornes demi-ouvertes, comme partout : `periode.date_debut <= souscription.date_fin <
+periode.date_fin`. **Unique** par Souscription, et peut ne pas encore exister (mois pas encore
+tiré). Se facture **au réel** même sur un contrat *lissé* : elle reçoit le tampon
+`provision := energie` à l'émission, comme une non-lissée (ADR 0030 décision 2, ADR 0031
+décision 4). Sa facturation, plus le solde de la *Régularisation* de clôture (ou rien à solder),
+rendent la clôture **soldée** — la Souscription passe *Résiliée* (cf. *En instance / En service*).
+La règle de bornes n'a qu'un **porteur** : le prédicat côté Période ; la Souscription ne fait que
+le projeter pour désigner sa Période de clôture.
+_Éviter_ : « dernière période » (rien ne garantit qu'elle soit déjà tirée) ; la sélectionner par la
+date de **fin** de Période (la borne de fin est exclue — même piège que la *Grille de prix*).
+
 **Énergie facturée** :
 La quantité d'énergie, par cadran facturé, que les *Factures* émises ont réellement portée pour
 une *Période* — le « facturé ». **N'évolue que par l'émission d'une facture qui la porte** :

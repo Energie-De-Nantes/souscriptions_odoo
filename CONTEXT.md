@@ -326,7 +326,10 @@ _Éviter_ : le *Chèque énergie* comme mode de paiement (c'est un **tiers-payeu
 avant règlement, le reste dû suit le mode de paiement normal) ; les **étiquettes** partenaire
 comme source de vérité du mode (non exclusives, non historisées, rattachées à la personne et non
 au contrat) ; **attester à la main** l'encaissement d'un *virement* ou d'un *chèque* — le relevé
-bancaire fait foi, une attestation créerait une **double vérité** contre le rapprochement.
+bancaire fait foi, une attestation créerait une **double vérité** contre le rapprochement ;
+**déduire le mode des coordonnées bancaires** (posséder un compte en base n'implique pas le
+prélèvement — le mode se lit, jamais ne se devine ; l'héritage prod de la facture PDF affirmait
+un prélèvement à quiconque avait un IBAN enregistré).
 
 **Mandat de prélèvement (SEPA)** :
 L'autorisation signée par le·la *souscripteur·rice* de débiter son compte, identifiée par un
@@ -580,7 +583,9 @@ _Éviter_ : les porter par `res.company` / `res.config.settings` (écriture rés
 dans le corps du *template* (le module le ré-affirme au déploiement : tout édit manuel y est
 silencieusement écrasé — cf. ADR 0034, « l'éditorial est toujours un champ ») ; en faire une
 variante de mail **par mode de paiement** (le paiement est un bloc **orthogonal** à la situation,
-c'est ce qui remplit d'un coup les cases Moneko manquantes).
+c'est ce qui remplit d'un coup les cases Moneko manquantes) ; **incruster le QR Moneko dans la
+facture PDF** (une facture émise est immuable : un QR que Moneko réémet y resterait figé faux —
+le QR ne vit que dans le mail, recomposé à chaque envoi, cf. *Facture*).
 
 **Accueilliste** :
 Rôle métier qui instruit les demandes de *raccordement* au quotidien : accueil des nouvelles

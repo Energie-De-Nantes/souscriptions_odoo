@@ -74,7 +74,9 @@ class TestCampagneEtapesDecorations(SouscriptionsTestCase):
 
     def test_liste_des_etapes_grise_les_lignes_faites_et_met_en_gras_les_pretes(self):
         self.assertEqual(self.arch.get('decoration-muted'), 'fait')
-        self.assertEqual(self.arch.get('decoration-bold'), "etat_prerequis == 'prete' and not fait")
+        # decoration-bf (#374) : « decoration-bold » n'existe pas en Odoo — le
+        # gras de #301 était en fait silencieusement ignoré en sous-liste inline.
+        self.assertEqual(self.arch.get('decoration-bf'), "etat_prerequis == 'prete' and not fait")
 
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')

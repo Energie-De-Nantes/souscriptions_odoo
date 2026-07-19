@@ -11,8 +11,12 @@
         <field name="name">souscription.campagne.etape.list</field>
         <field name="model">souscription.campagne.etape</field>
         <field name="arch" type="xml">
+            <!-- decoration-bf, pas « decoration-bold » : seul -bf est un attribut
+                 Odoo valide (le RNG d'une vue liste autonome le refuse ; en
+                 sous-liste inline, #371 l'embarquait sans validation et le gras
+                 était silencieusement ignoré). -->
             <list editable="bottom" create="0" delete="0"
-                  decoration-muted="fait" decoration-bold="etat_prerequis == 'prete' and not fait">
+                  decoration-muted="fait" decoration-bf="etat_prerequis == 'prete' and not fait">
                 <field name="code" readonly="1"/>
                 <field name="type_etape" column_invisible="1"/>
                 <field name="etat_prerequis" widget="badge"

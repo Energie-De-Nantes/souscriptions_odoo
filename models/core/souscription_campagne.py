@@ -1210,16 +1210,15 @@ class SouscriptionCampagneEtape(models.Model):
     )
 
     # Phase (#342, ADR 0036 décision 14) : fonction pure de `code`, même
-    # idiome que `type_etape` — aucune vue modifiée dans cette tranche (#344
-    # rendra les quatre sections). Cherchable (#374) : `search` traduit la
-    # comparaison en `code in [...]` via le catalogue, sans rien stocker de
-    # plus — le champ reste calculé.
+    # idiome que `type_etape`. `store=True` ⇒ colonne en base, donc cherchable
+    # nativement — les domains des quatre one2many par phase (#374) s'appuient
+    # dessus, aucune méthode `search` à écrire (elle écraserait la recherche
+    # SQL native, cf. odoo.orm.domains).
     phase = fields.Selection(
         [('tirer', 'Tirer'), ('verifier', 'Vérifier'), ('facturer', 'Facturer'), ('solder', 'Solder')],
         compute='_compute_phase',
         store=True,
         string='Phase',
-        search='_search_phase',
     )
 
     # Porte manuelle (#156, ADR 0025 §2) : état persisté du DAG avec `demande`
@@ -1284,22 +1283,6 @@ class SouscriptionCampagneEtape(models.Model):
     def _compute_phase(self):
         for etape in self:
             etape.phase = ETAPES_CAMPAGNE.get(etape.code, {}).get('phase')
-
-    @api.model
-    def _search_phase(self, operator, value):
-        """#374 : `phase` n'est pas stocké, donc pas indexé — on traduit la
-        comparaison en `code in [...]` via le catalogue (source unique),
-        AVANT que la requête ne parte en base. `=`/`!=` (valeur str) et
-        `in`/`not in` (valeur liste) couvrent les usages réels (les quatre
-        one2many par phase, ci-dessous) ; les autres opérateurs (comparaison
-        d'ordre...) n'ont pas de sens sur une Selection et ne sont pas
-        supportés."""
-        if operator not in ('=', '!=', 'in', 'not in'):
-            raise NotImplementedError(f'phase : opérateur de recherche non supporté {operator!r}')
-        phases = {value} if isinstance(value, str) else set(value)
-        codes = [code for code, info in ETAPES_CAMPAGNE.items() if info.get('phase') in phases]
-        inclus = operator in ('=', 'in')
-        return [('code', 'in' if inclus else 'not in', codes)]
 
     def write(self, vals):
         if vals.get('valide'):

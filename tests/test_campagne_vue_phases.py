@@ -60,7 +60,8 @@ class TestCampagneEtapeBloqueePar(SouscriptionsTestCase):
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagnePhaseChampsEtRecherche(SouscriptionsTestCase):
-    """#374 : `phase` cherchable (`_search_phase`) et les quatre one2many
+    """#374 : `phase` cherchable (colonne stockée, recherche SQL native) et
+    les quatre one2many
     `etape_<phase>_ids` qui partitionnent `etape_ids` — le fix du bug de la
     vue en phases (le `domain` XML ne filtrait jamais l'affichage)."""
 
@@ -159,7 +160,10 @@ class TestCampagneVueEnPhases(SouscriptionsTestCase):
         grisé/gras de #301 (motif déjà couvert par test_campagne_bandeau_view.py)
         survivent à la déduplication."""
         self.assertEqual(self.arch_liste_etape.get('decoration-muted'), 'fait')
-        self.assertEqual(self.arch_liste_etape.get('decoration-bold'), "etat_prerequis == 'prete' and not fait")
+        # decoration-bf, pas « decoration-bold » (#374) : seul -bf existe en
+        # Odoo — l'ancien attribut était ignoré en sous-liste inline et rejeté
+        # par le RNG en vue autonome.
+        self.assertEqual(self.arch_liste_etape.get('decoration-bf'), "etat_prerequis == 'prete' and not fait")
 
     def test_pas_de_poignee_de_tri_sur_les_lignes_detape(self):
         """AC #344 : le catalogue est fixe et topologique — drag-to-reorder

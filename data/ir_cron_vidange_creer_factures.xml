@@ -3,20 +3,21 @@
     <data noupdate="1">
         <!-- Vidange en tâche de fond de l'étape « Créer factures » (#327,
              ADR 0035) : jumeau du cron d'émission
-             (data/ir_cron_vidange_emettre_factures.xml, #326) — cron séparé
-             plutôt que partagé, celui de l'émission cible son étape en dur
-             et ne dispatche pas déjà sur toutes les étapes demandées (cf.
-             note de généricité, PR #327). Le bouton
-             (`action_creer_factures`) pose l'intention (`demande`) et
-             déclenche ce cron via `_trigger()` — exécuté dans les secondes
-             qui suivent, pas à l'heure ronde. `interval_type`/
-             `interval_number` ne servent que de filet de sécurité
-             quotidien. -->
+             (data/ir_cron_vidange_emettre_factures.xml, #326) — deux
+             enregistrements ir.cron séparés, xml_ids stables (parallélisme
+             préservé), un seul point d'entrée PARAMÉTRÉ depuis #342 (ADR
+             0036 décision 10, `_cron_vidanger(code)`, cf.
+             models/core/souscription_campagne.py) — chaque cron passe SON
+             code en dur. Le bouton (`action_creer_factures`) pose
+             l'intention (`demande`) et déclenche ce cron via `_trigger()` —
+             exécuté dans les secondes qui suivent, pas à l'heure ronde.
+             `interval_type`/`interval_number` ne servent que de filet de
+             sécurité quotidien. -->
         <record id="ir_cron_vidange_creer_factures" model="ir.cron">
             <field name="name">Souscriptions : vidange création factures (campagne)</field>
             <field name="model_id" ref="model_souscription_campagne_etape"/>
             <field name="state">code</field>
-            <field name="code">model._cron_vidanger_creer_factures()</field>
+            <field name="code">model._cron_vidanger('creer_factures')</field>
             <field name="interval_number">1</field>
             <field name="interval_type">days</field>
             <field name="active">True</field>

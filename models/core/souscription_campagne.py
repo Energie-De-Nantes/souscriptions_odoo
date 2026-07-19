@@ -5,6 +5,18 @@ ailleurs (périodes, factures, refacturations). 0 champ de vérification ajouté
 vraiment persisté ici est la validation des portes manuelles (et les notes
 reportées, #159) — tout le reste est dérivé à la volée depuis les données
 existantes (#157).
+
+Le catalogue `ETAPES_CAMPAGNE` est l'**interface complète du DAG** (#342, ADR
+0036 décision 9 — le « grand A ») : chaque entrée déclare tout ce qu'est son
+étape en clés plates, méthodes nommées par chaîne (résolues par `getattr`), clé
+absente = défaut — le moteur ci-dessous est générique, zéro branche
+`if self.code == ...`. Les six tables satellites que cette tranche absorbe :
+cible de statut (`cible_statut`), action du bouton (`action`), cible du
+drill-down (`drill_down`), stratégie de vidange (`vidange`), et le fait que
+« Préparer les prélèvements » lise un reste-à-faire qui n'est pas la
+cumulative-amont (`reste_a_faire`). Le test structurel (`tests/
+test_campagne_catalogue.py`) verrouille ce contrat : prérequis existants, ordre
+topologique, méthodes présentes, clés inconnues refusées.
 """
 
 from babel.dates import format_date
@@ -13,10 +25,11 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import is_html_empty
 
-# Catalogue des étapes (#156, ADR 0025 §1) : le DAG est déclaré en code, pas de
-# modèle de configuration ni de moteur de workflow. L'ordre d'insertion EST un
-# ordre topologique valide (chaque étape apparaît après tous ses prérequis) —
-# sert à la fois de source de vérité du DAG et d'ordre d'affichage/seed.
+# Catalogue des étapes (#156, ADR 0025 §1 ; #342, ADR 0036 décision 9) : le DAG
+# est déclaré en code, pas de modèle de configuration ni de moteur de workflow.
+# L'ordre d'insertion EST un ordre topologique valide (chaque étape apparaît
+# après tous ses prérequis) — sert à la fois de source de vérité du DAG et
+# d'ordre d'affichage/seed.
 #
 # type d'étape :
 #  - 'porte'  : validation manuelle (case à cocher, validé_par/validé_le persistés) ;
@@ -32,16 +45,51 @@ from odoo.tools import is_html_empty
 #               manuelle ») décidé au rebase de cette branche : la demande
 #               suffit, plus de coche (#163 est remplacé).
 #
+# phase (#342, ADR 0036 décision 14) : tirer / verifier / facturer / solder —
+# lue telle quelle par le champ compute stocké `souscription.campagne.etape.
+# phase` (même idiome que `type_etape`). Aucune vue modifiée dans cette
+# tranche (#344 s'en chargera).
+#
+# gate (#342, ADR 0036 décision 11) : dureté de la porte que l'action de
+# l'étape fait respecter — 'dure' (l'action lève `UserError` via
+# `_verifier_gate` tant que `etat_prerequis != 'prete'`) ou absente (« douce » :
+# l'action s'exécute même si un prérequis n'est pas satisfait — auto-
+# cicatrisation, jamais un verrou pour l'humain). Statu quo comportemental,
+# déclaré ici avec le pourquoi par entrée plutôt que du folklore lisible
+# seulement en cherchant les appels à `_verifier_gate` dans le corps du
+# moteur.
+#
+# cible_statut : pour une étape 'derive', le statut de `_STATUTS_ORDONNES`
+# qu'une souscription doit avoir atteint pour compter « faite » — lu par
+# `_reste_a_faire` (#157). reste_a_faire : nom d'une méthode de la Campagne
+# qui rend directement le recordset reste-à-faire, pour les étapes dont le
+# signal n'est pas la cumulative-amont des statuts (« Préparer les
+# prélèvements », #186).
+#
+# action : nom de la méthode de la Campagne que le bouton générique
+# (`action_executer`) délègue. Absent sur les portes (validées via la case
+# `valide`, jamais un bouton).
+#
+# drill_down : nom d'une méthode de la ligne d'étape qui construit l'action
+# « Voir » ; absente = dispatch par défaut (reste-à-faire souscriptions pour
+# une étape 'derive', périmètre facturable sinon).
+#
+# vidange : présente seulement sur les deux étapes en tâche de fond (#326/
+# #327, ADR 0035) — stratégie (liste de travail, action unitaire — le même nom
+# de méthode que le lot appelle sur N enregistrements ou sur 1, idiome
+# recordset natif —, libellé d'échec, libellé de réussite, source des
+# réussites pour la notification de fin) lue par
+# `SouscriptionCampagneEtape._vidanger_un_paquet` (générique, ADR 0036
+# décision 9).
+#
+# amorcage (#342, ADR 0036 décisions 3-4 et 9) : nom de la méthode-données du
+# pull, portée par la Campagne — présence de la clé = étape machine-runnable.
+# Consommée par la tranche suivante (#343, l'automate d'amorçage à la
+# création) ; cette tranche ne fait que la déclarer.
+#
 # Les deux « vrais pulls » (méta-périodes + F15) gatent chacun leur porte de
 # vérif. Les relevés d'index NE sont PAS une étape : ils arrivent avec le pull
 # des périodes (enfants souscription.releve, cf. _amorcer_depuis_meta).
-#
-# « Préparer les prélèvements » (#186, PRD #183) : étape 'action' dont le
-# bouton ouvre une liste (SDD, préparation seulement — aucun paiement/batch/
-# fichier créé par le module, cf. action_preparer_prelevements). Contrairement
-# à sync F15, son « fait » n'est PAS la demande (`demande`) mais un signal
-# dérivé (cf. _compute_fait/_compute_nb_reste_a_faire) — aucun champ de
-# verrou ajouté sur Période/Facture (esprit ADR 0025).
 #
 # « Pull sorties C15 » et « Régulariser les clôtures » (#248, ADR 0031
 # décision 4) : câblent l'ordre de campagne de la clôture — pull des sorties
@@ -50,38 +98,53 @@ from odoo.tools import is_html_empty
 # prérequis, comme sync F15 : tire tout, auto-cicatrisant, ADR 0031 décision
 # 1) ; `pull_meta_periodes` en dépend désormais — le prérequis documente
 # l'ordre voulu (`date_fin` doit être à jour avant que le périmètre du mois
-# soit tiré) mais n'est PAS un verrou dur (`action_pull_meta_periodes` ne
-# gate pas dessus, même idiome que les autres pulls-racines : l'auto-
-# cicatrisation du pull des sorties absorbe un passage dans le désordre).
-# `regulariser_clotures` est une étape 'action' (comme sync F15/pull sorties :
-# pas de backlog mensuel dérivable au sens de _CIBLE_PAR_ETAPE_DERIVEE, sa
-# cible est la file des sorties `en_attente_cloture`, pas un statut de
-# facturation) gatée sur les mensuelles émises.
+# soit tiré) mais n'est PAS un verrou dur (gate douce, même idiome que les
+# autres pulls-racines : l'auto-cicatrisation du pull des sorties absorbe un
+# passage dans le désordre).
 ETAPES_CAMPAGNE = {
     'pull_sorties_c15': {
         'label': 'Pull sorties C15',
         'type': 'action',
         'prerequis': (),
+        'phase': 'tirer',
+        # gate absente = douce : aucun prérequis de toute façon (racine).
+        'action': 'action_pull_sorties_c15',
+        'amorcage': '_pull_sorties_c15_donnees',
     },
     'pull_meta_periodes': {
         'label': 'Pull méta-périodes',
         'type': 'derive',
         'prerequis': ('pull_sorties_c15',),
+        'phase': 'tirer',
+        # gate absente = douce (auto-cicatrisation, ADR 0031 décision 1) : un
+        # passage dans le désordre se rattrape au pull suivant, jamais bloqué
+        # pour l'humain.
+        'cible_statut': 'a_facturer',
+        'action': 'action_pull_meta_periodes',
+        'amorcage': '_pull_meta_periodes_donnees',
     },
     'sync_f15': {
         'label': 'Sync F15',
         'type': 'action',
         'prerequis': (),
+        'phase': 'tirer',
+        # gate absente = douce : aucun prérequis (racine indépendante).
+        'action': 'action_sync_f15',
+        'amorcage': '_sync_f15_donnees',
     },
     'verif_periodes': {
         'label': 'Vérif périodes',
         'type': 'porte',
         'prerequis': ('pull_meta_periodes',),
+        'phase': 'verifier',
+        'drill_down': '_drill_down_periodes_du_mois',
     },
     'verif_refacturations': {
         'label': 'Vérif refacturations',
         'type': 'porte',
         'prerequis': ('sync_f15',),
+        'phase': 'verifier',
+        'drill_down': '_drill_down_ecran_refacturations',
     },
     # Tâche de fond (#327, ADR 0035 — second client du harnais posé en #326
     # pour `emettre_factures`) : le bouton POSE l'intention (`demande`) et
@@ -95,17 +158,33 @@ ETAPES_CAMPAGNE = {
         'label': 'Créer factures',
         'type': 'derive',
         'prerequis': ('verif_periodes', 'verif_refacturations'),
+        'phase': 'facturer',
+        # gate dure (#342, ADR 0036 décision 11) : objet même des deux vérifs
+        # qui la précèdent — les franchir SANS avoir vérifié romprait le sens
+        # de la porte.
+        'gate': 'dure',
+        'cible_statut': 'facturee',
+        'action': 'action_creer_factures',
+        'drill_down': '_drill_down_factures_du_mois',
+        'vidange': {
+            'liste_travail': '_souscriptions_a_facturer_du_mois',
+            'action': 'creer_factures',
+            'ok': '_souscriptions_facturees_ou_emises_du_mois',
+            'message_echec': 'Création de facture impossible',
+            'libelle_reussite': 'Créées',
+        },
     },
     # Porte manuelle (#287, ADR 0025 §2 — même grain que les vérifs) : la
     # fenêtre du geste commercial (CONTEXT.md « Geste commercial », ADR 0032)
     # se referme consciemment ici, AVANT le gel irréversible de l'émission —
     # aucun reste-à-faire (pas de signal dérivé), aucune action, son « Voir »
-    # ouvre les mêmes factures du mois que Créer/Émettre (#282,
-    # _CODES_DRILL_DOWN_FACTURES).
+    # ouvre les mêmes factures du mois que Créer/Émettre (#282).
     'gestes_commerciaux': {
         'label': 'Gestes commerciaux',
         'type': 'porte',
         'prerequis': ('creer_factures',),
+        'phase': 'facturer',
+        'drill_down': '_drill_down_factures_du_mois',
     },
     # Tâche de fond (#326, ADR 0035 — premier client du harnais, rejoint par
     # `creer_factures` en #327) : le bouton POSE l'intention (`demande` sur
@@ -118,18 +197,66 @@ ETAPES_CAMPAGNE = {
         'label': 'Émettre factures',
         'type': 'derive',
         'prerequis': ('creer_factures', 'gestes_commerciaux'),
+        'phase': 'facturer',
+        # gate dure (#342, ADR 0036 décision 11) : objet même de la vérif —
+        # émettre gèle définitivement, jamais sans porte franchie.
+        'gate': 'dure',
+        'cible_statut': 'emise',
+        'action': 'action_emettre_factures',
+        'drill_down': '_drill_down_factures_du_mois',
+        'vidange': {
+            'liste_travail': '_factures_brouillon_du_mois',
+            'action': 'action_post',
+            'ok': '_factures_postees_du_mois',
+            'message_echec': 'Émission impossible',
+            'libelle_reussite': 'Émises',
+        },
     },
     'regulariser_clotures': {
         'label': 'Régulariser les clôtures',
         'type': 'action',
         'prerequis': ('emettre_factures',),
+        'phase': 'solder',
+        # gate absente = douce (#342, ADR 0036 décision 11) : le garde-fou
+        # par unité (une clôture pas encore facturée est ignorée ce passage,
+        # cf. action_regulariser_clotures) est plus fin que l'arête — la
+        # durcir bloquerait les clôtures saines sur un échec d'émission
+        # tiers.
+        'action': 'action_regulariser_clotures',
     },
     'preparer_prelevements': {
         'label': 'Préparer les prélèvements',
         'type': 'action',
         'prerequis': ('emettre_factures',),
+        'phase': 'solder',
+        # gate dure (#342, ADR 0036 décision 11) : protège d'un batch SEPA
+        # incomplet lancé avant que les factures du mois ne soient toutes
+        # émises.
+        'gate': 'dure',
+        'reste_a_faire': '_factures_prelevement_dues_du_mois',
+        'action': 'action_preparer_prelevements',
     },
 }
+
+# Clés reconnues du catalogue (#342, ADR 0036 décision 12) : toute clé absente
+# de cet ensemble est un typo silencieux qui bloquerait une étape à vie sans
+# jamais lever — le test structurel (tests/test_campagne_catalogue.py) refuse
+# toute entrée qui en porte une autre.
+CLES_CATALOGUE_CONNUES = frozenset(
+    {
+        'label',
+        'type',
+        'prerequis',
+        'phase',
+        'gate',
+        'cible_statut',
+        'reste_a_faire',
+        'action',
+        'drill_down',
+        'vidange',
+        'amorcage',
+    }
+)
 
 
 class SouscriptionCampagneFacturation(models.Model):
@@ -350,25 +477,18 @@ class SouscriptionCampagneFacturation(models.Model):
     # souscription en « facturée » => reste 0).
     _STATUTS_ORDONNES = ('a_tirer', 'a_facturer', 'facturee', 'emise')
 
-    # Étape à signal dérivé -> statut cible atteint = étape faite pour cette
-    # souscription. Les étapes absentes (portes, action) n'ont pas de signal
-    # dérivé (cf. ETAPES_CAMPAGNE) : reste-à-faire vide par construction.
-    _CIBLE_PAR_ETAPE_DERIVEE = {
-        'pull_meta_periodes': 'a_facturer',
-        'creer_factures': 'facturee',
-        'emettre_factures': 'emise',
-    }
-
     def _reste_a_faire(self, code):
         """Souscriptions restantes pour l'étape dérivée `code` (#157) — toutes
-        celles pas encore parvenues au statut cible de l'étape. Feed aussi bien
-        le compteur affiché (`nb_reste_a_faire`) que le drill-down.
+        celles pas encore parvenues au statut cible de l'étape (`cible_statut`
+        du catalogue, #342 — remplace l'ancienne table satellite
+        `_CIBLE_PAR_ETAPE_DERIVEE`). Feed aussi bien le compteur affiché
+        (`nb_reste_a_faire`) que le drill-down.
 
         ponytail: une requête par souscription facturable (échelle facturiste —
         dizaines/centaines, pas un flux temps réel) ; upgrade en une seule
         requête SQL groupée si ça devient lent un jour."""
         self.ensure_one()
-        cible = self._CIBLE_PAR_ETAPE_DERIVEE.get(code)
+        cible = ETAPES_CAMPAGNE.get(code, {}).get('cible_statut')
         if not cible:
             return self.env['souscription.souscription']
         pas_encore = set(self._STATUTS_ORDONNES[: self._STATUTS_ORDONNES.index(cible)])
@@ -413,6 +533,40 @@ class SouscriptionCampagneFacturation(models.Model):
         for souscription in self._souscriptions_facturables():
             buckets[self._statut_facturation(souscription)] |= souscription
         return buckets
+
+    # --- Listes de travail de la vidange (#342, ADR 0036 décision 9 — clé
+    # `vidange.liste_travail`/`vidange.ok` du catalogue) : nommées par la
+    # Campagne, lues génériquement par `SouscriptionCampagneEtape` (liste
+    # complète, non limitée — l'appelant tranche `[:limit]`). Remplacent les
+    # anciennes branches `if self.code == 'creer_factures'` de
+    # `_liste_de_travail`/`_compter_liste_de_travail`/`_notifier_fin`. ---
+
+    def _souscriptions_a_facturer_du_mois(self):
+        """Travail restant pour « Créer factures » : le bucket EXACT « à
+        facturer » (#301) — pas le reste-à-faire cumulatif (une souscription
+        encore « à tirer », sans Période, n'est pas du travail pour CETTE
+        étape)."""
+        self.ensure_one()
+        return self._souscriptions_par_bucket()['a_facturer']
+
+    def _souscriptions_facturees_ou_emises_du_mois(self):
+        """Réussites de « Créer factures » pour la notification de fin :
+        toute souscription déjà parvenue à « facturée » ou « émise »."""
+        self.ensure_one()
+        buckets = self._souscriptions_par_bucket()
+        return buckets['facturee'] | buckets['emise']
+
+    def _factures_brouillon_du_mois(self):
+        """Travail restant pour « Émettre factures » : les brouillons du
+        mois."""
+        self.ensure_one()
+        return self._factures_du_mois().filtered(lambda f: f.state == 'draft')
+
+    def _factures_postees_du_mois(self):
+        """Réussites de « Émettre factures » pour la notification de fin :
+        les factures du mois déjà postées."""
+        self.ensure_one()
+        return self._factures_du_mois().filtered(lambda f: f.state == 'posted')
 
     @api.depends('mois')
     def _compute_stats_bandeau(self):
@@ -650,6 +804,27 @@ class SouscriptionCampagneFacturation(models.Model):
         self.ensure_one()
         return self.env['souscription.refacturation'].synchroniser_depuis_electricore()
 
+    # --- Méthodes-données de l'amorçage (#342, ADR 0036 décision 9 — clé
+    # `amorcage` du catalogue), consommées par la tranche suivante (#343).
+    # `_pull_meta_periodes_donnees` (ci-dessus) vit déjà nativement sur la
+    # Campagne (#341) ; les deux wrappers ci-dessous existent pour que les
+    # TROIS méthodes nommées par `amorcage` vivent sur le même modèle, lu
+    # uniformément par le futur automate — aucune nouvelle couture réseau,
+    # délégation pure aux méthodes-données durables (#341) déjà couvertes. ---
+
+    def _pull_sorties_c15_donnees(self):
+        """Vue Campagne de la méthode-données du pull des sorties C15 (#341)
+        — même délégation que `action_pull_sorties_c15` ci-dessus, sans le
+        toast."""
+        self.ensure_one()
+        return self.env['souscription.souscription']._pull_sorties_c15_donnees()
+
+    def _sync_f15_donnees(self):
+        """Vue Campagne de la méthode-données de la sync F15 (#341) — même
+        délégation que `action_sync_f15` ci-dessus, sans le toast."""
+        self.ensure_one()
+        return self.env['souscription.refacturation']._synchroniser_depuis_electricore_donnees()
+
     def action_creer_factures(self):
         """Gated sur les deux portes de vérif (#158) : pose l'intention et
         déclenche le cron de vidange dédié — elle ne crée plus les factures
@@ -725,6 +900,16 @@ class SouscriptionCampagneEtape(models.Model):
         string='Type',
     )
 
+    # Phase (#342, ADR 0036 décision 14) : fonction pure de `code`, même
+    # idiome que `type_etape` — aucune vue modifiée dans cette tranche (#344
+    # rendra les quatre sections).
+    phase = fields.Selection(
+        [('tirer', 'Tirer'), ('verifier', 'Vérifier'), ('facturer', 'Facturer'), ('solder', 'Solder')],
+        compute='_compute_phase',
+        store=True,
+        string='Phase',
+    )
+
     # Porte manuelle (#156, ADR 0025 §2) : état persisté du DAG avec `demande`
     # ci-dessous et les notes (#159). validé_par/validé_le sont estampillés au
     # write (jamais saisis à la main) — cf. write() ci-dessous.
@@ -777,6 +962,11 @@ class SouscriptionCampagneEtape(models.Model):
         for etape in self:
             etape.type_etape = ETAPES_CAMPAGNE.get(etape.code, {}).get('type')
 
+    @api.depends('code')
+    def _compute_phase(self):
+        for etape in self:
+            etape.phase = ETAPES_CAMPAGNE.get(etape.code, {}).get('phase')
+
     def write(self, vals):
         if vals.get('valide'):
             vals = dict(vals)
@@ -789,17 +979,20 @@ class SouscriptionCampagneEtape(models.Model):
 
     @api.depends('type_etape', 'code', 'campagne_id.mois')
     def _compute_nb_reste_a_faire(self):
-        """#157 : délègue à `campagne_id._reste_a_faire(code)` — recompté à
-        chaque lecture (pas de relation ORM déclarée vers période/facture,
-        donc pas d'invalidation de cache automatique inter-modèles, ADR 0025).
-
-        « Préparer les prélèvements » (#186) : même esprit dérivé, mais sur
-        les factures du mois plutôt que sur les souscriptions
-        (`_factures_prelevement_dues_du_mois`, pas `_reste_a_faire`)."""
+        """#157 : lit la stratégie de reste-à-faire au catalogue (#342) —
+        `reste_a_faire` (méthode dédiée, ex. « Préparer les prélèvements »,
+        #186) prime sur `cible_statut` (délègue alors à
+        `campagne_id._reste_a_faire(code)`, la cumulative-amont). Ni l'un ni
+        l'autre : pas de signal dérivé (portes, actions sans backlog), reste
+        à 0. Recompté à chaque lecture (pas de relation ORM déclarée vers
+        période/facture, donc pas d'invalidation de cache automatique
+        inter-modèles, ADR 0025)."""
         for etape in self:
-            if etape.code == 'preparer_prelevements' and etape.campagne_id:
-                etape.nb_reste_a_faire = len(etape.campagne_id._factures_prelevement_dues_du_mois())
-            elif etape.type_etape == 'derive' and etape.campagne_id:
+            info = ETAPES_CAMPAGNE.get(etape.code, {})
+            methode = info.get('reste_a_faire')
+            if methode and etape.campagne_id:
+                etape.nb_reste_a_faire = len(getattr(etape.campagne_id, methode)())
+            elif info.get('cible_statut') and etape.campagne_id:
                 etape.nb_reste_a_faire = len(etape.campagne_id._reste_a_faire(etape.code))
             else:
                 etape.nb_reste_a_faire = 0
@@ -807,14 +1000,15 @@ class SouscriptionCampagneEtape(models.Model):
     @api.depends('valide', 'type_etape', 'code', 'nb_reste_a_faire', 'demande')
     def _compute_fait(self):
         for etape in self:
+            info = ETAPES_CAMPAGNE.get(etape.code, {})
             if etape.type_etape == 'porte':
                 etape.fait = etape.valide
-            elif etape.type_etape == 'derive' or etape.code in self._CODES_ACTION_DERIVEE:
+            elif info.get('cible_statut') or info.get('reste_a_faire'):
                 etape.fait = etape.nb_reste_a_faire == 0
             else:
-                # 'action' restante (sync F15) : pas de backlog dérivable
-                # (tire tout, ADR 0009 §2) — « faite » une fois demandée pour
-                # la campagne.
+                # 'action' restante (sync F15, pull sorties C15, régulariser
+                # les clôtures) : pas de backlog dérivable (tire tout, ADR
+                # 0009 §2) — « faite » une fois demandée pour la campagne.
                 etape.fait = etape.demande
 
     @api.depends('code', 'valide', 'type_etape', 'campagne_id.etape_ids.fait')
@@ -831,50 +1025,60 @@ class SouscriptionCampagneEtape(models.Model):
             freres = {e.code: e.fait for e in etape.campagne_id.etape_ids}
             etape.etat_prerequis = 'prete' if all(freres.get(p) for p in prerequis) else 'bloquee'
 
-    # --- Drill-down (#157) : la liste filtrée des souscriptions concernées
-    # par cette étape (pour les étapes à signal dérivé) ou, à défaut, toutes
-    # les souscriptions facturables du mois. Exception (#282) : « Créer
-    # factures »/« Émettre factures » affichent un reste-à-faire côté
-    # souscriptions, mais la facturiste y travaille sur des FACTURES — le
-    # drill-down y ouvre donc les factures du mois plutôt que les
-    # souscriptions, groupées par statut (brouillon à émettre / comptabilisé
-    # déjà émis). Même action pour les deux étapes. Autre exception (#336) :
-    # les deux portes de vérif (verif_periodes, verif_refacturations)
-    # ouvrent ce qu'elles vérifient (périodes du mois / écran ADR 0012),
-    # jamais le fallback souscriptions — seule méthode de dispatch (ADR
-    # 0025 « une seule source de vérité »), aucune logique dupliquée
-    # ailleurs. ---
+    # --- Drill-down (#157 ; générique #342, ADR 0036 décision 9) : la clé
+    # `drill_down` du catalogue nomme une méthode de CETTE classe qui
+    # construit l'action « Voir » — absente = dispatch par défaut (liste
+    # filtrée des souscriptions concernées par cette étape, pour les étapes à
+    # signal dérivé, ou à défaut toutes les souscriptions facturables du
+    # mois). Exception #282 (« Créer factures »/« Émettre factures ») et #336
+    # (les deux portes de vérif) : nommées explicitement au catalogue,
+    # `_drill_down_factures_du_mois`/`_drill_down_periodes_du_mois`/
+    # `_drill_down_ecran_refacturations` ci-dessous — plus aucune branche
+    # `if self.code == ...` ici. ---
 
-    # gestes_commerciaux (#287) : même drill-down — la porte n'a pas de
-    # reste-à-faire propre, c'est sur CES factures du mois que se pose la
-    # ligne € manuelle avant que l'émission ne gèle le brouillon.
-    _CODES_DRILL_DOWN_FACTURES = ('creer_factures', 'gestes_commerciaux', 'emettre_factures')
+    def _drill_down_periodes_du_mois(self):
+        """#336 : « Vérif périodes » ouvre les périodes mensuelles du mois de
+        la campagne — pas le fallback souscriptions."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': ETAPES_CAMPAGNE.get(self.code, {}).get('label', self.code),
+            'res_model': 'souscription.periode',
+            'view_mode': 'list,form',
+            'domain': [('mois', '=', self.campagne_id.mois), ('type_periode', '=', 'mensuelle')],
+        }
+
+    def _drill_down_ecran_refacturations(self):
+        """#336 : « Vérif refacturations » réutilise l'écran de vérification
+        des prestations existant (ADR 0012, groupé par état) par référence à
+        son XML id — aucune vue ni domaine dupliqués ici."""
+        self.ensure_one()
+        return self.env['ir.actions.act_window']._for_xml_id('souscriptions_odoo.action_souscription_refacturation')
+
+    def _drill_down_factures_du_mois(self):
+        """#282 : « Créer factures »/« Émettre factures » affichent un
+        reste-à-faire côté souscriptions, mais la facturiste y travaille sur
+        des FACTURES — ouvre les factures du mois, groupées par statut
+        (brouillon à émettre / comptabilisé déjà émis). #287 : « Gestes
+        commerciaux » partage ce même drill-down — la porte n'a pas de
+        reste-à-faire propre, c'est sur CES factures du mois que se pose la
+        ligne € manuelle avant que l'émission ne gèle le brouillon."""
+        self.ensure_one()
+        factures = self.campagne_id._factures_du_mois()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': ETAPES_CAMPAGNE.get(self.code, {}).get('label', self.code),
+            'res_model': 'account.move',
+            'view_mode': 'list,form',
+            'domain': [('id', 'in', factures.ids)],
+            'context': {'group_by': 'state'},
+        }
 
     def action_drill_down(self):
         self.ensure_one()
-        if self.code == 'verif_periodes':
-            return {
-                'type': 'ir.actions.act_window',
-                'name': ETAPES_CAMPAGNE.get(self.code, {}).get('label', self.code),
-                'res_model': 'souscription.periode',
-                'view_mode': 'list,form',
-                'domain': [('mois', '=', self.campagne_id.mois), ('type_periode', '=', 'mensuelle')],
-            }
-        if self.code == 'verif_refacturations':
-            # #336 : réutilise l'écran de vérification des prestations
-            # existant (ADR 0012, groupé par état) par référence à son XML
-            # id — aucune vue ni domaine dupliqués ici.
-            return self.env['ir.actions.act_window']._for_xml_id('souscriptions_odoo.action_souscription_refacturation')
-        if self.code in self._CODES_DRILL_DOWN_FACTURES:
-            factures = self.campagne_id._factures_du_mois()
-            return {
-                'type': 'ir.actions.act_window',
-                'name': ETAPES_CAMPAGNE.get(self.code, {}).get('label', self.code),
-                'res_model': 'account.move',
-                'view_mode': 'list,form',
-                'domain': [('id', 'in', factures.ids)],
-                'context': {'group_by': 'state'},
-            }
+        methode = ETAPES_CAMPAGNE.get(self.code, {}).get('drill_down')
+        if methode:
+            return getattr(self, methode)()
         if self.type_etape == 'derive':
             souscriptions = self.campagne_id._reste_a_faire(self.code)
         else:
@@ -887,28 +1091,15 @@ class SouscriptionCampagneEtape(models.Model):
             'domain': [('id', 'in', souscriptions.ids)],
         }
 
-    # --- Bouton d'étape (#158) : un seul bouton générique par ligne, qui
-    # dispatche vers la méthode de la Campagne nommée par ce code — jamais de
-    # logique dupliquée entre la vue et ETAPES_CAMPAGNE. Les portes manuelles
-    # n'ont pas d'entrée ici : elles se valident via le champ `valide`.
-    _ACTIONS_PAR_ETAPE = {
-        'pull_sorties_c15': 'action_pull_sorties_c15',
-        'pull_meta_periodes': 'action_pull_meta_periodes',
-        'sync_f15': 'action_sync_f15',
-        'creer_factures': 'action_creer_factures',
-        'emettre_factures': 'action_emettre_factures',
-        'regulariser_clotures': 'action_regulariser_clotures',
-        'preparer_prelevements': 'action_preparer_prelevements',
-    }
-
-    # Étapes 'action' dont le « fait » est un signal dérivé (#186) plutôt que
-    # la demande (`demande`, cf. sync F15) — cf. _compute_fait/
-    # _compute_nb_reste_a_faire.
-    _CODES_ACTION_DERIVEE = ('preparer_prelevements',)
+    # --- Bouton d'étape (#158 ; générique #342) : un seul bouton générique
+    # par ligne, qui dispatche vers la méthode de la Campagne nommée par la
+    # clé `action` du catalogue — jamais de logique dupliquée entre la vue et
+    # ETAPES_CAMPAGNE. Les portes manuelles n'ont pas de clé `action` : elles
+    # se valident via le champ `valide`. ---
 
     def action_executer(self):
         self.ensure_one()
-        methode = self._ACTIONS_PAR_ETAPE.get(self.code)
+        methode = ETAPES_CAMPAGNE.get(self.code, {}).get('action')
         if not methode:
             raise UserError(
                 _("Pas d'action pour l'étape « %s ».", ETAPES_CAMPAGNE.get(self.code, {}).get('label', self.code))
@@ -923,8 +1114,9 @@ class SouscriptionCampagneEtape(models.Model):
             self.demande = True
         return resultat
 
-    # --- Vidange en tâche de fond (#326/#327, ADR 0035) : deux clients,
-    # « émettre factures » (#326) et « créer factures » (#327) ---
+    # --- Vidange en tâche de fond (#326/#327, ADR 0035 ; générique #342, ADR
+    # 0036 décision 9) : deux clients, « émettre factures » (#326) et « créer
+    # factures » (#327), tous deux nommés par la clé `vidange` du catalogue.
     #
     # Le bouton d'étape (`action_emettre_factures`/`action_creer_factures`,
     # ci-dessus sur la Campagne) pose l'intention (`demande`) et déclenche le
@@ -933,9 +1125,9 @@ class SouscriptionCampagneEtape(models.Model):
     # technique du cron). Une étape, un paquet, pas de boucle : c'est
     # `ir.cron._run_job` qui rappelle ce code tant qu'une passe progresse
     # (API de progression native, Odoo 17+ — aucune dépendance ajoutée).
-    # `_vidanger_un_paquet` est UNE seule méthode pour les deux étapes
-    # (dispatch sur `self.code` dans les trois hooks ci-dessous) — seule la
-    # liste de travail et l'action unitaire varient, la mécanique de paquet
+    # `_vidanger_un_paquet` est UNE seule méthode pour les deux étapes — la
+    # stratégie (liste de travail, action unitaire, libellés) vient du
+    # catalogue, zéro branche `if self.code == ...` ; la mécanique de paquet
     # (verrouillage, tentative en lot, repli unitaire sous savepoint, règle
     # « pas de progrès », notification) est strictement la même pour les
     # deux (cf. note de généricité dans la PR #327).
@@ -948,67 +1140,65 @@ class SouscriptionCampagneEtape(models.Model):
     # même ordre de grandeur par facture).
     _TAILLE_PAQUET_VIDANGE = 50
 
+    def _strategie_vidange(self):
+        self.ensure_one()
+        return ETAPES_CAMPAGNE[self.code]['vidange']
+
     def _liste_de_travail(self, limit):
         """Prochain paquet de travail du mois de la campagne — distinct de
         `_reste_a_faire` (ADR 0035 décision 4) : celui-ci répond « combien de
         souscriptions restent, pour la porte du DAG », celui-là « quelles
-        unités traiter au prochain paquet, pour le cron ». Deux étapes,
-        deux listes : les brouillons du mois à émettre, ou les souscriptions
-        du mois encore à facturer (bucket EXACT « à facturer », #301 — pas le
+        unités traiter au prochain paquet, pour le cron ». La liste complète
+        vient de la méthode de Campagne nommée par `vidange.liste_travail`
+        (#342) — brouillons du mois à émettre, ou souscriptions du mois
+        encore à facturer (bucket EXACT « à facturer », #301 — pas le
         reste-à-faire cumulatif : une souscription encore « à tirer », sans
         Période, n'est pas du travail pour CETTE étape)."""
         self.ensure_one()
-        if self.code == 'creer_factures':
-            a_facturer = self.campagne_id._souscriptions_par_bucket()['a_facturer']
-            return a_facturer[:limit]
-        a_emettre = self.campagne_id._factures_du_mois().filtered(lambda f: f.state == 'draft')
-        return a_emettre[:limit]
+        methode = self._strategie_vidange()['liste_travail']
+        return getattr(self.campagne_id, methode)()[:limit]
 
     def _compter_liste_de_travail(self):
         self.ensure_one()
-        if self.code == 'creer_factures':
-            return len(self.campagne_id._souscriptions_par_bucket()['a_facturer'])
-        return len(self.campagne_id._factures_du_mois().filtered(lambda f: f.state == 'draft'))
+        methode = self._strategie_vidange()['liste_travail']
+        return len(getattr(self.campagne_id, methode)())
 
     def _traiter_le_paquet(self, travail):
-        """Tentative en lot. Émission : le natif (`account.move._post()`)
-        poste tout un lot pour 7,7 ms/facture pièce (mesure ADR 0035) — bien
-        moins cher qu'un repli facture par facture quand le lot est sain.
-        Création : délègue à `souscription.souscription.creer_factures()`
-        (#158, déjà idempotent par période) — même levée `UserError` sur un
-        échec, qui fait retomber sur le repli unitaire ci-dessous."""
-        if self.code == 'creer_factures':
-            travail.creer_factures()
-            return len(travail)
-        travail.action_post()
+        """Tentative en lot : `vidange.action` (#342) est le nom d'UNE
+        méthode recordset, appelée identiquement qu'elle porte sur le lot
+        entier ou une seule unité (idiome natif) — `action_post()` pour
+        l'émission (7,7 ms/facture pièce, mesure ADR 0035, bien moins cher
+        qu'un repli facture par facture quand le lot est sain),
+        `creer_factures()` pour la création (#158, déjà idempotent par
+        période). Même levée `UserError` sur un échec, qui fait retomber sur
+        le repli unitaire ci-dessous."""
+        methode = self._strategie_vidange()['action']
+        getattr(travail, methode)()
         return len(travail)
 
     def _traiter_une_unite(self, unite):
-        """Repli unitaire (#268/#327) : l'action tentée sur UNE unité du
-        paquet, sous savepoint individuel — cf. `_vidanger_un_paquet`. Le
-        type de `unite` varie avec l'étape (une facture pour l'émission, une
-        souscription pour la création) ; c'est pour ça que le chatter de
-        l'échec (`_message_echec`) atterrit naturellement sur le bon
-        enregistrement : la facture pour l'émission, la SOUSCRIPTION pour la
-        création — qui n'a pas encore de facture à ce stade (#327)."""
-        if self.code == 'creer_factures':
-            unite.creer_factures()
-        else:
-            unite.action_post()
+        """Repli unitaire (#268/#327) : la MÊME action (`vidange.action`)
+        tentée sur UNE unité du paquet, sous savepoint individuel — cf.
+        `_vidanger_un_paquet`. Le type de `unite` varie avec l'étape (une
+        facture pour l'émission, une souscription pour la création) ; c'est
+        pour ça que le chatter de l'échec (`_message_echec`) atterrit
+        naturellement sur le bon enregistrement : la facture pour l'émission,
+        la SOUSCRIPTION pour la création — qui n'a pas encore de facture à ce
+        stade (#327)."""
+        methode = self._strategie_vidange()['action']
+        getattr(unite, methode)()
 
     def _message_echec(self, exc):
-        if self.code == 'creer_factures':
-            return _('Création de facture impossible : %(erreur)s', erreur=exc)
-        return _('Émission impossible : %(erreur)s', erreur=exc)
+        libelle = self._strategie_vidange()['message_echec']
+        return _('%(libelle)s : %(erreur)s', libelle=libelle, erreur=exc)
 
     def _vidanger_un_paquet(self):
         """Vide UN paquet de l'étape courante (« émettre factures », #326,
-        ou « créer factures », #327) — appelée par le cron dédié à cette
-        étape (`_cron_vidanger_emettre_factures`/`_cron_vidanger_creer_factures`),
-        sous `with_user(demande_par_id)`. Ne boucle pas : cf. le bloc de
-        commentaire ci-dessus. Un seul corps pour les deux étapes — seuls
-        `_liste_de_travail`/`_traiter_le_paquet`/`_traiter_une_unite`/
-        `_message_echec` varient avec `self.code`.
+        ou « créer factures », #327) — appelée par le point d'entrée cron
+        paramétré (`_cron_vidanger(code)`, #342), sous `with_user
+        (demande_par_id)`. Ne boucle pas : cf. le bloc de commentaire
+        ci-dessus. Un seul corps pour les deux étapes — seule la stratégie
+        du catalogue (`vidange`) varie avec `self.code`.
 
         Isolation d'erreur par unité (#268/#327) : tente le lot entier ; si
         une grille incapable de prixer (`UserError`, ADR 0029) ou toute
@@ -1063,41 +1253,28 @@ class SouscriptionCampagneEtape(models.Model):
             self.demande = False
             self._notifier_fin()
 
-    # Libellé du compteur de succès dans la notification de fin (#326/#327) —
-    # seule variation entre les deux étapes, le reste du payload est partagé
-    # (cf. `_construire_notification`). Chaîne brute non traduite, même
-    # convention que les labels d'`ETAPES_CAMPAGNE` (module French-only).
-    _LIBELLE_REUSSITE_PAR_ETAPE = {
-        'creer_factures': 'Créées',
-        'emettre_factures': 'Émises',
-    }
-
     def _notifier_fin(self):
-        """Notification de fin (#326, généralisée #327) : compteurs
-        réussites/échecs uniquement — le drill-down existant
+        """Notification de fin (#326, généralisée #327 ; générique #342) :
+        compteurs réussites/échecs uniquement — le drill-down existant
         (`action_drill_down`) dit LESQUELLES, le chatter de l'unité fautive
         dit POURQUOI (posé ci-dessus). Émise par `bus.bus._sendone` (natif,
         `simple_notification`) chez le·la demandeur·se — zéro JS.
 
-        Émission : compte les factures du mois postées/brouillon. Création :
-        compte les souscriptions du mois déjà facturées (bucket « facturée »
-        ou « émise », #301) contre celles encore « à facturer » — ce
-        deuxième bucket est exactement ce que `creer_factures()` n'a pas
-        réussi à faire avancer (une souscription encore « à tirer », sans
-        Période, n'a jamais été du travail pour cette étape)."""
+        `nb_echecs` = `_compter_liste_de_travail()` (même liste que la
+        vidange : le travail restant EST l'échec restant) ; `nb_ok` = la
+        méthode de Campagne nommée par `vidange.ok` (#342) — les factures du
+        mois postées pour l'émission, les souscriptions du mois déjà
+        « facturée » ou « émise » pour la création (ce dernier bucket exclut
+        volontairement « à tirer » : une souscription sans Période n'a
+        jamais été du travail pour cette étape)."""
         self.ensure_one()
         demandeur = self.demande_par_id
         if not demandeur:
             return
-        if self.code == 'creer_factures':
-            buckets = self.campagne_id._souscriptions_par_bucket()
-            nb_ok = len(buckets['facturee']) + len(buckets['emise'])
-            nb_echecs = len(buckets['a_facturer'])
-        else:
-            factures = self.campagne_id._factures_du_mois()
-            nb_ok = len(factures.filtered(lambda f: f.state == 'posted'))
-            nb_echecs = len(factures.filtered(lambda f: f.state == 'draft'))
-        libelle_ok = self._LIBELLE_REUSSITE_PAR_ETAPE[self.code]
+        strategie = self._strategie_vidange()
+        nb_ok = len(getattr(self.campagne_id, strategie['ok'])())
+        nb_echecs = self._compter_liste_de_travail()
+        libelle_ok = strategie['libelle_reussite']
         self.env['bus.bus']._sendone(
             demandeur.partner_id, 'simple_notification', self._construire_notification(nb_ok, nb_echecs, libelle_ok)
         )
@@ -1121,29 +1298,21 @@ class SouscriptionCampagneEtape(models.Model):
         }
 
     @api.model
-    def _cron_vidanger_emettre_factures(self):
-        """Point d'entrée du cron (`data/ir_cron_vidange_emettre_factures.xml`,
-        déclenché par `_trigger()` — #326). Cherche l'étape « émettre
-        factures » actuellement demandée (recliquer une étape déjà terminée
-        ne trouve rien : `demande` est retombée) et lui délègue UN paquet,
-        sous l'identité du·de la Facturiste demandeur·se — jamais celle,
-        technique, du cron."""
-        etape = self.search([('code', '=', 'emettre_factures'), ('demande', '=', True)], limit=1)
-        if not etape:
-            self.env['ir.cron']._commit_progress(remaining=0)
-            return
-        etape.with_user(etape.demande_par_id.id or self.env.user.id)._vidanger_un_paquet()
+    def _cron_vidanger(self, code):
+        """Point d'entrée paramétré (#342, ADR 0036 décision 10) — fusionne
+        les deux points d'entrée jumeaux `_cron_vidanger_emettre_factures`/
+        `_cron_vidanger_creer_factures` en UNE méthode, appelée par CHAQUE
+        cron avec SON code en dur dans le champ `code` XML (les deux
+        enregistrements `ir.cron`, xml_ids stables, restent — seul leur
+        champ `code` change, cf. `data/ir_cron_vidange_*.xml` — parallélisme
+        préservé : deux workers peuvent vidanger « créer » et « émettre »
+        en même temps).
 
-    @api.model
-    def _cron_vidanger_creer_factures(self):
-        """Point d'entrée du cron dédié (`data/ir_cron_vidange_creer_factures.xml`,
-        déclenché par `_trigger()` — #327). Même mécanique que
-        `_cron_vidanger_emettre_factures` (#326), en cron SÉPARÉ plutôt que
-        généralisé : celui de l'émission cible `emettre_factures` en dur, il
-        ne dispatche pas déjà sur toutes les étapes demandées — deux crons
-        jumeaux plutôt que de forcer une généralisation qui n'existait pas
-        encore côté #326 (cf. note de généricité, PR #327)."""
-        etape = self.search([('code', '=', 'creer_factures'), ('demande', '=', True)], limit=1)
+        Cherche l'étape `code` actuellement demandée (recliquer une étape
+        déjà terminée ne trouve rien : `demande` est retombée) et lui
+        délègue UN paquet, sous l'identité du·de la Facturiste demandeur·se
+        — jamais celle, technique, du cron."""
+        etape = self.search([('code', '=', code), ('demande', '=', True)], limit=1)
         if not etape:
             self.env['ir.cron']._commit_progress(remaining=0)
             return

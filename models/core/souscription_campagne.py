@@ -824,6 +824,11 @@ class SouscriptionCampagneFacturation(models.Model):
         sticky si des erreurs, auto-dismiss sinon — aucun résumé persisté."""
         self.ensure_one()
         creees, rafraichies, inchangees, conservees, erreurs = self._pull_meta_periodes_donnees()
+        # Symétrie avec l'automate d'amorçage (#343, grill 19/07) : `demande`
+        # marque « déjà tiré » sur cette étape 'derive' (elle ne pilote pas
+        # « fait », dérivé du backlog) — c'est elle qui fait sortir la
+        # campagne de la recherche du cron d'amorçage (`demande=False`).
+        self._etape('pull_meta_periodes').write({'demande': True})
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -910,7 +915,10 @@ class SouscriptionCampagneFacturation(models.Model):
             etape.write({'demande': True})
             cron._commit_progress(1)
             nb_erreurs = len(resultat[-1])
-            nb_total = sum(len(lot) for lot in resultat)
+            # « traité » = ligne aboutie — les erreurs (dernier lot, gabarit
+            # commun aux trois pulls) se comptent à part, jamais deux fois
+            # (grill 19/07 sur la revue de #343).
+            nb_total = sum(len(lot) for lot in resultat[:-1])
             mesures.append((ETAPES_CAMPAGNE[code]['label'], nb_total, nb_erreurs, duree, None))
         self._notifier_fin_amorcage(mesures)
 
@@ -923,7 +931,13 @@ class SouscriptionCampagneFacturation(models.Model):
         boucle pas (décision 4) : une campagne par appel, aucun
         re-déclenchement — le filet de sécurité quotidien du cron
         (`interval_type`, même idiome que la vidange, ADR 0035) suffit à
-        rattraper une campagne encore en attente."""
+        rattraper une campagne encore en attente.
+
+        Limite assumée (grill 19/07) : une campagne antérieure à #343 dont le
+        pull méta fut tiré à la main garde `demande=False` à jamais (la
+        symétrisation ne vaut que pour l'avenir) et peut être matchée en tête
+        par ce `limit=1` — no-op quotidien accepté, chaque création neuve a
+        son propre `_trigger()`."""
         etape = self.env['souscription.campagne.etape'].search(
             [('code', 'in', list(CODES_AMORCAGE)), ('demande', '=', False)], limit=1
         )

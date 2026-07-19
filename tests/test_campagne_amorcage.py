@@ -281,6 +281,26 @@ class TestCampagneAmorcageNotificationRecap(SouscriptionsTestCase):
         self.assertEqual(payload['type'], 'success')
         self.assertFalse(payload['sticky'])
 
+    def test_les_erreurs_ne_comptent_pas_dans_les_traites(self):
+        """Grill 19/07 : « traité » = ligne aboutie — une erreur par
+        souscription (skip-and-report) apparaît au compteur d'erreurs, jamais
+        dans le total traité (pas de double comptage)."""
+        meta_invalide = _meta(ref_situation_contractuelle='RSC-AMORCAGE-RECAP', debut=None)
+
+        with (
+            patcher_client_fabrique(_client_amorcage(meta_items=[meta_invalide])),
+            patcher_transport(refacturation_module.SouscriptionRefacturation, '_tirer_prestations', return_value=[]),
+            self.enter_registry_test_mode(),
+            patch.object(type(self.env['bus.bus']), '_sendone') as mock_sendone,
+        ):
+            self.cron.method_direct_trigger()
+
+        mock_sendone.assert_called_once()
+        _partner, _notif_type, payload = mock_sendone.call_args[0]
+        self.assertIn('Pull méta-périodes : 0 traité(s), 1 en erreur', payload['message'])
+        self.assertEqual(payload['type'], 'warning')
+        self.assertTrue(payload['sticky'])
+
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneAmorcageIdentite(SouscriptionsTestCase):

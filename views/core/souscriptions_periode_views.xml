@@ -11,7 +11,7 @@
                 <field name="date_debut" optional="hide"/>
                 <field name="date_fin" optional="hide"/>
                 <field name="config_cadrans" optional="hide"/>
-                <field name="lisse" optional="hide"/>
+                <field name="lisse_periode" optional="hide"/>
                 <field name="jours" optional="hide"/>
                 <!-- Énergies : champs stockés (energie_base_kwh dérive déjà le
                      total HP+HC en config hp_hc/4_cadrans, ADR 0005), donc
@@ -226,7 +226,7 @@
                     <filter string="Qualité" name="group_qualite" context="{'group_by': 'qualite'}"/>
                     <filter string="Statut de communication" name="group_statut_communication" context="{'group_by': 'statut_communication'}"/>
                     <filter string="Souscription" name="group_souscription" context="{'group_by': 'souscription_id'}"/>
-                    <filter string="Mois" name="group_mois" context="{'group_by': 'mois'}"/>
+                    <filter string="Mois (canonique)" name="group_mois" context="{'group_by': 'mois'}"/>
                 </group>
             </search>
         </field>

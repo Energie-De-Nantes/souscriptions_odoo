@@ -99,12 +99,31 @@ class TestPeriodeSnapshotType(SouscriptionsTestCase):
         # La valeur figée n'a pas bougé (tamponnée à l'émission : energie_base_kwh).
         self.assertEqual(periode.provision_base_kwh, 100.0)
 
+    def test_lisse_periode_figee_a_lemission(self):
+        """Fusion lisse/lisse_periode (#347) : `lisse_periode` pilote désormais
+        la facture (template ×2, colonne liste) — il hérite donc du même
+        verrou d'émission que les autres champs du snapshot figé, même
+        patron que `test_periode_figee_a_lemission`."""
+        self.souscription_base.lisse = True
+        periode = self._periode(self.souscription_base, provision_base_kwh=100.0, energie_base_kwh=100.0)
+        self.assertTrue(periode.lisse_periode, 'snapshotté depuis la souscription à la création')
+        facture = periode._creer_facture()
+        facture.action_post()  # émission → période figée
+
+        with self.assertRaises(UserError):
+            periode.write({'lisse_periode': False})
+
+        self.assertTrue(periode.lisse_periode, "la valeur figée n'a pas bougé")
+
     def test_champs_compat_deprecies_supprimes(self):
-        """Les champs de compatibilité dépréciés ont disparu du modèle (#14)."""
+        """Les champs de compatibilité dépréciés ont disparu du modèle (#14,
+        #347 pour `lisse` — fusionné sur `lisse_periode`, seul snapshot
+        autoritaire du lissage à la maille Période)."""
         champs = self.env['souscription.periode']._fields
         self.assertNotIn('energie_kwh', champs)
         self.assertNotIn('provision_kwh', champs)
         self.assertNotIn('_fix_provision', champs)
+        self.assertNotIn('lisse', champs)
 
     def test_snapshot_rsc_fige_a_la_creation(self):
         """La Période snapshotte la RSC de la Souscription à sa création — même

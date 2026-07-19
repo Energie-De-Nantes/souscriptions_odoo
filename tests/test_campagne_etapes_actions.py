@@ -1109,6 +1109,44 @@ class TestCampagneEtapeGestesCommerciaux(SouscriptionsTestCase):
         self.assertEqual(facture.state, 'draft', 'le clic ne poste plus lui-même (#326) — le cron le fera')
 
 
+@tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
+class TestCampagneEtapeMotDuMois(SouscriptionsTestCase):
+    """#314, ADR 0034 amendée (« Le marketing gate la facturation,
+    délibérément ») : porte manuelle, troisième racine du DAG — même
+    mécanique que Vérif périodes/Vérif refacturations/Gestes commerciaux
+    (coche Validé + validé_par/validé_le, aucune action, aucun reste-à-faire).
+    """
+
+    MOIS = date(2024, 3, 1)
+
+    def setUp(self):
+        super().setUp()
+        self.campagne = self.env['souscription.campagne.facturation'].create({'mois': self.MOIS})
+
+    def _etape(self, code):
+        return self.campagne.etape_ids.filtered(lambda e: e.code == code)
+
+    def test_mot_du_mois_est_une_racine_sans_prerequis(self):
+        """AC : apparaît comme racine du DAG, aucun prérequis."""
+        etape = self._etape('mot_du_mois')
+        self.assertEqual(etape.type_etape, 'porte')
+        self.assertEqual(etape.etat_prerequis, 'prete')
+        self.assertFalse(etape.bloquee_par)
+
+    def test_valider_avec_une_lettre_vide_est_accepte(self):
+        """AC : valider la porte avec une lettre VIDE est accepté — « rien à
+        dire ce mois-ci » est une décision légitime, jamais bloquée par le
+        contenu du champ `lettre_mois`."""
+        self.assertFalse(self.campagne.lettre_mois)
+        etape = self._etape('mot_du_mois')
+
+        etape.write({'valide': True})
+
+        self.assertTrue(etape.fait)
+        self.assertEqual(etape.valide_par_id, self.env.user)
+        self.assertTrue(etape.valide_le)
+
+
 @tagged('souscriptions', 'souscriptions_migration', 'post_install', '-at_install')
 class TestMigrationGestesCommerciaux(SouscriptionsTestCase):
     """Migration `19.0.1.17.0` (#287) : soigne les campagnes déjà ouvertes

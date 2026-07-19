@@ -215,6 +215,26 @@ ETAPES_CAMPAGNE = {
             'libelle_reussite': 'Émises',
         },
     },
+    # Porte manuelle, TROISIÈME racine du DAG — aucun prérequis, comme
+    # `pull_sorties_c15`/`sync_f15` (#314, ADR 0034 amendée « Le marketing
+    # gate la facturation, délibérément »). Le type est dicté par le
+    # catalogue d'étapes : `derive` là où un signal existe dans les données,
+    # `porte` là où il manque — une lettre VIDE est ambiguë (« pas encore
+    # écrite » vs « rien à dire ce mois-ci » sont indiscernables, aucun
+    # signal dérivable). En `derive`, un mois sans lettre ne serait jamais
+    # « fait » et bloquerait l'envoi À VIE — la porte valide une DÉCISION,
+    # pas une écriture : la valider avec une lettre vide (`campagne.
+    # lettre_mois` falsy) est parfaitement légitime, aucune garde ne le
+    # lie. Racine sans prérequis parce que l'éditorial ne dépend d'aucune
+    # donnée de facturation — l'analogue direct déjà en place est
+    # `gestes_commerciaux` (porte sans reste-à-faire dont la fenêtre se
+    # referme consciemment avant un acte irréversible).
+    'mot_du_mois': {
+        'label': 'Mot du mois',
+        'type': 'porte',
+        'prerequis': (),
+        'phase': 'facturer',
+    },
     'regulariser_clotures': {
         'label': 'Régulariser les clôtures',
         'type': 'action',

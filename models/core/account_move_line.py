@@ -48,7 +48,10 @@ class AccountMoveLine(models.Model):
 
         Une facture déjà **postée** n'a pas besoin de cette garde :
         l'immutabilité comptable (Odoo core) bloque déjà toute suppression de
-        ligne."""
+        ligne.
+
+        Consommateur des deux clés de contexte ci-dessus : carte complète
+        (« Régénération au fil de l'eau ») dans `account_move.py`."""
         if self.env.context.get('souscription_move_unlink') or self.env.context.get('souscription_regenere_lignes'):
             return
         for ligne in self:

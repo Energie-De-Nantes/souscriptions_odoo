@@ -447,7 +447,11 @@ class SouscriptionPeriode(models.Model):
         `souscription_tampon_emission` (posé uniquement par
         `_tamponner_provision`) : la re-génération de `account.move._post()`
         suit immédiatement le tampon dans le même événement d'émission,
-        inutile de la déclencher deux fois."""
+        inutile de la déclencher deux fois.
+
+        Point d'entrée (b), et consommateur des deux clés de contexte
+        ci-dessus : carte complète dans la bannière « Régénération au fil de
+        l'eau » de `account_move.py`."""
         champs_geles = self._LOCKED_FIELDS.intersection(vals)
         if champs_geles and not self.env.context.get('regularisation_tampon'):
             for periode in self:
@@ -854,7 +858,9 @@ class SouscriptionPeriode(models.Model):
         du mesuré déclenche lui-même la recomposition d'un brouillon lié
         (`_CHAMPS_MESURE_COMPOSES`, suivi de review #271) — les vals
         d'atterrissage portent toujours les énergies/TURPE, un seul mécanisme
-        suffit, plus d'appel explicite ici."""
+        suffit, plus d'appel explicite ici. Carte complète des 5 points
+        d'entrée : bannière « Régénération au fil de l'eau » dans
+        `account_move.py`."""
         self.ensure_one()
         vals = self._vals_atterrissage_v3(meta)
         if not self._est_facturee_emise():
@@ -928,6 +934,10 @@ class SouscriptionPeriode(models.Model):
         la ré-émettre rejoue ce tampon aux valeurs courantes de ``energie_*``
         — la future « régularisation des réels » d'un non-lissé rééditée par
         Enedis emprunte le même mécanisme.
+
+        Producteur de la clé de contexte `souscription_tampon_emission` :
+        carte complète dans la bannière « Régénération au fil de l'eau » de
+        `account_move.py`.
         """
         self.ensure_one()
         if not self._a_tamponner():

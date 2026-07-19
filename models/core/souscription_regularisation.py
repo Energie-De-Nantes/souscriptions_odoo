@@ -115,7 +115,10 @@ class SouscriptionRegularisation(models.Model):
         déjà lié (``_recalculer`` l'autorise tant qu'il n'est pas ÉMIS), ses
         lignes générées sont recomposées juste après — le·la facturiste voit
         immédiatement l'effet du recalcul sur le document, sans devoir
-        rouvrir la Facture."""
+        rouvrir la Facture.
+
+        Point d'entrée (d) : carte complète des 5 points d'entrée dans la
+        bannière « Régénération au fil de l'eau » de `account_move.py`."""
         self.ensure_one()
         self._recalculer()
         if self.facture_id.state == 'draft':
@@ -422,7 +425,11 @@ class SouscriptionRegularisation(models.Model):
         `account.move._post()` sur les moves qui viennent d'être postés,
         jamais un second effet non idempotent ajouté) : poser un booléen à
         `True` deux fois est un non-événement, donc un re-post n'aggrave rien
-        de ce côté-là."""
+        de ce côté-là.
+
+        Producteur de la clé de contexte `regularisation_tampon` : carte
+        complète dans la bannière « Régénération au fil de l'eau » de
+        `account_move.py`."""
         self.ensure_one()
         for ligne in self.ligne_ids:
             champ = f'provision_{ligne.cadran}_kwh'

@@ -166,7 +166,10 @@ class AccountMove(models.Model):
         Facture d'énergie porte `periode_id`/`regularisation_id` (pas
         `copy=False`, CONTEXT.md « Avoir ») mais n'est jamais *la* facture
         de sa source — sans ce filtre il serait recomposé depuis la Période
-        (lignes doublées) et raflerait les Refacturations en file."""
+        (lignes doublées) et raflerait les Refacturations en file.
+
+        Filet final de la régénération au fil de l'eau : carte complète (5
+        points d'entrée, 4 clés de contexte) dans la bannière ci-dessous."""
         a_regenerer = self.filtered(
             lambda m: m.is_facture_energie and m.state == 'draft' and m._facture_de_la_source() == m
         )
@@ -196,9 +199,39 @@ class AccountMove(models.Model):
         null') remet les Refacturations rassemblées en file, et le statut de
         facturation de la Souscription (dérivé, ADR 0025 §2) retombe tout
         seul à « à facturer » — la cascade native suffit, aucun code dédié
-        ici."""
+        ici.
+
+        Producteur de la clé de contexte `souscription_move_unlink` : carte
+        complète dans la bannière « Régénération au fil de l'eau » ci-dessous."""
         self = self.with_context(souscription_move_unlink=True)
         return super().unlink()
+
+    # === Régénération au fil de l'eau (#267, carte #364) ===
+    #
+    # Invariant : le brouillon = sa source à l'instant T + les lignes
+    # manuelles (#266). Tout converge vers `_recomposer_lignes_generees`
+    # ci-dessous, DÉCLENCHÉ par 5 points d'entrée dans 4 fichiers — l'ORM
+    # impose cet éparpillement (verrou ici, dédup là), le mécanisme central
+    # reste unique. Carte, pas refactor : les lettres (a)-(d) citées par les
+    # docstrings des sites sont définies UNIQUEMENT ici.
+    #
+    # Points d'entrée :
+    #   (a) pull méta-périodes -> `souscription.periode._rafraichir_depuis_meta`
+    #   (b) édition facturable  -> `souscription.periode.write()`
+    #   (c) insertion F15       -> `souscription.refacturation._recomposer_brouillons_mensuels`
+    #   (d) recalcul régul      -> `souscription.regularisation.action_recalculer`
+    #   + filet final à l'émission : `_post()` ci-dessus (ordre : cf. sa docstring)
+    #
+    # Clés de contexte (produite par -> consommée par : effet) :
+    #   regularisation_tampon        `regularisation._solder_provisions` -> `periode.write` : lève le verrou #14
+    #   souscription_tampon_emission `periode._tamponner_provision` -> `periode.write` : évite une double recomposition
+    #   souscription_regenere_lignes `_recomposer_lignes_generees` -> `account.move.line.ondelete` : lève la garde #266
+    #   souscription_move_unlink     `unlink()` ci-dessus -> `account.move.line.ondelete` : lève la garde #266
+    #
+    # Risque connu (PR #259, non résolu) : re-poster un move de Régularisation
+    # (post -> button_draft -> re-post) rejoue `_solder_provisions` (+=) —
+    # gardé par `_verifier_regularisation_emise_immuable` ci-dessous, qui
+    # interdit le `button_draft`/`button_cancel` d'une régularisation ÉMISE.
 
     # === Provenance des lignes (#266, tranche 2 du PRD #264, ADR 0014 amendé) ===
     #
@@ -258,7 +291,12 @@ class AccountMove(models.Model):
 
         Contexte `souscription_regenere_lignes` : lève la garde `ondelete`
         (#266) pour la suppression, ici, des lignes flaguées qu'on remplace —
-        seule cette méthode (et `unlink()`, cascade) pose ce contexte."""
+        seule cette méthode (et `unlink()`, cascade) pose ce contexte.
+
+        Mécanisme central de la régénération au fil de l'eau (#267) : les 5
+        points d'entrée et le protocole de contexte sont cartographiés dans
+        la bannière « Régénération au fil de l'eau », plus haut dans ce
+        fichier."""
         self.ensure_one()
         self.invoice_line_ids.filtered('souscription_ligne_generee').with_context(
             souscription_regenere_lignes=True

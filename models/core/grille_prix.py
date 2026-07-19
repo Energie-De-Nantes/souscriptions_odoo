@@ -1,3 +1,4 @@
+from dateutil.relativedelta import relativedelta
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
@@ -234,38 +235,15 @@ class GrillePrix(models.Model):
         # viole jamais la contrainte « 1er du mois » (contrairement à `today`,
         # qui la viole tout jour sauf le 1er) — l'utilisateur l'ajuste avant
         # activation si besoin.
-        today = fields.Date.today()
-        if today.month == 12:
-            date_debut_suggeree = today.replace(year=today.year + 1, month=1, day=1)
-        else:
-            date_debut_suggeree = today.replace(month=today.month + 1, day=1)
+        date_debut_suggeree = fields.Date.today() + relativedelta(months=1, day=1)
 
-        # Préparer les lignes à copier
-        lignes_vals = []
-        for ligne in self.ligne_ids:
-            lignes_vals.append(
-                (
-                    0,
-                    0,
-                    {
-                        'product_id': ligne.product_id.id,
-                        'type_produit': ligne.type_produit,
-                        'prix_unitaire': ligne.prix_unitaire,
-                        'prix_base_3kva': ligne.prix_base_3kva,
-                        'coef_kva': ligne.coef_kva,
-                    },
-                )
-            )
-
-        # Créer la nouvelle grille avec ses lignes, dans le même régime (une
-        # duplication ne change jamais de régime de prix).
-        nouvelle_grille = self.create(
+        # copy() recopie nativement le One2many ligne_ids et le regime_prix ;
+        # seules name/date_debut/active ont besoin d'être surchargées.
+        nouvelle_grille = self.copy(
             {
                 'name': f'Copie de {self.name}',
                 'date_debut': date_debut_suggeree,
-                'regime_prix': self.regime_prix,
                 'active': False,
-                'ligne_ids': lignes_vals,
             }
         )
 

@@ -12,8 +12,10 @@ couvert en intégration côté `test_periode_facture.py`.
 
 from datetime import date
 
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
+from odoo.tools import mute_logger
+from psycopg2 import IntegrityError
 
 from .common import SouscriptionsTestCase
 
@@ -107,9 +109,10 @@ class TestChequeEnergieModel(SouscriptionsTestCase):
             rejete.action_valider()
 
     def test_numero_deja_saisi_refuse(self):
-        """Un `numero` déjà utilisé par un autre chèque est refusé (unicité)."""
+        """Un `numero` déjà utilisé par un autre chèque est refusé (unicité,
+        portée par une contrainte SQL — #355)."""
         self._new_cheque(numero='CHQ-DUP')
-        with self.assertRaises(ValidationError):
+        with self.assertRaises(IntegrityError), mute_logger('odoo.sql_db'), self.cr.savepoint():
             self._new_cheque(numero='CHQ-DUP')
 
     def test_cheques_projetes_sur_la_souscription_par_partner(self):

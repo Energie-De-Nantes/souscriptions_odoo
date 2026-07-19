@@ -19,7 +19,6 @@ tests/
 
 # Fichiers de configuration locaux
 odoo-server.log
-unittest.cfg
 
 # VSCode/IDE
 .vscode/

@@ -125,6 +125,21 @@ class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
             action = etape.action_executer()
         self.assertEqual(action['tag'], 'display_notification')
 
+    def test_methode_donnees_rend_le_tuple_sans_passer_par_le_toast(self):
+        """#341, ADR 0036 décision 13 : `_pull_meta_periodes_donnees` — la
+        méthode-données consommée par le bouton — est exercée directement,
+        sans passer par le payload `display_notification`. Même gabarit que
+        les deux autres pulls (sorties C15, sync F15)."""
+        client = client_flux_factice('meta_periodes', [_periode_meta()])
+        with patcher_client_fabrique(client):
+            creees, rafraichies, inchangees, conservees, erreurs = self.campagne._pull_meta_periodes_donnees()
+
+        self.assertEqual(len(creees), 1)
+        self.assertFalse(rafraichies)
+        self.assertFalse(inchangees)
+        self.assertFalse(conservees)
+        self.assertFalse(erreurs)
+
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
 class TestCampagneEtapeSyncF15(SouscriptionsTestCase):

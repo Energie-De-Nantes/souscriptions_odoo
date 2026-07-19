@@ -31,7 +31,8 @@ refusé — ce service n'écrit **jamais** `provision_*`.
 
 Deux scopes partagent cette politique (ADR 0030 conséquences) :
 - `pull(souscriptions, mois)` — scope **facturation** : un mois, crée les
-  Périodes manquantes (wizard ad-hoc, bouton Campagne) ;
+  Périodes manquantes (méthode-données `_pull_meta_periodes_donnees` de la
+  Campagne, #341) ;
 - `refresh(souscriptions, mois_debut, mois_fin)` — scope **refresh** : plage
   de mois, ne crée jamais de Période (consommé par la Régularisation,
   tranche 4 du PRD #231, pour rafraîchir le mesuré des mois candidats avant
@@ -64,18 +65,19 @@ class SouscriptionPullMetaPeriodesService(models.AbstractModel):
         politique gardée par l'empreinte (docstring du module).
 
         Args:
-            souscriptions: le périmètre déjà voulu par l'appelant (toutes-RSC
-                pour le wizard ad-hoc, Périmètre de campagne du mois pour la
-                Campagne) — aucun filtre supplémentaire ici, seules les
-                souscriptions à RSC résolue participent au flux.
+            souscriptions: le périmètre déjà voulu par l'appelant — Périmètre
+                de campagne du mois pour la Campagne (#341) — aucun filtre
+                supplémentaire ici, seules les souscriptions à RSC résolue
+                participent au flux.
             mois: n'importe quelle date du mois à tirer (année/mois seuls
                 comptent).
 
         Returns:
             tuple[list[str], list[str], list[str], list[str], list[str]] :
             `(creees, rafraichies, inchangees, conservees, erreurs)`, cinq
-            listes de libellés consommées par le résumé du wizard ad-hoc et
-            par le résultat/toast de la Campagne (#158/#176).
+            listes de libellés — même gabarit que les deux autres pulls
+            (sorties C15, sync F15, #341) — consommées par la méthode-données
+            de la Campagne puis emballées en toast (#158/#176).
         """
         return self._pull_un_mois(souscriptions, mois, creer_manquantes=True)
 
@@ -163,6 +165,11 @@ class SouscriptionPullMetaPeriodesService(models.AbstractModel):
                                 conservees=conservees,
                             )
                     except Exception as exc:
+                        # Skip-and-report durable (#341, ADR 0036 décision
+                        # 8a) : l'erreur va au chatter de la souscription
+                        # fautive, au point d'échec, pour les deux chemins
+                        # (bouton manuel ET futur automate d'amorçage).
+                        souscription.message_post(body=f'Pull méta-périodes ({mois_str}) : échec — {exc}')
                         erreurs.append(f'{souscription.name} ({mois_str}) : {exc}')
         except IngestionEnCours:
             raise UserError("L'ingestion electricore est en cours (verrou base) : réessayez plus tard.")
@@ -288,6 +295,11 @@ class SouscriptionPullMetaPeriodesService(models.AbstractModel):
                         souscription, ligne, ecrites=ecrites, corrigees=corrigees, inchangees=inchangees
                     )
             except Exception as exc:
+                # Skip-and-report durable (#341, ADR 0036 décision 8a) :
+                # même geste que le pull méta-périodes — chatter de la
+                # souscription fautive, au point d'échec, chemin manuel
+                # comme futur automate.
+                souscription.message_post(body=f'Pull sorties C15 : échec — {exc}')
                 erreurs.append(f'{souscription.name} ({ligne.ref_situation_contractuelle}) : {exc}')
 
         return ecrites, corrigees, inchangees, erreurs

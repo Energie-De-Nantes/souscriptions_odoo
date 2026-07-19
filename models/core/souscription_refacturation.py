@@ -102,9 +102,10 @@ class SouscriptionRefacturation(models.Model):
 
     # --- Sync electricore : pull-tout des prestations F15 (#147, ADR 0009 §2 amendé) ---
 
-    def synchroniser_depuis_electricore(self):
-        """Tire les prestations F15 d'electricore sur les RSC de nos souscriptions,
-        insert-si-absente par `reference`.
+    def _synchroniser_depuis_electricore_donnees(self):
+        """Méthode-données du pull des prestations F15 (#341, ADR 0036
+        décision 13) : tire les prestations F15 d'electricore sur les RSC de
+        nos souscriptions, insert-si-absente par `reference`.
 
         Pas de fenêtre temporelle : les lignes F15 arrivent en retard, datées dans
         le passé — un curseur de date les manquerait (ADR 0009 §2) ; l'idempotence
@@ -114,6 +115,12 @@ class SouscriptionRefacturation(models.Model):
         (#245) : le périmètre Enedis peut être partagé entre entités, on ne tire
         pas sur le fil les prestations d'un tiers. Le client est acquis en tête,
         avant tout travail (échec rapide et déterministe, ADR 0024 §5).
+
+        Returns:
+            tuple[list[str], list[str], list[str]] : `(creees, ignorees,
+            erreurs)`, même gabarit que les deux autres pulls (méta-périodes,
+            sorties C15) — consommé par le bouton `synchroniser_depuis_electricore`
+            (toast) et par tout appelant non-UI (automate d'amorçage, tests).
         """
         client = self.env['souscription.electricore.client'].client()
         try:
@@ -124,11 +131,19 @@ class SouscriptionRefacturation(models.Model):
             raise UserError(_('Précondition non remplie côté electricore : %s', exc))
         except ContractVersionError as exc:
             raise UserError(_('Contrat electricore obsolète : %s', exc))
-        compte = self._inserer_prestations(lignes)
+        return self._inserer_prestations(lignes)
+
+    def synchroniser_depuis_electricore(self):
+        """Bouton (#147) : emballe `_synchroniser_depuis_electricore_donnees`
+        en toast (#341, ADR 0036 décision 13) — aucune couture réseau ici,
+        seuls les comptes traversent la frontière UI."""
+        creees, ignorees, erreurs = self._synchroniser_depuis_electricore_donnees()
         message = _(
             'Prestations : %(creees)s créée(s), %(ignorees)s sans souscription (RSC inconnue), '
-            '%(erreurs)s en erreur (voir logs).',
-            **compte,
+            '%(erreurs)s en erreur (chatter des souscriptions fautives).',
+            creees=len(creees),
+            ignorees=len(ignorees),
+            erreurs=len(erreurs),
         )
         return {
             'type': 'ir.actions.client',
@@ -136,7 +151,7 @@ class SouscriptionRefacturation(models.Model):
             'params': {
                 'title': _('Sync prestations electricore'),
                 'message': message,
-                'type': 'warning' if compte['erreurs'] or compte['ignorees'] else 'success',
+                'type': 'warning' if erreurs or ignorees else 'success',
                 'sticky': False,
             },
         }
@@ -175,7 +190,9 @@ class SouscriptionRefacturation(models.Model):
         comptée — signal de backfill RSC, la ligne est rattrapée gratuitement au
         run suivant. Une référence déjà présente n'est jamais touchée (pas de
         chemin d'update). Savepoint par ligne (skip-and-report, ADR 0011) : une
-        contrainte sur une ligne n'emporte pas le lot.
+        contrainte sur une ligne n'emporte pas le lot — l'erreur va au chatter
+        de la souscription fautive, au point d'échec (#341, ADR 0036 décision
+        8a), en plus du log (trace complète pour l'outillage).
 
         Régénération au fil de l'eau (#267, point d'entrée (c)) : une fois le
         lot inséré, les brouillons mensuels non émis des souscriptions
@@ -183,6 +200,10 @@ class SouscriptionRefacturation(models.Model):
         re-génération à l'émission (#266) suffit déjà à la conformité du
         document final, mais le·la facturiste doit voir la nouvelle
         Refacturation rassemblée AVANT d'émettre, pas seulement après.
+
+        Returns:
+            tuple[list[str], list[str], list[str]] : `(creees, ignorees,
+            erreurs)`, trois listes de libellés (référence de la ligne).
         """
         existantes = set(
             self.search([('reference', 'in', [ligne['reference'] for ligne in lignes])]).mapped('reference')
@@ -192,25 +213,28 @@ class SouscriptionRefacturation(models.Model):
             s.ref_situation_contractuelle: s
             for s in self.env['souscription.souscription'].search([('ref_situation_contractuelle', 'in', list(rscs))])
         }
-        compte = {'creees': 0, 'ignorees': 0, 'erreurs': 0}
+        creees, ignorees, erreurs = [], [], []
         souscriptions_touchees = set()
         for ligne in lignes:
             if ligne['reference'] in existantes:
                 continue
             souscription = par_rsc.get(ligne.get('ref_situation_contractuelle'))
             if souscription is None:
-                compte['ignorees'] += 1
+                ignorees.append(ligne['reference'])
                 continue
             try:
                 with self.env.cr.savepoint():
                     self.create(self._vals_prestation(ligne, souscription))
-                compte['creees'] += 1
+                creees.append(ligne['reference'])
                 souscriptions_touchees.add(souscription.id)
-            except Exception:
+            except Exception as exc:
                 _logger.warning('Sync prestation %s : échec, ligne sautée.', ligne.get('reference'), exc_info=True)
-                compte['erreurs'] += 1
+                souscription.message_post(
+                    body=f'Sync prestations F15 : échec sur la référence {ligne.get("reference")} — {exc}'
+                )
+                erreurs.append(f'{souscription.name} ({ligne.get("reference")}) : {exc}')
         self._recomposer_brouillons_mensuels(souscriptions_touchees)
-        return compte
+        return creees, ignorees, erreurs
 
     def _recomposer_brouillons_mensuels(self, souscription_ids):
         """Recompose les brouillons mensuels (source Période, pas

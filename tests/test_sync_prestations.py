@@ -228,6 +228,36 @@ class TestSyncPrestations(SouscriptionsTestCase):
         self.assertTrue(self._prestas('ref-autre'))
         self.assertIn('1 en erreur', action['params']['message'])
 
+    def test_erreur_par_ligne_va_au_chatter_de_la_souscription_fautive(self):
+        """#341, ADR 0036 décision 8a : même geste que les deux autres pulls —
+        l'erreur skip-and-report va au chatter de la souscription fautive, au
+        point d'échec dans le service, chemin manuel comme futur automate."""
+        self._sync(
+            [
+                _ligne(reference='ref-dup-chatter'),
+                _ligne(reference='ref-dup-chatter', prix_unitaire=999.99),
+            ]
+        )
+
+        messages = self.souscription_base.message_ids.mapped('body')
+        self.assertTrue(any('Sync prestations F15' in m for m in messages), 'erreur tracée au chatter')
+
+    def test_methode_donnees_rend_le_tuple_sans_passer_par_le_toast(self):
+        """#341, ADR 0036 décision 13 : `_synchroniser_depuis_electricore_donnees`
+        — la méthode-données consommée par le bouton — est exercée
+        directement, sans passer par le payload `display_notification`. Même
+        gabarit que les deux autres pulls (sorties C15, méta-périodes)."""
+        with patcher_transport(
+            refacturation_module.SouscriptionRefacturation,
+            '_tirer_prestations',
+            return_value=[_ligne(reference='ref-donnees')],
+        ):
+            creees, ignorees, erreurs = self.Refacturation._synchroniser_depuis_electricore_donnees()
+
+        self.assertEqual(creees, ['ref-donnees'])
+        self.assertFalse(ignorees)
+        self.assertFalse(erreurs)
+
     def test_contract_version_error_mappee_en_userror(self):
         """Contrat obsolète -> erreur dure actionnable (UserError), pas de
         traceback brut pour le·la facturiste."""

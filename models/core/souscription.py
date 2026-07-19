@@ -306,11 +306,11 @@ class Souscription(models.Model):
         (`date_fin` vide OU `date_fin >= premier jour de M`).
 
         Point unique du prédicat : la Campagne (`_souscriptions_facturables`)
-        et le wizard ad-hoc de pull le consomment tous les deux, pour ne
-        jamais diverger. Historique et figé par le mois — à distinguer de
-        `etat == 'en_service'`, un instantané vivant (aujourd'hui), qui
-        sur-compte les Souscriptions entrées après `M` et sous-compte celles
-        résiliées depuis (ADR 0025)."""
+        et la méthode-données du pull méta-périodes le consomment tous les
+        deux, pour ne jamais diverger. Historique et figé par le mois — à
+        distinguer de `etat == 'en_service'`, un instantané vivant
+        (aujourd'hui), qui sur-compte les Souscriptions entrées après `M` et
+        sous-compte celles résiliées depuis (ADR 0025)."""
         premier_jour = fields.Date.to_date(mois).replace(day=1)
         dernier_jour = premier_jour + relativedelta(day=31)
         return self.search(
@@ -619,19 +619,32 @@ class Souscription(models.Model):
 
     # --- Pull des sorties C15 (#246, ADR 0031 décisions 1-2) ---
 
+    def _pull_sorties_c15_donnees(self):
+        """Méthode-données du pull des sorties C15 (#341, ADR 0036 décision
+        13) : scope (toutes les Souscriptions non résiliées à RSC résolue,
+        quelle que soit la sélection de la liste — même indépendance au
+        recordset appelant que le pull des prestations F15) + appel au
+        service, `souscription.pull.meta.periodes.service.pull_sorties`.
+        `date_fin` en sort à auteur unique (ADR 0031), jamais saisie à la
+        main.
+
+        Returns:
+            tuple[list[str], list[str], list[str], list[str]] : `(ecrites,
+            corrigees, inchangees, erreurs)`, même gabarit que les deux
+            autres pulls (méta-périodes, sync F15) — consommé par le bouton
+            `action_tirer_sorties_c15` (toast) et par tout appelant non-UI
+            (automate d'amorçage, tests)."""
+        perimetre = self.search([('etat', '!=', 'resiliee'), ('ref_situation_contractuelle', '!=', False)])
+        return self.env['souscription.pull.meta.periodes.service'].pull_sorties(perimetre)
+
     def action_tirer_sorties_c15(self):
         """Bouton autonome (motif sync F15, cf.
-        `souscription.refacturation.synchroniser_depuis_electricore`) : pull
-        des sorties C15 sur toutes les Souscriptions non résiliées à RSC
-        résolue, quelle que soit la sélection de la liste — même
-        indépendance au recordset appelant que le pull des prestations F15.
-        `date_fin` en sort à auteur unique (ADR 0031), jamais saisie à la
-        main. Le câblage dans l'ordre de la campagne relève de la tranche 3
-        du chantier #21."""
-        perimetre = self.search([('etat', '!=', 'resiliee'), ('ref_situation_contractuelle', '!=', False)])
-        ecrites, corrigees, inchangees, erreurs = self.env['souscription.pull.meta.periodes.service'].pull_sorties(
-            perimetre
-        )
+        `souscription.refacturation.synchroniser_depuis_electricore`) :
+        emballe `_pull_sorties_c15_donnees` en toast (#341, ADR 0036 décision
+        13) — aucune couture réseau ici, seuls les comptes traversent la
+        frontière UI. Le câblage dans l'ordre de la campagne relève de la
+        tranche 3 du chantier #21."""
+        ecrites, corrigees, inchangees, erreurs = self._pull_sorties_c15_donnees()
         message = _(
             'Sorties C15 : %(ecrites)s date(s) de fin écrite(s), %(corrigees)s corrigée(s), '
             '%(inchangees)s inchangée(s), %(erreurs)s en erreur.',

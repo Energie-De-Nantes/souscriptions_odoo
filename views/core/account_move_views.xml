@@ -59,6 +59,34 @@
          le champ produit/libellé/quantité/prix — ce que la composition
          écrit — est concerné, pas la ligne entière (les sections/notes
          générées n'ont, de toute façon, que `name` d'éditable). -->
+    <!-- Champs du passé (PRD #207/#208, ADR 0023 §3 amendé) : `origine_legacy`
+         filtrable en vue liste factures — distinguer d'un coup d'œil les
+         factures pré-module (ETL de migration) des natives. Extension
+         ordinaire (pas `mode="primary"`) : hérite dans toute vue liste
+         primaire qui étend `account.view_invoice_tree` (factures ET avoirs
+         client). -->
+    <record id="view_invoice_tree_origine_legacy" model="ir.ui.view">
+        <field name="name">account.invoice.list.origine.legacy</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_invoice_tree"/>
+        <field name="arch" type="xml">
+            <field name="ref" position="after">
+                <field name="origine_legacy" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_account_invoice_filter_origine_legacy" model="ir.ui.view">
+        <field name="name">account.invoice.select.origine.legacy</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_account_invoice_filter"/>
+        <field name="arch" type="xml">
+            <filter name="out_refund" position="after">
+                <filter string="Origine legacy" name="origine_legacy" domain="[('origine_legacy', '=', True)]"/>
+            </filter>
+        </field>
+    </record>
+
     <record id="view_move_form_lignes_generees_readonly" model="ir.ui.view">
         <field name="name">account.move.form.lignes.generees.readonly</field>
         <field name="model">account.move</field>

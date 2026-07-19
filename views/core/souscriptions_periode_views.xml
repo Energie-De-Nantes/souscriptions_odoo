@@ -44,6 +44,11 @@
                      d'account.move — la référence prod est le marqueur
                      d'identification, mise en évidence par la couleur de ligne. -->
                 <field name="facture_legacy_ref" optional="hide"/>
+                <!-- État « régularisée » (PRD #207/#208, ADR 0023 §3 amendé) :
+                     mois déjà soldé (migration ou clôture) — exclu des
+                     candidats de la Régularisation (#236), visible en liste
+                     comme en formulaire. -->
+                <field name="legacy_regularisee" optional="hide"/>
             </list>
         </field>
     </record>

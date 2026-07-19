@@ -1109,6 +1109,188 @@ class TestCampagneEtapeGestesCommerciaux(SouscriptionsTestCase):
         self.assertEqual(facture.state, 'draft', 'le clic ne poste plus lui-même (#326) — le cron le fera')
 
 
+@tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
+class TestCampagneEtapeMotDuMois(SouscriptionsTestCase):
+    """#314, ADR 0034 amendée (« Le marketing gate la facturation,
+    délibérément ») : porte manuelle, troisième racine du DAG — même
+    mécanique que Vérif périodes/Vérif refacturations/Gestes commerciaux
+    (coche Validé + validé_par/validé_le, aucune action, aucun reste-à-faire).
+    """
+
+    MOIS = date(2024, 3, 1)
+
+    def setUp(self):
+        super().setUp()
+        self.campagne = self.env['souscription.campagne.facturation'].create({'mois': self.MOIS})
+
+    def _etape(self, code):
+        return self.campagne.etape_ids.filtered(lambda e: e.code == code)
+
+    def test_mot_du_mois_est_une_racine_sans_prerequis(self):
+        """AC : apparaît comme racine du DAG, aucun prérequis."""
+        etape = self._etape('mot_du_mois')
+        self.assertEqual(etape.type_etape, 'porte')
+        self.assertEqual(etape.etat_prerequis, 'prete')
+        self.assertFalse(etape.bloquee_par)
+
+    def test_valider_avec_une_lettre_vide_est_accepte(self):
+        """AC : valider la porte avec une lettre VIDE est accepté — « rien à
+        dire ce mois-ci » est une décision légitime, jamais bloquée par le
+        contenu du champ `lettre_mois`."""
+        self.assertFalse(self.campagne.lettre_mois)
+        etape = self._etape('mot_du_mois')
+
+        etape.write({'valide': True})
+
+        self.assertTrue(etape.fait)
+        self.assertEqual(etape.valide_par_id, self.env.user)
+        self.assertTrue(etape.valide_le)
+
+    def test_envoyer_factures_a_pour_prerequis_emettre_et_mot_du_mois(self):
+        """AC : `envoyer_factures` a pour prérequis `emettre_factures` ET
+        `mot_du_mois`."""
+        from odoo.addons.souscriptions_odoo.models.core import souscription_campagne as campagne_module
+
+        prerequis = campagne_module.ETAPES_CAMPAGNE['envoyer_factures']['prerequis']
+        self.assertEqual(set(prerequis), {'emettre_factures', 'mot_du_mois'})
+
+    def test_non_validee_bloque_envoyer_factures(self):
+        etape_envoyer = self._etape('envoyer_factures')
+        self.assertEqual(etape_envoyer.etat_prerequis, 'bloquee')
+        self.assertIn('Mot du mois', etape_envoyer.bloquee_par)
+
+
+@tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')
+class TestCampagneEtapeEnvoyerFactures(SouscriptionsTestCase):
+    """#314 : envoi gouverné — l'étape entre dans le DAG, gardée par
+    `emettre_factures` ET la porte `mot_du_mois`. Délègue à la machinerie
+    NATIVE d'envoi (`account.move.send._generate_and_send_invoices`) —
+    jamais réimplémentée : les tests mockent cette frontière plutôt que de
+    faire tourner un rendu PDF/e-mail réel (même convention que
+    tests/test_mail_facture_energie.py, « jamais un envoi SMTP complet »)."""
+
+    MOIS = date(2024, 3, 1)
+    FIN_MOIS = date(2024, 3, 31)
+
+    def setUp(self):
+        super().setUp()
+        self.souscription_base.with_context(rsc_automatisme=True).write(
+            {'ref_situation_contractuelle': 'RSC-CAMPAGNE-ENVOYER'}
+        )
+        self.campagne = self.env['souscription.campagne.facturation'].create({'mois': self.MOIS})
+
+    def _etape(self, code):
+        return self.campagne.etape_ids.filtered(lambda e: e.code == code)
+
+    def _valider(self, code):
+        self._etape(code).write({'valide': True})
+
+    def _facture_postee(self):
+        periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        facture = periode._creer_facture()
+        facture.action_post()
+        return facture
+
+    def _periode_pour(self, souscription):
+        return self.create_test_periode(souscription, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+
+    def _mock_send(self):
+        return patch.object(type(self.env['account.move.send']), '_generate_and_send_invoices')
+
+    def test_envoyer_bloque_si_mot_du_mois_non_valide(self):
+        """AC : tenter d'envoyer sans avoir validé la porte refuse, avec un
+        message qui dit quoi faire — le libellé du prérequis manquant."""
+        facture = self._facture_postee()
+        self.campagne.etape_ids.invalidate_recordset()
+        self.assertTrue(self._etape('emettre_factures').fait)
+        self.assertEqual(self._etape('envoyer_factures').etat_prerequis, 'bloquee')
+
+        with self.assertRaises(UserError) as cm:
+            self.campagne.action_envoyer_factures()
+
+        self.assertIn('Mot du mois', str(cm.exception))
+        self.assertFalse(facture.is_move_sent)
+
+    def test_envoyer_bloque_tant_que_emettre_factures_pas_fait(self):
+        """AC : les brouillons ne sont jamais envoyés — `emettre_factures`
+        gate aussi `envoyer_factures`."""
+        periode = self.create_test_periode(self.souscription_base, date_debut=self.MOIS, date_fin=self.FIN_MOIS)
+        periode._creer_facture()  # reste en brouillon
+        self._valider('mot_du_mois')
+        self.campagne.etape_ids.invalidate_recordset()
+
+        self.assertEqual(self._etape('envoyer_factures').etat_prerequis, 'bloquee')
+        with self.assertRaises(UserError):
+            self.campagne.action_envoyer_factures()
+
+    def test_envoyer_debloquee_une_fois_mot_du_mois_valide(self):
+        facture = self._facture_postee()
+        self._valider('mot_du_mois')
+        self.campagne.etape_ids.invalidate_recordset()
+        self.assertEqual(self._etape('envoyer_factures').etat_prerequis, 'prete')
+
+        with self._mock_send() as mock_send:
+            self.campagne.action_envoyer_factures()
+
+        mock_send.assert_called_once()
+        args, kwargs = mock_send.call_args
+        self.assertEqual(set(args[0].ids), {facture.id})
+        self.assertFalse(kwargs.get('allow_raising', True), 'remontée au chatter, jamais une levée (#314)')
+
+    def test_bouton_generique_dispatch_vers_envoyer_factures(self):
+        self._facture_postee()
+        self._valider('mot_du_mois')
+        self.campagne.etape_ids.invalidate_recordset()
+
+        with self._mock_send() as mock_send:
+            self._etape('envoyer_factures').action_executer()
+
+        mock_send.assert_called_once()
+
+    def test_reclic_ne_redeclenche_rien_quand_tout_est_deja_envoye(self):
+        """AC : recliquer reprend exactement les factures non envoyées, sans
+        doublon sur celles déjà parties — un reclic sans reste-à-faire
+        n'appelle même pas la machinerie native."""
+        facture = self._facture_postee()
+        self._valider('mot_du_mois')
+        self.campagne.etape_ids.invalidate_recordset()
+        facture.is_move_sent = True
+
+        with self._mock_send() as mock_send:
+            self.campagne.action_envoyer_factures()
+
+        mock_send.assert_not_called()
+
+    def test_echec_denvoi_sur_une_facture_nempeche_pas_les_autres(self):
+        """AC : un échec d'envoi sur une facture n'empêche pas les autres de
+        partir ; l'échec est rapporté (ici, au chatter de la facture
+        fautive — le point d'échec va toujours à l'enregistrement en
+        cause, même convention que les vidanges #326/#327)."""
+        p1 = self._periode_pour(self.souscription_base)
+        p2 = self._periode_pour(self.souscription_hphc)
+        f_ok = p1._creer_facture()
+        f_ok.action_post()
+        f_ko = p2._creer_facture()
+        f_ko.action_post()
+        self._valider('mot_du_mois')
+        self.campagne.etape_ids.invalidate_recordset()
+
+        def _envoi_partiel(model_self, moves, allow_raising=True, **kwargs):
+            for move in moves:
+                if move.id == f_ko.id:
+                    move.message_post(body='Envoi impossible : erreur simulée')
+                else:
+                    move.is_move_sent = True
+
+        with patch.object(type(self.env['account.move.send']), '_generate_and_send_invoices', _envoi_partiel):
+            self.campagne.action_envoyer_factures()
+
+        self.assertTrue(f_ok.is_move_sent)
+        self.assertFalse(f_ko.is_move_sent)
+        self.assertTrue(any('erreur simulée' in (m.body or '') for m in f_ko.message_ids))
+        self.assertEqual(self.campagne._factures_a_envoyer_du_mois(), f_ko)
+
+
 @tagged('souscriptions', 'souscriptions_migration', 'post_install', '-at_install')
 class TestMigrationGestesCommerciaux(SouscriptionsTestCase):
     """Migration `19.0.1.17.0` (#287) : soigne les campagnes déjà ouvertes

@@ -30,10 +30,6 @@ class Souscription(models.Model):
 
     date_debut = fields.Date(string='Début de la souscription')
     date_fin = fields.Date(string='Fin de la souscription')
-    # facture_ids = fields.One2many(
-    #     'account.move',
-    #     'souscription_id',
-    #     string='Factures')
     facture_ids = fields.One2many(
         'account.move', compute='_compute_factures_via_periodes', string='Factures', store=False
     )

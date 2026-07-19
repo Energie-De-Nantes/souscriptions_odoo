@@ -1,5 +1,5 @@
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import UserError
 
 
 class SouscriptionChequeEnergie(models.Model):
@@ -35,6 +35,11 @@ class SouscriptionChequeEnergie(models.Model):
     _CODE_JOURNAL_CHEQUE_ENERGIE = 'CHEN'
 
     numero = fields.Char(string='Numéro', required=True, copy=False)
+
+    _numero_unique = models.Constraint(
+        'UNIQUE(numero)',
+        'Ce numéro de chèque énergie est déjà saisi.',
+    )
 
     # Nominatif à la personne, pas au contrat (ADR 0026) : un chèque s'impute
     # sur toutes les Factures de l'usager·ère, tous contrats confondus.
@@ -126,12 +131,6 @@ class SouscriptionChequeEnergie(models.Model):
                 cheque.etat_solde = 'non_entame'
             else:
                 cheque.etat_solde = 'en_cours'
-
-    @api.constrains('numero')
-    def _check_numero_unique(self):
-        for cheque in self:
-            if cheque.numero and self.search_count([('numero', '=', cheque.numero), ('id', '!=', cheque.id)]):
-                raise ValidationError(_('Ce numéro de chèque énergie (%s) est déjà saisi.', cheque.numero))
 
     def action_valider(self):
         """Le **gate** (ADR 0026) : reçu → validé, crée et poste l'`account.payment`

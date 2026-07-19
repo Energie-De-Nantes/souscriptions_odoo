@@ -76,6 +76,18 @@ class TestCampagneEtapePullMetaPeriodes(SouscriptionsTestCase):
         )
         self.assertEqual(len(periode), 1)
 
+    def test_bouton_pull_pose_demande(self):
+        """Symétrie avec l'automate d'amorçage (#343, grill 19/07) : le clic
+        manuel pose aussi `demande` sur cette étape 'derive' — même
+        sémantique post-succès que la passe d'amorçage, et la campagne sort
+        de la recherche du cron (`demande=False`)."""
+        client = client_flux_factice('meta_periodes', [_periode_meta()])
+        with patcher_client_fabrique(client):
+            self.campagne.action_pull_meta_periodes()
+
+        etape = self.campagne.etape_ids.filtered(lambda e: e.code == 'pull_meta_periodes')
+        self.assertTrue(etape.demande)
+
     def test_bouton_pull_toast_sticky_quand_une_souscription_echoue(self):
         """AC #176 : skip-and-report préservé — un échec sur une souscription
         n'interrompt pas le lot, apparaît au compteur d'erreurs, et rend le

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Amorçage automatique à la création (#343, ADR 0036 décisions 3-4) :
+             la création d'une Campagne déclenche ce cron dédié via
+             `_trigger()` (`_declencher_amorcage`, models/core/
+             souscription_campagne.py) — exécuté dans les secondes qui
+             suivent, pas à l'heure ronde. Une seule campagne, une seule
+             passe séquentielle par appel (« la passe ne boucle pas ») : pas
+             de re-déclenchement automatique au-delà du filet de sécurité
+             quotidien — même idiome que les deux crons de vidange (ADR
+             0035) : `interval_type`/`interval_number` ne servent que de
+             filet, la vraie cadence vient du `_trigger()` à la création. -->
+        <record id="ir_cron_amorcage_campagne" model="ir.cron">
+            <field name="name">Souscriptions : amorçage automatique de campagne</field>
+            <field name="model_id" ref="model_souscription_campagne_facturation"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_amorcer()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active">True</field>
+        </record>
+    </data>
+</odoo>

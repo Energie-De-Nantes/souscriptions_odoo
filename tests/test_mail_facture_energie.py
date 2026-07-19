@@ -38,7 +38,7 @@ class TestGetMailTemplateFactureEnergie(SouscriptionsTestCase):
 
     def test_facture_energie_route_vers_notre_modele(self):
         _periode, facture = self.create_test_invoice(
-            self.souscription_base, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_base, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
         template = facture._get_mail_template()
         self.assertEqual(template, self.env.ref('souscriptions_odoo.mail_template_facture_energie'))
@@ -87,10 +87,10 @@ class TestGetMailTemplateFactureEnergie(SouscriptionsTestCase):
         `all(...)` ; un renvoi groupé de 2 factures d'énergie ne doit plus
         planter (grill 2026-07-15, 3e passage)."""
         _periode1, facture1 = self.create_test_invoice(
-            self.souscription_base, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_base, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
         _periode2, facture2 = self.create_test_invoice(
-            self.souscription_hphc, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_hphc, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
         lot = facture1 + facture2
 
@@ -140,9 +140,9 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
         return template._render_field('body_html', facture.ids)[facture.id]
 
     def test_lettre_du_mois_ecrite_sur_la_campagne_apparait_dans_le_corps(self):
-        self._campagne(date(2026, 5, 1), lettre_mois='<p>Nos permanences reprennent le mardi.</p>')
+        self._campagne(date(2024, 5, 1), lettre_mois='<p>Nos permanences reprennent le mardi.</p>')
         _periode, facture = self.create_test_invoice(
-            self.souscription_base, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_base, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
 
         body = self._rendre(facture)
@@ -153,14 +153,14 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
         """AC : lettre vide -> aucun bloc, aucun résidu de mise en forme —
         même avec une lettre écrite sur un AUTRE mois dans la même base
         (aucune fuite entre mois)."""
-        self._campagne(date(2026, 6, 1), lettre_mois='<p>Marqueur unique ARDOISE-JUIN.</p>')
+        self._campagne(date(2024, 6, 1), lettre_mois='<p>Marqueur unique ARDOISE-JUIN.</p>')
         _periode2, facture_avec_lettre = self.create_test_invoice(
-            self.souscription_hphc, date_debut=date(2026, 6, 1), date_fin=date(2026, 6, 30)
+            self.souscription_hphc, date_debut=date(2024, 6, 1), date_fin=date(2024, 6, 30)
         )
         body_avec = self._rendre(facture_avec_lettre)
 
         _periode, facture_sans_lettre = self.create_test_invoice(
-            self.souscription_base, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_base, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
         body_sans = self._rendre(facture_sans_lettre)
 
@@ -170,14 +170,14 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
     def test_chaque_facture_porte_la_lettre_de_son_propre_mois(self):
         """AC : deux campagnes portant deux lettres -> chaque facture porte
         celle de SON mois, jamais celle du mois courant."""
-        self._campagne(date(2026, 5, 1), lettre_mois='<p>Lettre de mai.</p>')
-        self._campagne(date(2026, 6, 1), lettre_mois='<p>Lettre de juin.</p>')
+        self._campagne(date(2024, 5, 1), lettre_mois='<p>Lettre de mai.</p>')
+        self._campagne(date(2024, 6, 1), lettre_mois='<p>Lettre de juin.</p>')
 
         _periode_mai, facture_mai = self.create_test_invoice(
-            self.souscription_base, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_base, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
         _periode_juin, facture_juin = self.create_test_invoice(
-            self.souscription_hphc, date_debut=date(2026, 6, 1), date_fin=date(2026, 6, 30)
+            self.souscription_hphc, date_debut=date(2024, 6, 1), date_fin=date(2024, 6, 30)
         )
 
         body_mai = self._rendre(facture_mai)
@@ -191,7 +191,7 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
     def test_html_riche_emis_non_echappe(self):
         """AC : gras, listes, liens, emoji sont émis en HTML, pas échappé."""
         self._campagne(
-            date(2026, 5, 1),
+            date(2024, 5, 1),
             lettre_mois=(
                 '<p><strong>Gras</strong>, une liste :</p>'
                 '<ul><li>Un</li><li>Deux</li></ul>'
@@ -199,7 +199,7 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
             ),
         )
         _periode, facture = self.create_test_invoice(
-            self.souscription_base, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_base, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
 
         body = self._rendre(facture)
@@ -222,7 +222,7 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
         une affirmation fausse sur QUAND l'argent quitte le compte."""
         self.souscription_base.mode_paiement = 'prelevement'
         _periode, facture = self.create_test_invoice(
-            self.souscription_base, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_base, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
 
         body = self._rendre(facture)
@@ -237,7 +237,7 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
         self.souscription_base.mode_paiement = 'monnaie_locale'
         self.assertFalse(self._config_mail().qr_code_moneko, 'précondition : aucun QR configuré')
         _periode, facture = self.create_test_invoice(
-            self.souscription_base, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_base, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
 
         body = self._rendre(facture)
@@ -256,7 +256,7 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
         self.souscription_base.mode_paiement = 'monnaie_locale'
         self._config_mail().qr_code_moneko = base64.b64encode(_PNG_1X1)
         _periode, facture = self.create_test_invoice(
-            self.souscription_base, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_base, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
 
         body = self._rendre(facture)
@@ -287,7 +287,7 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
                     }
                 )
                 _periode, facture = self.create_test_invoice(
-                    souscription, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+                    souscription, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
                 )
 
                 body = self._rendre(facture)
@@ -302,7 +302,7 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
         la branche « client rattaché à une société »."""
         self.assertFalse(self.partner_test.parent_id)
         _periode, facture = self.create_test_invoice(
-            self.souscription_base, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_base, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
 
         body = self._rendre(facture)
@@ -314,7 +314,7 @@ class TestRenduCorpsFactureEnergie(SouscriptionsTestCase):
         """AC : bug vivant corrigé — le sign-off n'était plus conditionné à
         la présence d'une signature."""
         _periode, facture = self.create_test_invoice(
-            self.souscription_base, date_debut=date(2026, 5, 1), date_fin=date(2026, 5, 31)
+            self.souscription_base, date_debut=date(2024, 5, 1), date_fin=date(2024, 5, 31)
         )
 
         body = self._rendre(facture)

@@ -19,6 +19,8 @@ test_campagne_catalogue.py`) verrouille ce contrat : prérequis existants, ordre
 topologique, méthodes présentes, clés inconnues refusées.
 """
 
+import time
+
 from babel.dates import format_date
 from dateutil.relativedelta import relativedelta
 from odoo import _, api, fields, models
@@ -258,6 +260,12 @@ CLES_CATALOGUE_CONNUES = frozenset(
     }
 )
 
+# Étapes machine-runnable (#343, ADR 0036 décisions 3-4) : les trois pulls,
+# dans l'ordre du catalogue (topologique) — l'ordre d'itération EST l'ordre
+# de la passe séquentielle de l'automate (pull sorties C15 avant pull
+# méta-périodes, cf. le prérequis douce qui les relie).
+CODES_AMORCAGE = tuple(code for code, info in ETAPES_CAMPAGNE.items() if 'amorcage' in info)
+
 
 class SouscriptionCampagneFacturation(models.Model):
     """Campagne de facturation (`souscription.campagne.facturation`, ADR 0025).
@@ -341,14 +349,44 @@ class SouscriptionCampagneFacturation(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
+        # Garde « mois révolu » (#343, ADR 0036 décisions 2-3) : l'invariant
+        # qui rend l'amorçage automatique sûr — un mois pas encore terminé
+        # tirerait un périmètre et des relevés incomplets. Vérifiée AVANT
+        # tout `super().create()` (aucune ligne n'existe encore, aucun
+        # réseau) : la création reste instantanée, la garde ne fait que lire
+        # l'horloge.
+        premier_mois_courant = fields.Date.context_today(self).replace(day=1)
         for vals in vals_list:
             if vals.get('mois'):
                 vals['mois'] = fields.Date.to_date(vals['mois']).replace(day=1)
+                mois = vals['mois']
+            else:
+                mois = self._default_mois()
+            if mois >= premier_mois_courant:
+                raise UserError(
+                    _(
+                        'Impossible de créer une campagne pour %(mois)s : le mois doit être strictement '
+                        "révolu — sinon la campagne, qui s'amorce seule à sa création, tirerait un "
+                        'périmètre et des relevés incomplets (ADR 0036).',
+                        mois=format_date(mois, format='MMMM yyyy', locale='fr_FR'),
+                    )
+                )
         campagnes = super().create(vals_list)
         campagnes._seed_etapes()
         campagnes._reporter_notes_precedentes()
         campagnes._reporter_lettre_precedente()
+        campagnes._declencher_amorcage()
         return campagnes
+
+    def _declencher_amorcage(self):
+        """Déclenche le cron d'amorçage dédié (#343, ADR 0036 décision 3) —
+        `_trigger()` ne fait que planifier une exécution proche (ligne
+        `ir.cron.trigger`), aucun appel réseau : la création reste
+        instantanée. Le cron (`_cron_amorcer`) se charge lui-même de
+        retrouver quoi amorcer — aucun identifiant de campagne à lui
+        transmettre."""
+        if self:
+            self.env.ref('souscriptions_odoo.ir_cron_amorcage_campagne')._trigger()
 
     def write(self, vals):
         if vals.get('mois'):
@@ -786,6 +824,11 @@ class SouscriptionCampagneFacturation(models.Model):
         sticky si des erreurs, auto-dismiss sinon — aucun résumé persisté."""
         self.ensure_one()
         creees, rafraichies, inchangees, conservees, erreurs = self._pull_meta_periodes_donnees()
+        # Symétrie avec l'automate d'amorçage (#343, grill 19/07) : `demande`
+        # marque « déjà tiré » sur cette étape 'derive' (elle ne pilote pas
+        # « fait », dérivé du backlog) — c'est elle qui fait sortir la
+        # campagne de la recherche du cron d'amorçage (`demande=False`).
+        self._etape('pull_meta_periodes').write({'demande': True})
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -831,6 +874,129 @@ class SouscriptionCampagneFacturation(models.Model):
         délégation que `action_sync_f15` ci-dessus, sans le toast."""
         self.ensure_one()
         return self.env['souscription.refacturation']._synchroniser_depuis_electricore_donnees()
+
+    # --- Amorçage automatique à la création (#343, ADR 0036 décisions 3-8) ---
+    #
+    # `_cron_amorcer` est le point d'entrée du cron dédié (déclenché par
+    # `_declencher_amorcage` ci-dessus) : il cherche lui-même UNE campagne
+    # dont au moins un pull n'a encore jamais été demandé — `demande` (déjà
+    # persisté, ADR 0035) suffit, aucun marqueur d'état nouveau (décision 4).
+    # `_amorcer` fait la passe séquentielle proprement dite, sous l'identité
+    # du créateur (décision 7) : au plus une tentative par étape d'amorçage,
+    # dans l'ordre du catalogue — jamais de boucle (« la passe ne boucle
+    # pas », décision 4). Un échec transport (UserError, cf.
+    # `traduire_exceptions_electricore`) laisse l'étape « à lancer » ; ses
+    # avals ne la verront jamais « prête » (`etat_prerequis`, décision 5) —
+    # aucune logique de propagation dédiée, la lecture normale du DAG
+    # suffit. Erreurs par souscription (skip-and-report) : déjà au chatter
+    # de la souscription fautive, DANS le service (#341/#360) — la méthode-
+    # données réussit quand même (tuple avec des erreurs dedans), `demande`
+    # est donc posée normalement (décision 8a).
+
+    def _amorcer(self):
+        """Passe séquentielle d'amorçage pour CETTE campagne (#343). Committe
+        après chaque étape réussie (API de progression `ir.cron`, ADR 0035) :
+        un échec à l'étape suivante ne perd pas le succès déjà acquis."""
+        self.ensure_one()
+        cron = self.env['ir.cron']
+        mesures = []
+        for code in CODES_AMORCAGE:
+            etape = self._etape(code)
+            if etape.etat_prerequis != 'prete' or etape.fait:
+                continue
+            methode = ETAPES_CAMPAGNE[code]['amorcage']
+            debut = time.monotonic()
+            try:
+                resultat = getattr(self, methode)()
+            except UserError as exc:
+                mesures.append((ETAPES_CAMPAGNE[code]['label'], None, None, time.monotonic() - debut, str(exc)))
+                continue
+            duree = time.monotonic() - debut
+            etape.write({'demande': True})
+            cron._commit_progress(1)
+            nb_erreurs = len(resultat[-1])
+            # « traité » = ligne aboutie — les erreurs (dernier lot, gabarit
+            # commun aux trois pulls) se comptent à part, jamais deux fois
+            # (grill 19/07 sur la revue de #343).
+            nb_total = sum(len(lot) for lot in resultat[:-1])
+            mesures.append((ETAPES_CAMPAGNE[code]['label'], nb_total, nb_erreurs, duree, None))
+        self._notifier_fin_amorcage(mesures)
+
+    @api.model
+    def _cron_amorcer(self):
+        """Point d'entrée du cron d'amorçage (`ir_cron_amorcage_campagne`,
+        #343) : cherche UNE campagne portant encore un pull jamais demandé
+        et lui délègue sa passe, sous l'identité de sa créatrice/son
+        créateur — jamais l'utilisateur technique du cron (décision 7). Ne
+        boucle pas (décision 4) : une campagne par appel, aucun
+        re-déclenchement — le filet de sécurité quotidien du cron
+        (`interval_type`, même idiome que la vidange, ADR 0035) suffit à
+        rattraper une campagne encore en attente.
+
+        Limite assumée (grill 19/07) : une campagne antérieure à #343 dont le
+        pull méta fut tiré à la main garde `demande=False` à jamais (la
+        symétrisation ne vaut que pour l'avenir) et peut être matchée en tête
+        par ce `limit=1` — no-op quotidien accepté, chaque création neuve a
+        son propre `_trigger()`."""
+        etape = self.env['souscription.campagne.etape'].search(
+            [('code', 'in', list(CODES_AMORCAGE)), ('demande', '=', False)], limit=1
+        )
+        if etape:
+            campagne = etape.campagne_id
+            campagne.with_user(campagne.create_uid.id or self.env.user.id)._amorcer()
+        self.env['ir.cron']._commit_progress(remaining=0)
+
+    def _notifier_fin_amorcage(self, mesures):
+        """Notification bus récapitulative de fin de passe (#343, ADR 0036
+        décision 8c) : comptes et durée par étape tentée, erreur transport le
+        cas échéant — même idiome que `_notifier_fin` de la vidange
+        (`bus.bus._sendone`, natif, zéro JS), chez le créateur de la
+        campagne. Best effort (décision 8b) : aucune exception ne doit faire
+        perdre le travail déjà committé si l'envoi échoue — non gardé
+        explicitement, `_sendone` est un simple INSERT natif."""
+        self.ensure_one()
+        if not mesures:
+            return
+        demandeur = self.create_uid
+        if not demandeur:
+            return
+        self.env['bus.bus']._sendone(
+            demandeur.partner_id, 'simple_notification', self._construire_notification_amorcage(mesures)
+        )
+
+    def _construire_notification_amorcage(self, mesures):
+        self.ensure_one()
+        lignes = []
+        une_erreur = False
+        for label, nb_total, nb_erreurs, duree, erreur_transport in mesures:
+            if erreur_transport is not None:
+                une_erreur = True
+                lignes.append(
+                    _(
+                        '%(label)s : échec transport (%(duree).1fs) — %(erreur)s',
+                        label=label,
+                        duree=duree,
+                        erreur=erreur_transport,
+                    )
+                )
+            else:
+                if nb_erreurs:
+                    une_erreur = True
+                lignes.append(
+                    _(
+                        '%(label)s : %(nb)s traité(s), %(erreurs)s en erreur (%(duree).1fs)',
+                        label=label,
+                        nb=nb_total,
+                        erreurs=nb_erreurs,
+                        duree=duree,
+                    )
+                )
+        return {
+            'title': _('Amorçage de la campagne %s', self.name),
+            'message': '\n'.join(lignes),
+            'type': 'warning' if une_erreur else 'success',
+            'sticky': une_erreur,
+        }
 
     def action_creer_factures(self):
         """Gated sur les deux portes de vérif (#158) : pose l'intention et

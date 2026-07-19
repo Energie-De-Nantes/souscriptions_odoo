@@ -54,6 +54,7 @@ models/core/electricore_client_fabrique.py et ne lève qu'à l'appel du pull.
         'data/ir_cron_poll_affaires_enedis.xml',
         'data/ir_cron_vidange_emettre_factures.xml',
         'data/ir_cron_vidange_creer_factures.xml',
+        'data/ir_cron_amorcage_campagne.xml',
         'data/mail_templates_raccordement.xml',
         'reports/souscription_conditions_particulieres_report.xml',
         'reports/souscription_attestation_report.xml',

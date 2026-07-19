@@ -84,6 +84,77 @@ def client_sorties_factice(items=(), *, leve=None):
     return client
 
 
+def periode_meta(**overrides):
+    """Stub duck-typé de `PeriodeMeta` (contrat v3, ADR 0011/0020) : miroir
+    **complet** (~20 champs) du modèle pydantic réel, mêmes noms — le mapping
+    ne fait aucune traduction — y compris `pdl`, `nb_jours`,
+    `formule_tarifaire_acheminement` que le mapping ne lit pas (même
+    philosophie que `resultat_rsc`/`ligne_sortie`). Défauts réalistes (280 kWh,
+    TURPE 8,5/4,2 €, CTA 1,1 €, accise 21,0) repris du `_periode_meta`
+    canonique de test_pull_meta_periodes.py.
+
+    Centralise ce qui était ré-encodé à la main dans 5 sites (#356).
+    Renversement assumé de la note « dupliqué ici (petit, local) pour ne pas
+    coupler les deux suites de tests » qui accompagnait l'ancien
+    `test_regularisation._meta_stub` : le couplage au contrat pydantic v3
+    existait déjà, juste invisible derrière 5 copies indépendantes — et
+    `common.py` couple déjà ces suites via `client_flux_factice`/
+    `patcher_client_fabrique`. Un passage v3→v4 du contrat ne touche plus
+    qu'un seul endroit.
+
+    Les suites régul/tampon posent leurs zéros (TURPE/CTA/accise/énergie) en
+    overrides **explicites** au site d'appel plutôt que d'hériter d'un
+    wrapper local : ces zéros sont porteurs de sens (écart mesuré − facturé
+    lisible de tête), ils doivent se voir."""
+    base = dict(
+        ref_situation_contractuelle='RSC-00000000000001',
+        pdl='14000000000001',
+        mois_annee='2024-01',
+        debut='2024-01-01',
+        fin='2024-02-01',
+        nb_jours=31,
+        puissance_moyenne_kva=6.0,
+        formule_tarifaire_acheminement='CU4',
+        energie_base_kwh=280.0,
+        energie_hp_kwh=None,
+        energie_hc_kwh=None,
+        turpe_fixe_eur=8.5,
+        turpe_variable_eur=4.2,
+        cta_eur=1.1,
+        taux_accise_eur_mwh=21.0,
+        has_changement=False,
+        qualite='réelle',
+        statut_communication='communicante',
+        releves_utilises=[],
+        source_hash='hash-abc123',
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def objet_releve(**overrides):
+    """Stub duck-typé d'`ObjetReleve` (contrat v3) — stub enfant de
+    `periode_meta` (même contrat, champ `releves_utilises`) : mêmes
+    attributs, valeurs par défaut à None pour les champs optionnels du
+    contrat."""
+    base = dict(
+        releve_id='ELC-RELEVE-001',
+        date_releve='2024-01-31',
+        nature_index='reel',
+        origine_releve='flux_R151',
+        evenement=None,
+        index_base_kwh=None,
+        index_hp_kwh=None,
+        index_hc_kwh=None,
+        index_hph_kwh=None,
+        index_hch_kwh=None,
+        index_hpb_kwh=None,
+        index_hcb_kwh=None,
+    )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
 # Tarif d'abonnement affine (ADR 0018) : base 3 kVA + coefficient par kVA.
 # prix_an(P) = base + coef * (P - 3)
 ABO_BASE_3KVA_STD = 150.0

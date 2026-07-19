@@ -18,26 +18,23 @@ attendue, rejouable sans effet.
 """
 
 
+# Le texte du cron vit sur l'action serveur liée (ir_act_server.code via
+# ir_cron.ir_actions_server_id), pas sur ir_cron — vérifié par upgrade réel
+# sur copie de prodlocal (UndefinedColumn sinon).
 def migrate(cr, version):
-    cr.execute(
-        """
-        UPDATE ir_cron SET code = %(code)s
-        FROM ir_model_data
-        WHERE ir_model_data.model = 'ir.cron'
-          AND ir_model_data.res_id = ir_cron.id
-          AND ir_model_data.module = 'souscriptions_odoo'
-          AND ir_model_data.name = %(xml_id)s
-        """,
-        {'code': "model._cron_vidanger('creer_factures')", 'xml_id': 'ir_cron_vidange_creer_factures'},
-    )
-    cr.execute(
-        """
-        UPDATE ir_cron SET code = %(code)s
-        FROM ir_model_data
-        WHERE ir_model_data.model = 'ir.cron'
-          AND ir_model_data.res_id = ir_cron.id
-          AND ir_model_data.module = 'souscriptions_odoo'
-          AND ir_model_data.name = %(xml_id)s
-        """,
-        {'code': "model._cron_vidanger('emettre_factures')", 'xml_id': 'ir_cron_vidange_emettre_factures'},
-    )
+    for code, xml_id in [
+        ("model._cron_vidanger('creer_factures')", 'ir_cron_vidange_creer_factures'),
+        ("model._cron_vidanger('emettre_factures')", 'ir_cron_vidange_emettre_factures'),
+    ]:
+        cr.execute(
+            """
+            UPDATE ir_act_server SET code = %(code)s
+            FROM ir_cron, ir_model_data
+            WHERE ir_act_server.id = ir_cron.ir_actions_server_id
+              AND ir_model_data.model = 'ir.cron'
+              AND ir_model_data.res_id = ir_cron.id
+              AND ir_model_data.module = 'souscriptions_odoo'
+              AND ir_model_data.name = %(xml_id)s
+            """,
+            {'code': code, 'xml_id': xml_id},
+        )

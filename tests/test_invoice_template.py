@@ -288,6 +288,63 @@ class TestInvoiceTemplate(TransactionCase):
         expected_pattern = f'Facture_Energie_{self.souscription_base.name}'
         self.assertIn(expected_pattern, filename)
 
+    def test_paiement_prelevement_affiche_la_mention_sans_compte_bancaire(self):
+        """#369 : le bloc Paiement lit `o.mode_paiement` (prélèvement) — la
+        mention de prélèvement est présente, aucune mention agnostique
+        n'est absente."""
+        self.souscription_base.mode_paiement = 'prelevement'
+        _periode, facture = self._create_periode_and_invoice(
+            self.souscription_base, date(2024, 8, 1), date(2024, 8, 31)
+        )
+
+        html_bytes, _dummy = self.env['ir.actions.report']._render_qweb_html('account.account_invoices', facture.ids)
+        html_content = html_bytes.decode()
+
+        self.assertIn('Prélèvement automatique déclenché le 10 du mois', html_content)
+        self.assertIn("Pas d'escompte pour paiement anticipé", html_content)
+        self.assertIn("Passée la date d'échéance", html_content)
+
+    def test_paiement_avec_compte_bancaire_mais_mode_virement_naffiche_aucun_prelevement(self):
+        """#369 : la régression corrigée — un partner porteur d'un
+        `res.partner.bank` (donc de `bank_ids`) dont la souscription est en
+        virement ne doit JAMAIS voir la mention de prélèvement (l'ancien
+        gabarit la devinait depuis `bank_ids`, sans lire `mode_paiement`).
+        Aucun bloc de mode pour virement ; les mentions agnostiques restent."""
+        self.env['res.partner.bank'].create(
+            {'partner_id': self.partner.id, 'acc_number': 'FR1420041010050500013M02606'}
+        )
+        self.souscription_base.mode_paiement = 'virement'
+        _periode, facture = self._create_periode_and_invoice(
+            self.souscription_base, date(2024, 9, 1), date(2024, 9, 30)
+        )
+
+        html_bytes, _dummy = self.env['ir.actions.report']._render_qweb_html('account.account_invoices', facture.ids)
+        html_content = html_bytes.decode()
+
+        self.assertNotIn('Prélèvement automatique', html_content)
+        self.assertNotIn('règlement manuel', html_content)
+        self.assertIn("Pas d'escompte pour paiement anticipé", html_content)
+        self.assertIn("Passée la date d'échéance", html_content)
+
+    def test_paiement_monnaie_locale_affiche_la_marche_a_suivre_sans_qr(self):
+        """#369 : Moneko affiche la marche à suivre vouvoyée, jamais de
+        `<img>` de QR sur le PDF (immuable une fois émis — le QR ne vit que
+        dans le mail, recomposé à chaque envoi)."""
+        self.souscription_base.mode_paiement = 'monnaie_locale'
+        _periode, facture = self._create_periode_and_invoice(
+            self.souscription_base, date(2024, 10, 1), date(2024, 10, 31)
+        )
+
+        html_bytes, _dummy = self.env['ir.actions.report']._render_qweb_html('account.account_invoices', facture.ids)
+        html_content = html_bytes.decode()
+
+        self.assertIn("d'ici le 10 de ce mois", html_content)
+        self.assertIn('Opérations', html_content)
+        self.assertNotIn('<img', html_content)
+        self.assertNotIn('Prélèvement automatique', html_content)
+        self.assertIn("Pas d'escompte pour paiement anticipé", html_content)
+        self.assertIn("Passée la date d'échéance", html_content)
+
     def test_invoice_totals_calculation(self):
         """Test du calcul des totaux dans la facture"""
         periode, facture = self._create_periode_and_invoice(self.souscription_base, date(2024, 7, 1), date(2024, 7, 31))

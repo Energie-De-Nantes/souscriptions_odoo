@@ -29,7 +29,14 @@
          stocké sur account.move (`qr_moneko_image_url`), le template reste
          bête (un `t-if` + un `t-att-src`, aucun `search`). Absent -> aucune
          promesse de QR, la marche à suivre in-app et l'échéance tiennent
-         seules.
+         seules. Le QR n'existe QUE dans ce corps, jamais sur le PDF joint
+         (une Facture émise est immuable — un QR que Moneko réémet y
+         resterait figé faux, cf. reports/facture_energie_template.xml).
+
+         Chemin d'argent partagé avec le bloc Paiement du PDF
+         (reports/facture_energie_template.xml, #369) : les mêmes phrases
+         (prélèvement / Moneko), les mêmes dates — toute modification se
+         synchronise À LA MAIN dans les deux fichiers.
 
          SANS noupdate (contrairement aux modèles de bienvenue, ADR 0034) :
          ce modèle ne doit JAMAIS être édité à la main — un `-u

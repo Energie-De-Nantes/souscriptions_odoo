@@ -186,7 +186,7 @@ class TestRenduCorpsRegularisation(SouscriptionsTestCase):
 
         body = self._rendre(avoir)
 
-        self.assertIn('remboursement en Moneko direct', body)
+        self.assertIn('remboursé en Moneko direct', body)
         self.assertNotIn('<img', body)
         self.assertNotIn('QR-code', body)
         self.assertNotIn('flashe', body)

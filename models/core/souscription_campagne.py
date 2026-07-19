@@ -301,6 +301,25 @@ class SouscriptionCampagneFacturation(models.Model):
     )
 
     etape_ids = fields.One2many('souscription.campagne.etape', 'campagne_id', string='Étapes')
+
+    # Vue en phases (#374, corrige #344) : quatre one2many, un par phase, le
+    # domain est posé ICI en Python — le seul endroit où un domain filtre
+    # réellement les lignes affichées d'un one2many (un `domain` XML sur le
+    # `<field>` ne fait que contraindre la sélection, jamais l'affichage).
+    # Partitionnent `etape_ids` (union complète, zéro recouvrement).
+    etape_tirer_ids = fields.One2many(
+        'souscription.campagne.etape', 'campagne_id', domain=[('phase', '=', 'tirer')], string='Étapes — Tirer'
+    )
+    etape_verifier_ids = fields.One2many(
+        'souscription.campagne.etape', 'campagne_id', domain=[('phase', '=', 'verifier')], string='Étapes — Vérifier'
+    )
+    etape_facturer_ids = fields.One2many(
+        'souscription.campagne.etape', 'campagne_id', domain=[('phase', '=', 'facturer')], string='Étapes — Facturer'
+    )
+    etape_solder_ids = fields.One2many(
+        'souscription.campagne.etape', 'campagne_id', domain=[('phase', '=', 'solder')], string='Étapes — Solder'
+    )
+
     note_ids = fields.One2many('souscription.campagne.note', 'campagne_id', string='Notes')
 
     # Lettre du mois (#313, ADR 0034) : TOUT l'éditorial du mail de facture —
@@ -1191,8 +1210,10 @@ class SouscriptionCampagneEtape(models.Model):
     )
 
     # Phase (#342, ADR 0036 décision 14) : fonction pure de `code`, même
-    # idiome que `type_etape` — aucune vue modifiée dans cette tranche (#344
-    # rendra les quatre sections).
+    # idiome que `type_etape`. `store=True` ⇒ colonne en base, donc cherchable
+    # nativement — les domains des quatre one2many par phase (#374) s'appuient
+    # dessus, aucune méthode `search` à écrire (elle écraserait la recherche
+    # SQL native, cf. odoo.orm.domains).
     phase = fields.Selection(
         [('tirer', 'Tirer'), ('verifier', 'Vérifier'), ('facturer', 'Facturer'), ('solder', 'Solder')],
         compute='_compute_phase',

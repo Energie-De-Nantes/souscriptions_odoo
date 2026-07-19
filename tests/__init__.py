@@ -62,4 +62,5 @@ from . import (
     test_souscription_form,
     test_sync_prestations,
     test_unites_facturation,
+    test_uom_libelle_kwh,
 )

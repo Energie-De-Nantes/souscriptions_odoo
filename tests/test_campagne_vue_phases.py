@@ -123,6 +123,13 @@ class TestCampagneVueEnPhases(SouscriptionsTestCase):
         super().setUpClass()
         view = cls.env['souscription.campagne.facturation'].get_view(view_type='form')
         cls.arch = etree.fromstring(view['arch'])
+        # L'arch SOURCE (stocké), distinct de l'arch résolu ci-dessus :
+        # get_view incorpore la vue liste par défaut du comodèle comme enfant
+        # <list> des champs nus — l'assertion « champ nu » ne vaut que sur la
+        # source.
+        cls.arch_source = etree.fromstring(
+            cls.env.ref('souscriptions_odoo.view_souscription_campagne_facturation_form').arch
+        )
         vue_etape = cls.env['souscription.campagne.etape'].get_view(
             view_id=cls.env.ref('souscriptions_odoo.view_souscription_campagne_etape_list').id, view_type='list'
         )
@@ -139,14 +146,19 @@ class TestCampagneVueEnPhases(SouscriptionsTestCase):
         """AC #374 : un champ etape_<phase>_ids par phase, SANS enfants (pas
         de domain XML — le filtre vit dans la définition Python du champ),
         dans l'ordre Tirer/Vérifier/Facturer/Solder."""
-        etape_page = self.arch.find(".//page[@name='etapes']")
+        etape_page = self.arch_source.find(".//page[@name='etapes']")
         self.assertIsNotNone(etape_page)
         champs = [e for e in etape_page if e.tag == 'field']
         self.assertEqual(len(champs), 4, 'un champ par phase, plus de duplication')
         for (code, _label), champ in zip(self._PHASES_ATTENDUES, champs, strict=True):
             self.assertEqual(champ.get('name'), f'etape_{code}_ids')
             self.assertIsNone(champ.get('domain'), 'le filtre vit côté Python, plus en domain XML')
-            self.assertEqual(list(champ), [], 'champ nu : la vue liste vient du comodèle')
+            self.assertEqual(list(champ), [], 'champ nu (source) : la vue liste vient du comodèle')
+        # Et sur l'arch RÉSOLU : get_view a bien incorporé une <list> par champ
+        # — preuve que la vue partagée du comodèle est effectivement piochée.
+        for code, _label in self._PHASES_ATTENDUES:
+            champ_resolu = self.arch.find(f".//page[@name='etapes']/field[@name='etape_{code}_ids']")
+            self.assertIsNotNone(champ_resolu.find('list'), 'la vue liste du comodèle est incorporée')
 
     def test_chaque_section_est_precedee_dun_separateur_titre(self):
         """Un séparateur TITRÉ précède chaque section."""

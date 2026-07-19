@@ -500,8 +500,10 @@ Les deux étapes lourdes à l'échelle du parc (**créer** puis **émettre** les
 replanification ASAP), sous l'identité du·de la *Facturiste* demandeur·se, sans file de jobs ni
 dépendance ajoutée. Le succès continue de se lire **uniquement** dans le reste-à-faire dérivé de
 l'étape, jamais dans le fait d'avoir été lancée : `lance` (étapes de type *action*) devient une
-**intention** posée au clic, pas un accompli. Un échec de paquet va au chatter de l'enregistrement
-fautif (souscription, période, facture), jamais sur la Campagne elle-même.
+**intention** posée au clic, pas un accompli. Le **point d'échec** va au chatter de
+l'enregistrement fautif (souscription, période, facture) ; le **récapitulatif de passe** (comptes,
+lignes d'erreur liées, durées) va au **journal de la Campagne** (chatter) — le toast/bus reste le
+retour immédiat, jamais la trace.
 
 **La campagne naît tirée** (ADR 0036, amende ADR 0025) : sa création — gardée par un invariant dur
 **« mois strictement révolu »** (`UserError` sinon) — **amorce seule les trois pulls** (sorties C15,

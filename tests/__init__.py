@@ -7,6 +7,7 @@ from . import (
     test_campagne_catalogue,
     test_campagne_etapes_actions,
     test_campagne_facturation,
+    test_campagne_journal,
     test_campagne_lettre_mois,
     test_campagne_notes,
     test_campagne_signaux,

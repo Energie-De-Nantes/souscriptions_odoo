@@ -121,21 +121,25 @@ class SouscriptionRefacturation(models.Model):
         avant tout travail (échec rapide et déterministe, ADR 0024 §5).
 
         Returns:
-            tuple[list[str], list[str], list[str]] : `(creees, ignorees,
+            tuple[list[str], list[str], list[tuple]] : `(creees, ignorees,
             erreurs)`, même gabarit que les deux autres pulls (méta-périodes,
             sorties C15) — consommé par le bouton `synchroniser_depuis_electricore`
             (toast) et par tout appelant non-UI (automate d'amorçage, tests).
+            `erreurs` porte des triplets `(libellé, res_model, res_id)`
+            (#366) — `ignorees` (RSC inconnue, aucune souscription à
+            désigner) reste une liste de libellés simples.
         """
         client = self.env['souscription.electricore.client'].client()
         with traduire_exceptions_electricore():
             lignes = self._tirer_prestations(client)
         return self._inserer_prestations(lignes)
 
-    def synchroniser_depuis_electricore(self):
-        """Bouton (#147) : emballe `_synchroniser_depuis_electricore_donnees`
-        en toast (#341, ADR 0036 décision 13) — aucune couture réseau ici,
-        seuls les comptes traversent la frontière UI."""
-        creees, ignorees, erreurs = self._synchroniser_depuis_electricore_donnees()
+    def _toast_sync_f15(self, creees, ignorees, erreurs):
+        """Toast de la sync F15 (#341) — extrait de `synchroniser_depuis_electricore`
+        pour être réutilisé tel quel par `souscription.campagne.facturation.
+        action_sync_f15` (#366) : la Campagne poste le récapitulatif au
+        journal SANS dupliquer ce toast, en appelant `_synchroniser_depuis_electricore_donnees`
+        puis ce même formatage."""
         message = _(
             'Prestations : %(creees)s créée(s), %(ignorees)s sans souscription (RSC inconnue), '
             '%(erreurs)s en erreur (chatter des souscriptions fautives).',
@@ -153,6 +157,13 @@ class SouscriptionRefacturation(models.Model):
                 'sticky': False,
             },
         }
+
+    def synchroniser_depuis_electricore(self):
+        """Bouton (#147) : emballe `_synchroniser_depuis_electricore_donnees`
+        en toast (#341, ADR 0036 décision 13) — aucune couture réseau ici,
+        seuls les comptes traversent la frontière UI."""
+        creees, ignorees, erreurs = self._synchroniser_depuis_electricore_donnees()
+        return self._toast_sync_f15(creees, ignorees, erreurs)
 
     def _tirer_prestations(self, client):
         """Couture transport (patchée par les tests) : consomme le flux JSONL typé
@@ -230,7 +241,17 @@ class SouscriptionRefacturation(models.Model):
                 souscription.message_post(
                     body=f'Sync prestations F15 : échec sur la référence {ligne.get("reference")} — {exc}'
                 )
-                erreurs.append(f'{souscription.name} ({ligne.get("reference")}) : {exc}')
+                # Triplet (libellé, modèle, id) — pas juste le libellé
+                # (#366) : porte de quoi construire un lien HTML vers la
+                # souscription fautive au moment du post au journal de la
+                # Campagne ; `creees`/`ignorees` restent des libellés seuls.
+                erreurs.append(
+                    (
+                        f'{souscription.name} ({ligne.get("reference")}) : {exc}',
+                        'souscription.souscription',
+                        souscription.id,
+                    )
+                )
         self._recomposer_brouillons_mensuels(souscriptions_touchees)
         return creees, ignorees, erreurs
 

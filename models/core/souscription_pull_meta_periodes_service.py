@@ -80,11 +80,13 @@ class SouscriptionPullMetaPeriodesService(models.AbstractModel):
                 comptent).
 
         Returns:
-            tuple[list[str], list[str], list[str], list[str], list[str]] :
-            `(creees, rafraichies, inchangees, conservees, erreurs)`, cinq
-            listes de libellés — même gabarit que les deux autres pulls
-            (sorties C15, sync F15, #341) — consommées par la méthode-données
-            de la Campagne puis emballées en toast (#158/#176).
+            tuple[list[str], list[str], list[str], list[str], list[tuple]] :
+            `(creees, rafraichies, inchangees, conservees, erreurs)`, même
+            gabarit que les deux autres pulls (sorties C15, sync F15, #341)
+            — consommées par la méthode-données de la Campagne puis
+            emballées en toast (#158/#176). `erreurs` porte des triplets
+            `(libellé, res_model, res_id)` (#366) — les quatre autres
+            listes restent des libellés simples.
         """
         return self._pull_un_mois(souscriptions, mois, creer_manquantes=True)
 
@@ -179,7 +181,14 @@ class SouscriptionPullMetaPeriodesService(models.AbstractModel):
                     # fautive, au point d'échec, pour les deux chemins
                     # (bouton manuel ET futur automate d'amorçage).
                     souscription.message_post(body=f'Pull méta-périodes ({mois_str}) : échec — {exc}')
-                    erreurs.append(f'{souscription.name} ({mois_str}) : {exc}')
+                    # Triplet (libellé, modèle, id) — pas juste le libellé
+                    # (#366) : porte de quoi construire un lien HTML vers
+                    # l'enregistrement fautif au moment du post au journal
+                    # de la Campagne, sans changer le gabarit des quatre
+                    # autres listes (labels seuls).
+                    erreurs.append(
+                        (f'{souscription.name} ({mois_str}) : {exc}', 'souscription.souscription', souscription.id)
+                    )
 
         # Mois absent du flux (ADR 0030 décision 1) : une Période déjà
         # amorcée dont la RSC n'est pas revenue dans ce lot est conservée et
@@ -265,9 +274,11 @@ class SouscriptionPullMetaPeriodesService(models.AbstractModel):
                 les souscriptions à RSC résolue participent à l'appel.
 
         Returns:
-            tuple[list[str], list[str], list[str], list[str]]: `(ecrites,
-            corrigees, inchangees, erreurs)`, quatre listes de libellés
-            consommées par la notification du bouton.
+            tuple[list[str], list[str], list[str], list[tuple]]: `(ecrites,
+            corrigees, inchangees, erreurs)` consommées par la notification
+            du bouton. `erreurs` porte des triplets `(libellé, res_model,
+            res_id)` (#366) — les trois autres listes restent des libellés
+            simples.
         """
         client = self.env['souscription.electricore.client'].client()
         par_rsc = {s.ref_situation_contractuelle: s for s in souscriptions if s.ref_situation_contractuelle}
@@ -297,7 +308,13 @@ class SouscriptionPullMetaPeriodesService(models.AbstractModel):
                 # souscription fautive, au point d'échec, chemin manuel
                 # comme futur automate.
                 souscription.message_post(body=f'Pull sorties C15 : échec — {exc}')
-                erreurs.append(f'{souscription.name} ({ligne.ref_situation_contractuelle}) : {exc}')
+                erreurs.append(
+                    (
+                        f'{souscription.name} ({ligne.ref_situation_contractuelle}) : {exc}',
+                        'souscription.souscription',
+                        souscription.id,
+                    )
+                )
 
         return ecrites, corrigees, inchangees, erreurs
 

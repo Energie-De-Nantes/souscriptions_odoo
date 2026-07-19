@@ -23,6 +23,7 @@ import time
 
 from babel.dates import format_date
 from dateutil.relativedelta import relativedelta
+from markupsafe import Markup, escape
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import is_html_empty
@@ -279,6 +280,13 @@ class SouscriptionCampagneFacturation(models.Model):
     _name = 'souscription.campagne.facturation'
     _description = 'Campagne de facturation'
     _order = 'mois desc'
+    # Journal de campagne (#366) : `mail.thread` SEUL, jamais
+    # `mail.activity.mixin` (pas d'activités planifiées sur la Campagne).
+    # Les notes de campagne (#159, `souscription.campagne.note`) restent le
+    # modèle dédié pour « à reporter »/chaînage — le chatter ne sait faire
+    # ni l'un ni l'autre, il ne fait que recevoir le récapitulatif de
+    # chaque fin de passe (cf. `_poster_recap_journal`).
+    _inherit = ['mail.thread']
 
     name = fields.Char(string='Nom', compute='_compute_name', store=True)
 
@@ -730,18 +738,75 @@ class SouscriptionCampagneFacturation(models.Model):
         if etape.etat_prerequis != 'prete':
             raise UserError(_('Étape « %s » bloquée : prérequis non satisfaits.', ETAPES_CAMPAGNE[code]['label']))
 
+    # --- Journal de campagne (#366) : « toute fin de passe poste son
+    # récapitulatif au journal » — un seul point d'écriture, appelé depuis
+    # chaque seam de fin de passe (les trois pulls, régulariser les
+    # clôtures, les deux vidanges, l'amorçage), zéro branche
+    # `if self.code == ...` (esprit ADR 0036 décision 9). Le toast/bus reste
+    # partout la trace éphémère inchangée ; ceci est la trace durable qui
+    # les complète — jamais les remplace.
+
+    def _poster_recap_journal(self, titre, comptes, erreurs=None):
+        """Poste le récapitulatif de fin de passe comme note interne
+        (`message_post` par défaut) — signée par l'utilisateur COURANT de
+        `self.env`, jamais réécrit ici : chaque appelant a déjà posé la
+        bonne identité en amont (bouton : l'utilisateur qui clique ;
+        vidange/amorçage : `with_user(demande_par_id)`/`with_user(create_uid)`,
+        ADR 0035/0036) — jamais l'utilisateur technique du cron.
+
+        Args:
+            titre: libellé de l'étape (même texte que le toast/bus).
+            comptes: lignes déjà formatées (« Créées : 3 », mêmes libellés
+                que le toast/bus correspondant).
+            erreurs: liste optionnelle de triplets `(libellé, res_model,
+                res_id)` (#366) — un lien HTML par erreur vers
+                l'enregistrement fautif (`_get_html_link`, idiome natif
+                mail). Absente/vide pour les passages qui n'en ont pas
+                besoin (régulariser les clôtures, les deux vidanges : le
+                drill-down et le chatter de l'unité fautive suffisent déjà,
+                ADR 0036 décision 8a).
+        """
+        self.ensure_one()
+        puces = Markup('').join(Markup('<li>%s</li>') % escape(str(compte)) for compte in comptes)
+        corps = Markup('<p><strong>%s</strong></p><ul>%s</ul>') % (escape(str(titre)), puces)
+        if erreurs:
+            puces_erreurs = Markup('').join(
+                Markup('<li>%s</li>')
+                % (
+                    self.env[res_model].browse(res_id)._get_html_link(title=str(label))
+                    if res_model and res_id
+                    else escape(str(label))
+                )
+                for label, res_model, res_id in erreurs
+            )
+            corps += Markup('<p><strong>%s</strong></p><ul>%s</ul>') % (escape(str(_('Erreurs'))), puces_erreurs)
+        self.message_post(body=corps)
+
     def action_pull_sorties_c15(self):
         """Étape racine du DAG (#248, ADR 0031 décision 4) : pull des sorties
         C15 en tête de campagne — ordre voulu « pull des sorties -> date_fin
-        -> périmètre -> pull des méta-périodes ». Délègue intégralement au
-        bouton autonome déjà couvert
-        (`souscription.souscription.action_tirer_sorties_c15`, #246), même
+        -> périmètre -> pull des méta-périodes ». Délègue à la même
+        méthode-données que le bouton autonome
+        (`souscription.souscription._pull_sorties_c15_donnees`, #246), même
         périmètre toutes-souscriptions-non-résiliées (auto-cicatrisant, pas
         de fenêtre mensuelle, ADR 0031 décision 1) : aucune nouvelle couture
         réseau, aucun scope par mois de campagne — la file des sorties n'en a
-        pas besoin."""
+        pas besoin. Poste le récapitulatif au journal (#366) avant de
+        rendre le MÊME toast que le bouton autonome (`_toast_sorties_c15`,
+        extrait pour ne pas dupliquer son formatage)."""
         self.ensure_one()
-        return self.env['souscription.souscription'].action_tirer_sorties_c15()
+        ecrites, corrigees, inchangees, erreurs = self._pull_sorties_c15_donnees()
+        self._poster_recap_journal(
+            ETAPES_CAMPAGNE['pull_sorties_c15']['label'],
+            [
+                _('Écrites : %s', len(ecrites)),
+                _('Corrigées : %s', len(corrigees)),
+                _('Inchangées : %s', len(inchangees)),
+                _('Erreurs : %s', len(erreurs)),
+            ],
+            erreurs=erreurs,
+        )
+        return self.env['souscription.souscription']._toast_sorties_c15(ecrites, corrigees, inchangees, erreurs)
 
     def action_regulariser_clotures(self):
         """Étape de fin de campagne (#248, ADR 0031 décision 4) : émet la
@@ -781,6 +846,18 @@ class SouscriptionCampagneFacturation(models.Model):
                     emises.append(souscription.name)
             except Exception as exc:
                 erreurs.append(f'{souscription.name} : {exc}')
+        self._poster_recap_journal(
+            ETAPES_CAMPAGNE['regulariser_clotures']['label'],
+            [
+                _('Émises : %s', len(emises)),
+                _('Ignorées (rien à solder pour le moment) : %s', len(ignorees)),
+                _('Erreurs : %s', len(erreurs)),
+            ],
+            # Pas de liens ici (#366) : les erreurs de ce lot restent des
+            # libellés simples, pas des triplets (contrairement aux trois
+            # pulls) — le travail restant se lit déjà à la file
+            # `en_attente_cloture`, auto-cicatrisante.
+        )
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -807,11 +884,12 @@ class SouscriptionCampagneFacturation(models.Model):
         `_ouvrir_flux`/fabrique client, ADR 0024).
 
         Returns:
-            tuple[list[str], list[str], list[str], list[str], list[str]] :
+            tuple[list[str], list[str], list[str], list[str], list[tuple]] :
             `(creees, rafraichies, inchangees, conservees, erreurs)`, même
             gabarit que les deux autres pulls (sorties C15, sync F15) —
             consommé par le bouton `action_pull_meta_periodes` (toast) et par
-            tout appelant non-UI (automate d'amorçage, tests)."""
+            tout appelant non-UI (automate d'amorçage, tests). `erreurs`
+            porte des triplets `(libellé, res_model, res_id)` (#366)."""
         self.ensure_one()
         cibles = self._souscriptions_facturables()
         return self.env['souscription.pull.meta.periodes.service'].pull(cibles, self.mois)
@@ -821,7 +899,10 @@ class SouscriptionCampagneFacturation(models.Model):
         emballe `_pull_meta_periodes_donnees` en toast (#341, ADR 0036
         décision 13) résumant créées/rafraîchies/conservées/erreurs
         (politique gardée par l'empreinte, ADR 0030 décision 1, #235) —
-        sticky si des erreurs, auto-dismiss sinon — aucun résumé persisté."""
+        sticky si des erreurs, auto-dismiss sinon. Poste aussi le même
+        récapitulatif au journal de la Campagne, avec un lien HTML par
+        erreur vers la souscription fautive (#366) — le toast reste la
+        seule trace éphémère, le journal la trace durable."""
         self.ensure_one()
         creees, rafraichies, inchangees, conservees, erreurs = self._pull_meta_periodes_donnees()
         # Symétrie avec l'automate d'amorçage (#343, grill 19/07) : `demande`
@@ -829,6 +910,16 @@ class SouscriptionCampagneFacturation(models.Model):
         # « fait », dérivé du backlog) — c'est elle qui fait sortir la
         # campagne de la recherche du cron d'amorçage (`demande=False`).
         self._etape('pull_meta_periodes').write({'demande': True})
+        self._poster_recap_journal(
+            ETAPES_CAMPAGNE['pull_meta_periodes']['label'],
+            [
+                _('Créées : %s', len(creees)),
+                _('Rafraîchies : %s', len(rafraichies)),
+                _('Conservées : %s', len(conservees)),
+                _('Erreurs : %s', len(erreurs)),
+            ],
+            erreurs=erreurs,
+        )
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -848,11 +939,19 @@ class SouscriptionCampagneFacturation(models.Model):
         }
 
     def action_sync_f15(self):
-        """Délègue directement à la sync F15 déjà couverte (#147),
-        indépendante du pull (#158 — les deux racines du DAG n'ont aucune
-        dépendance entre elles)."""
+        """Délègue à la même méthode-données que le bouton autonome
+        (#147), indépendante du pull (#158 — les deux racines du DAG n'ont
+        aucune dépendance entre elles). Poste le récapitulatif au journal
+        (#366) avant de rendre le MÊME toast que le bouton autonome
+        (`_toast_sync_f15`, extrait pour ne pas dupliquer son formatage)."""
         self.ensure_one()
-        return self.env['souscription.refacturation'].synchroniser_depuis_electricore()
+        creees, ignorees, erreurs = self._sync_f15_donnees()
+        self._poster_recap_journal(
+            ETAPES_CAMPAGNE['sync_f15']['label'],
+            [_('Créées : %s', len(creees)), _('Ignorées : %s', len(ignorees)), _('Erreurs : %s', len(erreurs))],
+            erreurs=erreurs,
+        )
+        return self.env['souscription.refacturation']._toast_sync_f15(creees, ignorees, erreurs)
 
     # --- Méthodes-données de l'amorçage (#342, ADR 0036 décision 9 — clé
     # `amorcage` du catalogue), consommées par la tranche suivante (#343).
@@ -947,16 +1046,24 @@ class SouscriptionCampagneFacturation(models.Model):
         self.env['ir.cron']._commit_progress(remaining=0)
 
     def _notifier_fin_amorcage(self, mesures):
-        """Notification bus récapitulative de fin de passe (#343, ADR 0036
-        décision 8c) : comptes et durée par étape tentée, erreur transport le
-        cas échéant — même idiome que `_notifier_fin` de la vidange
-        (`bus.bus._sendone`, natif, zéro JS), chez le créateur de la
-        campagne. Best effort (décision 8b) : aucune exception ne doit faire
-        perdre le travail déjà committé si l'envoi échoue — non gardé
-        explicitement, `_sendone` est un simple INSERT natif."""
+        """Fin de passe d'amorçage (#343, ADR 0036 décision 8c ; #366) :
+        poste le récapitulatif au journal de la Campagne (comptes et durée
+        par étape tentée, erreur transport le cas échéant — persistant du
+        coup la mesure « pull méta à froid » qu'ADR 0035/0036 réservaient),
+        PUIS envoie la même notification bus chez le créateur (`bus.bus.
+        _sendone`, natif, zéro JS) — le bus reste la trace éphémère
+        inchangée, le journal la complète en trace durable, jamais ne la
+        remplace. Toute la passe s'exécute déjà `with_user(create_uid)`
+        (#343) : le post au journal en hérite, jamais l'utilisateur
+        technique du cron. Best effort sur le bus (décision 8b) : aucune
+        exception ne doit faire perdre le travail déjà committé si l'envoi
+        échoue — non gardé explicitement, `_sendone` est un simple INSERT
+        natif."""
         self.ensure_one()
         if not mesures:
             return
+        lignes, _une_erreur = self._lignes_recap_amorcage(mesures)
+        self._poster_recap_journal(_('Amorçage'), lignes)
         demandeur = self.create_uid
         if not demandeur:
             return
@@ -964,7 +1071,12 @@ class SouscriptionCampagneFacturation(models.Model):
             demandeur.partner_id, 'simple_notification', self._construire_notification_amorcage(mesures)
         )
 
-    def _construire_notification_amorcage(self, mesures):
+    def _lignes_recap_amorcage(self, mesures):
+        """Lignes de texte du récapitulatif d'amorçage — une par étape
+        tentée — partagées par la notification bus
+        (`_construire_notification_amorcage`) et le post au journal
+        (`_notifier_fin_amorcage`, #366) : un seul endroit qui formate ces
+        lignes, jamais deux formulations qui pourraient diverger."""
         self.ensure_one()
         lignes = []
         une_erreur = False
@@ -991,6 +1103,11 @@ class SouscriptionCampagneFacturation(models.Model):
                         duree=duree,
                     )
                 )
+        return lignes, une_erreur
+
+    def _construire_notification_amorcage(self, mesures):
+        self.ensure_one()
+        lignes, une_erreur = self._lignes_recap_amorcage(mesures)
         return {
             'title': _('Amorçage de la campagne %s', self.name),
             'message': '\n'.join(lignes),
@@ -1439,15 +1556,25 @@ class SouscriptionCampagneEtape(models.Model):
         mois postées pour l'émission, les souscriptions du mois déjà
         « facturée » ou « émise » pour la création (ce dernier bucket exclut
         volontairement « à tirer » : une souscription sans Période n'a
-        jamais été du travail pour cette étape)."""
+        jamais été du travail pour cette étape).
+
+        Poste aussi le même compte au journal de la Campagne (#366) — sous
+        la même identité que le reste de la vidange (`with_user
+        (demande_par_id)`, posé par l'appelant), sans lien HTML (le
+        drill-down et le chatter de l'unité fautive suffisent déjà, ADR
+        0036 décision 8a)."""
         self.ensure_one()
-        demandeur = self.demande_par_id
-        if not demandeur:
-            return
         strategie = self._strategie_vidange()
         nb_ok = len(getattr(self.campagne_id, strategie['ok'])())
         nb_echecs = self._compter_liste_de_travail()
         libelle_ok = strategie['libelle_reussite']
+        self.campagne_id._poster_recap_journal(
+            ETAPES_CAMPAGNE[self.code]['label'],
+            [_('%s : %s', libelle_ok, nb_ok), _('Échecs : %s', nb_echecs)],
+        )
+        demandeur = self.demande_par_id
+        if not demandeur:
+            return
         self.env['bus.bus']._sendone(
             demandeur.partner_id, 'simple_notification', self._construire_notification(nb_ok, nb_echecs, libelle_ok)
         )

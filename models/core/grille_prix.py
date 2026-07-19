@@ -138,7 +138,8 @@ class GrillePrix(models.Model):
 
         L'unique implémentation de la règle d'assemblage : partition en cadrans
         facturés, prix de l'énergie par cadran, abonnement affine (ADR 0018 —
-        à terme pricé sur la puissance moyenne, #78), majoration PRO (#67,
+        l'appelant décide de la puissance à prixer ; la Période privilégie la
+        moyenne mesurée sur le snapshot souscrit, #78), majoration PRO (#67,
         toute la fourniture, jamais la Refacturation — pur transit Enedis),
         résolution du Produit de facturation standard /
         solidaire (ADR 0013). Rend des données pures HT — produits résolus et

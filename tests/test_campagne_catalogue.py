@@ -165,6 +165,14 @@ class TestCatalogueCampagneStructurel(TransactionCase):
         codes_avec_vidange = {code for code, info in ETAPES_CAMPAGNE.items() if 'vidange' in info}
         self.assertEqual(codes_avec_vidange, {'creer_factures', 'emettre_factures'})
 
+    def test_amorcage_present_seulement_sur_les_trois_pulls(self):
+        """AC #343, ADR 0036 : la frontière machine/humain est structurelle —
+        seuls les trois pulls (« tirer de la donnée ») portent la clé
+        `amorcage` ; aucune porte, aucune étape de facturation/solde
+        (« juger et engager comptablement ») n'est machine-runnable."""
+        codes_avec_amorcage = {code for code, info in ETAPES_CAMPAGNE.items() if 'amorcage' in info}
+        self.assertEqual(codes_avec_amorcage, {'pull_sorties_c15', 'pull_meta_periodes', 'sync_f15'})
+
     def test_creation_seme_les_etapes_avec_la_phase_du_catalogue(self):
         """Non-régression légère : le champ compute stocké `phase` (#342)
         est peuplé, cohérent avec le catalogue, sur les lignes réellement

@@ -681,6 +681,13 @@ class SouscriptionCampagneFacturation(models.Model):
         pas l'étape `code` prête — réutilise `etat_prerequis` (donc le
         catalogue ETAPES_CAMPAGNE), aucune logique de gate dupliquée."""
         self.ensure_one()
+        # Cohérence déclaration/enforcement (review #350) : un appel ici sans
+        # `gate: 'dure'` au catalogue est un mensonge de documentation — le
+        # sens inverse (déclarée dure, appel oublié) est verrouillé par
+        # test_campagne_catalogue.test_toute_gate_dure_est_reellement_appliquee.
+        assert ETAPES_CAMPAGNE[code].get('gate') == 'dure', (
+            f"_verifier_gate({code!r}) : appel présent mais gate non déclarée 'dure' au catalogue"
+        )
         etape = self._etape(code)
         if etape.etat_prerequis != 'prete':
             raise UserError(_('Étape « %s » bloquée : prérequis non satisfaits.', ETAPES_CAMPAGNE[code]['label']))

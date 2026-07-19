@@ -13,8 +13,10 @@ bien SUR SON MODÈLE (aucun enregistrement créé, sauf le test de non-régressi
 `phase` en fin de fichier)."""
 
 from datetime import date
+from unittest.mock import patch
 
 from odoo.addons.souscriptions_odoo.models.core import souscription_campagne as campagne_module
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
 
 ETAPES_CAMPAGNE = campagne_module.ETAPES_CAMPAGNE
@@ -84,6 +86,42 @@ class TestCatalogueCampagneStructurel(TransactionCase):
         for code, info in ETAPES_CAMPAGNE.items():
             if 'gate' in info:
                 self.assertEqual(info['gate'], 'dure', f"{code} : 'gate' ne devrait valoir que 'dure'")
+
+    def test_toute_entree_non_porte_declare_une_action(self):
+        """Review #350 : une étape 'action'/'derive' sans clé `action` ne
+        surfacerait qu'en UserError au clic du bouton générique — la même
+        classe « typo silencieux » que ce fichier existe pour tuer. Une porte
+        n'a jamais d'action (elle se valide via `valide`)."""
+        for code, info in ETAPES_CAMPAGNE.items():
+            if info.get('type') != 'porte':
+                self.assertIn('action', info, f'{code} : entrée non-porte sans action')
+
+    def test_toute_gate_dure_est_reellement_appliquee(self):
+        """Review #350 : lie la déclaration `gate: 'dure'` à son enforcement
+        (les appels `_verifier_gate` dans les méthodes d'action) — sinon les
+        deux dérivent en silence. Paramétrique sur le catalogue : toute future
+        entrée dure (p. ex. #314) est couverte à sa création. Le sens inverse
+        (appel sans déclaration) est un assert dans `_verifier_gate` même.
+
+        Le blocage est FORCÉ en patchant le compute `etat_prerequis` (le seam
+        exact que `_verifier_gate` lit) : sur une campagne vierge sans données,
+        les étapes dérivées sont vacuement « faites » (reste-à-faire 0) et
+        certaines gates naîtraient prêtes — le scénario resterait couplé aux
+        fixtures au lieu du catalogue."""
+
+        def _tout_bloquer(etapes):
+            for etape in etapes:
+                etape.etat_prerequis = 'bloquee'
+
+        campagne = self.env['souscription.campagne.facturation'].create({'mois': date(2024, 4, 1)})
+        with patch.object(self.registry[_MODELE_ETAPE], '_compute_etat_prerequis', _tout_bloquer):
+            campagne.etape_ids.invalidate_recordset(['etat_prerequis'])
+            for code, info in ETAPES_CAMPAGNE.items():
+                if info.get('gate') != 'dure':
+                    continue
+                self.assertIn('action', info, f'{code} : gate dure sans action à garder')
+                with self.assertRaises(UserError, msg=f'{code} : gate déclarée dure mais action non gardée'):
+                    getattr(campagne, info['action'])()
 
     def test_type_derive_porte_toujours_une_cible_statut(self):
         """Toute étape 'derive' doit déclarer `cible_statut` (générique

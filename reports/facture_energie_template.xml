@@ -228,12 +228,31 @@
                 </div>
 
                 <!-- ===== Paiement ===== -->
-                <div t-if="o.move_type == 'out_invoice' and o.partner_id.bank_ids" class="no-page-break" style="margin-top:18px;">
-                    <div class="fe_callout">
-                        <strong>Paiement.</strong> Prélèvement automatique déclenché le 10 du mois sur le
-                        compte <span t-out="'XXXX ' * 4 + o.partner_id.bank_ids[0].acc_number[29:]"/>.
+                <!-- Chemin d'argent partagé avec le mail de facture
+                     (data/mail_templates_facture_energie.xml, #320, ADR 0034) :
+                     toute modification de wording ou de date se synchronise À LA
+                     MAIN dans les deux fichiers. Une branche EXPLICITE par valeur
+                     de `mode_paiement`, JAMAIS de `t-else` (un `t-else`
+                     affirmerait un prélèvement par défaut, cf. CONTEXT.md « Mode
+                     de paiement ») : espèces, virement, chèque et mode vide
+                     n'ont aucun ancêtre prod et n'obtiennent donc aucun bloc.
+                     Aucune mention de compte bancaire (ni `bank_ids`, ni
+                     `acc_number`) : la réassurance « quel compte sera débité »
+                     relève de la pré-notification SEPA, pas de la facture.
+                     Aucun QR-code ici : une Facture émise est immuable — un QR
+                     que Moneko réémet y resterait figé faux — le QR ne vit que
+                     dans le mail, recomposé à chaque envoi. -->
+                <div t-if="o.move_type == 'out_invoice'" class="no-page-break" style="margin-top:18px;">
+                    <div t-if="o.mode_paiement == 'prelevement'" class="fe_callout">
+                        <strong>Paiement.</strong> Prélèvement automatique déclenché le 10 du mois.
                         Cette facture ne vous est envoyée qu'à titre informatif, n'effectuez pas de
                         règlement manuel.
+                    </div>
+                    <div t-if="o.mode_paiement == 'monnaie_locale'" class="fe_callout">
+                        <strong>Paiement.</strong> En tant que payeur·euse en Moneko, nous vous invitons
+                        à réaliser le paiement d'ici le 10 de ce mois, sur votre compte Moneko :
+                        rubrique « Opérations », « effectuer un virement », tapez EDN dans la barre de
+                        recherche et entrez le montant de votre facture.
                     </div>
                 </div>
 
@@ -244,6 +263,8 @@
                         <li>Grille tarifaire : <a href="https://energie-de-nantes.fr/souscrire/">energie-de-nantes.fr/souscrire</a>. Nos tarifs ne sont pas réglementés, mais décidés collectivement.</li>
                         <li>CGV : souscription d'un an renouvelable par tacite reconduction (art. 2.3) ; résiliation de plein droit quand vous voulez (art. 3.2).</li>
                         <li>Sans compteur Linky, transmettez vos index la veille du 1er du mois pour qu'ils soient pris en compte.</li>
+                        <li>Pas d'escompte pour paiement anticipé.</li>
+                        <li>Passée la date d'échéance, la fourniture pourra être réduite suivant les CGV et les délais légaux.</li>
                         <li>Vos droits et démarches : <a href="http://www.energie-info.fr">energie-info.fr</a>. En cas de litige non résolu sous deux mois : <a href="http://www.energie-mediateur.fr">energie-mediateur.fr</a> — Médiateur national de l'énergie, Libre réponse n° 59252, 75443 Paris cedex 09, n° vert 0800 112 212.</li>
                     </ul>
                 </div>

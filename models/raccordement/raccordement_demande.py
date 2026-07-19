@@ -1,10 +1,18 @@
 import logging
 import re
 
-import requests
 from odoo import api, fields, models
 from odoo.addons.base_iban.models.res_partner_bank import validate_iban
 from odoo.exceptions import UserError, ValidationError
+
+# Trio ré-exporté par la fabrique (#222/#360, ADR 0024) : la garde de version
+# vit désormais dans le client (ContractVersionError), IngestionEnCours et
+# PreconditionNonRemplie couvrent le flux R67 absent (typé upstream, #229).
+# Importés ici (pas `traduire_exceptions_electricore()`) : ce bouton a un
+# mapping propre, distinct de celui des quatre appelants frères — les deux
+# premières deviennent une notification non bloquante plutôt qu'une
+# UserError, cf. action_estimer_provisions.
+from ..core.electricore_client_fabrique import ContractVersionError, IngestionEnCours, PreconditionNonRemplie
 
 _logger = logging.getLogger(__name__)
 
@@ -676,38 +684,37 @@ class RaccordementDemande(models.Model):
         self.sepa_mandate_ref = mandat.name
         self.message_post(body=f'Mandat SEPA créé et actif (RUM : {mandat.name}).')
 
-    # --- Estimation des provisions (#121, GET /provision/estimation) ---
+    # --- Estimation des provisions (#121, `provision_estimation`, #229) ---
     #
     # Bouton seulement, pas d'auto-déclenchement au drag kanban : un appel
     # réseau dans write() bloquerait la transaction du drag-and-drop — le
     # bouton suffit (l'AC de l'issue accepte « bouton, et/ou auto »).
 
-    _CONTRACT_VERSION_ESTIMATION_ATTENDU = 1
-
     def action_estimer_provisions(self):
         """Bouton « Estimer les provisions » (visible à l'étape « Calcul de
         mensualités en cours ») : interroge electricore
-        (GET /provision/estimation) et pré-remplit les provisions selon le
-        tarif. L'humain garde la main — les champs restent éditables — et
-        l'absence de données (trouve=False, 503 flux R67) n'empêche jamais la
-        saisie manuelle : c'est le chemin normal."""
+        (`client.provision_estimation(pdl)`) et pré-remplit les provisions
+        selon le tarif. L'humain garde la main — les champs restent éditables
+        — et l'absence de données (trouve=False, flux R67 indisponible)
+        n'empêche jamais la saisie manuelle : c'est le chemin normal.
+
+        Mapping d'exceptions (#229, trio ré-exporté par la fabrique) :
+        `IngestionEnCours`/`PreconditionNonRemplie` (flux R67 absent, typé
+        upstream) -> notification non bloquante + chatter (même
+        comportement que l'ancien 503, plus précis) ; `ContractVersionError`
+        -> `UserError` (la garde de version vit dans le client) ; tout le
+        reste (réseau coupé, 500 inattendu) remonte tel quel — plus
+        d'enveloppe `UserError` générique."""
         self.ensure_one()
         client = self.env['souscription.electricore.client'].client()  # fast-fail paquet+config (ADR 0024)
         try:
             reponse = self._appeler_estimation(client, self.pdl)
-        except requests.exceptions.HTTPError as exc:
-            if exc.response is not None and exc.response.status_code == 503:
-                return self._notifier_estimation_indisponible(exc.response)
-            raise UserError(f"Erreur electricore lors de l'estimation des provisions : {exc}") from exc
-        except requests.exceptions.RequestException as exc:
-            raise UserError(f"Erreur electricore lors de l'estimation des provisions : {exc}") from exc
-
-        contract_version = reponse.get('contract_version')
-        if contract_version is None or contract_version < self._CONTRACT_VERSION_ESTIMATION_ATTENDU:
+        except (IngestionEnCours, PreconditionNonRemplie) as exc:
+            return self._notifier_estimation_indisponible(exc)
+        except ContractVersionError as exc:
             raise UserError(
-                "Version de contrat electricore inattendue pour l'estimation des provisions : "
-                f'{contract_version!r} (attendu >= {self._CONTRACT_VERSION_ESTIMATION_ATTENDU}).'
-            )
+                f"Version de contrat electricore inattendue pour l'estimation des provisions : {exc}"
+            ) from exc
 
         if not reponse.get('trouve'):
             self.message_post(
@@ -718,34 +725,20 @@ class RaccordementDemande(models.Model):
         self._appliquer_estimation(reponse['estimation'])
 
     def _appeler_estimation(self, client, pdl):
-        """Point de transport unique : GET /provision/estimation?pdl=<pdl>
-        (couture patchée en tests, réponse en boîte — rien d'autre n'est
-        mocké).
+        """Point de transport unique : passe-plat vers
+        `client.provision_estimation(pdl)` (`electricore-client` 0.5.0,
+        #229) — couture patchée en tests, réponse en boîte, rien d'autre
+        n'est mocké."""
+        return client.provision_estimation(pdl)
 
-        TODO: electricore-client 0.2.0 n'expose pas encore
-        `/provision/estimation` (seuls meta_periodes, chronologie,
-        turpe_variable, resoudre_rsc existent) : basculer sur la méthode du
-        client quand elle existera."""
-        response = requests.get(
-            f'{client.url}/provision/estimation',
-            params={'pdl': pdl},
-            headers={'X-API-Key': client.api_key},
-            timeout=30,
-        )
-        response.raise_for_status()
-        return response.json()
-
-    def _notifier_estimation_indisponible(self, response):
-        """503 = état opérationnel attendu (flux R67 non matérialisé — M023
-        pas encore ingérée sur le portail SGE — ou ingestion en cours) :
-        jamais une UserError. Tracé au chatter comme information
-        opérationnelle, et notification non bloquante côté utilisateur."""
+    def _notifier_estimation_indisponible(self, exc):
+        """`IngestionEnCours`/`PreconditionNonRemplie` (#229) = état
+        opérationnel attendu (flux R67 non matérialisé — M023 pas encore
+        ingérée sur le portail SGE — ou ingestion en cours) : jamais une
+        UserError. Tracé au chatter comme information opérationnelle, et
+        notification non bloquante côté utilisateur."""
         self.ensure_one()
-        try:
-            detail = response.json().get('detail')
-        except ValueError:
-            detail = None
-        message = detail or (
+        message = str(exc) or (
             'Flux R67 non disponible pour ce PDL (mesures pas encore ingérées, ou ingestion en cours) : '
             'réessayez plus tard, ou saisissez les provisions à la main.'
         )

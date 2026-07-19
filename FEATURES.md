@@ -21,7 +21,7 @@ Journeys de capacités (`REQ-XXX-nn`), chacune avec un statut (✅ Proven · ⚠
 - REQ-SOU-01 ✅ souscription base ou HP/HC avec provisions par cadran — preuve: tests/test_souscription.py::test_souscription_creation
 - REQ-SOU-02 ✅ tarif solidaire et majoration pro — preuve: tests/test_souscription.py::test_tarif_solidaire
 - REQ-SOU-03 ✅ identité Enedis : RSC unique, id_affaire, recherche — preuve: tests/test_souscription_etat.py::test_rsc_dupliquee_refusee · #15
-- REQ-SOU-04 ✅ estimation automatique des provisions (electricore) — preuve: tests/test_estimation_provisions.py · #121
+- REQ-SOU-04 ✅ estimation automatique des provisions (electricore, `client.provision_estimation(pdl)` — dernière brèche `requests` hors fabrique refermée, ADR 0024 restauré) : `IngestionEnCours`/`PreconditionNonRemplie` → notification non bloquante + chatter, `ContractVersionError` → `UserError` (garde de version côté client, plus de vérification manuelle) — preuve: tests/test_estimation_provisions.py · #121, #229
 - REQ-SOU-05 ✅ journal de consentement append-only — preuve: tests/test_documents_contractuels.py::test_journal_est_append_only_en_ecriture
 - REQ-SOU-06 ✅ conditions particulières et attestation PDF — preuve: tests/test_documents_contractuels.py
 - REQ-SOU-07 ✅ droits resserrés user/manager sur souscriptions et grilles — preuve: tests/test_security.py · #17

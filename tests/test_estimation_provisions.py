@@ -1,19 +1,24 @@
-"""Tests #121 — estimation des provisions à l'étape « Calcul de mensualités »
-(GET /provision/estimation).
+"""Tests #121/#229 — estimation des provisions à l'étape « Calcul de
+mensualités » (`client.provision_estimation(pdl)`).
 
 Couture de test : on patche `_appeler_estimation`, la méthode transport de
 `raccordement.demande`, avec des réponses en boîte. Le client lui-même est
 fourni directement par la fabrique patchée (`souscription.electricore.client`,
 ADR 0024) — sa garde paquet/config est testée une fois dans
 test_electricore_client_fabrique.py, pas ici. Aucun HTTP réel.
+
+Exceptions typées importées de la fabrique (#229, trio ré-exporté) — plus de
+stubs `requests.exceptions` : `IngestionEnCours`/`PreconditionNonRemplie`
+mènent à une notification non bloquante, `ContractVersionError` à une
+`UserError` (la garde de version vit désormais dans le client).
 """
 
 from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
-import requests
 from odoo.addons.souscriptions_odoo.models.core import electricore_client_fabrique as fabrique_module
 from odoo.addons.souscriptions_odoo.models.raccordement import raccordement_demande as demande_module
+from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
 from .common import SouscriptionsTestCase
@@ -41,24 +46,14 @@ def _estimation(**kwargs):
     return base
 
 
-def _reponse(trouve=True, estimation=None, contract_version=1):
-    """Stub de l'enveloppe JSON de `GET /provision/estimation`."""
+def _reponse(trouve=True, estimation=None):
+    """Stub de l'enveloppe rendue par `client.provision_estimation(pdl)`."""
     return {
-        'contract_version': contract_version,
         'pdl': 'PDL_ESTIMATION_TEST',
         'as_of': '2024-01-01',
         'trouve': trouve,
         'estimation': estimation,
     }
-
-
-def _http_error_503(detail=None):
-    """Stub de `requests.exceptions.HTTPError` (503), avec ou sans `detail`
-    JSON — mime `response.raise_for_status()`."""
-    response = MagicMock()
-    response.status_code = 503
-    response.json.return_value = {'detail': detail} if detail else {}
-    return requests.exceptions.HTTPError(response=response)
 
 
 @tagged('souscriptions', 'souscriptions_estimation_provisions', 'post_install', '-at_install')
@@ -67,8 +62,10 @@ class TestEstimationProvisions(SouscriptionsTestCase):
         super().setUp()
         # Le client est fourni directement par la fabrique patchée : la garde
         # paquet/config (ADR 0024) est hors sujet ici (cf.
-        # test_electricore_client_fabrique.py).
-        self.fake_client = MagicMock(url='https://electricore.example.test', api_key='fake-api-key')
+        # test_electricore_client_fabrique.py). `_appeler_estimation` étant
+        # lui-même patché par chaque test (#229), ce client n'est jamais
+        # vraiment sollicité — un MagicMock nu suffit.
+        self.fake_client = MagicMock()
         patcher = patch.object(fabrique_module.SouscriptionElectricoreClient, 'client', return_value=self.fake_client)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -146,7 +143,7 @@ class TestEstimationProvisions(SouscriptionsTestCase):
         self.assertEqual(len(demande.message_ids) - avant_msgs, 1)
         self.assertIn('profondeur', demande.message_ids[0].body.lower())
 
-    # --- trouve=False / 503 : jamais bloquant ---
+    # --- trouve=False / flux R67 indisponible : jamais bloquant ---
 
     def test_trouve_false_necrit_rien(self):
         demande = self._demande_calcul_mensualites(type_tarif='base')
@@ -159,13 +156,14 @@ class TestEstimationProvisions(SouscriptionsTestCase):
         self.assertEqual(demande.provision_mensuelle_kwh, avant)
         self.assertEqual(len(demande.message_ids) - avant_msgs, 1)
 
-    def test_503_ne_leve_pas_userror(self):
-        """503 = état opérationnel attendu (flux R67 pas encore matérialisé) :
-        chatter + notification non bloquante, jamais une UserError."""
+    def test_ingestion_en_cours_ne_leve_pas_userror(self):
+        """IngestionEnCours (#229) = état opérationnel attendu (verrou base
+        electricore) : chatter + notification non bloquante, jamais une
+        UserError — même comportement que l'ancien 503."""
         demande = self._demande_calcul_mensualites(type_tarif='base')
         avant_msgs = len(demande.message_ids)
 
-        with self._patch_appeler_estimation(side_effect=_http_error_503('flux R67 non matérialisé')):
+        with self._patch_appeler_estimation(side_effect=fabrique_module.IngestionEnCours('ingestion en cours')):
             resultat = demande.action_estimer_provisions()  # ne doit pas lever
 
         self.assertEqual(resultat['type'], 'ir.actions.client')
@@ -173,6 +171,36 @@ class TestEstimationProvisions(SouscriptionsTestCase):
         self.assertEqual(resultat['params']['type'], 'warning')
         self.assertFalse(resultat['params']['sticky'])
         self.assertEqual(len(demande.message_ids) - avant_msgs, 1)
+
+    def test_precondition_non_remplie_ne_leve_pas_userror(self):
+        """PreconditionNonRemplie (#229) = flux R67 non matérialisé (typé
+        upstream) : chatter + notification non bloquante, jamais une
+        UserError — même comportement que l'ancien 503, plus précis."""
+        demande = self._demande_calcul_mensualites(type_tarif='base')
+        avant_msgs = len(demande.message_ids)
+
+        with self._patch_appeler_estimation(
+            side_effect=fabrique_module.PreconditionNonRemplie('flux R67 non matérialisé')
+        ):
+            resultat = demande.action_estimer_provisions()  # ne doit pas lever
+
+        self.assertEqual(resultat['type'], 'ir.actions.client')
+        self.assertEqual(resultat['tag'], 'display_notification')
+        self.assertEqual(resultat['params']['type'], 'warning')
+        self.assertFalse(resultat['params']['sticky'])
+        self.assertEqual(len(demande.message_ids) - avant_msgs, 1)
+
+    def test_contract_version_error_leve_userror(self):
+        """ContractVersionError (#229) : la garde de version vit dans le
+        client, le bouton la traduit en UserError — plus de vérification
+        manuelle de contract_version côté addon."""
+        demande = self._demande_calcul_mensualites(type_tarif='base')
+
+        with (
+            self._patch_appeler_estimation(side_effect=fabrique_module.ContractVersionError('trop ancien')),
+            self.assertRaises(UserError),
+        ):
+            demande.action_estimer_provisions()
 
     # --- Éditabilité + recopie vers la Souscription ---
 

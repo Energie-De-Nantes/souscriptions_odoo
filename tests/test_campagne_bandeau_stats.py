@@ -139,16 +139,18 @@ class TestCampagneBandeauStats(SouscriptionsTestCase):
     # --- Étapes faites X/Y (AC #301, liste des campagnes enrichie) ---
 
     def test_etapes_faites_compte_x_sur_y(self):
-        # Campagne fraîche : « préparer les prélèvements » est déjà faite par
-        # construction — son « fait » est un signal dérivé (#186) et il n'y a
-        # encore aucune facture prélèvement due. Le compteur part donc de 1.
+        # Campagne fraîche : « préparer les prélèvements » (#186) et
+        # « envoyer les factures » (#314) sont déjà faites par construction —
+        # leur « fait » est un signal dérivé d'un backlog propre (pas
+        # cumulatif-amont) et il n'y a encore ni facture prélèvement due, ni
+        # facture postée non envoyée. Le compteur part donc de 2.
         total = len(self.campagne.etape_ids)
-        self.assertEqual(self.campagne.etapes_faites, f'1/{total}')
+        self.assertEqual(self.campagne.etapes_faites, f'2/{total}')
 
         self.campagne.etape_ids.filtered(lambda e: e.code == 'verif_periodes').write({'valide': True})
         self.campagne.invalidate_recordset()
 
-        self.assertEqual(self.campagne.etapes_faites, f'2/{total}')
+        self.assertEqual(self.campagne.etapes_faites, f'3/{total}')
 
     # --- 0 champ stocké (AC #301, esprit ADR 0025) ---
 

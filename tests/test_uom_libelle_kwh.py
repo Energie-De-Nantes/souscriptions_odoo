@@ -32,10 +32,14 @@ class TestUomLibelleKwh(TransactionCase):
 
     def test_jour_deja_correct_non_touche(self):
         """Non-régression : `uom.product_uom_day` n'est pas dans le champ
-        d'application de #307, il était déjà correct."""
+        d'application de #307, il était déjà correct. Sur une base CI
+        fraîche, fr_FR est activée sans chargement des .po : le libellé
+        fr_FR vaut « Days » (fallback en_US) ici, « Jours » en prod — on
+        vérifie seulement que notre data ne l'a pas écrasé en « kWh »."""
         self.env['res.lang']._activate_lang('fr_FR')
         jour = self.env.ref('uom.product_uom_day')
-        self.assertEqual(jour.with_context(lang='fr_FR').name, 'Jours')
+        self.assertEqual(jour.with_context(lang='en_US').name, 'Days')
+        self.assertIn(jour.with_context(lang='fr_FR').name, ('Jours', 'Days'))
 
     def test_replay_de_la_donnee_est_idempotent(self):
         """Simule un `-u` : rejouer `update_field_translations` avec les

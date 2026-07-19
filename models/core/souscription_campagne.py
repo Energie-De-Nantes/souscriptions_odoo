@@ -1689,10 +1689,17 @@ class SouscriptionCampagneEtape(models.Model):
                 with self.env.cr.savepoint():
                     self._traiter_une_unite(unite)
                 aucun_progres = False
+                cron._commit_progress(1)
             except UserError as exc:
                 unite.message_post(body=self._message_echec(exc))
-            finally:
-                cron._commit_progress(1)
+                # Commite l'échec SANS décrémenter `remaining` (#383) : un
+                # `finally: cron._commit_progress(1)` inconditionnel comptait
+                # aussi l'échec comme « traité » — `remaining` natif tombait
+                # à 0 dès qu'un lot mixte était tenté une fois, `ir.cron.
+                # _run_job` concluait FULLY_DONE et ne rappelait plus la
+                # vidange, empêchant la passe terminale (règle « pas de
+                # progrès » ci-dessous) de tourner dans le MÊME job.
+                cron._commit_progress()
 
         if aucun_progres:
             self.demande = False

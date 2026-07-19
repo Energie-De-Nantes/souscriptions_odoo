@@ -15,9 +15,10 @@ chargement du module, seul l'appel à `client()` échoue, avec un message
 actionnable.
 
 Chaque appelant garde son propre appel d'endpoint (`resoudre_rsc` en lot ↔
-`meta_periodes` en flux) et son propre mapping d'exceptions : cette fabrique
-s'arrête à « rends-moi un client configuré » (ADR 0024 §4, option écartée
-« fabrique de transport complète »).
+`meta_periodes` en flux) : cette fabrique s'arrête à « rends-moi un client
+configuré » (ADR 0024 §4, option écartée « fabrique de transport complète »).
+Seule la *traduction* du vocabulaire d'exceptions est partagée depuis #360
+(cf. plus bas) — pas l'appel d'endpoint lui-même.
 
 Ré-export des exceptions du contrat (#222, tranche 2 du PRD #219) : les
 quatre appelants (résolution RSC, pull méta-périodes, refacturation F15,

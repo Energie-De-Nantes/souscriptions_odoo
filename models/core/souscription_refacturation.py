@@ -1,12 +1,16 @@
 import logging
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError
 
-# Exceptions du mapping de ce module, ré-exportées par la fabrique unique
-# (ADR 0024, #222) : la construction du client (garde + drapeau + config) vit
-# dans la fabrique, seule la correspondance d'exceptions reste ici.
-from .electricore_client_fabrique import ContractVersionError, IngestionEnCours, PreconditionNonRemplie
+# Exceptions du mapping electricore : la traduction en UserError vit dans
+# `traduire_exceptions_electricore()` (#360). Les trois noms d'exception
+# restent importés : couture de test (`refacturation_module.ContractVersionError(...)`).
+from .electricore_client_fabrique import (  # noqa: F401
+    ContractVersionError,
+    IngestionEnCours,
+    PreconditionNonRemplie,
+    traduire_exceptions_electricore,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -123,14 +127,8 @@ class SouscriptionRefacturation(models.Model):
             (toast) et par tout appelant non-UI (automate d'amorçage, tests).
         """
         client = self.env['souscription.electricore.client'].client()
-        try:
+        with traduire_exceptions_electricore():
             lignes = self._tirer_prestations(client)
-        except IngestionEnCours:
-            raise UserError(_("L'ingestion electricore est en cours (verrou base) : réessayez plus tard."))
-        except PreconditionNonRemplie as exc:
-            raise UserError(_('Précondition non remplie côté electricore : %s', exc))
-        except ContractVersionError as exc:
-            raise UserError(_('Contrat electricore obsolète : %s', exc))
         return self._inserer_prestations(lignes)
 
     def synchroniser_depuis_electricore(self):

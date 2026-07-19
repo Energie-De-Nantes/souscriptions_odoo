@@ -4,8 +4,10 @@
 Le client electricore est acquis auprès de la fabrique unique
 `souscription.electricore.client` (ADR 0024) : ce module ne porte plus ni
 garde d'import, ni drapeau de disponibilité, ni lecture de config — seul son
-propre appel d'endpoint (`resoudre_rsc` en lot) et son mapping d'exception
-(`ContractVersionError`, ré-exportée par la fabrique — #222).
+propre appel d'endpoint (`resoudre_rsc` en lot). La traduction d'exception
+(`ContractVersionError` -> `UserError`) passe par
+`traduire_exceptions_electricore()` (#360), partagée avec les quatre autres
+sites — ce module ne porte plus son propre mapping.
 
 C'est l'unique point du module qui parle réseau pour la résolution RSC ; le
 pull des périodes (#12) s'y branchera plus tard.
@@ -14,9 +16,11 @@ pull des périodes (#12) s'y branchera plus tard.
 from __future__ import annotations
 
 from odoo import models
-from odoo.exceptions import UserError
 
-from .electricore_client_fabrique import ContractVersionError
+# `ContractVersionError` n'est plus attrapée ici (le mapping vit dans
+# `traduire_exceptions_electricore()`, #360) mais reste importée : couture de
+# test — `test_rsc_service.py` construit `service_module.ContractVersionError(...)`.
+from .electricore_client_fabrique import ContractVersionError, traduire_exceptions_electricore  # noqa: F401
 
 
 class SouscriptionRscService(models.AbstractModel):
@@ -44,10 +48,8 @@ class SouscriptionRscService(models.AbstractModel):
         ids = list(ids)
         if not ids:
             return {}
-        try:
+        with traduire_exceptions_electricore():
             resultats = self._appeler(ids)
-        except ContractVersionError as exc:
-            raise UserError(f'Contrat electricore obsolète : {exc}') from exc
         return {r.id_affaire: r for r in resultats}
 
     def _appeler(self, ids):

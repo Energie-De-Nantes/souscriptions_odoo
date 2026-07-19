@@ -45,9 +45,16 @@ from datetime import timedelta
 
 from dateutil.relativedelta import relativedelta
 from odoo import fields, models
-from odoo.exceptions import UserError
 
-from .electricore_client_fabrique import ContractVersionError, IngestionEnCours, PreconditionNonRemplie
+# Exceptions du mapping electricore : la traduction en UserError vit dans
+# `traduire_exceptions_electricore()` (#360). Les trois noms d'exception
+# restent importés : couture de test (`service_module.ContractVersionError(...)`).
+from .electricore_client_fabrique import (  # noqa: F401
+    ContractVersionError,
+    IngestionEnCours,
+    PreconditionNonRemplie,
+    traduire_exceptions_electricore,
+)
 
 # Verdicts electricore jugés fiables pour écraser le mesuré stocké (ADR 0030
 # décision 1) — les termes du glossaire electricore, accents compris
@@ -141,42 +148,38 @@ class SouscriptionPullMetaPeriodesService(models.AbstractModel):
         mois_str = fields.Date.to_string(mois_cle_requete)
         rsc_traitees = set()
 
-        try:
-            with self._ouvrir_flux(client, mois_str, list(par_rsc)) as stream:
-                for meta in stream:
-                    souscription = par_rsc.get(meta.ref_situation_contractuelle)
-                    if souscription is None:
-                        continue  # RSC hors du filtre demandé, ignorée silencieusement
-                    rsc_traitees.add(meta.ref_situation_contractuelle)
-                    try:
-                        # Savepoint par élément (skip-and-report, ADR 0011) :
-                        # un échec de mapping/contrainte sur une RSC ne doit
-                        # ni écrire de résultat partiel ni casser le curseur
-                        # pour les RSC suivantes du même lot.
-                        with self.env.cr.savepoint():
-                            self._appliquer_une(
-                                Periode,
-                                souscription,
-                                meta,
-                                creer_manquantes=creer_manquantes,
-                                creees=creees,
-                                rafraichies=rafraichies,
-                                inchangees=inchangees,
-                                conservees=conservees,
-                            )
-                    except Exception as exc:
-                        # Skip-and-report durable (#341, ADR 0036 décision
-                        # 8a) : l'erreur va au chatter de la souscription
-                        # fautive, au point d'échec, pour les deux chemins
-                        # (bouton manuel ET futur automate d'amorçage).
-                        souscription.message_post(body=f'Pull méta-périodes ({mois_str}) : échec — {exc}')
-                        erreurs.append(f'{souscription.name} ({mois_str}) : {exc}')
-        except IngestionEnCours:
-            raise UserError("L'ingestion electricore est en cours (verrou base) : réessayez plus tard.")
-        except PreconditionNonRemplie as exc:
-            raise UserError(f'Précondition non remplie côté electricore : {exc}')
-        except ContractVersionError as exc:
-            raise UserError(f'Contrat electricore obsolète : {exc}')
+        with (
+            traduire_exceptions_electricore(),
+            self._ouvrir_flux(client, mois_str, list(par_rsc)) as stream,
+        ):
+            for meta in stream:
+                souscription = par_rsc.get(meta.ref_situation_contractuelle)
+                if souscription is None:
+                    continue  # RSC hors du filtre demandé, ignorée silencieusement
+                rsc_traitees.add(meta.ref_situation_contractuelle)
+                try:
+                    # Savepoint par élément (skip-and-report, ADR 0011) :
+                    # un échec de mapping/contrainte sur une RSC ne doit
+                    # ni écrire de résultat partiel ni casser le curseur
+                    # pour les RSC suivantes du même lot.
+                    with self.env.cr.savepoint():
+                        self._appliquer_une(
+                            Periode,
+                            souscription,
+                            meta,
+                            creer_manquantes=creer_manquantes,
+                            creees=creees,
+                            rafraichies=rafraichies,
+                            inchangees=inchangees,
+                            conservees=conservees,
+                        )
+                except Exception as exc:
+                    # Skip-and-report durable (#341, ADR 0036 décision
+                    # 8a) : l'erreur va au chatter de la souscription
+                    # fautive, au point d'échec, pour les deux chemins
+                    # (bouton manuel ET futur automate d'amorçage).
+                    souscription.message_post(body=f'Pull méta-périodes ({mois_str}) : échec — {exc}')
+                    erreurs.append(f'{souscription.name} ({mois_str}) : {exc}')
 
         # Mois absent du flux (ADR 0030 décision 1) : une Période déjà
         # amorcée dont la RSC n'est pas revenue dans ce lot est conservée et
@@ -273,14 +276,8 @@ class SouscriptionPullMetaPeriodesService(models.AbstractModel):
         if not par_rsc:
             return ecrites, corrigees, inchangees, erreurs
 
-        try:
+        with traduire_exceptions_electricore():
             lignes = self._appeler_sorties(client, list(par_rsc))
-        except IngestionEnCours:
-            raise UserError("L'ingestion electricore est en cours (verrou base) : réessayez plus tard.")
-        except PreconditionNonRemplie as exc:
-            raise UserError(f'Précondition non remplie côté electricore : {exc}')
-        except ContractVersionError as exc:
-            raise UserError(f'Contrat electricore obsolète : {exc}')
 
         for ligne in lignes:
             souscription = par_rsc.get(ligne.ref_situation_contractuelle)

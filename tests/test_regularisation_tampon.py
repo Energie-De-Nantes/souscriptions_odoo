@@ -10,39 +10,17 @@ facture qui la porte.
 """
 
 from datetime import date
-from types import SimpleNamespace
 
 from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
-from .common import SouscriptionsTestCase, build_grille_lignes, client_flux_factice, patcher_client_fabrique
-
-
-def _meta_stub(**kwargs):
-    """Stub duck-typé minimal de `PeriodeMeta` (contrat v3), même idiome que
-    test_regularisation.py — simule un mesuré raffiné (nouvelle empreinte)
-    après le solde d'une première Régularisation (AC « re-régul »)."""
-    base = dict(
-        ref_situation_contractuelle='RSC-TAMPON',
-        debut='2024-01-01',
-        fin='2024-02-01',
-        mois_annee='2024-01',
-        puissance_moyenne_kva=6.0,
-        energie_base_kwh=0.0,
-        energie_hp_kwh=None,
-        energie_hc_kwh=None,
-        turpe_fixe_eur=0.0,
-        turpe_variable_eur=0.0,
-        cta_eur=0.0,
-        taux_accise_eur_mwh=0.0,
-        has_changement=False,
-        qualite='réelle',
-        statut_communication='communicante',
-        releves_utilises=[],
-        source_hash='H-TAMPON',
-    )
-    base.update(kwargs)
-    return SimpleNamespace(**base)
+from .common import (
+    SouscriptionsTestCase,
+    build_grille_lignes,
+    client_flux_factice,
+    patcher_client_fabrique,
+    periode_meta,
+)
 
 
 @tagged('souscriptions', 'souscriptions_regularisation', 'post_install', '-at_install')
@@ -267,7 +245,20 @@ class TestRegularisationTamponEmission(SouscriptionsTestCase):
 
         # Mesuré raffiné (nouvelle empreinte, exemption ciblée du verrou #235) :
         # l'écart renaît.
-        periode._rafraichir_depuis_meta(_meta_stub(source_hash='H-TAMPON-REFINE', energie_base_kwh=235.0))
+        periode._rafraichir_depuis_meta(
+            periode_meta(
+                ref_situation_contractuelle='RSC-TAMPON',
+                debut='2024-01-01',
+                fin='2024-02-01',
+                mois_annee='2024-01',
+                turpe_fixe_eur=0.0,
+                turpe_variable_eur=0.0,
+                cta_eur=0.0,
+                taux_accise_eur_mwh=0.0,
+                source_hash='H-TAMPON-REFINE',
+                energie_base_kwh=235.0,
+            )
+        )
         self.assertAlmostEqual(periode.ecart_base_kwh, 15.0, places=2)
 
         regularisation2 = self.env['souscription.regularisation'].create({'souscription_id': souscription.id})

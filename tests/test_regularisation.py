@@ -14,7 +14,6 @@ candidats.
 """
 
 from datetime import date
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from odoo.exceptions import UserError, ValidationError
@@ -28,34 +27,8 @@ from .common import (
     client_flux_factice,
     flux_electricore,
     patcher_client_fabrique,
+    periode_meta,
 )
-
-
-def _meta_stub(**kwargs):
-    """Stub duck-typé minimal de `PeriodeMeta` (contrat v3) — mêmes attributs
-    que le stub de test_pull_meta_periodes.py, dupliqué ici (petit, local)
-    pour ne pas coupler les deux suites de tests."""
-    base = dict(
-        ref_situation_contractuelle='RSC-REGUL-AC4',
-        debut='2024-02-01',
-        fin='2024-03-01',
-        mois_annee='2024-02',
-        puissance_moyenne_kva=6.0,
-        energie_base_kwh=230.0,
-        energie_hp_kwh=None,
-        energie_hc_kwh=None,
-        turpe_fixe_eur=0.0,
-        turpe_variable_eur=0.0,
-        cta_eur=0.0,
-        taux_accise_eur_mwh=0.0,
-        has_changement=False,
-        qualite='réelle',
-        statut_communication='communicante',
-        releves_utilises=[],
-        source_hash='H-FEB',
-    )
-    base.update(kwargs)
-    return SimpleNamespace(**base)
 
 
 @tagged('souscriptions', 'souscriptions_regularisation', 'post_install', '-at_install')
@@ -262,7 +235,22 @@ class TestRegularisationCandidats(SouscriptionsTestCase):
         # nouvelle empreinte -> rafraîchie).
         client.meta_periodes.side_effect = [
             flux_electricore([]),
-            flux_electricore([_meta_stub()]),
+            flux_electricore(
+                [
+                    periode_meta(
+                        ref_situation_contractuelle='RSC-REGUL-AC4',
+                        debut='2024-02-01',
+                        fin='2024-03-01',
+                        mois_annee='2024-02',
+                        energie_base_kwh=230.0,
+                        turpe_fixe_eur=0.0,
+                        turpe_variable_eur=0.0,
+                        cta_eur=0.0,
+                        taux_accise_eur_mwh=0.0,
+                        source_hash='H-FEB',
+                    )
+                ]
+            ),
         ]
 
         regularisation = self.env['souscription.regularisation'].create({'souscription_id': souscription.id})

@@ -12,7 +12,6 @@ Dates dans la couverture de la grille de prix fixture (2024, tests/common.py).
 import os
 import runpy
 from datetime import date
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from odoo.addons.souscriptions_odoo.models.core import souscription_refacturation as refacturation_module
@@ -26,34 +25,22 @@ from .common import (
     patcher_client_fabrique,
     patcher_transport,
 )
+from .common import periode_meta as _periode_meta_partage
 
 
 def _periode_meta(**kwargs):
-    """Stub duck-typé de `PeriodeMeta` (contrat v3) — cf. test_pull_meta_periodes.py."""
-    base = dict(
+    """Overrides locaux de campagne (RSC/PDL/mois de mars) par-dessus le stub
+    partagé (`periode_meta`, tests/common.py, #356)."""
+    overrides = dict(
         ref_situation_contractuelle='RSC-CAMPAGNE-BASE',
         pdl='14000000000099',
         mois_annee='2024-03',
         debut='2024-03-01',
         fin='2024-04-01',
-        nb_jours=31,
-        puissance_moyenne_kva=6.0,
-        formule_tarifaire_acheminement='CU4',
-        energie_base_kwh=280.0,
-        energie_hp_kwh=None,
-        energie_hc_kwh=None,
-        turpe_fixe_eur=8.5,
-        turpe_variable_eur=4.2,
-        cta_eur=1.1,
-        taux_accise_eur_mwh=21.0,
-        has_changement=False,
-        qualite='réelle',
-        statut_communication='communicante',
-        releves_utilises=[],
         source_hash='hash-campagne',
     )
-    base.update(kwargs)
-    return SimpleNamespace(**base)
+    overrides.update(kwargs)
+    return _periode_meta_partage(**overrides)
 
 
 @tagged('souscriptions', 'souscriptions_campagne', 'post_install', '-at_install')

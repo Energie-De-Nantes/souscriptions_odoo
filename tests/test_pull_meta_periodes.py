@@ -23,7 +23,6 @@ Fixtures RSC/PDL : identifiants factices (jamais des vrais échantillons).
 
 import unittest
 from datetime import date
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from odoo.addons.souscriptions_odoo.models.core import electricore_client_fabrique as fabrique_module
@@ -32,56 +31,8 @@ from odoo.exceptions import UserError
 from odoo.tests.common import tagged
 
 from .common import SouscriptionsTestCase, client_flux_factice, flux_electricore, patcher_client_fabrique
-
-
-def _objet_releve(**kwargs):
-    """Stub duck-typé d'`ObjetReleve` (contrat v3) : mêmes attributs, valeurs
-    par défaut à None pour les champs optionnels du contrat."""
-    base = dict(
-        releve_id='ELC-RELEVE-001',
-        date_releve='2024-01-31',
-        nature_index='reel',
-        origine_releve='flux_R151',
-        evenement=None,
-        index_base_kwh=None,
-        index_hp_kwh=None,
-        index_hc_kwh=None,
-        index_hph_kwh=None,
-        index_hch_kwh=None,
-        index_hpb_kwh=None,
-        index_hcb_kwh=None,
-    )
-    base.update(kwargs)
-    return SimpleNamespace(**base)
-
-
-def _periode_meta(**kwargs):
-    """Stub duck-typé de `PeriodeMeta` (contrat v3) : mêmes attributs que le
-    modèle pydantic réel, mêmes noms — le mapping ne fait aucune traduction."""
-    base = dict(
-        ref_situation_contractuelle='RSC-00000000000001',
-        pdl='14000000000001',
-        mois_annee='2024-01',
-        debut='2024-01-01',
-        fin='2024-02-01',
-        nb_jours=31,
-        puissance_moyenne_kva=6.0,
-        formule_tarifaire_acheminement='CU4',
-        energie_base_kwh=280.0,
-        energie_hp_kwh=None,
-        energie_hc_kwh=None,
-        turpe_fixe_eur=8.5,
-        turpe_variable_eur=4.2,
-        cta_eur=1.1,
-        taux_accise_eur_mwh=21.0,
-        has_changement=False,
-        qualite='réelle',
-        statut_communication='communicante',
-        releves_utilises=[],
-        source_hash='hash-abc123',
-    )
-    base.update(kwargs)
-    return SimpleNamespace(**base)
+from .common import objet_releve as _objet_releve
+from .common import periode_meta as _periode_meta
 
 
 @tagged('souscriptions', 'souscriptions_pull_meta', 'post_install', '-at_install')

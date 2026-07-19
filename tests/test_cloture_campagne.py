@@ -14,7 +14,6 @@ réel de la dernière mensuelle d'un lissé (`_tamponner_provision`).
 """
 
 from datetime import date
-from types import SimpleNamespace
 
 from odoo.tests.common import tagged
 
@@ -25,6 +24,7 @@ from .common import (
     client_sorties_factice,
     ligne_sortie,
     patcher_client_fabrique,
+    periode_meta,
 )
 
 
@@ -160,23 +160,15 @@ class TestPeriodeClotureAuReel(SouscriptionsTestCase):
 
         periode = self.env['souscription.periode']._amorcer_depuis_meta(
             souscription,
-            SimpleNamespace(
+            periode_meta(
                 ref_situation_contractuelle='RSC-CLOTURE-REEL-UNIT',
                 debut='2024-06-01',
                 fin='2024-06-12',
                 mois_annee='2024-06',
-                puissance_moyenne_kva=6.0,
                 energie_base_kwh=90.0,
-                energie_hp_kwh=None,
-                energie_hc_kwh=None,
                 turpe_fixe_eur=3.0,
                 turpe_variable_eur=1.2,
                 cta_eur=0.4,
-                taux_accise_eur_mwh=21.0,
-                has_changement=False,
-                qualite='réelle',
-                statut_communication='communicante',
-                releves_utilises=[],
                 source_hash='H-CLOTURE-REEL-UNIT',
             ),
         )
@@ -264,23 +256,15 @@ class TestRegulariserClotures(SouscriptionsTestCase):
 
         periode_juin = self.env['souscription.periode']._amorcer_depuis_meta(
             souscription,
-            SimpleNamespace(
+            periode_meta(
                 ref_situation_contractuelle='RSC-CLOTURE-REEL',
                 debut='2024-06-01',
                 fin='2024-06-12',
                 mois_annee='2024-06',
-                puissance_moyenne_kva=6.0,
                 energie_base_kwh=90.0,
-                energie_hp_kwh=None,
-                energie_hc_kwh=None,
                 turpe_fixe_eur=3.0,
                 turpe_variable_eur=1.2,
                 cta_eur=0.4,
-                taux_accise_eur_mwh=21.0,
-                has_changement=False,
-                qualite='réelle',
-                statut_communication='communicante',
-                releves_utilises=[],
                 source_hash='H-CLOTURE-REEL-JUIN',
             ),
         )
@@ -345,19 +329,13 @@ class TestRegulariserClotures(SouscriptionsTestCase):
         # electricore raffine ensuite le mesuré (nouvelle empreinte) : la
         # vraie conso des 11 jours, plus faible que le mois plein provisionné.
         periode_juin._rafraichir_depuis_meta(
-            SimpleNamespace(
+            periode_meta(
                 source_hash='H-JUIN-REEL-TRONQUE',
                 energie_base_kwh=80.0,
-                energie_hp_kwh=None,
-                energie_hc_kwh=None,
-                puissance_moyenne_kva=6.0,
                 turpe_fixe_eur=0.0,
                 turpe_variable_eur=0.0,
                 cta_eur=0.0,
                 taux_accise_eur_mwh=0.0,
-                has_changement=False,
-                qualite='réelle',
-                statut_communication='communicante',
             )
         )
         self.assertAlmostEqual(periode_juin.ecart_base_kwh, -120.0, places=2)
@@ -386,25 +364,15 @@ class TestRegulariserClotures(SouscriptionsTestCase):
 
         # Même si electricore renverrait encore une méta-période de juillet
         # pour cette RSC, le périmètre — pas le flux — est la garde.
-        meta_juillet = SimpleNamespace(
+        meta_juillet = periode_meta(
             ref_situation_contractuelle='RSC-CLOTURE-APRES',
             pdl='PDL_CLOTURE_APRES',
             mois_annee='2024-07',
             debut='2024-07-01',
             fin='2024-08-01',
-            nb_jours=31,
-            puissance_moyenne_kva=6.0,
             energie_base_kwh=200.0,
-            energie_hp_kwh=None,
-            energie_hc_kwh=None,
-            turpe_fixe_eur=8.5,
             turpe_variable_eur=3.0,
             cta_eur=1.0,
-            taux_accise_eur_mwh=21.0,
-            has_changement=False,
-            qualite='réelle',
-            statut_communication='communicante',
-            releves_utilises=[],
             source_hash='H-JUILLET-JAMAIS',
         )
         with patcher_client_fabrique(client_flux_factice('meta_periodes', [meta_juillet])):

@@ -37,9 +37,6 @@ services:
     volumes:
       - odoo-web-data:/var/lib/odoo
       - ../:/mnt/extra-addons/souscriptions_odoo:rw
-      # Masque .claude (worktrees d'agents) : leurs checkouts déclenchaient
-      # l'autoreload --dev et coupaient les connexions en vol.
-      - /mnt/extra-addons/souscriptions_odoo/.claude
     command: >
       odoo
       --db_host=db

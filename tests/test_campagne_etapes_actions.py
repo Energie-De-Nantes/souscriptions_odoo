@@ -30,8 +30,7 @@ from .common import periode_meta as _periode_meta_partage
 
 def _periode_meta(**kwargs):
     """Overrides locaux de campagne (RSC/PDL/mois de mars) par-dessus le stub
-    partagé (`periode_meta`, tests/common.py, #356) — cf.
-    test_pull_meta_periodes.py."""
+    partagé (`periode_meta`, tests/common.py, #356)."""
     overrides = dict(
         ref_situation_contractuelle='RSC-CAMPAGNE-BASE',
         pdl='14000000000099',

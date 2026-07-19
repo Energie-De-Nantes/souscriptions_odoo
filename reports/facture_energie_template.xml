@@ -148,7 +148,10 @@
                                 <td><span t-field="line.name" t-options="{'widget': 'text'}"/></td>
                                 <td class="num">
                                     <span t-field="line.quantity"/>
-                                    <span t-field="line.product_uom_id" groups="uom.group_uom"/>
+                                    <!-- pas de groups="uom.group_uom" (idiome core) : sur une
+                                         facture d'énergie l'unité est une mention obligatoire,
+                                         pas une préférence backoffice (#307) -->
+                                    <span t-field="line.product_uom_id"/>
                                 </td>
                                 <td class="num" t-out="'%.4f' % line.price_unit"/>
                                 <td t-if="display_discount" class="num"><span t-field="line.discount"/></td>

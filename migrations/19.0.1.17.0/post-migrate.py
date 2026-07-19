@@ -20,6 +20,10 @@ SQL direct (comme 19.0.1.14.0/19.0.1.16.0/post-migrate.py) : `type_etape` est
 posé à la valeur que `_compute_type_etape` calculerait de toute façon pour ce
 code ('porte', cf. ETAPES_CAMPAGNE) — un backfill SQL brut d'un champ stocké
 compute n'est jamais recalculé tout seul par un simple accès ORM ultérieur.
+Même motif pour `phase` (#342, ADR 0036 décision 14, champ ajouté après ce
+script mais rejoué par tout `-u` multi-versions partant d'une base plus
+ancienne) : 'facturer', la valeur que `_compute_phase` calculerait pour
+`gestes_commerciaux`.
 `valide` + le drapeau de lancement à FALSE (porte non validée, jamais
 lancée) : l'état de départ normal d'une porte fraîchement seedée. Idempotent :
 n'insère que pour les campagnes qui n'ont pas encore la ligne.
@@ -44,9 +48,9 @@ def migrate(cr, version):
     cr.execute(
         f"""
         INSERT INTO souscription_campagne_etape
-            (campagne_id, code, sequence, type_etape, valide, {colonne_lancement},
+            (campagne_id, code, sequence, type_etape, phase, valide, {colonne_lancement},
              create_uid, write_uid, create_date, write_date)
-        SELECT c.id, 'gestes_commerciaux', 65, 'porte', FALSE, FALSE, 1, 1, NOW(), NOW()
+        SELECT c.id, 'gestes_commerciaux', 65, 'porte', 'facturer', FALSE, FALSE, 1, 1, NOW(), NOW()
         FROM souscription_campagne_facturation c
         WHERE NOT EXISTS (
             SELECT 1 FROM souscription_campagne_etape e

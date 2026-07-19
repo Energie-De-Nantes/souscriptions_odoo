@@ -28,3 +28,14 @@ Complète l'[ADR-0003](0003-strategie-migration-odoo19-odoo-sh.md) (stratégie d
 ## Raison
 
 On minimise les actes dans le système mourant (aucune facturation nouvelle pilotée par le legacy, aucune régul xlsx supplémentaire) et on donne au nouveau système exactement les entrées dont sa machinerie normale a besoin pour solder le passé **correctement** — plutôt que de perpétuer un calcul faux pour fabriquer une couture « propre » en apparence.
+
+## Amendement (PRD #207, #208) — backfill ciblé → historique complet, réouverture prévue par la décision 3 elle-même
+
+La décision 3 qualifiait déjà le backfill ciblé de **réversible** (« electricore garde tout, un backfill ultérieur reste possible ») : ce n'était pas une porte fermée, seulement une portée volontairement restreinte au load initial (mois non régularisés des contrats lissés, faute de temps et de besoin confirmé). Le PRD #207 (« gestion du passé ») rouvre cette portée : au-delà du chargement initial, le module a besoin de reconstruire/consulter davantage d'historique pré-bascule (portail, analytique) sans perpétuer le split legacy/nouveau système à chaque écran.
+
+**Ce que #208 pose comme socle**, en s'appuyant sur la décision 2 (*settled is settled*) sans rouvrir 1/4/5 ci-dessus (reprise à 100 %, régularisation enjambante, consentements vides) :
+
+- **État « régularisée » sur la Période** (`souscription.periode.legacy_regularisee`) : déjà introduit par la décision 4 côté modèle et par ADR 0031 décision 4 (second auteur, clôture) — ce champ **devient** aussi le marqueur posé par le backfill ciblé de la décision 3 elle-même, pour tout mois couvert par une facture de régul prod. *Settled is settled* (§2) est ainsi une propriété des **données**, pas seulement une règle d'ETL au moment du load : toute sélection de travail de la Régularisation (#20) exclut les Périodes régularisées, migration comme clôture confondues, sans code spécifique par origine.
+- **`origine_legacy` sur `account.move`** : un booléen d'affichage, filtrable en liste, qui distingue une facture pré-module (ETL) d'une facture native — la clé **technique** de rattachement reste l'external id `__migration__` (inchangé, décision non révisée ici) ; ce booléen n'en est qu'une projection lisible pour le·la facturiste, jamais une seconde source de vérité.
+
+Le reste de la réouverture (quelle profondeur d'historique reconstruire, quels écrans la consomment) est instruit issue par issue sous le PRD #207, chacune pouvant amender cette même section si elle déplace une décision ci-dessus.

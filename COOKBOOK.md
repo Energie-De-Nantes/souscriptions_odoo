@@ -70,10 +70,3 @@ when: a change to docs/educpopage/, mkdocs.yml, or the cozy stylesheets — see 
 do: `uv sync --group docs && uv run --group docs mkdocs serve`
 look: http://127.0.0.1:8000/ — navigate to the changed page
 expect: style « Warm Cosy » identique à la doc electricore (papier crème, bandeau sombre, police Excalifont) ; la nav et la page reflètent ton changement
-
-## pages-activation
-mode: human
-when: once, after the merge of the docs infra PR (#392) — then delete this recipe
-do: open https://github.com/Energie-De-Nantes/souscriptions_odoo/settings/pages → Build and deployment → Source: « GitHub Actions », then wait for the docs run on main
-look: https://energie-de-nantes.github.io/souscriptions_odoo/
-expect: the educpopage site is live; without this step the `deploy` job fails on the first push to main

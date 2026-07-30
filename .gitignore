@@ -67,3 +67,6 @@ docs/diagrams/*.png
 
 # Snapshot éphémère du skill story-map (jamais commité)
 FEATURES.report.html
+
+# Site educpopage construit (mkdocs build) — publié par CI, jamais commité
+site/

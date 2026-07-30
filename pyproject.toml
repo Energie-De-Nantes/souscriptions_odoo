@@ -16,6 +16,10 @@ dev = [
     "ruff>=0.15.0,<0.16",   # lint + format ; config dans [tool.ruff] ci-dessous
     "pre-commit>=4.0.0,<5", # `pre-commit install` pour activer les hooks locaux
 ]
+# Site educpopage (docs/educpopage/, mkdocs.yml) — voir .github/workflows/docs.yml
+docs = [
+    "mkdocs-material>=9,<10",
+]
 
 [tool.uv]
 # Projet « virtuel » : uv gère seulement les dépendances et l'environnement, il

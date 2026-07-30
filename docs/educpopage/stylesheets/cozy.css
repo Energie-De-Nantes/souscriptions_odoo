@@ -1,0 +1,69 @@
+/* Palette « Warm Cosy » — copiée telle quelle de la doc electricore
+   (docs/stylesheets/cozy.css), où elle est dérivée de ses schémas Excalidraw :
+   papier #faf4ed, encre titres/annotations #464261. Copie, pas dépendance :
+   ce fichier est la source de vérité ici. Les schémas de ce dépôt
+   (docs/**/*.excalidraw) sont encore sur #f7f2e9 — à exporter sur #faf4ed
+   (tranche 2, #391) pour qu'ils se fondent dans la page sans liseré. */
+
+@font-face {
+  /* Excalifont = fontFamily 5 des schémas Excalidraw. Subset Latin (couvre le
+     français, œ et € inclus). SIL OFL 1.1, voir fonts/OFL-Excalifont.txt. */
+  font-family: "Excalifont";
+  src: url("fonts/Excalifont-Regular.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Le body porte data-md-color-scheme="default" et Material y redéclare ces
+   variables : cibler :root seul ne suffit pas (la déclaration sur le body
+   masquerait les nôtres). Même sélecteur que le thème + chargé après = gagnant. */
+:root,
+[data-md-color-scheme="default"] {
+  /* papier & encre */
+  --md-default-bg-color: #faf4ed;
+  --md-default-fg-color: #292524;
+  --md-default-fg-color--light: #575042;
+  --md-default-fg-color--lighter: #7a705c;
+  --md-default-fg-color--lightest: #d6d2cd;
+
+  /* bandeau d'entête = rôle « dark » des schémas (boîtes code) */
+  --md-primary-fg-color: #292524;
+  --md-primary-fg-color--light: #575042;
+  --md-primary-fg-color--dark: #1c1917;
+  --md-primary-bg-color: #faf4ed;
+  --md-primary-bg-color--light: rgba(250, 244, 237, 0.7);
+
+  /* accent (survol des liens, focus, boutons) = orange B alerte/frontière */
+  --md-accent-fg-color: #c2410c;
+  --md-accent-fg-color--transparent: rgba(194, 65, 12, 0.1);
+
+  /* liens = vert A données */
+  --md-typeset-a-color: #15803d;
+
+  /* code : papier assombri, encre inchangée */
+  --md-code-bg-color: #f0e8dd;
+  --md-code-fg-color: #292524;
+
+  --md-footer-bg-color: #292524;
+  --md-footer-bg-color--dark: #1c1917;
+}
+
+/* Hand-drawn sur les titres et le nom du site ; le corps de texte reste en
+   fonte système pour la lisibilité (h5/h6 aussi : trop petits pour Excalifont). */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+.md-header__topic {
+  font-family: "Excalifont", var(--md-text-font-family, sans-serif);
+}
+
+/* Titres à l'encre violette des schémas (Material grise h1 via
+   --md-default-fg-color--light, d'où le color explicite ici). */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4 {
+  color: #464261;
+}

@@ -56,3 +56,24 @@ look: prompt with `env`/`self` bound; pick the db that actually holds your recor
   # gotcha: souscriptions_demo carries only the F15-DEMO-* demo rows; real synced data lives in souscriptions_prodlocal
   # gotcha: a stale schema (e.g. `column … does not exist`) means the module wasn't upgraded on that db — re-run bring-up with --reset, or `-u souscriptions_odoo`
 expect: your ORM code runs; after `env.cr.commit()` the change persists
+
+## docs-site-build
+mode: afk
+when: a change to docs/educpopage/, mkdocs.yml, or the cozy stylesheets — verify the site still builds
+do: `uv sync --group docs && uv run --group docs mkdocs build --strict`
+observe: exit code — strict turns any warning (dead internal link, page missing from nav) into a failure
+covered-by: ci-pr — job « build (mkdocs --strict) » in .github/workflows/docs.yml
+
+## docs-site-render
+mode: human
+when: a change to docs/educpopage/, mkdocs.yml, or the cozy stylesheets — see the rendering with your own eyes
+do: `uv sync --group docs && uv run --group docs mkdocs serve`
+look: http://127.0.0.1:8000/ — navigate to the changed page
+expect: style « Warm Cosy » identique à la doc electricore (papier crème, bandeau sombre, police Excalifont) ; la nav et la page reflètent ton changement
+
+## pages-activation
+mode: human
+when: once, after the merge of the docs infra PR (#392) — then delete this recipe
+do: open https://github.com/Energie-De-Nantes/souscriptions_odoo/settings/pages → Build and deployment → Source: « GitHub Actions », then wait for the docs run on main
+look: https://energie-de-nantes.github.io/souscriptions_odoo/
+expect: the educpopage site is live; without this step the `deploy` job fails on the first push to main

@@ -1,4 +1,7 @@
-FROM odoo:19.0
+# Épinglé par digest (#393) : le tag 19.0 est un nightly mouvant, et celui du
+# 30/07/2026 casse l'init de la base (ValidationError du module account core).
+# Digest = image du 02/07/2026, dernière vérifiée bonne. Dé-épinglage : #394.
+FROM odoo:19.0@sha256:f54272f31d5f77e4146b887efb3761c98480317daf687e4b4b5e76ed8bcc08c5
 
 USER root
 

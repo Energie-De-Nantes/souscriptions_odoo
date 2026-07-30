@@ -1,8 +1,9 @@
-/* Palette « Warm Cosy » — la même que les schémas Excalidraw du repo.
-   Source de vérité : les docs/**/*.excalidraw livrés (viewBackgroundColor
-   #faf4ed, encre titres/annotations #464261), pas scripts/cozy_palettes.json
-   (palette de travail, teintes antérieures). Papier identique = les PNG des
-   schémas se fondent dans la page sans liseré. */
+/* Palette « Warm Cosy » — copiée telle quelle de la doc electricore
+   (docs/stylesheets/cozy.css), où elle est dérivée de ses schémas Excalidraw :
+   papier #faf4ed, encre titres/annotations #464261. Copie, pas dépendance :
+   ce fichier est la source de vérité ici. Les schémas de ce dépôt
+   (docs/**/*.excalidraw) sont encore sur #f7f2e9 — à exporter sur #faf4ed
+   (tranche 2, #391) pour qu'ils se fondent dans la page sans liseré. */
 
 @font-face {
   /* Excalifont = fontFamily 5 des schémas Excalidraw. Subset Latin (couvre le

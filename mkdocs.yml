@@ -18,6 +18,13 @@ extra_css:
 plugins:
   - search
 
+markdown_extensions:
+  # Encarts « À valider avec vous » (admonitions Material) + ancres de titres
+  # pour partager un lien vers un étage précis d'une page.
+  - admonition
+  - toc:
+      permalink: true
+
 # validation.links n'a pas de niveau `error` dans cette version de MkDocs (seulement
 # warn/info/ignore) : `warn` est le niveau le plus strict disponible, et c'est bien
 # `mkdocs build --strict` (garde-fou CI) qui transforme un warning en échec — un lien
@@ -32,15 +39,20 @@ validation:
 
 exclude_docs: "*.excalidraw"
 
+# Sommaire ajusté par la passe story-map (#391) : « Facturer le mois » scindé en
+# pilotage de campagne / contenu de la facture (26 capacités, deux gestes distincts),
+# libellés portail/consentement alignés sur CONTEXT.md, lexique ajouté.
 nav:
   - Accueil: index.md
   - Vue d'ensemble: resume.md
   - Le contrat de fourniture: contrat.md
   - Les prix: prix.md
-  - Facturer le mois: facturer.md
+  - Piloter la campagne du mois: facturer.md
+  - La facture d'énergie: facture.md
   - Régulariser: regulariser.md
   - Encaisser: encaisser.md
   - Le raccordement: raccordement.md
-  - Le portail client: portail.md
+  - Le portail usager·ère: portail.md
   - Les mails: mails.md
-  - Le consentement données conso: consentement.md
+  - Le consentement (données de consommation): consentement.md
+  - Petit lexique: lexique.md

@@ -21,8 +21,10 @@ technique :
    volontairement interdit.
 4. **Sous le capot** — le mécanisme réel, pour qui veut aller plus loin.
 
-## Les 9 gestes métier
+## Les 10 gestes métier
 
-La nav à gauche liste les 9 gestes couverts : le contrat, les prix, la
-facturation du mois, la régularisation, l'encaissement, le raccordement, le
-portail client, les mails et le consentement des données de conso.
+La nav à gauche compte 12 entrées de contenu : une vue d'ensemble, les
+10 gestes couverts — le contrat, les prix, le pilotage de la campagne du
+mois, la facture d'énergie, la régularisation, l'encaissement, le
+raccordement, le portail usager·ère, les mails et le consentement (données
+de consommation) — et un petit lexique.

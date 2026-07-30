@@ -48,7 +48,7 @@ C'est **le même document partout** : impression depuis la facture, pièce joint
 
 **Le mois civil, au prorata des jours.** Tout le monde est facturé au mois calendaire — jamais de « mois anniversaire » propre à chaque contrat. Un contrat qui entre ou sort en cours de mois a une période raccourcie : l'abonnement se facture **en jours** (le nombre de jours réels de la période × un prix par jour), l'énergie **en kWh**. Les unités apparaissent telles quelles sur les lignes.
 
-**L'abonnement se prixe sur la puissance moyenne.** Le tarif d'abonnement dépend de la puissance ; quand la puissance change en cours de mois, on facture sur la **moyenne pondérée** mesurée du mois — mathématiquement équivalent à découper le mois, sans le découper. Le libellé de la ligne affiche cette puissance facturée. Si la moyenne est inconnue (période saisie à la main), on se replie sur la puissance souscrite du contrat.
+**L'abonnement se tarife sur la puissance moyenne.** Le tarif d'abonnement dépend de la puissance ; quand la puissance change en cours de mois, on facture sur la **moyenne pondérée** mesurée du mois — mathématiquement équivalent à découper le mois, sans le découper. Le libellé de la ligne affiche cette puissance facturée. Si la moyenne est inconnue (période saisie à la main), on se replie sur la puissance souscrite du contrat.
 
 **Le réel au réel, la provision au mensualisé.** Un contrat au réel est facturé de sa consommation mesurée. Un contrat mensualisé est facturé chaque mois de sa mensualité prévue, jamais du mesuré du mois ; l'écart s'accumule et attend la [régularisation](regulariser.md).
 

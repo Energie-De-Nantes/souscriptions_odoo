@@ -58,7 +58,7 @@ rassurage part vers le·la souscripteur·rice (voir [mails](mails.md)).
 Ensuite, plus personne ne va vérifier l'affaire sur le portail d'Enedis : un automate
 interroge **chaque jour** l'état des affaires en cours. Quand Enedis confirme la mise en
 service (la RSC, l'identifiant définitif du contrat, est acquise), la carte avance seule
-en **🔴 Validé sur SGE**. Impatient·e ? Le bouton **Résoudre la RSC maintenant**, sur la
+en **🔴 Validé sur SGE** (SGE : le guichet Enedis des fournisseurs). Impatient·e ? Le bouton **Résoudre la RSC maintenant**, sur la
 fiche de la Souscription, interroge sans attendre le lendemain.
 
 ### Finir : mensualités et bienvenue

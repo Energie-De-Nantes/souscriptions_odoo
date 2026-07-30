@@ -49,7 +49,7 @@ Deux champs hérités de l'ancien système se croisent tous les jours :
 Un contrat ne se crée pas à la main : il naît du parcours de raccordement (voir [raccordement](raccordement.md)),
 en état « en instance ». À ce stade il lui manque sa RSC — la référence contractuelle Enedis qui le
 rend facturable. Chaque nuit, un automate interroge Enedis et fait avancer tout seul les contrats
-qui ont obtenu leur RSC : plus besoin d'aller vérifier sur le portail SGE. Pour ne pas attendre la
+qui ont obtenu leur RSC : plus besoin d'aller vérifier sur le portail SGE (le guichet Enedis des fournisseurs). Pour ne pas attendre la
 nuit, le bouton **Résoudre la RSC maintenant** (visible sur une fiche en instance) force la
 recherche tout de suite. L'onglet **Électricore** montre cette identité Enedis — RSC et n° d'affaire
 — et permet de corriger une faute de frappe sur le n° d'affaire.

@@ -12,7 +12,7 @@ passé retrouve toujours les prix de l'époque, jamais ceux d'aujourd'hui.
 
 ### Où vivent les grilles
 
-Menu **Souscriptions → Grilles de Prix** (réservé au groupe Facturiste-manager).
+Menu **Souscriptions → Grilles de Prix** (réservé au rôle gestionnaire — affiché « Souscriptions / Gestionnaire » dans Odoo).
 Chaque carte est un barème valable **à partir d'un 1er du mois**. La date de fin ne
 se saisit jamais : elle se déduit toute seule du début de la grille suivante du même
 régime. Une grille sans successeur est simplement « encore ouverte » — rien à fermer

@@ -6,7 +6,7 @@ moment on en a besoin — de quoi choisir sa porte d'entrée sans lire tout le
 sommaire. Les mots du métier, eux, sont définis dans [lexique](lexique.md).
 
 Par où commencer ? Pour une prise en main, trois pages suffisent : le contrat
-(contrat.md) pour comprendre la fiche centrale, la campagne ([facturer.md](facturer.md)) pour
+([contrat.md](contrat.md)) pour comprendre la fiche centrale, la campagne ([facturer.md](facturer.md)) pour
 le rythme mensuel, et la facture ([facture.md](facture.md)) pour savoir d'où viennent les
 chiffres. Le reste se lit quand le besoin se présente — chaque page renvoie
 vers ses voisines au bon moment.
@@ -108,7 +108,7 @@ dans un journal où rien ne s'efface : c'est lui, la preuve.
       Périodes, la Campagne de facturation (menu « Cycle de facturation »),
       les Régularisations, les Règlements en attente, les Chèques énergie et
       le tableau des raccordements.
-    - Le rôle **Facturiste-manager** voit en plus les menus de réglage :
+    - Le rôle **gestionnaire** (« Souscriptions / Gestionnaire » dans Odoo) voit en plus les menus de réglage :
       **Grilles de Prix**, **Configuration des mails** et les **Étapes de
       raccordement** (la configuration du tableau d'accueil).
     - Le menu **Paramètres** (le réglage du journal d'encaissement de la

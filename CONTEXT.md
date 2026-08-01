@@ -376,6 +376,26 @@ _Éviter_ : confondre avec `config_cadrans` (la copie Odoo, déclarative, snapsh
 *Configuration fournisseur* — pas la famille propre à un relevé) ; croire l'inférence purement
 morte (elle reste le repli, #138).
 
+**Segment (Enedis)** :
+La classe de facturation **réseau** d'un PDL chez Enedis — liste vivante côté fourniture :
+**C5** (BT ≤ 36 kVA, contrat unique — le parc de masse), **C4** (BT > 36 kVA, contrat
+unique), **C2** (HTA, contrat unique, courbe mesurée) ; **C1** = tout point en **CARD**
+(défini par le contrat, pas la tension — le client paie l'acheminement à Enedis, le
+fournisseur ne facture que l'énergie) ; C3 (HTA profilé) **obsolète depuis 01/2023**
+(cf. `docs/segments-enedis.md`, sourcé). **Fait réseau**, porté nativement par le C15
+(`Segment_Clientele`) : propriété de la *Configuration Enedis*, jamais un choix
+commercial — personne ne « choisit » C4, le réseau le constate. Chaque segment se
+facture **différemment** (structure TURPE, calculs — C4 : dépassements de puissance ; HTA :
+composantes supplémentaires) : c'est l'axe qui sépare les processus de facturation fournisseur.
+La ligne de partage : la **production des factures** (tirer, vérifier, facturer) est **par
+segment** ; les **règlements et la comptabilité** (modes de paiement, encaissement, batch SEPA)
+sont **parc-entier**, jamais segmentés. Côté Odoo : snapshot à la main sur la *Souscription*
+(défaut C5), même statut que `config_cadrans` (ADR 0005) — electricore source autoritative à
+terme.
+_Éviter_ : le confondre avec la *puissance souscrite* fournisseur (le segment suit la FTA
+réseau, pas le champ commercial) ; « type de client » (un PRO peut être C5) ; en faire une
+donnée éditable du processus commercial (fait réseau, se corrige comme un fait).
+
 **Configuration fournisseur** :
 La configuration *commerciale* portée par la *Souscription* : formule tarifaire fournisseur
 (cadrans **facturés** : Base, ou HP/HC), lissage, provisions, mode de paiement. **Orthogonale

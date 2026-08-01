@@ -2,7 +2,7 @@
 
 ## En deux mots
 
-Chaque personne fournie en électricité par la coopérative a une fiche de contrat : la Souscription.
+Chaque personne fournie en électricité par le commun a une fiche de contrat : la Souscription.
 Elle dit qui est fourni, où, à quel tarif, depuis quand — et tout le reste du logiciel s'appuie
 dessus pour facturer. Son état (en instance, en service, en attente de clôture, résiliée) se lit
 mais ne se choisit jamais : il se déduit de faits vérifiables. Cette page explique comment lire une

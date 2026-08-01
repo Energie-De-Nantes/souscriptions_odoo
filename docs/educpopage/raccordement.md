@@ -2,7 +2,7 @@
 
 ## En deux mots
 
-Quand une personne demande à être fournie en électricité par la coopérative, sa demande
+Quand une personne demande à être fournie en électricité par le commun, sa demande
 entre dans un tableau de suivi, colonne par colonne, de l'accueil jusqu'à la mise en
 service. L'équipe vérifie le dossier et accepte la demande ; à partir de là, le contrat
 existe et les cartes avancent toutes seules au rythme des confirmations du gestionnaire

@@ -71,17 +71,17 @@ ne se modifie pas, il s'enrichit. Pour enregistrer un changement d'avis, on
 
 ### La chaîne de responsabilité : qui répond de quoi
 
-Pourquoi tant de rigueur ? Parce que c'est la coopérative qui **déclare au
+Pourquoi tant de rigueur ? Parce que c'est le commun qui **déclare au
 gestionnaire du réseau (Enedis)** détenir le consentement de la personne
 avant de collecter ses données fines. Le jour où la CNIL — l'autorité de
-contrôle des données personnelles — demande la preuve, c'est la coopérative
+contrôle des données personnelles — demande la preuve, c'est le commun
 qui doit la produire. Le Journal des actes est cette preuve.
 
 ![La chaîne de responsabilité](diagrammes/consentement-chaine-responsabilite.png)
 
-En clair : le·la souscripteur·rice donne (ou retire) son accord ; la
-coopérative l'enregistre dans le journal et le déclare à Enedis ; Enedis
-transmet les données ; la CNIL peut demander des comptes à la coopérative,
+En clair : le·la souscripteur·rice donne (ou retire) son accord ; le
+commun l'enregistre dans le journal et le déclare à Enedis ; Enedis
+transmet les données ; la CNIL peut demander des comptes au commun,
 et à personne d'autre. Chaque maillon a son rôle, et la preuve vit chez nous.
 
 !!! question "🤖 À valider avec vous"

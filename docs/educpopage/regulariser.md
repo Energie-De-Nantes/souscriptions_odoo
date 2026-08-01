@@ -54,7 +54,7 @@ brouillon, relisible comme toute facture (voir [facture](facture.md)), que l'ém
 
 ### La sortie d'un·e usager·ère
 
-Quand quelqu'un·e quitte la coopérative, la chaîne se déroule d'un bout à l'autre de la
+Quand quelqu'un·e quitte le commun, la chaîne se déroule d'un bout à l'autre de la
 Campagne de facturation, sans saisie manuelle :
 
 1. **« Pull sorties C15 »** (fiche Campagne, phase Tirer) : les sorties signalées par le

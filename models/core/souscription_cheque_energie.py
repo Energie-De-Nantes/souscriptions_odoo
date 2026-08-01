@@ -161,6 +161,9 @@ class SouscriptionChequeEnergie(models.Model):
             )
             payment.action_post()
             cheque.write({'payment_id': payment.id, 'state': 'valide'})
+        # None n'est pas marshallable en XML-RPC (Odoo 19, allow_none=False) —
+        # la migration appelle ce gate via execute_kw.
+        return True
 
     @api.model
     def _setup_compta(self):
